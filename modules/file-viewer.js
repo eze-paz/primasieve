@@ -278,7 +278,27 @@
       // The iframe doc is a foreign document: theme vars don't resolve there, so
       // take the resolved accent color from the app root and inject the literal.
       const accent = (getComputedStyle(document.documentElement).getPropertyValue('--sp-accent') || '').trim() || '#2f81f7';
-      const SCALE = 2;   // fixed 2x render for crisp crops
+      // Pick-mode doc mods: force the crosshair EVERYWHERE (element rules like
+      // button { cursor: pointer } were winning over the body-level crosshair) and
+      // neutralize :hover rules so hidden-on-hover content does not jump out.
+      const pickStyle = doc.createElement('style');
+      pickStyle.textContent = '*, *::before, *::after { cursor: crosshair !important; user-select: none !important; }';
+      (doc.head || doc.documentElement).appendChild(pickStyle);
+      const hoverSaved = [];
+      try {
+        const walk = (list) => {
+          for (const r of list) {
+            try {
+              if (r.selectorText && r.selectorText.indexOf(':hover') !== -1) {
+                hoverSaved.push([r, r.selectorText]);
+                r.selectorText = r.selectorText.replace(/[^,]*:hover[^,]*/g, '.sp-pick-none');
+              }
+              if (r.cssRules && r.cssRules.length) walk(r.cssRules);
+            } catch (_) {}
+          }
+        };
+        for (const sheet of doc.styleSheets) { try { walk(sheet.cssRules); } catch (_) {} }
+      } catch (_) {}
       let last = null, saved = null;
       const clearHl = () => { if (last && saved) { last.style.outline = saved[0]; last.style.outlineOffset = saved[1]; } last = null; saved = null; };
       const onMove = (e) => {
@@ -287,68 +307,68 @@
         if (t !== last) { clearHl(); last = t; saved = [t.style.outline, t.style.outlineOffset]; t.style.outline = '2px solid ' + accent; t.style.outlineOffset = '-2px'; }
       };
       const onLeave = () => clearHl();
-      // Rasterize ONE element to a JPEG data URL. Same technique as
-      // SandpieScreenshot for whole artifacts, but instead of re-serializing
-      // just the node (its outerHTML breaks as XML when the subtree contains
-      // HTML entities like &nbsp;), we clone the WHOLE document — exactly what
-      // the proven whole-artifact capture does — serialize it with
-      // XMLSerializer (namespace-aware, entity-safe), and CROP to the element
-      // via relative offsets on the canvas.
-      // Known limitation, same as the full-artifact capture: sub-resources
-      // (external <img>, fonts) cannot be fetched inside an SVG-in-<img>
-      // rasterization context, so they come out blank.
+      // Rasterize ONE element to a JPEG data URL by REUSING the proven
+      // SandpieScreenshot pipeline: the live document is serialized (XMLSerializer,
+      // entity-safe) to a temp file NEXT TO the source artifact (so relative URLs
+      // still resolve, after being rewritten to absolute anyway), captured with the
+      // battle-tested capture engine used for whole artifacts, and the full-page
+      // result is cropped on a canvas to the element's box. Hand-rolling the SVG
+      // data URL here (previous attempts) kept failing on browser quirks the
+      // engine already solved.
       async function elementToDataUrl(t) {
         const doc = frame.contentDocument;
         if (!doc || !doc.documentElement) throw new Error('no document to capture');
+        if (typeof SandpieScreenshot === 'undefined' || !SandpieScreenshot.capture)
+          throw new Error('screenshot engine not loaded');
         const root = doc.documentElement;
-        const DW = Math.max(1, root.scrollWidth || doc.body.scrollWidth || 1280);
-        const DH = Math.max(1, Math.min(root.scrollHeight || doc.body.scrollHeight || 800, 16384));
-        const clone = root.cloneNode(true);
-        // Neutralize scroll-dependent layouts: show everything from the top.
-        clone.querySelectorAll('*').forEach((el) => { try { el.scrollTop = 0; el.scrollLeft = 0; } catch (_) {} });
-        clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-        const html = new XMLSerializer().serializeToString(clone);
-        const svg =
-          '<svg xmlns="http://www.w3.org/2000/svg" width="' + DW + '" height="' + DH + '" viewBox="0 0 ' + DW + ' ' + DH + '">' +
-          '<foreignObject x="0" y="0" width="' + DW + '" height="' + DH + '">' + html + '</foreignObject></svg>';
-        const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-
-        const draw = async () => {
-          const img = new Image();
-          img.src = url;
-          let ok = true;
-          if (img.decode) { try { await img.decode(); } catch (_) { ok = false; } }
-          if (!ok) await new Promise((res) => { img.onload = res; img.onerror = res; });
-          if (!img.complete || !(img.naturalWidth > 0)) throw new Error('SVG rasterization failed (invalid markup or entity in the element\u0027s HTML)');
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.round(DW * SCALE); canvas.height = Math.round(DH * SCALE);
-          const cx = canvas.getContext('2d');
-          cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, canvas.width, canvas.height);
-          cx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          return canvas;
-        };
-        await draw();                       // Safari's first foreignObject raster can be blank
-        const full = await draw();
-
-        // Crop to the element using offsets RELATIVE to the document root —
-        // immune to iframe scroll and to the scale used for the full render.
         const rr = root.getBoundingClientRect();
         const er = t.getBoundingClientRect();
-        const sx = Math.max(0, Math.round((er.left - rr.left) * SCALE));
-        const sy = Math.max(0, Math.round((er.top - rr.top) * SCALE));
-        const sw = Math.max(1, Math.min(Math.round(er.width * SCALE), full.width - sx));
-        const sh = Math.max(1, Math.min(Math.round(er.height * SCALE), full.height - sy));
+        const clone = root.cloneNode(true);
+        clone.querySelectorAll('script').forEach((s) => s.remove());
+        clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+        // rewrite relative URLs to absolute so the temp file resolves the same resources
+        clone.querySelectorAll('link[href], img[src], source[src], input[src], use[href]').forEach((el) => {
+          const a = el.hasAttribute('href') ? 'href' : 'src';
+          const v = el.getAttribute(a) || '';
+          if (!v || /^(data:|https?:)/i.test(v)) return;
+          try { el.setAttribute(a, new URL(v, doc.baseURI).href); } catch (_) {}
+        });
+        const html = '<!DOCTYPE html>' + new XMLSerializer().serializeToString(clone);
+        const dir = fullKey ? fullKey.split('/').slice(0, -1).join('/') : '';
+        const tmp = (dir ? dir + '/' : '') + '.pick-' + Date.now() + '.html';
+        await opfs.write(tmp, html);
+        let shot = null;
+        try {
+          shot = await SandpieScreenshot.capture(tmp, {
+            width: Math.max(120, Math.round(rr.width)), full_page: true, exact_width: true, wait_ms: 400,
+          });
+        } finally {
+          try { opfs.remove(tmp); } catch (_) {}
+        }
+        if (!shot || !shot.dataUrl) throw new Error('capture returned no image');
+        const img = new Image();
+        img.src = shot.dataUrl;
+        if (img.decode) { try { await img.decode(); } catch (_) { await new Promise((res) => { img.onload = res; img.onerror = res; }); } }
+        else await new Promise((res) => { img.onload = res; img.onerror = res; });
+        if (!(img.naturalWidth > 0)) throw new Error('capture image did not decode');
+        // Crop to the element: offsets relative to the document root, scaled from
+        // CSS px to the capture's actual pixel density.
+        const scale = img.naturalWidth / Math.max(1, rr.width);
+        const sx = Math.max(0, Math.round((er.left - rr.left) * scale));
+        const sy = Math.max(0, Math.round((er.top - rr.top) * scale));
+        const sw = Math.max(1, Math.min(Math.round(er.width * scale), img.naturalWidth - sx));
+        const sh = Math.max(1, Math.min(Math.round(er.height * scale), img.naturalHeight - sy));
         if (!sw || !sh) throw new Error('element has no visible box (display:none or zero size)');
         const out = document.createElement('canvas');
         out.width = sw; out.height = sh;
-        out.getContext('2d').drawImage(full, sx, sy, sw, sh, 0, 0, sw, sh);
+        out.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
         return out.toDataURL('image/jpeg', 0.92);
       }
 
       // Copy + attach: the clipboard keeps the HTML (DevTools "Copy element"),
-      // and the element is ALSO rendered to an image and attached to the
-      // composer exactly like a pasted screenshot, so the model sees what was
-      // picked. Saved under picked/ in OPFS (visible in the sidebar).
+      // and the element is ALSO rendered to an image and attached to the MAIN
+      // composer exactly like a pasted screenshot (the viewer overlays the side
+      // pane, so the side composer's chip row is not visible while picking).
       async function attachPicked(t) {
         try {
           const dataUrl = await elementToDataUrl(t);
@@ -357,10 +377,11 @@
           const name = 'picked/' + fname;
           await opfs.write(name, bytes);
           opfs.notifyUpload(name);
-          const pane = 'main';   // the viewer overlays the side pane — attach where the user types
           if (typeof SandpieImages !== 'undefined' && SandpieImages.setState) {
             SandpieImages.setState({ kind: 'image', opfsPath: name, name: fname, mime: 'image/jpeg',
-              size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' } }, pane);
+              size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' } }, 'main');
+          } else {
+            throw new Error('SandpieImages module not available');
           }
           if (opfs._toast) opfs._toast('\u2713 Element attached to the composer', 2500);
           if (typeof window.injectUploadMessage === 'function') {
@@ -405,6 +426,8 @@
         doc.removeEventListener('keydown', onKey, true);
         document.removeEventListener('keydown', onWinKey, true);
         doc.body.style.cursor = prevCursor;
+        try { pickStyle.remove(); } catch (_) {}
+        for (const [r, sel] of hoverSaved) { try { r.selectorText = sel; } catch (_) {} }
         clearHl();
         pickOn = false;
         pickBtn.style.background = ''; pickBtn.style.color = '';
