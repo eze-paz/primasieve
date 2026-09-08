@@ -385,11 +385,6 @@
             throw new Error('SandpieImages module not available');
           }
           if (opfs._toast) opfs._toast('\u2713 Element attached to the composer', 2500);
-          if (typeof window.injectUploadMessage === 'function') {
-            const snippet = t.outerHTML.replace(/\s+/g, ' ').slice(0, 120);
-            window.injectUploadMessage('User picked element <' + String(t.tagName || '').toLowerCase() +
-              '> from the preview — saved to ' + name + ' and attached: ' + snippet);
-          }
         } catch (err) {
           console.error('[file-viewer] pick attach failed', err);
           opfs._toast('Element copied, but the image snapshot failed: ' + ((err && err.message) || err), 6000);
