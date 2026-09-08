@@ -400,6 +400,9 @@ const Sandpie = (() => {
     // Shift = hard reload (cache bypass). Never intercept it: that is the escape
     // hatch for a wedged page, and it must stay instant.
     if (e.shiftKey || e.altKey) return;
+    // Opt-out for hosts where Ctrl-R belongs to the content (the walios shell uses
+    // it for history search). They flush on pagehide instead.
+    if (window.SANDPIE_NO_RELOAD_INTERCEPT) return;
     if (!_sync?.isConnected?.()) return;  // nothing to flush → let the browser reload
     e.preventDefault();
     reloadWithSync();

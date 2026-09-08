@@ -458,7 +458,10 @@ opfs.downloadFolderZip = async function(folderKey) {
 };
 
 opfs.currentPath = function() {
-  return (document.getElementById('opfsPath').value || '').trim().replace(/^\/+|\/+$/g, '');
+  // No file browser in this host (e.g. /walios/, which loads opfs.js only to run the
+  // sync engine): the current path is the root, not a crash.
+  const el = document.getElementById('opfsPath');
+  return ((el && el.value) || '').trim().replace(/^\/+|\/+$/g, '');
 };
 
 /* Read-only fence. The sync provider MAY declare which paths are read-only; this
@@ -1269,6 +1272,10 @@ function setFileSortMode(m) { localStorage.setItem(FILE_SORT_KEY, (m === 'size' 
 
 opfs.refreshFileList = async function() {
   const ul = document.getElementById('fileList');
+  // Redrawing the file browser is meaningless without one. /walios/ loads opfs.js to
+  // run the sync engine, and dropbox.js calls this after its migrations and after a
+  // sync; it used to throw there and abort the caller mid-way.
+  if (!ul) return;
   const path = opfs.currentPath();
   const frag = document.createDocumentFragment();
 
@@ -1984,9 +1991,16 @@ function initFileBrowser() {
 
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { initFileBrowser(); sandpiePersistence.check(); });
-} else {
+// Only wire the file browser where its markup exists. Hosts that load opfs.js for
+// the filesystem API alone (/walios/ boots it for the sync engine) have no #opfsPath,
+// and initFileBrowser used to throw on them before anything else could run.
+function initFileBrowserIfPresent() {
+  if (!document.getElementById('opfsPath')) return;
   initFileBrowser();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { initFileBrowserIfPresent(); sandpiePersistence.check(); });
+} else {
+  initFileBrowserIfPresent();
   sandpiePersistence.check();
 }

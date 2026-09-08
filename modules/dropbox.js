@@ -2082,6 +2082,15 @@
     localStorage.removeItem(FLUSH_KEY);
     addSection();
     loadCloudIndex();   // populate _idxCache from IndexedDB (async, non-blocking)
+    // Claim the single-syncer lock. The standalone /walios/ page runs THIS module
+    // when nobody else is (walios/walios-sync.js) and takes the same lock with
+    // ifAvailable; steal:true means the app always wins and walios stands down.
+    // The app does not gate its own sync on the lock — it is purely the signal
+    // that says "an authoritative syncer exists", so two app tabs are unaffected.
+    try {
+      if (navigator.locks && !window.SANDPIE_SYNC_LOCK_HELD) navigator.locks.request('sandpie-dbx-sync', { steal: true }, () => new Promise(() => {}))
+        .catch(() => {});   // stolen by a newer app tab: harmless, that tab syncs
+    } catch (_) {}
     Sandpie.registerSyncProvider({
       sync, fileStatus, getState: syncState,
       isConnected: () => !!tokens(),

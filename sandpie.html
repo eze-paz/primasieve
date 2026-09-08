@@ -33,7 +33,7 @@ if("serviceWorker"in navigator){
     // stays byte-identical in behavior. Must run before any module loads.
     window.SANDPIE_BETA = /\/app-beta$/.test(location.pathname) || new URLSearchParams(location.search).has('beta');
   </script>
-  <script src="modules/core.js?v=12"></script>
+  <script src="modules/core.js?v=13"></script>
   <script src="modules/config.js?v=2"></script>
   <script src="modules/languages.js?v=4"></script>
   <script src="modules/pins.js?v=17"></script>
@@ -45,13 +45,13 @@ if("serviceWorker"in navigator){
   <!-- Token read/refresh, shared verbatim with /walios/terminal.html. Must load BEFORE dropbox.js. -->
   <script src="modules/dbx-token.js?v=1"></script>
   <script src="modules/dbx-syncstate.js?v=1"></script>
-  <script src="modules/dropbox.js?v=87"></script>
+  <script src="modules/dropbox.js?v=88"></script>
   <script src="modules/images.js?v=12"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/speech-to-text.js?v=3"></script>
   <script src="modules/tools.js?v=87"></script>
   <script src="modules/screenshot.js?v=6"></script>
-  <script src="modules/opfs.js?v=52"></script>
+  <script src="modules/opfs.js?v=53"></script>
   <script src="modules/html-editor.js?v=20"></script>
   <script src="modules/file-viewer.js?v=35"></script>
   <script src="modules/univer.js?v=1"></script>
