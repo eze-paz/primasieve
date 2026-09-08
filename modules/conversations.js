@@ -261,6 +261,8 @@ async function ensureSessionId(convId) {
   if (meta && meta.session_id) return meta.session_id;
   const sid = newSessionId(convId);
   const updated = Object.assign({}, meta || {}, { id: convId, session_id: sid });
+  // A >>> lite toggle on a brand-new conversation (no meta yet) is honored here:
+  if (liteMetaCache.get(convId) === true) updated.lite = true;
   await opfs.write(mp, JSON.stringify(updated));
   Sandpie.events.emit('file:changed', mp);
   return sid;
@@ -1515,6 +1517,7 @@ function mountConv(convId, pane = null) {
   }
   activeConvId = convId;
   if (convId) {
+    _loadLiteFlag(convId).catch(() => {});   // preload lite flag for the next turn
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
@@ -1630,6 +1633,70 @@ function registerMetacogCommand() {
   });
 }
 
+/* ---- LITE MODE (per-conversation fast path) ------------------------------ */
+// >>> lite toggles a per-conversation flag stored in <id>.meta.json. When ON,
+// the turn is sent WITHOUT the tool schema, skills block and memory block, and
+// with a minimal system prompt — cutting the request from ~30-60K tokens to
+// ~1-2K so simple queries (translations, quick questions) answer in seconds.
+// Tools are unavailable while lite is on; turn it off to restore full power.
+function _liteOn(id) {
+  try { const m = liteMetaCache.get(id || activeConvId); return m === true; } catch (_) { return false; }
+}
+const liteMetaCache = new Map();   // convId -> boolean (best-effort read cache)
+async function _loadLiteFlag(id) {
+  if (liteMetaCache.has(id)) return liteMetaCache.get(id);
+  let on = false;
+  try { const m = await readConvMeta(id); on = !!(m && m.lite); } catch (_) {}
+  liteMetaCache.set(id, on);
+  return on;
+}
+async function _setLite(id, on) {
+  const loc = await convLocation(id);
+  if (!loc.format) { liteMetaCache.set(id, !!on); return; }   // brand-new conv: cache only (ensureSessionId persists it on first send)
+  if (loc.format === 'old') {
+    // Legacy single-file format: readConvMeta() reads the .json for these, so
+    // the flag must live inside it (a sidecar meta would never be read back).
+    const cp = convPath(id, loc.archived);
+    let data = null; try { data = JSON.parse(await opfs.read(cp)); } catch (_) {}
+    if (data) {
+      data.lite = !!on;
+      await opfs.write(cp, JSON.stringify(data));
+      try { Sandpie.events.emit('file:changed', cp); } catch (_) {}
+    }
+    liteMetaCache.set(id, !!on);
+    return;
+  }
+  const mp = metaPath(id, loc.archived);
+  let meta = null; try { meta = JSON.parse(await opfs.read(mp)); } catch (_) {}
+  const updated = Object.assign({}, meta || {}, { id, lite: !!on });
+  await opfs.write(mp, JSON.stringify(updated));
+  try { Sandpie.events.emit('file:changed', mp); } catch (_) {}
+  liteMetaCache.set(id, !!on);
+}
+function registerLiteCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'lite',
+    module: 'core',
+    help: 'Toggle LITE mode for this conversation (no tools/skills/memories - fast answers)',
+    usage: '>>> lite [on|off]',
+    run(text, parts) {
+      const cid = activeConvId;
+      if (!cid) return 'LITE mode applies per conversation - open (or start) a conversation first, then run >>> lite.';
+      let on;
+      if (parts.length > 1) on = /^(on|1|true|yes)$/i.test(parts[1]);
+      else on = !_liteOn(cid);   // no arg -> toggle
+      const apply = () => _setLite(cid, on).then(() =>
+        'LITE mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.'
+        + '\n(' + (on
+          ? 'No tools, skills or memories are sent - simple queries answer in seconds. Turn it off with >>> lite off when you need files, Python or search.'
+          : 'Full power restored: tools, skills and memories are back on the next turn.') + ')');
+      // New conversation (no meta yet): flush the pending conv creation first if needed.
+      return _loadLiteFlag(cid).then(() => apply());
+    }
+  });
+}
+
 /* ---- command registration: rewind -------------------------------------- */
 function registerRewindCommand() {
   if (typeof SandpieCommands === 'undefined') return;
@@ -1714,6 +1781,7 @@ registerRewindCommand();
 registerDriftCommand();
 registerHiddenCommand();
 registerMetacogCommand();
+registerLiteCommand();
 
 let _memRecalcLatest = null, _memRecalcBusy = false;
 // Recompute which memories are active/standby immediately after the active
@@ -2952,7 +3020,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=215');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=216');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3747,6 +3815,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   }
   // The project rule, appended to the system prompt so the model knows where it
   // can write and that reads are unrestricted.
+  const _liteCfg = _liteOn(convId || activeConvId);
   const _sysPrompt = await buildSystemPrompt(convMessages, null);
   if (window.SANDPIE_BETA && _sysPrompt && typeof _sysPrompt.content === 'string') {
     _sysPrompt.content += _projRoot
@@ -3771,7 +3840,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     model: (effective && effective.model) || '',
     systemPrompt: _sysPrompt,
     messages: resolvedMessages,
-    tools: _todoV2() ? toolDefs() : _todoLabTools(toolDefs()),
+    tools: _liteCfg ? [] : (_todoV2() ? toolDefs() : _todoLabTools(toolDefs())),
     // Todos run in CLAUDE MODE by default (2026-08-28 A/B: deepseek fully
     // complies with the trust-based TodoWrite contract — 5 turns/27s vs
     // 7/39s under the gated v2): blind full replace, no plan-first gate, no
@@ -6157,9 +6226,21 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   // System prompt) — NOT a synced or browsable OPFS file. The single DEFAULT
   // literal lives in system-prompt.js (SandpieSystemPrompt.DEFAULT); the
   // fallback below only honors a stored prompt if that module somehow missed.
-  let content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
-    ? await SandpieSystemPrompt.get()
-    : (localStorage.getItem('sandpie-system-prompt') || '');   // the DEFAULT literal lives only in SandpieSystemPrompt (this branch is unreachable — the module always loads first)
+  // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
+  // The reply-language directive below still applies (it is appended after this).
+  const _liteCid = (typeof activeConvId !== 'undefined' && activeConvId) || null;
+  let content;
+  if (_liteCid && _liteOn(_liteCid)) {
+    // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
+    // The reply-language directive below still applies (it is appended after this).
+    content = 'You are sandpie, a fast assistant in LITE mode. Answer directly, concisely and completely. '
+      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. '
+      + 'Do not invent tool results.';
+  } else {
+    content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
+      ? await SandpieSystemPrompt.get()
+      : (localStorage.getItem('sandpie-system-prompt') || '');   // the DEFAULT literal lives only in SandpieSystemPrompt (this branch is unreachable — the module always loads first)
+  }
   // Current local DATE (day granularity), prepended. Deliberately NOT the time:
   // this line sits at byte ~0 of every request, and provider prompt-caching only
   // works on a byte-stable prefix — a minute-level stamp here invalidated the
@@ -6172,17 +6253,18 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     const stamp = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     content = 'The current date is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as today; the precise time arrives with each request.\n\n' + content;
   } catch (_) {}
+  const _lite = !!(_liteCid && _liteOn(_liteCid));
   // Optional capability: context.js appends the skills block (enforced skill
   // index + an instruction telling the model to fetch a skill via the load_skill
   // tool when relevant). Module absent ⇒ plain memory prompt.
-  if (typeof SandpieContext !== 'undefined' && SandpieContext.skillBlock) {
+  if (!_lite && typeof SandpieContext !== 'undefined' && SandpieContext.skillBlock) {
     try { content += await SandpieContext.skillBlock(convMessages); }
     catch (e) { console.warn('[sandpie] skills block failed:', e); }
   }
   // Optional capability: mindframe.js appends a Stage-0 AWARENESS directive that
   // forces the model to scan the prompt into nouns/verbs (and research unknown
   // nouns) before acting. Returns '' when the toggle is off ⇒ no behavior change.
-  if (typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
+  if (!_lite && typeof SandpieMindframe !== 'undefined' && SandpieMindframe.systemBlock) {
     try { content += SandpieMindframe.systemBlock(convMessages); }
     catch (e) { console.warn('[sandpie] mindframe block failed:', e); }
   }
@@ -6191,7 +6273,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   // take minutes (and 504), and awaiting it here blocked every completion —
   // behind it. The pruned store simply
   // lands on the NEXT prompt build; this one injects the current store as-is.
-  if (typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
+  if (!_lite && typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
     // (consolidation is event-driven off memory writes now — no per-turn / clock trigger)
     // Context for tiered injection: the latest user message (keyword activation) +
     // the files touched recently (path activation) decide which project's memories
@@ -6579,8 +6661,10 @@ function registerInspectPromptCommand() {
     help: 'Show the complete system prompt that will be sent to the model for the next turn',
     usage: '>>> inspect-prompt',
     async run(text, parts) {
+      if (activeConvId) await _loadLiteFlag(activeConvId).catch(() => {});
       const prompt = await buildSystemPrompt(messages);
-      return '=== System prompt ===\n\n' + prompt.content;
+      const lite = activeConvId && _liteOn(activeConvId);
+      return '=== System prompt ' + (lite ? '(LITE MODE ON - minimal)' : '') + ' ===\n\n' + prompt.content;
     },
   });
 }

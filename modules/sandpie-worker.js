@@ -5408,7 +5408,7 @@ async function runAgent(config, ctx) {
       messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
       stream: true,
       stream_options: { include_usage: true },
-      tools: _availTools,
+      tools: (_availTools && _availTools.length) ? _availTools : undefined,   // lite mode: no tools key at all
     };
     // Force a tool call every round when respond() is in play (until the first
     // respond): the visible chat is exactly the tool actions + the respond() reply.
@@ -5450,7 +5450,7 @@ async function runAgent(config, ctx) {
             messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
-            tools: _availTools,
+            tools: (_availTools && _availTools.length) ? _availTools : undefined,   // lite mode: no tools key at all
           };
           if (_respondToolChoice) compactedReqBody.tool_choice = _respondToolChoice;
           if (config.maxTokens != null) compactedReqBody[config.reasoningEffort ? 'max_completion_tokens' : 'max_tokens'] = config.maxTokens;
