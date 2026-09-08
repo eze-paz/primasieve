@@ -42,7 +42,9 @@ if("serviceWorker"in navigator){
   <script src="modules/themes.js?v=2"></script>
   <script type="module" src="modules/providers.js?v=51"></script>
   <script src="modules/console.js?v=3"></script>
-  <script src="modules/dropbox.js?v=85"></script>
+  <!-- Token read/refresh, shared verbatim with /walios/terminal.html. Must load BEFORE dropbox.js. -->
+  <script src="modules/dbx-token.js?v=1"></script>
+  <script src="modules/dropbox.js?v=86"></script>
   <script src="modules/images.js?v=12"></script>
   <script src="modules/notifications.js?v=3"></script>
   <script src="modules/speech-to-text.js?v=2"></script>

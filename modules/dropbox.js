@@ -31,9 +31,10 @@
 (function () {
   'use strict';
   if (!window.Sandpie) { console.warn('[dropbox] no Sandpie host — disabled'); return; }
+  if (!self.SandpieDbxToken) { console.error('[dropbox] modules/dbx-token.js must load first — disabled'); return; }
 
   // ---- persistent state (dbxfull-* namespace) -------------------------------
-  const TOKENS_KEY = 'dbxfull-tokens';
+  const TOKENS_KEY = self.SandpieDbxToken.TOKENS_KEY;   // shared with /walios (modules/dbx-token.js)
   const PKCE_KEY   = 'dbxfull-pkce';
   const ROOT_KEY   = 'dbxfull-working-root';
   const STATE_KEY  = 'dbxfull-sync-state';
@@ -169,22 +170,20 @@
     }
   }
 
-  function tokens() { try { return JSON.parse(localStorage.getItem(TOKENS_KEY) || 'null'); } catch { return null; } }
+  // The read/refresh half lives in modules/dbx-token.js, shared with
+  // /walios/terminal.html. It used to be duplicated, and the copies drifted: this
+  // one refreshed an expired token, walios read `access_token` and ignored
+  // `expires_at` -- so the shell usually held a dead token, and opfs-worker hides
+  // every cloud-only file when it cannot hydrate, making a directory of dehydrated
+  // files list EMPTY. One implementation, so that cannot happen again.
+  const DbxToken = self.SandpieDbxToken;
+  function tokens() { return DbxToken.read(); }
   async function accessToken() {
-    const stored = tokens();
-    if (!stored) throw new Error('Dropbox not connected');
-    if (Date.now() < stored.expires_at - 60000) return stored.access_token;
-    const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: stored.refresh_token, client_id: stored.app_key });
-    const res = await dbxFetch(dbxRoute('https://api.dropboxapi.com/oauth2/token'), {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
-    });
-    if (!res.ok) throw new Error('Token refresh failed: ' + await res.text());
-    const data = await res.json();
-    stored.access_token = data.access_token;
-    stored.expires_at = Date.now() + data.expires_in * 1000;
-    localStorage.setItem(TOKENS_KEY, JSON.stringify(stored));
-    pushDbxTokenToSW();
-    return data.access_token;
+    const before = tokens();
+    const tok = await DbxToken.accessToken({ fetchImpl: (u, i) => dbxFetch(dbxRoute(u), i) });
+    // Same as before: a refresh has to reach the worker, which holds its own copy.
+    if (!before || before.access_token !== tok) pushDbxTokenToSW();
+    return tok;
   }
   // TEAM-scoped calls only. The default API behavior — no header — resolves paths
   // against the member's HOME namespace, which is where the personal workspace now
