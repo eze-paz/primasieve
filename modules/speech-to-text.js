@@ -1,11 +1,15 @@
-// sandpie/modules/speech-to-text.js — SandpieSpeech: voice input UI (rebuild).
+// sandpie/modules/speech-to-text.js — SandpieSpeech: on-device voice input.
 //
-// UI layer only for now: injects a mic button into the composer's .input-bar
-// (right of the model picker) and a "Speech" panel in the gear settings. The
-// button toggles idle -> recording -> idle; the transcription engine (on-device
-// Whisper + sentence VAD, audio never leaves the tab) plugs into
-// window.SandpieSpeechEngine and lands in a later commit — until then the
-// button works as a visible state machine and the engine calls are no-ops.
+// Mic button in the composer. Click → start listening; speech is segmented by
+// an energy VAD into sentence-ish chunks, each chunk is transcribed ON-DEVICE
+// with Whisper (modules/stt-worker.js, Transformers.js: WebGPU first, WASM
+// fallback) and the text is APPENDED into the prompt box as segments complete.
+// Cost per transcription is constant (one segment, not the whole window) — no
+// drag as the dictation gets long. Click again → stop; the trailing buffer is
+// flushed as a final segment. It never auto-sends: the user reviews then sends.
+//
+// FULLY ON-DEVICE: the microphone audio NEVER leaves the tab. The only network
+// traffic is the one-time model download from the HF CDN (cached after).
 //
 // Self-wiring like every sandpie module: injects its own button, registers its
 // own settings panel, degrades to a clean no-op on unsupported browsers.
@@ -33,6 +37,13 @@ const SandpieSpeech = (function () {
   // Inline SVG glyphs, inherit currentColor.
   const MIC_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>';
   const STOP_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>';
+
+  // ── VAD / capture tuning ──
+  const TARGET_SR   = 16000;  // Whisper expects 16 kHz mono
+  const RMS_THRESH  = 0.012;  // speech vs silence energy gate
+  const MIN_SEG_SEC = 0.5;    // shorter than this after silence → discard (hallucination guard)
+  const SILENCE_MS  = 700;    // silence that closes a segment
+  const MAX_SEG_SEC = 28;     // force-close before Whisper's 30 s receptive field
 
   // ── Prefs (SandpieConfig namespace, localStorage fallback — no secrets) ──
   function cfgAll() {
@@ -80,17 +91,150 @@ const SandpieSpeech = (function () {
     setTimeout(() => { if (_btn && _state === 'idle') _btn.title = 'Dictate by voice (on-device)'; }, 4000);
   }
 
-  // ── Engine hooks — filled by the logic commit. UI must NOT throw when the
-  // engine is absent, so this build is safe to ship before the engine lands. ──
-  function engineStart() {
-    if (window.SandpieSpeechEngine && window.SandpieSpeechEngine.start) return window.SandpieSpeechEngine.start();
-    console.warn('[stt] engine not wired yet — UI only');
-    flashTitle('Engine pending — logic commit next');
-    setState('idle');
+  // ── Worker plumbing ──
+  let _worker = null, _workerReady = false, _reqId = 0, _progressCb = null;
+  function getWorker() {
+    if (_worker) return _worker;
+    _worker = new Worker('modules/stt-worker.js', { type: 'module' });
+    _worker.onmessage = (e) => {
+      const d = e.data || {};
+      if (d.type === 'progress') { if (_progressCb) _progressCb(d.data); return; }
+      if (d.type === 'ready') { _workerReady = true; if (_progressCb) { _progressCb({ ready: true }); } return; }
+      if (d.type === 'result') { const r = _pending.get(d.id); _pending.delete(d.id); if (r) r.resolve(d.text); return; }
+      if (d.type === 'error') {
+        const r = _pending.get(d.id);
+        if (r) { _pending.delete(d.id); r.reject(new Error(d.message)); }
+        else console.warn('[stt] worker error:', d.message);
+        return;
+      }
+    };
+    _worker.onerror = (e) => console.warn('[stt] worker error:', e.message || e);
+    return _worker;
   }
+  const _pending = new Map();
+  function transcribeSegment(f32) {
+    const id = ++_reqId;
+    return new Promise((resolve, reject) => {
+      _pending.set(id, { resolve, reject });
+      getWorker().postMessage({ type: 'transcribe', id, modelId: cfgModel(), lang: cfgLang(), audio: f32 }, [f32.buffer]);
+    });
+  }
+
+  // ── Composer insertion: append text to the main prompt box ──
+  function appendToComposer(text) {
+    if (!text) return;
+    const ta = document.getElementById('input') || document.querySelector('textarea');
+    if (!ta) return;
+    const cur = ta.value;
+    const needsSpace = cur && !/\s$/.test(cur);
+    ta.value = cur + (needsSpace ? ' ' : '') + text + ' ';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.focus();
+    // keep caret at end
+    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
+  }
+
+  // ── Capture + VAD loop ──
+  let _stream = null, _ctx = null, _node = null, _src = null;
+  let _buf = [];            // Float32 chunks at 16 kHz (current segment)
+  let _bufSec = 0;
+  let _silenceMs = 0;
+  let _speechSeen = false;
+  let _queue = Promise.resolve();   // serialized transcription queue
+  let _stopping = false;
+
+  function resampleTo16k(input, inputRate) {
+    if (inputRate === TARGET_SR) return input;
+    const ratio = inputRate / TARGET_SR;
+    const outLen = Math.floor(input.length / ratio);
+    const out = new Float32Array(outLen);
+    for (let i = 0; i < outLen; i++) {
+      const j = Math.floor(i * ratio);
+      out[i] = input[j] || 0;
+    }
+    return out;
+  }
+
+  function rms(buf) {
+    let s = 0;
+    for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+    return Math.sqrt(s / buf.length);
+  }
+
+  function enqueueSegment(f32, final) {
+    if (f32.length / TARGET_SR < MIN_SEG_SEC && !final) return;
+    _queue = _queue.then(async () => {
+      try {
+        const txt = await transcribeSegment(f32);
+        if (txt) appendToComposer(txt);
+      } catch (e) {
+        console.warn('[stt] segment failed:', e && e.message);
+        if (final) flashTitle('Dictation failed: ' + (e && e.message || e));
+      }
+      if (final) window.SandpieSpeech.engineDone(true);
+    });
+  }
+
+  function onAudioChunk(chunk, rate) {
+    const f32 = resampleTo16k(chunk, rate);
+    const loud = rms(f32) > RMS_THRESH;
+    if (loud) {
+      _speechSeen = true;
+      _silenceMs = 0;
+      _buf.push(f32);
+      _bufSec += f32.length / TARGET_SR;
+      if (_bufSec >= MAX_SEG_SEC) flushSegment(false);   // force-close long segment
+    } else if (_speechSeen) {
+      _silenceMs += (f32.length / TARGET_SR) * 1000;
+      _buf.push(f32);   // keep trailing silence inside the segment (natural tail)
+      _bufSec += f32.length / TARGET_SR;
+      if (_silenceMs >= SILENCE_MS) flushSegment(false);
+    }
+    // pure silence before any speech: drop (keeps ticks cheap)
+  }
+
+  function flushSegment(final) {
+    if (!_buf.length) { if (final) window.SandpieSpeech.engineDone(true); return; }
+    const total = new Float32Array(Math.floor(_bufSec * TARGET_SR));
+    let off = 0;
+    for (const c of _buf) { total.set(c, off); off += c.length; }
+    _buf = []; _bufSec = 0; _silenceMs = 0; _speechSeen = false;
+    enqueueSegment(total, final);
+  }
+
+  async function engineStart() {
+    try {
+      _stopping = false;
+      _stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      _ctx = new (window.AudioContext || window.webkitAudioContext)();
+      _src = _ctx.createMediaStreamSource(_stream);
+      _node = _ctx.createScriptProcessor(4096, 1, 1);   // deprecated but universal; capture-only
+      _node.onaudioprocess = (e) => { if (_state === 'recording') onAudioChunk(e.inputBuffer.getChannelData(0), _ctx.sampleRate); };
+      _src.connect(_node);
+      _node.connect(_ctx.destination);   // ScriptProcessor needs a destination; gain 0 path
+      // Preload the model in the background so the first segment isn't slow.
+      try { getWorker().postMessage({ type: 'load', modelId: cfgModel() }); } catch (_) {}
+    } catch (e) {
+      console.warn('[stt] mic denied/failed:', e && e.message);
+      flashTitle('Microphone unavailable: ' + (e && e.message || e));
+      teardownCapture();
+      window.SandpieSpeech.engineDone(false, (e && e.message) || 'mic failed');
+    }
+  }
+
+  function teardownCapture() {
+    try { if (_node) _node.disconnect(); } catch (_) {}
+    try { if (_src) _src.disconnect(); } catch (_) {}
+    try { if (_ctx) _ctx.close(); } catch (_) {}
+    try { if (_stream) _stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+    _node = _src = _ctx = _stream = null;
+  }
+
   function engineStop() {
-    if (window.SandpieSpeechEngine && window.SandpieSpeechEngine.stop) return window.SandpieSpeechEngine.stop();
-    setState('idle');
+    _stopping = true;
+    teardownCapture();
+    flushSegment(true);   // trailing buffer → final segment; engineDone fires on drain
+    // If nothing was pending, engineDone already fired inside flushSegment.
   }
 
   function onMicClick() {
@@ -100,15 +244,12 @@ const SandpieSpeech = (function () {
     } else if (_state === 'recording') {
       setState('busy');
       engineStop();
-      // The engine calls SandpieSpeech.engineDone() when it finishes; with no
-      // engine wired, return to idle right away.
-      if (!window.SandpieSpeechEngine) setState('idle');
     } else {
       setState('idle');   // busy state clicked: user bailed out
     }
   }
 
-  // Public hook for the engine: call when a stop/finish transition completes.
+  // Public hook: called when the final segment drains (or on failure).
   function engineDone(ok, err) {
     if (err) { console.warn('[stt]', err); flashTitle('Dictation failed: ' + err); }
     setState('idle');
@@ -163,7 +304,7 @@ const SandpieSpeech = (function () {
     modelSel.value = cfgModel();
     langSel.value  = cfgLang();
 
-    modelSel.addEventListener('change', () => { setCfg({ model: modelSel.value }); status.textContent = ''; });
+    modelSel.addEventListener('change', () => { setCfg({ model: modelSel.value }); _workerReady = false; status.textContent = ''; });
     langSel.addEventListener('change', () => setCfg({ lang: langSel.value }));
 
     if (!supported()) {
@@ -174,8 +315,14 @@ const SandpieSpeech = (function () {
 
     preload.addEventListener('click', () => {
       preload.disabled = true;
-      status.textContent = 'Engine not wired yet — model download arrives with the logic commit.';
-      setTimeout(() => { preload.disabled = false; }, 2500);
+      status.textContent = 'Downloading model… 0%';
+      _progressCb = (d) => {
+        if (d && d.ready) { status.textContent = 'Model ready.'; preload.disabled = false; _progressCb = null; return; }
+        const pct = d && d.progress ? Math.round(d.progress * 100) : 0;
+        status.textContent = 'Downloading model… ' + pct + '%';
+      };
+      try { getWorker().postMessage({ type: 'load', modelId: cfgModel() }); }
+      catch (e) { status.textContent = 'Failed: ' + ((e && e.message) || e); preload.disabled = false; _progressCb = null; }
     });
   }
 
@@ -196,7 +343,7 @@ const SandpieSpeech = (function () {
     init, supported, engineDone,
     startRecording: () => { if (_state === 'idle') onMicClick(); },
     stopRecording:  () => { if (_state !== 'idle') onMicClick(); },
-    _internals: { setState, cfgModel, cfgLang },
+    _internals: { setState, cfgModel, cfgLang, resampleTo16k, rms, onAudioChunk, flushSegment },
   };
 })();
 
