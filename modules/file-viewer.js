@@ -442,21 +442,35 @@
     name = name || String(fullKey).split('/').pop();
     // read (with dehydrated-cloud fault-in, same contract the old viewer had)
     let file;
-    const readLocal = async () => {
-      const parts = fullKey.split('/').filter(Boolean);
+    const readLocal = async (key) => {
+      const parts = key.split('/').filter(Boolean);
       const fname = parts.pop();
       const dir = await opfs.resolveDir(parts);
       return (await dir.getFileHandle(fname)).getFile();
     };
-    try {
-      file = await readLocal();
-    } catch (e) {
-      const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
-      let hydrated = false;
-      if (sp && sp.hydrate) { try { hydrated = await sp.hydrate(fullKey); } catch (_) {} }
-      if (hydrated) { try { file = await readLocal(); } catch (_) {} opfs.refreshFileList().catch(() => {}); }
-      if (!file) { Sandpie.addMsg('err', `Could not open ${fullKey}: ${e.message}`); return; }
+    // Legacy-path fallback: sandpie/artifacts/ was migrated OUT of the sandbox to
+    // /artifacts (and the boot prune deletes anything recreated there), so stored
+    // paths like sandpie/artifacts/x.html are dead. Try the stored path first,
+    // then its sandpie/-prefix / un-prefixed variant (same candidates
+    // resolveArtifactPath uses for artifact cards).
+    const candidates = [fullKey];
+    if (!fullKey.startsWith('sandpie/')) candidates.push('sandpie/' + fullKey);
+    else candidates.push(fullKey.slice('sandpie/'.length));
+    let e0 = null;
+    for (const cand of candidates) {
+      try { file = await readLocal(cand); fullKey = cand; break; } catch (e) { if (!e0) e0 = e; }
     }
+    if (!file) {
+      const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+      for (const cand of candidates) {
+        let hydrated = false;
+        if (sp && sp.hydrate) { try { hydrated = await sp.hydrate(cand); } catch (_) {} }
+        if (hydrated) {
+          try { file = await readLocal(cand); fullKey = cand; opfs.refreshFileList().catch(() => {}); break; } catch (_) {}
+        }
+      }
+    }
+    if (!file) { Sandpie.addMsg('err', `Could not open ${fullKey}: ${(e0 && e0.message) || 'not found'}`); return; }
 
     opfs.closeFile();                       // single viewer instance
     window._openFilePath = fullKey;

@@ -804,3 +804,4 @@ window.toggleArtifactCollapse = toggleArtifactCollapse;
 window.showArtifactError = showArtifactError;
 window.openArtifactPanel = openArtifactPanel;
 window.closeArtifactPanel = closeArtifactPanel;
+window.resolveArtifactPath = resolveArtifactPath;
