@@ -32,12 +32,13 @@
   'use strict';
   if (!window.Sandpie) { console.warn('[dropbox] no Sandpie host — disabled'); return; }
   if (!self.SandpieDbxToken) { console.error('[dropbox] modules/dbx-token.js must load first — disabled'); return; }
+  if (!self.SandpieDbxSyncState) { console.error('[dropbox] modules/dbx-syncstate.js must load first — disabled'); return; }
 
   // ---- persistent state (dbxfull-* namespace) -------------------------------
   const TOKENS_KEY = self.SandpieDbxToken.TOKENS_KEY;   // shared with /walios (modules/dbx-token.js)
   const PKCE_KEY   = 'dbxfull-pkce';
   const ROOT_KEY   = 'dbxfull-working-root';
-  const STATE_KEY  = 'dbxfull-sync-state';
+  const STATE_KEY  = self.SandpieDbxSyncState.STATE_KEY;   // shared with /walios (modules/dbx-syncstate.js)
   const INDEX_KEY  = 'dbxfull-cloud-index';
   // BETA (/app-beta fork): Dropbox IS the filesystem; the page sync engine runs
   // exempt-only (sandpie/* app metadata) and OPFS is demoted to a render cache.
@@ -528,8 +529,12 @@
   // ===========================================================================
   //  Sync state
   // ===========================================================================
-  function syncState() { try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch { return {}; } }
-  function setSyncState(s) { localStorage.setItem(STATE_KEY, JSON.stringify(s)); }
+  // The ledger lives in modules/dbx-syncstate.js, shared with /walios/terminal.html:
+  // anything that writes to OPFS outside this module must be able to mark what it
+  // wrote, or Pass 2 below deletes it as an orphan.
+  const Ledger = self.SandpieDbxSyncState;
+  function syncState() { return Ledger.read(); }
+  function setSyncState(s) { Ledger.write(s); }
   function cloudIndex() { return _idxCache || {}; }   // synchronous — populated by loadCloudIndex() at boot
   function setCloudIndex(i) { _idxCache = i; _idbPutIndex(i); }   // write-through to IndexedDB
   function dehydrated() { return !!tokens(); }  // always on-demand when Dropbox is connected
