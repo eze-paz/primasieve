@@ -379,7 +379,8 @@
           opfs.notifyUpload(name);
           if (typeof SandpieImages !== 'undefined' && SandpieImages.setState) {
             SandpieImages.setState({ kind: 'image', opfsPath: name, name: fname, mime: 'image/jpeg',
-              size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' } }, 'main');
+              size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' },
+              htmlCode: t.outerHTML }, 'main');
           } else {
             throw new Error('SandpieImages module not available');
           }
