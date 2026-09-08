@@ -610,7 +610,14 @@ const SandpieImages = (function() {
     if (text) parts.push({ type: 'text', text });
     for (const a of list) {
       if (a.kind === 'image') {
-        parts.push({ type: 'image_url', image_url: { url: 'opfs://' + a.opfsPath } });
+        // Element-pick attachments carry the element's HTML (htmlCode): the
+        // snapshot is ONLY for the user to see in the chip — the model gets the
+        // CODE, never the image.
+        if (a.htmlCode) {
+          parts.push({ type: 'text', text: 'HTML code of the element the user picked (snapshot attached for the user only — do not process it as an image):\n' + a.htmlCode });
+        } else {
+          parts.push({ type: 'image_url', image_url: { url: 'opfs://' + a.opfsPath } });
+        }
       } else {
         parts.push({ type: 'file', file: { path: a.opfsPath, name: a.name, mime: a.mime, size: a.size, text: !!a.isText } });
       }
