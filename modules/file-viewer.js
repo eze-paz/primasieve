@@ -357,11 +357,12 @@
           const name = 'picked/' + fname;
           await opfs.write(name, bytes);
           opfs.notifyUpload(name);
-          const pane = (document.querySelector('#messagesSide .file-viewer') && !opfs._isMobile()) ? 'side' : 'main';
-          if (window.SandpieImages && SandpieImages.setState) {
+          const pane = 'main';   // the viewer overlays the side pane — attach where the user types
+          if (typeof SandpieImages !== 'undefined' && SandpieImages.setState) {
             SandpieImages.setState({ kind: 'image', opfsPath: name, name: fname, mime: 'image/jpeg',
               size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' } }, pane);
           }
+          if (opfs._toast) opfs._toast('\u2713 Element attached to the composer', 2500);
           if (typeof window.injectUploadMessage === 'function') {
             const snippet = t.outerHTML.replace(/\s+/g, ' ').slice(0, 120);
             window.injectUploadMessage('User picked element <' + String(t.tagName || '').toLowerCase() +
