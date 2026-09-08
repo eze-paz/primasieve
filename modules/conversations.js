@@ -1784,6 +1784,8 @@ registerDriftCommand();
 registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
+function _lite2Only(id) { return _lite2On(id) && !_liteOn(id); }   // lite2-active AND lite-off: lite2's own behavior (web_search allowed)
+
 /* ---- LITE2 MODE (exact copy of LITE, independent flag) ------------------- */
 // >>> lite2 mirrors >>> lite as a SEPARATE per-conversation flag (meta.lite2)
 // so the two fast paths can be customized independently later. Today it is a
@@ -3903,7 +3905,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     model: (effective && effective.model) || '',
     systemPrompt: _sysPrompt,
     messages: resolvedMessages,
-    tools: _liteCfg ? [] : (_todoV2() ? toolDefs() : _todoLabTools(toolDefs())),
+    tools: _liteCfg ? (_lite2Only(convId || activeConvId) ? [toolDefs().find(t => t.function && t.function.name === 'web_search')].filter(Boolean) : []) : (_todoV2() ? toolDefs() : _todoLabTools(toolDefs())),
     // Todos run in CLAUDE MODE by default (2026-08-28 A/B: deepseek fully
     // complies with the trust-based TodoWrite contract — 5 turns/27s vs
     // 7/39s under the gated v2): blind full replace, no plan-first gate, no
@@ -6297,7 +6299,10 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
     // The reply-language directive below still applies (it is appended after this).
     content = 'You are sandpie, a fast assistant in LITE mode. Answer directly, concisely and completely. '
-      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> ' + (_lite2On(_liteCid) ? 'lite2' : 'lite') + ' off. '
+      + (_lite2On(_liteCid)
+        ? 'You have exactly ONE tool: web_search (keyword web search returning a ranked list of {title, url, snippet}). Use it whenever the request needs current/recent info or a lookup, then answer from the results. '
+        : 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. ')
+      + 'No other tools exist in this mode (no files, no code execution, no page fetching): if the request needs them, say so in one short line and ask the user to run >>> ' + (_lite2On(_liteCid) ? 'lite2' : 'lite') + ' off. '
       + 'Do not invent tool results.';
   } else {
     content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
