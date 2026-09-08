@@ -95,6 +95,41 @@
       return e;
     },
 
+    // ---- TLS trust + git config, for EVERY walios host ------------------------
+    // PY_ENV's SSL_CERT_FILE points at /site-packages/certifi/cacert.pem, which only
+    // exists once python's companion tar has been mounted. Anything that needs TLS
+    // before that -- `git clone`, wget, curl -- then has no trust store at all. The
+    // terminal seeded a real bundle and pointed the env at it; the walios() TOOL did
+    // not, so a clone that worked in the terminal died in the tool with
+    //   SSL certificate problem: unable to get local issuer certificate
+    // Both now take the same two helpers, so they cannot drift again.
+    CA_PATH: '/etc/ssl/certs/ca-certificates.crt',
+
+    tlsEnv() {
+      return {
+        SSL_CERT_FILE: this.CA_PATH,
+        CURL_CA_BUNDLE: this.CA_PATH,
+        GIT_CONFIG_GLOBAL: '/etc/gitconfig',
+      };
+    },
+
+    // Blobs to seed into the guest before it runs. `base` lets a caller on another
+    // path reach /walios/ (the worker is not served from there).
+    async tlsBlobs(base) {
+      const b = {};
+      const enc = (s2) => new TextEncoder().encode(s2).buffer;
+      try {
+        const r = await fetch((base || '/walios/') + 'cacert.pem');
+        if (r.ok) b[this.CA_PATH] = await r.arrayBuffer();
+      } catch (_) {}
+      // safe.directory: the guest runs as root over an OPFS-backed tree, which git
+      // otherwise refuses as "dubious ownership". Connection: close because the WISP
+      // relay does not multiplex a kept-alive connection.
+      b['/etc/gitconfig'] = enc('[safe]\n\tdirectory = *\n[http]\n\tsslCAInfo = ' + this.CA_PATH
+                                + '\n\textraHeader = Connection: close\n');
+      return b;
+    },
+
     // Is JSPI here? walios' blocking syscalls are WebAssembly.Suspending imports, so
     // without it the guest traps rather than degrading. Callers pass `jspi: WB.jspi()`
     // so a browser without it takes the synchronous path instead of dying.

@@ -3167,7 +3167,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=5');
+importScripts('/modules/walios-backend.js?v=6');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');
@@ -3201,8 +3201,23 @@ async function _waliosPkgManifest() {
 function _waliosWireOpfs(ow) {
   try { ow.postMessage({ t: 'dbx', token: (_dbxCtx && _dbxCtx.token) || null, beta: !!(_dbxCtx && _dbxCtx.beta) }); } catch (_) {}
   ow.addEventListener('message', (ev) => {
-    const d = ev.data; if (!d || d.t !== 'hydrated' || !d.rel) return;
-    _hydratedSet.add(d.rel); _reportHydrated(d.rel);
+    const d = ev.data; if (!d) return;
+    if (d.t === 'hydrated' && d.rel) { _hydratedSet.add(d.rel); _reportHydrated(d.rel); return; }
+    // /root IS the app's OPFS workspace, and dropbox.js deletes any local file with no
+    // sync-ledger entry as an orphan. A walios() script writing there was invisible to
+    // the ledger, so its work — a `git clone`, say — was deleted by the next sync, the
+    // same way the terminal's was before it started reporting. Reuse the page relays
+    // the tools already use (this worker has no localStorage to mark with):
+    //   sw-opfs-changed        -> dropbox.js marks dirty (kept, then uploaded)
+    //   opfs-deleted-by-python -> the delete handshake (remote delete + index trim)
+    if (d.t === 'opfs-changed' && Array.isArray(d.rels) && d.rels.length) {
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: d.rels } }); } catch (_) {}
+      return;
+    }
+    if (d.t === 'opfs-removed' && Array.isArray(d.rels) && d.rels.length) {
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: d.rels } }); } catch (_) {}
+      return;
+    }
   });
   return ow;
 }
@@ -3238,6 +3253,7 @@ const WALIOS_SITECUSTOMIZE_URL = './walios-sitecustomize.py?v=1';
 const WALIOS_PRELUDE = 'chmod +x /usr/bin/soffice 2>/dev/null; ';
 let _waliosSofficeSrc = null;
 let _waliosSiteSrc = null;
+let _waliosTlsBlobs = null;
 async function _waliosBlobs() {
   if (_waliosSofficeSrc === null) {
     try { _waliosSofficeSrc = await (await fetch(WALIOS_SOFFICE_URL)).arrayBuffer(); }
@@ -3254,6 +3270,15 @@ async function _waliosBlobs() {
   // PIL/docx simply did not exist there while terminal.html had them — measured, 4 of 7
   // capability checks diverged.
   if (_waliosSiteSrc) b['/site-packages/_shims/sitecustomize.py'] = _waliosSiteSrc.slice(0);
+  // TLS trust + git config, the SAME pair the terminal seeds (WB.tlsBlobs). Without
+  // them SSL_CERT_FILE pointed at certifi's bundle, which does not exist until python
+  // has run — so `git clone` in a walios() call died with "SSL certificate problem:
+  // unable to get local issuer certificate" while the identical command worked in the
+  // terminal. Cached after the first call; the bundle is ~180KB.
+  if (_waliosTlsBlobs === null) {
+    try { _waliosTlsBlobs = await WB.tlsBlobs(WALIOS_BASE); } catch (_) { _waliosTlsBlobs = false; }
+  }
+  if (_waliosTlsBlobs) for (const k of Object.keys(_waliosTlsBlobs)) b[k] = _waliosTlsBlobs[k].slice(0);
   if (_waliosSofficeSrc) {
     b['/usr/lib/sandpie/soffice.py'] = _waliosSofficeSrc.slice(0);
     b['/usr/bin/soffice'] = new TextEncoder().encode('#!/bin/sh\nexec python3 /usr/lib/sandpie/soffice.py "$@"\n').buffer;
@@ -3343,8 +3368,12 @@ async function tool_walios({ script, timeout }, ctx) {
       // SANDPIE_HOST_RPC tells the in-guest sitecustomize that someone is listening on
       // fd 1, so an import miss can ask for a bundle. The terminal deliberately does not
       // set it: there the bundles are already mounted and a frame would land in the pty.
+      // WB.tlsEnv() AFTER WB.env(): the latter's SSL_CERT_FILE points at certifi, which
+      // only exists once python's companion tar is mounted, and git/wget need trust
+      // before that. Same override the terminal applies.
       env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
-                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8', SANDPIE_HOST_RPC: '1' }, WB.env('repl')),
+                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8', SANDPIE_HOST_RPC: '1' },
+                         WB.env('repl'), WB.tlsEnv()),
       cwd: '/root', argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
   });
 }
