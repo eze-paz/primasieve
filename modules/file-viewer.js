@@ -264,7 +264,7 @@
     /* ⌖ pick — hover-highlight an element in the Rendered preview and click to
        copy its outerHTML (DevTools "Copy element" without opening DevTools).
        Stays armed so several elements can be grabbed; exit: ⌖ again or Esc. */
-    const pickBtn = addHeaderButton(header, '⌖', 'Pick element — click in the preview to copy its HTML (Esc to exit)', () => {
+    const pickBtn = addHeaderButton(header, '⌖', 'Pick element — click in the preview to copy its HTML and attach it as an image (Esc to exit)', () => {
       if (pickOn) { disarmPick(); return; }
       if (modeSel.value !== 'rendered') { modeSel.value = 'rendered'; showRendered(); pendingPick = true; return; }
       if (curFrame && curFrame.contentDocument && curFrame.contentDocument.body) armPick(curFrame);
@@ -286,12 +286,76 @@
         if (t !== last) { clearHl(); last = t; saved = [t.style.outline, t.style.outlineOffset]; t.style.outline = '2px solid ' + accent; t.style.outlineOffset = '-2px'; }
       };
       const onLeave = () => clearHl();
+      // Rasterize ONE element to a JPEG data URL via SVG <foreignObject> — the
+      // same technique SandpieScreenshot uses for whole artifacts, applied to a
+      // single node so the model can SEE the picked element, not just read its
+      // HTML. Sub-resources (external <img>, fonts) cannot be fetched inside an
+      // SVG-in-<img> rasterization context, so they come out blank — the same
+      // known limitation the full-artifact capture has.
+      async function elementToDataUrl(t) {
+        const r = t.getBoundingClientRect();
+        const W = Math.max(1, Math.min(Math.ceil(r.width || t.offsetWidth || 1), 4096));
+        const H = Math.max(1, Math.min(Math.ceil(r.height || t.offsetHeight || 1), 4096));
+        const clone = t.cloneNode(true);
+        clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+        const svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' +
+          '<foreignObject x="0" y="0" width="' + W + '" height="' + H + '">' +
+          '<html xmlns="http://www.w3.org/1999/xhtml"><head><style>html,body{margin:0;padding:0;background:#fff}</style></head><body>' +
+          clone.outerHTML + '</body></html></foreignObject></svg>';
+        const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        const draw = async () => {
+          const img = new Image();
+          img.src = url;
+          if (img.decode) { try { await img.decode(); } catch (_) { await new Promise((res) => { img.onload = res; img.onerror = res; }); } }
+          else await new Promise((res) => { img.onload = res; img.onerror = res; });
+          const canvas = document.createElement('canvas');
+          canvas.width = W; canvas.height = H;
+          const cx = canvas.getContext('2d');
+          cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, W, H);
+          cx.drawImage(img, 0, 0, W, H);
+          return canvas;
+        };
+        await draw();                       // Safari's first foreignObject raster can be blank
+        const canvas = await draw();
+        return canvas.toDataURL('image/jpeg', 0.92);
+      }
+
+      // Copy + attach: the clipboard keeps the HTML (DevTools "Copy element"),
+      // and the element is ALSO rendered to an image and attached to the
+      // composer exactly like a pasted screenshot, so the model sees what was
+      // picked. Saved under picked/ in OPFS (visible in the sidebar).
+      async function attachPicked(t) {
+        try {
+          const dataUrl = await elementToDataUrl(t);
+          const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), (c) => c.charCodeAt(0));
+          const fname = 'element-' + Date.now().toString(36) + '.jpg';
+          const name = 'picked/' + fname;
+          await opfs.write(name, bytes);
+          opfs.notifyUpload(name);
+          const pane = (host && host.id === 'messagesSide' && !opfs._isMobile()) ? 'side' : 'main';
+          if (window.SandpieImages && SandpieImages.setState) {
+            SandpieImages.setState({ kind: 'image', opfsPath: name, name: fname, mime: 'image/jpeg',
+              size: bytes.length, thumb: dataUrl, file: { name: fname, type: 'image/jpeg' } }, pane);
+          }
+          if (typeof window.injectUploadMessage === 'function') {
+            const snippet = t.outerHTML.replace(/\s+/g, ' ').slice(0, 120);
+            window.injectUploadMessage('User picked element <' + String(t.tagName || '').toLowerCase() +
+              '> from the preview — saved to ' + name + ' and attached: ' + snippet);
+          }
+        } catch (err) {
+          console.error('[file-viewer] pick attach failed', err);
+          opfs._toast('Element copied, but the image snapshot failed', 4000);
+        }
+      }
+
       const onClick = (e) => {
         e.preventDefault(); e.stopPropagation();   // never navigate while picking
         const t = e.target;
         if (!(t && t.nodeType === 1) || t === doc.documentElement || t === doc.body) return;
-        navigator.clipboard.writeText(t.outerHTML).then(() => {
+        navigator.clipboard.writeText(t.outerHTML).then(async () => {
           pickBtn.textContent = '✓'; setTimeout(() => { if (pickOn) pickBtn.textContent = '⌖'; }, 1100);
+          await attachPicked(t);
         }).catch((err) => {
           console.error('[file-viewer] pick copy failed', err);
           pickBtn.textContent = '✗'; setTimeout(() => { if (pickOn) pickBtn.textContent = '⌖'; }, 1100);
@@ -308,7 +372,7 @@
       doc.body.style.cursor = 'crosshair';
       pickOn = true;
       pickBtn.style.background = 'var(--sp-accent)'; pickBtn.style.color = 'var(--sp-bg)';
-      pickBtn.title = 'Pick mode ON — click elements to copy their HTML (⌖ again or Esc to exit)';
+      pickBtn.title = 'Pick mode ON — click elements to copy their HTML + attach a snapshot (⌖ again or Esc to exit)';
       pickArm = () => {
         doc.removeEventListener('mousemove', onMove, true);
         doc.removeEventListener('mouseleave', onLeave, true);
@@ -320,7 +384,7 @@
         pickOn = false;
         pickBtn.style.background = ''; pickBtn.style.color = '';
         pickBtn.textContent = '⌖';
-        pickBtn.title = 'Pick element — click in the preview to copy its HTML (Esc to exit)';
+        pickBtn.title = 'Pick element — click in the preview to copy its HTML and attach it as an image (Esc to exit)';
       };
     }
     function disarmPick() { if (pickArm) { try { pickArm(); } catch (_) {} pickArm = null; } }
