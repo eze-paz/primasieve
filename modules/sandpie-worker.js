@@ -1325,7 +1325,7 @@ async function tool_web_search({ query, num_results }, ctx) {
   }
   // 2) Fallback: multi-engine /proxy/ scrape on the Pyodide pool.
   try {
-    const data = await _webPyRun('_web_search.py', _WEB_SEARCH_PY, { query: q, n, fast: !!(ctx && ctx._lite2) }, (ctx && ctx._lite2) ? 30 : 75, ctx);
+    const data = await _webPyRun('_web_search.py', _WEB_SEARCH_PY, { query: q, n }, 75, ctx);
     if (!data.results || !data.results.length) {
       const why = (data.tried && data.tried.length) ? '\nEngines tried:\n- ' + data.tried.join('\n- ') : '';
       return { result: `No web results for "${q}".${orNote ? '\n' + orNote : ''}${why}\n(If every engine was blocked or unreachable, the /proxy/ route may be unavailable in this deployment.)` };
@@ -3715,21 +3715,6 @@ async function runToolGuarded(name, args, ctx) {
   const key = String(name) + '\u0000' + JSON.stringify(args == null ? {} : args);
   const out = await runTool(name, args, ctx);
   const res = out && typeof out.result === 'string' ? out.result : JSON.stringify(out == null ? {} : out);
-  // Guard 3 (LITE2 only): web_search "No web results" is a failure the model
-  // loves to retry with reworded queries (session y5xo6tis: 12 empty searches).
-  // It matches neither Guard 1 (args vary) nor Guard 2 (not an "Error:" string),
-  // so count consecutive empty searches with its OWN state - lite2 only.
-  if (ctx._lite2 && String(name) === 'web_search') {
-    const wg = ctx._wsEmptyGuard || (ctx._wsEmptyGuard = { n: 0, fired: false });
-    if (/^No web results for /.test(res)) {
-      wg.n++;
-      if (wg.fired) return { result: 'LOOP GUARD active: web_search is unavailable right now. Answer from your own knowledge and say live search failed.' };
-      if (wg.n >= 3) {
-        wg.fired = true;
-        return { result: 'LOOP GUARD (LITE2): web_search has returned NO results ' + wg.n + ' times in a row - live search is effectively unavailable. STOP calling it. Answer from your own knowledge and tell the user in one line that live search is unavailable.' };
-      }
-    } else if (!/^Error/.test(res)) { wg.n = 0; wg.fired = false; }   // a real result resets the streak
-  }
   // Guard 2: error streak - same tool, N consecutive failures, args may vary
   if (/^Error[: ]/.test(res)) {
     const eg = _errGuardState(ctx);
@@ -5189,8 +5174,6 @@ async function runAgent(config, ctx) {
   // TODO-LAB: 'claude' mode = trust-based TodoWrite clone — no plan-first gate,
   // no open-todos stop guard (see tool_write_todos_claude).
   ctx._todoMode = config.todoMode || '';
-  // LITE2 fast-path flag (round cap, empty-search guard, scraper fail-fast).
-  ctx._lite2 = !!config.lite2;
   const _planForced = ctx._todoMode !== 'claude' && Array.isArray(config.tools) && config.tools.some(t => t && t.function && t.function.name === 'write_todos');
   const _hasActiveTask = () => Array.isArray(ctx._todos) && ctx._todos.some(t => t && t.status === 'in_progress');
   // "Open" = pending or in_progress. completed AND deleted are both closed.
@@ -5210,11 +5193,6 @@ async function runAgent(config, ctx) {
   // Round budget: subagents pass config.maxRounds so a delegated loop can't run
   // away in an isolated context; the main loop leaves it unset (unbounded).
   const maxRounds = config.maxRounds || 0;
-  // LITE2 round cap (2026-09-08): lite2 is the fast path - cap tool rounds so a
-  // failing tool cannot spin the loop (session y5xo6tis: 6 rounds / 14 searches).
-  // At the cap the model gets ONE grace round with tools stripped + a forced
-  // answer reminder; one round later the turn ends. Standard mode: untouched.
-  const _lite2Cap = config.lite2 ? (Number(config.lite2Rounds) > 0 ? Number(config.lite2Rounds) : 3) : 0;
   let _roundNo = 0;
 
   // ---- Per-turn profiling ----------------------------------------------------
@@ -5320,18 +5298,6 @@ async function runAgent(config, ctx) {
       ctx.emit({ type: 'reminder', kind: 'round-cap', text: 'Reached the ' + maxRounds + '-round budget; stopping and returning what is done.' });
       break;
     }
-    // LITE2 round cap: at the budget, strip tools and force a final answer; one
-    // grace round later, end the turn (the model can still be looping).
-    if (_lite2Cap && !ctx._responded) {
-      if (_roundNo >= _lite2Cap + 1) {
-        ctx.emit({ type: 'reminder', kind: 'lite2-cap', text: 'LITE2 tool budget exhausted; ending the turn.' });
-        break;
-      }
-      if (_roundNo >= _lite2Cap) {
-        ctx._lite2NoTools = true;
-        setReminder('lite2-cap', '<system-reminder>LITE2 tool budget reached (' + _lite2Cap + ' tool rounds). No more tool calls are available this turn - write your final answer NOW from what you already have. If information is missing, say so in one line.</system-reminder>');
-      }
-    }
     _roundNo++;
     if (await drainSteers()) ctx._stopBlocks = 0;   // fresh user input → reset the stop guard
     // Reminder assembly (only if nothing more urgent is already queued this round).
@@ -5424,7 +5390,7 @@ async function runAgent(config, ctx) {
             return { ...t, function: { ...t.function, description: (t.function.description || '') +
               '\nCURRENTLY HIDDEN by the plan-first gate (they exist and unlock the moment a task is in_progress): ' + hidden.join(', ') + '.' } };
           })
-      : (ctx._lite2NoTools ? [] : config.tools);
+      : config.tools;
     // the model reads it immediately before generating (recency beats a rule
     // Force-respond escalation: a bare-prose round (the model tried to answer
     // WITHOUT respond()) armed _forceRespondNext, so THIS request compels respond()

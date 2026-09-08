@@ -263,7 +263,6 @@ async function ensureSessionId(convId) {
   const updated = Object.assign({}, meta || {}, { id: convId, session_id: sid });
   // A >>> lite toggle on a brand-new conversation (no meta yet) is honored here:
   if (liteMetaCache.get(convId) === true) updated.lite = true;
-  if (lite2MetaCache.get(convId) === true) updated.lite2 = true;
   await opfs.write(mp, JSON.stringify(updated));
   Sandpie.events.emit('file:changed', mp);
   return sid;
@@ -1519,7 +1518,6 @@ function mountConv(convId, pane = null) {
   activeConvId = convId;
   if (convId) {
     _loadLiteFlag(convId).catch(() => {});   // preload lite flag for the next turn
-    _loadLite2Flag(convId).catch(() => {});   // preload lite2 flag for the next turn
     localStorage.setItem('sandpie-active-conv', convId);
     const s = ensureStream(convId);
     messages = s.messages;
@@ -1784,70 +1782,6 @@ registerDriftCommand();
 registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
-function _lite2Only(id) { return _lite2On(id) && !_liteOn(id); }   // lite2-active AND lite-off: lite2's own behavior (web_search allowed)
-
-/* ---- LITE2 MODE (exact copy of LITE, independent flag) ------------------- */
-// >>> lite2 mirrors >>> lite as a SEPARATE per-conversation flag (meta.lite2)
-// so the two fast paths can be customized independently later. Today it is a
-// byte-for-byte copy of lite: no tools, skills or memories, minimal prompt.
-function _lite2On(id) {
-  try { const m = lite2MetaCache.get(id || activeConvId); return m === true; } catch (_) { return false; }
-}
-const lite2MetaCache = new Map();   // convId -> boolean (best-effort read cache)
-async function _loadLite2Flag(id) {
-  if (lite2MetaCache.has(id)) return lite2MetaCache.get(id);
-  let on = false;
-  try { const m = await readConvMeta(id); on = !!(m && m.lite2); } catch (_) {}
-  lite2MetaCache.set(id, on);
-  return on;
-}
-async function _setLite2(id, on) {
-  const loc = await convLocation(id);
-  if (!loc.format) { lite2MetaCache.set(id, !!on); return; }   // brand-new conv: cache only (ensureSessionId persists it on first send)
-  if (loc.format === 'old') {
-    // Legacy single-file format: the flag must live inside the .json itself.
-    const cp = convPath(id, loc.archived);
-    let data = null; try { data = JSON.parse(await opfs.read(cp)); } catch (_) {}
-    if (data) {
-      data.lite2 = !!on;
-      await opfs.write(cp, JSON.stringify(data));
-      try { Sandpie.events.emit('file:changed', cp); } catch (_) {}
-    }
-    lite2MetaCache.set(id, !!on);
-    return;
-  }
-  const mp = metaPath(id, loc.archived);
-  let meta = null; try { meta = JSON.parse(await opfs.read(mp)); } catch (_) {}
-  const updated = Object.assign({}, meta || {}, { id, lite2: !!on });
-  await opfs.write(mp, JSON.stringify(updated));
-  try { Sandpie.events.emit('file:changed', mp); } catch (_) {}
-  lite2MetaCache.set(id, !!on);
-}
-function registerLite2Command() {
-  if (typeof SandpieCommands === 'undefined') return;
-  SandpieCommands.register({
-    name: 'lite2',
-    module: 'core',
-    help: 'Toggle LITE2 mode for this conversation (copy of LITE: no tools/skills/memories - fast answers)',
-    usage: ">>> lite2 [on|off]",
-    run(text, parts) {
-      const cid = activeConvId;
-      if (!cid) return 'LITE2 mode applies per conversation - open (or start) a conversation first, then run >>> lite2.';
-      let on;
-      if (parts.length > 1) on = /^(on|1|true|yes)$/i.test(parts[1]);
-      else on = !_lite2On(cid);   // no arg -> toggle
-      const apply = () => _setLite2(cid, on).then(() =>
-        'LITE2 mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.'
-        + '\n(' + (on
-          ? 'No tools, skills or memories are sent - simple queries answer in seconds. Turn it off with >>> lite2 off when you need files, Python or search.'
-          : 'Full power restored: tools, skills and memories are back on the next turn.') + ')');
-      // New conversation (no meta yet): flush the pending conv creation first if needed.
-      return _loadLite2Flag(cid).then(() => apply());
-    }
-  });
-}
-registerLite2Command();
-
 let _memRecalcLatest = null, _memRecalcBusy = false;
 // Recompute which memories are active/standby immediately after the active
 // conversation changes — send-time systemBlock() only recalculates on submit.
@@ -3085,7 +3019,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=217');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=218');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3880,7 +3814,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
   }
   // The project rule, appended to the system prompt so the model knows where it
   // can write and that reads are unrestricted.
-  const _liteCfg = _liteOn(convId || activeConvId) || _lite2On(convId || activeConvId);
+  const _liteCfg = _liteOn(convId || activeConvId);
   const _sysPrompt = await buildSystemPrompt(convMessages, null);
   if (window.SANDPIE_BETA && _sysPrompt && typeof _sysPrompt.content === 'string') {
     _sysPrompt.content += _projRoot
@@ -3905,16 +3839,13 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     model: (effective && effective.model) || '',
     systemPrompt: _sysPrompt,
     messages: resolvedMessages,
-    tools: _liteCfg ? (_lite2Only(convId || activeConvId) ? [toolDefs().find(t => t.function && t.function.name === 'web_search')].filter(Boolean) : []) : (_todoV2() ? toolDefs() : _todoLabTools(toolDefs())),
+    tools: _liteCfg ? [] : (_todoV2() ? toolDefs() : _todoLabTools(toolDefs())),
     // Todos run in CLAUDE MODE by default (2026-08-28 A/B: deepseek fully
     // complies with the trust-based TodoWrite contract — 5 turns/27s vs
     // 7/39s under the gated v2): blind full replace, no plan-first gate, no
     // open-todos stop guard. window.__todoV2 = 1 (console) restores the
     // guarded v2 tool for comparison/rollback.
     todoMode: _todoV2() ? '' : 'claude',
-    // LITE2 fast-path flags (worker-side round cap + empty-search guard + scraper fail-fast).
-    lite2: _lite2Only(convId || activeConvId),
-    lite2Rounds: 3,
     // Rerouted to the vision fallback for this turn (user attached an image to a
     // text-only model). The composer marks the user bubble; the worker just uses
     // this config as-is (url/headers/model already point at the fallback).
@@ -3939,20 +3870,6 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // uses only the /proxy/ multi-engine scrape fallback.
     webSearch: (() => {
       try {
-        // LITE2-ONLY primary backend (2026-09-08): route the search helper through
-        // the managed company proxy (the server holds a VALID upstream key) instead
-        // of the client's stored openrouter.ai key, which can be stale/invalid
-        // (session y5xo6tis: every search 401'd "User not found"). Gated on lite2
-        // so the standard mode's webSearch backend is untouched.
-        if (_lite2Only(convId || activeConvId)) {
-          const mg = [effective, active, ...((typeof SandpieProviders !== 'undefined' && SandpieProviders.list) ? SandpieProviders.list() : [])].filter(Boolean)
-            .find(p => p.managed && String(p.apiKey || '').trim() && String(p.endpoint || '').trim());
-          if (mg) return {
-            url: String(mg.endpoint).trim().replace(/\/$/, '') + '/chat/completions',
-            apiKey: String(mg.apiKey).trim(),
-            model: (effective && effective.model) || '',
-          };
-        }
         const cands = [effective, active,
                        ...((typeof SandpieProviders !== 'undefined' && SandpieProviders.list) ? SandpieProviders.list() : [])].filter(Boolean);
         const or = cands.find(p => /(^https?:\/\/|\.)openrouter\.ai(\/|$)/i.test(String(p.endpoint || '').trim() + '/')
@@ -6312,14 +6229,11 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   // The reply-language directive below still applies (it is appended after this).
   const _liteCid = (typeof activeConvId !== 'undefined' && activeConvId) || null;
   let content;
-  if (_liteCid && (_liteOn(_liteCid) || _lite2On(_liteCid))) {
+  if (_liteCid && _liteOn(_liteCid)) {
     // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
     // The reply-language directive below still applies (it is appended after this).
-    content = 'You are sandpie, a fast assistant in ' + (_lite2Only(_liteCid) ? 'LITE2' : 'LITE') + ' mode. Answer directly, concisely and completely. '
-      + (_lite2Only(_liteCid)
-        ? 'You have exactly ONE tool: web_search (keyword web search returning a ranked list of {title, url, snippet}). SPEED is the priority: answer from your own knowledge by default; call web_search ONLY when the answer depends on current/recent facts you are unsure of. When you do search, batch independent lookups as SEVERAL web_search calls in the SAME turn, then answer. If searches return no results, do NOT keep retrying reworded queries - answer from what you know and say live search is unavailable. '
-        : 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. ')
-      + 'No other tools exist in this mode (no files, no code execution, no page fetching): if the request needs them, say so in one short line and ask the user to run >>> ' + (_lite2Only(_liteCid) ? 'lite2' : 'lite') + ' off. '
+    content = 'You are sandpie, a fast assistant in LITE mode. Answer directly, concisely and completely. '
+      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. '
       + 'Do not invent tool results.';
   } else {
     content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
@@ -6338,7 +6252,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     const stamp = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     content = 'The current date is ' + stamp + (tz ? ' (' + tz + ')' : '') + '. Treat this as today; the precise time arrives with each request.\n\n' + content;
   } catch (_) {}
-  const _lite = !!(_liteCid && (_liteOn(_liteCid) || _lite2On(_liteCid)));
+  const _lite = !!(_liteCid && _liteOn(_liteCid));
   // Optional capability: context.js appends the skills block (enforced skill
   // index + an instruction telling the model to fetch a skill via the load_skill
   // tool when relevant). Module absent ⇒ plain memory prompt.
@@ -6747,9 +6661,8 @@ function registerInspectPromptCommand() {
     usage: '>>> inspect-prompt',
     async run(text, parts) {
       if (activeConvId) await _loadLiteFlag(activeConvId).catch(() => {});
-      if (activeConvId) await _loadLite2Flag(activeConvId).catch(() => {});
       const prompt = await buildSystemPrompt(messages);
-      const lite = activeConvId && (_liteOn(activeConvId) || _lite2On(activeConvId));
+      const lite = activeConvId && _liteOn(activeConvId);
       return '=== System prompt ' + (lite ? '(LITE MODE ON - minimal)' : '') + ' ===\n\n' + prompt.content;
     },
   });
