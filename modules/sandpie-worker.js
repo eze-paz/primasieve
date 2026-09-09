@@ -353,11 +353,24 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'tool') {
-    const { id, name, args, conversation_file_name } = data;
+    const { id, name, args, conversation_file_name, agentId } = data;
     const ctx = { _conversation_file_name: conversation_file_name || 'unknown', emit: () => {} };
+    // A caller MAY supply an agentId to attribute file writes: register a touched-file
+    // sink so owner-stamped writes (e.g. the walios() tool's) surface as cards, and emit
+    // the deduped list when the tool returns — the single-call analogue of runAgent's
+    // turn-end emit. Without an agentId this is a bare tool call (nothing surfaces).
+    if (agentId != null) { ctx.agentId = agentId; ctx._filesTouched = new Map(); _touchSinks.set(agentId, ctx._filesTouched); }
     let out;
     try { out = await runToolGuarded(name, args || {}, ctx); }
     catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
+    if (agentId != null) {
+      try {
+        const files = [...ctx._filesTouched.entries()].filter(([p]) => p && !_ftExcluded(p))
+          .sort((a, b) => a[1] - b[1]).map(([path, ts]) => ({ path, ts }));
+        if (files.length) self.postMessage({ type: 'files_touched', files, partial: false });
+      } catch (_) {}
+      _touchSinks.delete(agentId);
+    }
     try {
       self.postMessage({
         type: 'tool_result',
@@ -444,6 +457,7 @@ const _touchSinks = new Map();   // agentId → ctx._filesTouched (registered wh
 // plus lab/infra trees.
 const _ftExcluded = p => (p.startsWith('sandpie/') && !p.startsWith('sandpie/artifacts/'))
   || p.startsWith('looplab-runs/') || p.startsWith('.tokens');
+const _toOpfsRel = p => String(p || '').replace(/^\/+/, '').replace(/^(?:files|root)\//, '');
 const _postRaw = self.postMessage.bind(self);
 self.postMessage = function (msg, ...rest) {
   try {
@@ -452,8 +466,8 @@ self.postMessage = function (msg, ...rest) {
     if (p && p.owner != null && Array.isArray(p.paths)) {
       const sink = _touchSinks.get(p.owner);
       if (sink) {
-        if (p.type === 'sw-opfs-changed') { const t = Date.now(); for (const x of p.paths) sink.set(String(x).replace(/^\/+/, ''), t); }
-        else if (p.type === 'opfs-deleted-by-python') { for (const x of p.paths) sink.delete(String(x).replace(/^\/+/, '')); }
+        if (p.type === 'sw-opfs-changed') { const t = Date.now(); for (const x of p.paths) sink.set(_toOpfsRel(x), t); }
+        else if (p.type === 'opfs-deleted-by-python') { for (const x of p.paths) sink.delete(_toOpfsRel(x)); }
       }
     }
   } catch (_) {}
@@ -3167,7 +3181,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=7');
+importScripts('/modules/walios-backend.js?v=8');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');
@@ -3177,6 +3191,9 @@ const WALIOS_MANIFEST = Object.assign(WB.manifest(WALIOS_BB), {
   make: 'make.wasm', gmake: 'make.wasm',
 });
 let _waliosWorker = null, _waliosQueue = Promise.resolve();
+let _waliosOpfsWorker = null;      // the walios OPFS bridge (hoisted so a run can flush it)
+let _waliosActiveOwner = null;     // agentId of the walios() run currently holding _waliosQueue
+let _waliosFlushResolve = null;    // one-shot, resolved by the OPFS worker's 'flushed' ack
 
 // pkgcache: binaries other users compiled in-tab (e.g. git) live on the server
 // (/walios/pkgcache/<name>.wasm + index.json). The terminal.html page folds them
@@ -3210,12 +3227,20 @@ function _waliosWireOpfs(ow) {
     // the tools already use (this worker has no localStorage to mark with):
     //   sw-opfs-changed        -> dropbox.js marks dirty (kept, then uploaded)
     //   opfs-deleted-by-python -> the delete handshake (remote delete + index trim)
+    // A 'flushed' ack means the OPFS worker has posted every pending change batch;
+    // the run may now resolve knowing its writes are recorded under its own owner.
+    if (d.t === 'flushed') { const r = _waliosFlushResolve; _waliosFlushResolve = null; if (r) r(); return; }
+    // owner = the agentId of the walios() run currently holding the queue, so these
+    // writes surface as THIS conversation's touched-file cards (same owner-routing the
+    // pyodide pool uses). _waliosQueue serialises runs, so the owner is unambiguous;
+    // the flush-on-exit below guarantees a late batch never lands after the next run
+    // has taken the slot.
     if (d.t === 'opfs-changed' && Array.isArray(d.rels) && d.rels.length) {
-      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: d.rels } }); } catch (_) {}
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: d.rels, owner: _waliosActiveOwner } }); } catch (_) {}
       return;
     }
     if (d.t === 'opfs-removed' && Array.isArray(d.rels) && d.rels.length) {
-      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: d.rels } }); } catch (_) {}
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: d.rels, owner: _waliosActiveOwner } }); } catch (_) {}
       return;
     }
   });
@@ -3226,8 +3251,8 @@ function _waliosEnsure() {
   const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
   try {   // OPFS bridge: persistent /root home (full origin OPFS root). Optional.
     const opfsSab = new SharedArrayBuffer(32 + (1 << 20));
-    const opfsWorker = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
-    opfsWorker.postMessage({ t: 'sab', sab: opfsSab });
+    _waliosOpfsWorker = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
+    _waliosOpfsWorker.postMessage({ t: 'sab', sab: opfsSab });
     w.postMessage({ t: 'opfs-sab', sab: opfsSab });
   } catch (_) { /* no cross-origin isolation → RAM-only VFS */ }
   try {   // WISP bridge: real TCP/UDP via the relay. Optional.
@@ -3295,6 +3320,10 @@ async function tool_walios({ script, timeout }, ctx) {
   if (typeof WebAssembly.Suspending !== 'function' || typeof WebAssembly.promising !== 'function')
     return { result: 'Error: the walios shell needs WebAssembly JSPI, which this browser does not have '
                      + '(Chromium-only today). Use run_python for computation, or the shell tool for the relay host.' };
+  // Everything this run writes to /root must surface as THIS conversation's
+  // touched-file cards: arm the owner the OPFS forwards are stamped with. The
+  // global _waliosQueue serialises walios() runs, so this is unambiguous.
+  _waliosActiveOwner = (ctx && ctx.agentId != null) ? ctx.agentId : null;
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
   const pkgM = await _waliosPkgManifest();
@@ -3353,7 +3382,15 @@ async function tool_walios({ script, timeout }, ctx) {
         if (truncated) text = text.slice(0, 65536) + '\n…[output truncated at 64KB]';
         text = text.replace(/\n+$/, '');
         text += (text ? '\n' : '') + '[walios exit ' + m.code + (m.ms != null ? ' · ' + Math.round(m.ms) + 'ms' : '') + ']';
-        finish(text || '[no output]');
+        // Drain the OPFS worker's pending change batch (250ms debounce) BEFORE resolving,
+        // so every file this run wrote is forwarded — under THIS run's owner — and lands
+        // as a touched-file card. Bounded: a missing ack must never hang the tool.
+        const out = text || '[no output]';
+        let settled = false; const go = () => { if (settled) return; settled = true; finish(out); };
+        if (_waliosOpfsWorker) { _waliosFlushResolve = go;
+          try { _waliosOpfsWorker.postMessage({ t: 'flush' }); } catch (_) {}
+          setTimeout(go, 600);
+        } else { go(); }
       }
     };
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
