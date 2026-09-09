@@ -364,10 +364,13 @@ function buildModelPickerInto(host, active) {
   if (shownManaged.length) {
     panel.appendChild(hdr('Company'));
     shownManaged.forEach(p => panel.appendChild(item(p)));
-    panel.appendChild(Object.assign(document.createElement('div'), { className: 'mp-sep' }));
-    panel.appendChild(hdr('Your models'));
-    if (_providers.length) _providers.forEach(p => panel.appendChild(item(p)));
-    else panel.appendChild(empty('None yet — add one in Settings'));
+    // 'Your models' section only exists when the user actually HAS models —
+    // with none, no header, no separator, no empty note (nothing to show).
+    if (_providers.length) {
+      panel.appendChild(Object.assign(document.createElement('div'), { className: 'mp-sep' }));
+      panel.appendChild(hdr('Your models'));
+      _providers.forEach(p => panel.appendChild(item(p)));
+    }
   } else if (_providers.length) {
     _providers.forEach(p => panel.appendChild(item(p)));
   } else {
