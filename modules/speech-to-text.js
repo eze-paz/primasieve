@@ -264,7 +264,11 @@ const SandpieSpeech = (function () {
   }
 
   function activeModelId() {
-    return cfgEngine() === 'moonshine' ? 'onnx-community/moonshine-base-ONNX' : cfgModel();
+    if (cfgEngine() !== 'moonshine') return cfgModel();
+    // Moonshine is mono-lingual: pick the model for the configured spoken language.
+    const lang = cfgLang();
+    if (lang === 'es') return 'izaaku16/moonshine-base-es-ONNX';   // Spanish base (q8, browser-ready)
+    return 'onnx-community/moonshine-base-ONNX';                    // English base
   }
   async function engineStart() {
     if (cfgEngine() === 'webspeech' && webspeechSupported()) {
@@ -391,7 +395,7 @@ const SandpieSpeech = (function () {
           : 'This browser has no Web Speech API — Whisper on-device will be used instead.';
       }
       if (cfgEngine() === 'moonshine') {
-        return 'Moonshine runs fully in this tab (~5x faster than Whisper). English uses moonshine-base; other languages fall back to Whisper.';
+        return 'Moonshine runs fully in this tab (~5x faster than Whisper). English uses moonshine-base; Spanish uses moonshine-base-es (set Spoken language = Spanish).';
       }
       return 'Whisper runs fully in this tab; the first use downloads the model.';
     }
