@@ -140,6 +140,35 @@ const SandpieSpeech = (function () {
     try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
   }
 
+  // ── Interim tail: live Web Speech interim text rendered INTO the prompt box ──
+  // The unconfirmed interim text is appended to the composer and REPLACED in
+  // place as recognition refines it; on a final result the tail is removed and
+  // the confirmed transcript appended in its place. On stop, any surviving tail
+  // is promoted to committed text so no dictated words are lost.
+  let _interimTail = '';
+  function _composerEl() {
+    return document.getElementById('input') || document.querySelector('textarea');
+  }
+  function setInterimText(text) {
+    const ta = _composerEl(); if (!ta) return;
+    let cur = ta.value;
+    if (_interimTail && cur.endsWith(_interimTail)) {
+      cur = cur.slice(0, cur.length - _interimTail.length);
+    }
+    _interimTail = text || '';
+    if (_interimTail) {
+      const needsSpace = cur && !/\s$/.test(cur);
+      cur = cur + (needsSpace ? ' ' : '') + _interimTail;
+    }
+    ta.value = cur;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
+  }
+  function commitInterim(finalText) {
+    setInterimText('');          // drop the unconfirmed tail
+    appendToComposer(finalText); // append the confirmed transcript
+  }
+
   // ── Engine: Web Speech API (default) — native recognizer, live text ──
   // Chrome/Edge: excellent quality + instant live results. Desktop Chrome routes
   // audio through Google's recognizer service (not fully on-device); Android is
@@ -161,9 +190,10 @@ const SandpieSpeech = (function () {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
         if (res.isFinal) {
-          appendToComposer(res[0].transcript);
+          commitInterim(res[0].transcript);
         } else interim += res[0].transcript;
       }
+      if (interim) setInterimText(interim);
       setState('recording');
       if (interim) _btn.title = interim.slice(-60);
     };
@@ -183,6 +213,7 @@ const SandpieSpeech = (function () {
     return true;
   }
   function wsStop() {
+    if (_interimTail) commitInterim(_interimTail);   // promote unconfirmed tail
     _recogActive = false;
     try { _recog && _recog.stop(); } catch (_) {}
     // onend fires engineDone; settle shortly after in case it never fires.
