@@ -3991,7 +3991,7 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
       try {
         if (typeof SandpieCompactor === 'undefined' || !SandpieCompactor.isEnabled()) return null;
         let window = null;
-        try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.contextWindow) window = SandpieTokens.contextWindow(); } catch (_) {}
+        try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.contextWindow) window = SandpieTokens.contextWindow(convId); } catch (_) {}
         if (!window) return null;
         const c = SandpieCompactor.config();
         return { enabled: true, pct: c.pct, keepTail: c.keepTail, prompt: c.prompt, model: c.model || '', window, marker: SP_SUMMARY_MARKER };
@@ -7774,7 +7774,7 @@ async function openContextPopup(convId, anchorEl) {
   if (_ctxPopupEl) { _closeContextPopup(); return; }   // toggle off if already open
   const T = (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null;
   let used = 0, win = null;
-  if (T) { try { used = await T.conversationTokens(convId); } catch (_) {} try { win = T.contextWindow(); } catch (_) {} }
+  if (T) { try { used = await T.conversationTokens(convId); } catch (_) {} try { win = T.contextWindow(convId); } catch (_) {} }
 
   const pop = document.createElement('div');
   pop.className = 'ctx-popup';

@@ -74,14 +74,20 @@ const SandpieTokens = (() => {
     const used = usageTotal(u);
     if (!used) return null;
     const rec = (u._window > 0) ? u._window : null;
-    const act = contextWindow();
+    const act = contextWindow(convId);
     const w = (rec && act) ? Math.min(rec, act) : (rec || act);
     if (!w) return null;
     return (used / w) * 100;
   }
 
-  function contextWindow() {
-    const ap = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null;
+  function contextWindow(convId) {
+    // Per-conversation: resolve THIS conversation's provider (falls back to the
+    // default provider when the conv has no bound id). getActive() is a legacy
+    // alias for defaultProvider() and would report the wrong model's window.
+    let ap = null;
+    try { ap = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(convId) : null; }
+    catch (_) { ap = null; }
+    if (!ap) { try { ap = (typeof SandpieProviders !== 'undefined') ? SandpieProviders.getActive() : null; } catch (_) {} }
     return (ap && ap.contextWindow > 0) ? ap.contextWindow : null;
   }
 
@@ -89,7 +95,7 @@ const SandpieTokens = (() => {
     if (!usage) return;
     // Stamp the context window the usage was measured against, so contextPct
     // keeps an honest denominator after the user switches the active provider.
-    try { const w = contextWindow(); if (w) usage = { ...usage, _window: w }; } catch {}
+    try { const w = contextWindow(convId); if (w) usage = { ...usage, _window: w }; } catch {}
     localStorage.setItem(USAGE_PREFIX + convId, JSON.stringify(usage));
     const log = prune(loadLog());
     log.push({ t: Date.now(), tokens: usageTotal(usage) });
