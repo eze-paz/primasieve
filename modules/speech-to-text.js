@@ -42,7 +42,7 @@ const SandpieSpeech = (function () {
   const TARGET_SR   = 16000;  // Whisper expects 16 kHz mono
   const RMS_THRESH  = 0.012;  // speech vs silence energy gate
   const MIN_SEG_SEC = 0.5;    // shorter than this after silence → discard (hallucination guard)
-  const SILENCE_MS  = 400;    // silence that closes a segment (lower = text appears sooner)
+  const SILENCE_MS  = 700;    // silence that closes a segment
   const MAX_SEG_SEC = 28;     // force-close before Whisper's 30 s receptive field
 
   // ── Prefs (SandpieConfig namespace, localStorage fallback — no secrets) ──
@@ -343,9 +343,6 @@ const SandpieSpeech = (function () {
   function onMicClick() {
     if (_state === 'idle') {
       setState('recording');
-      // Preload the model immediately so the first segment isn't slow
-      // (runs in parallel with the getUserMedia permission prompt).
-      try { getWorker().postMessage({ type: 'load', modelId: activeModelId() }); } catch (_) {}
       engineStart();
     } else if (_state === 'recording') {
       setState('busy');
