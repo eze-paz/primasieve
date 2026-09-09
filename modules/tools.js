@@ -550,19 +550,17 @@ const RUN_PYTHON_WALIOS = (() => {
   return out;
 })();
 
-// walios is a real Linux userland: every blocking syscall suspends through JSPI, so
-// without it the guest does not degrade, it TRAPS — measured, a bare `echo ok` exits 139
-// and python cannot start at all. JSPI is Chromium-only, so on Safari/Firefox a user with
-// the walios preference set would get a dead Python tool. Fall back to Pyodide instead.
+// walios runs every guest process on its own worker and its kernel reads guest memory
+// through SharedArrayBuffers, so it needs cross-origin isolation (the app serves the
+// COOP/COEP headers) -- and nothing else: no JSPI, so it is not Chromium-only. Without
+// isolation there is no SharedArrayBuffer and the OS cannot start; fall back to Pyodide.
 //
 // THE SAME predicate must decide the tool DESCRIPTION and the tool's actual BACKEND, or
 // the model is told walios's rules while running on Pyodide — that exact mismatch was a
 // real bug once already. conversations.js calls SandpieTools.waliosPython() for the
 // worker's config so there is one answer, not two.
 function _waliosCapable() {
-  return typeof WebAssembly !== 'undefined'
-      && typeof WebAssembly.Suspending === 'function'
-      && typeof WebAssembly.promising === 'function';
+  return typeof WebAssembly !== 'undefined' && typeof SharedArrayBuffer === 'function';
 }
 let _waliosWarned = false;
 function _waliosPython() {
@@ -573,8 +571,8 @@ function _waliosPython() {
   if (_waliosCapable()) return true;
   if (!_waliosWarned) {
     _waliosWarned = true;
-    console.warn('[sandpie] python backend "walios" requested but this browser has no JSPI '
-                 + '(WebAssembly.Suspending/promising) — falling back to Pyodide.');
+    console.warn('[sandpie] python backend "walios" requested but this page has no SharedArrayBuffer '
+                 + '(not cross-origin isolated) — falling back to Pyodide.');
   }
   return false;
 }

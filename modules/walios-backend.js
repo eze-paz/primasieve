@@ -35,7 +35,14 @@
   // dlopen16: every WASI process gets fd 3 = "/" preopened. Only the root module and
   // wasi-threads binaries had one, so a WASI child exec'd from the shell (qjs) could
   // not open any path: `qjs -e` worked, `qjs /tmp/t.js` and std.open() said ENOENT.
-  const WORKER_V = 'dlopen16';
+  // dlopen17: ONE engine. Every process runs on its own worker; the kernel is a
+  // never-blocked async syscall server. The JSPI engine (Chrome-only) and the in-kernel
+  // synchronous engine are gone, and with them the stdin/mount SAB bridges that only
+  // existed to feed a parked kernel, the sync lazy-fetch, and the separate wasi-threads
+  // proxy (merged into the process worker: imported shared memory + thread mode). One
+  // exec path (resolveExec + startProcess). WASI guests must link shared memory
+  // (wasm32-wasi-threads); qjs/qjsc were rebuilt that way.
+  const WORKER_V = 'dlopen17';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -131,6 +138,57 @@
         // credentials, which is the actionable message; put a token in the URL for a
         // private repo (https://x-access-token:TOKEN@github.com/owner/repo).
         GIT_TERMINAL_PROMPT: '0',
+      };
+    },
+
+    // ---- ONE boot for every host -----------------------------------------------
+    // The run message a host posts to wali-worker.js, assembled in one place: the
+    // busybox root, the package index folded into the manifest and lazyTars, the TLS
+    // trust store + gitconfig, the apk client + its TSV, python's import-miss shim, and
+    // the env every guest needs. Hosts add only what is theirs (the terminal's build
+    // script, the tool's soffice bridge, the REPL's entry script). Every "worked in the
+    // terminal, missing in the tool" bug in this file's history was a host forgetting one
+    // of these; now there is nothing to forget.
+    //
+    //   kind        'terminal' | 'tool' | 'repl'  (selects env(kind) / eagerTars(kind))
+    //   base        where /walios/ is reachable from the caller (default '/walios/')
+    //   busybox     root module url (default this.BUSYBOX)
+    //   pkgs        pkgIndex() result or a promise of one (optional)
+    //   manifest    host additions; win over the package index
+    //   lazyTars    host additions, keyed by module url
+    //   blobs       host additions, path -> ArrayBuffer/Uint8Array; win over the defaults
+    //   env         host additions; win over the defaults
+    //   rpc         seed sitecustomize + SANDPIE_HOST_RPC=1 so python can ask for bundles
+    //               over the frame channel (default true; the REPL brings its own)
+    //   argv, cwd, pty, cols, rows   as in the run message
+    BUSYBOX: 'busybox.wasm?v=net4',   // v=net4: fuller coreutils (expr/cmp/install/realpath/od/getopt/diff + find predicates); ash+networking, --export-table (shell ^C)
+    async runMessage(o) {
+      const base = o.base || '/walios/';
+      const bb = o.busybox || this.BUSYBOX;
+      const pkgs = o.pkgs ? await o.pkgs : null;
+      const rpc = o.rpc !== false;
+      const blobs = Object.assign({}, await this.tlsBlobs(base), pkgs ? this.pkgBlobs(pkgs) : {});
+      if (rpc) {
+        // On the default path for every python in the guest, so an import miss can ask
+        // the host for the bundle. Without it numpy/pandas/PIL/docx simply did not exist
+        // in the walios() tool while the terminal had them.
+        try { const r = await fetch('/modules/walios-sitecustomize.py?v=1'); if (r.ok) blobs['/site-packages/_shims/sitecustomize.py'] = await r.arrayBuffer(); } catch (_) {}
+      }
+      Object.assign(blobs, o.blobs || {});
+      const env = Object.assign(
+        { HOME: '/root', TERM: o.pty ? 'xterm' : 'dumb', PATH: '/bin:/usr/bin', PS1: o.pty ? 'walios:$PWD$ ' : '', HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' },
+        rpc ? { SANDPIE_HOST_RPC: '1' } : {},
+        this.env(o.kind),
+        // AFTER env(): its SSL_CERT_FILE points at certifi, which only exists once python's
+        // companion tar is mounted, and git/wget need trust before that.
+        this.tlsEnv(),
+        o.env || {});
+      return {
+        t: 'run', wasm: bb,
+        manifest: Object.assign({}, pkgs ? pkgs.manifest : {}, this.manifest(bb), o.manifest || {}),
+        tars: [['rootfs.tar.gz', '/']], opfs: '/root', blobs,
+        lazyTars: Object.assign({}, pkgs ? pkgs.lazyTars : {}, this.eagerTars(o.kind), o.lazyTars || {}),
+        env, cwd: o.cwd || '/root', argv: o.argv, pty: !!o.pty, cols: o.cols || 120, rows: o.rows || 40,
       };
     },
 
@@ -266,144 +324,6 @@
       ].join('\n');
     },
 
-    // Is JSPI here? walios' blocking syscalls are WebAssembly.Suspending imports, so
-    // without it the guest traps rather than degrading. Callers pass `jspi: WB.jspi()`
-    // so a browser without it takes the synchronous path instead of dying.
-    jspi() {
-      return typeof WebAssembly !== 'undefined'
-          && typeof WebAssembly.Suspending === 'function'
-          && typeof WebAssembly.promising === 'function';
-    },
-
-    // Yield to the event loop WITHOUT setTimeout.
-    //
-    // Both SAB bridges below hand the guest one chunk at a time and then spin until it
-    // has drained: the host cannot Atomics.wait (it may be the main thread, where that
-    // is illegal), so it has to yield. setTimeout was the obvious way, and it is wrong --
-    // Chrome clamps timers to >=1s in a HIDDEN tab, so every chunk handshake cost a
-    // second the moment the user switched tabs. Measured: an 8-chunk stdlib mount blew
-    // through syncRequest's 60s budget and the guest reported the bundle "did not
-    // arrive", which surfaces as `ModuleNotFoundError: No module named 'encodings'` --
-    // a background tab silently broke python. MessagePort delivery is not throttled.
-    tick() {
-      if (!this._tickCh) {
-        this._tickCh = new MessageChannel();
-        this._tickQ = [];
-        this._tickCh.port1.onmessage = () => { const f = this._tickQ.shift(); if (f) f(); };
-        this._tickCh.port1.start();
-      }
-      return new Promise((r) => { this._tickQ.push(r); this._tickCh.port2.postMessage(0); });
-    },
-
-    // Blocking stdin for the SYNCHRONOUS path.
-    //
-    // Without JSPI the guest cannot await a postMessage, so `{t:'stdin'}` is useless to
-    // it: a read on fd 0 returns EOF immediately and the warm REPL exits the instant it
-    // starts (measured — "guest exited 0" in 5s). wali-worker.js has always had the
-    // receiving half of the fix — readStdin() parks on Atomics.wait against a
-    // SharedArrayBuffer installed by a 'stdin-sab' message — but NO host ever sent that
-    // message, so the whole mechanism was dead code. This is the writing half.
-    //
-    // Protocol (ctl = Int32Array(sab,0,4), data = Uint8Array(sab,16)):
-    //   ctl[0]  0 = empty / host may write, 1 = data ready, 2 = EOF
-    //   ctl[1]  byte count in data
-    // The guest drains, sets ctl[0] back to 0 and notifies; we wait for that before the
-    // next chunk. Never Atomics.wait here — a host may be on the main thread, where it
-    // is disallowed — so yield to the event loop instead.
-    stdinBridge(worker, capacity) {
-      let sab;
-      try { sab = new SharedArrayBuffer(16 + (capacity || (1 << 20))); }
-      catch (_) { return null; }                       // no cross-origin isolation
-      const ctl = new Int32Array(sab, 0, 4), data = new Uint8Array(sab, 16);
-      try { worker.postMessage({ t: 'stdin-sab', sab }); } catch (_) { return null; }
-      const enc = new TextEncoder();
-      return {
-        async write(str) {
-          const b = enc.encode(str);
-          for (let off = 0; off < b.length;) {
-            while (Atomics.load(ctl, 0) !== 0) await g.WALIOS_BACKEND.tick();
-            const n = Math.min(b.length - off, data.length);
-            data.set(b.subarray(off, off + n), 0);
-            Atomics.store(ctl, 1, n);
-            Atomics.store(ctl, 0, 1);
-            Atomics.notify(ctl, 0);
-            off += n;
-          }
-        },
-        eof() { Atomics.store(ctl, 0, 2); Atomics.notify(ctl, 0); },
-      };
-    },
-
-    // Lazy bundle mounting for the SYNCHRONOUS path.
-    //
-    // With JSPI the wali worker fetches and extracts a bundle itself. Without it the guest
-    // is parked in Atomics.wait ON THAT THREAD, so the worker can never run its own
-    // 'mount-tar' handler: the mount frame went out and nothing came back. Measured --
-    // `import numpy` hung to the 90s test timeout while the stdlib worked fine.
-    //
-    // So the host does the half that needs an event loop (fetch + gunzip) on ITS thread
-    // and streams the plain tar bytes through a SAB the guest drains from inside its wait
-    // loop; the guest parses them with the same installTar() the async path uses. One
-    // buffer, installed at boot -- a blocked guest can never be handed a new one.
-    //
-    //   ctl[0]  0 = host may write, 1 = chunk ready, 2 = last chunk, 3 = host error
-    //   ctl[1]  bytes in this chunk        data[0..256) = NUL-padded mount prefix
-    // `base` matters: bundle URLs are RELATIVE ('walios-numpy.tar.gz?v=3') and the wali
-    // worker resolves them against its own script at /walios/. Fetching from the host
-    // instead resolves them against the HOST's document, which 404s and looks exactly
-    // like a missing package -- the finder gets ok_call:false and raises
-    // ModuleNotFoundError in milliseconds. Resolve explicitly.
-    mountBridge(worker, opts) {
-      const o = (typeof opts === 'number') ? { chunkBytes: opts } : (opts || {});
-      const base = o.base || '/walios/';
-      const chunkBytes = o.chunkBytes;
-      const PREFIX = 256, cap = chunkBytes || (4 << 20);
-      let sab;
-      try { sab = new SharedArrayBuffer(32 + PREFIX + cap); }
-      catch (_) { return null; }                       // no cross-origin isolation
-      const ctl = new Int32Array(sab, 0, 8), data = new Uint8Array(sab, 32);
-      try { worker.postMessage({ t: 'mount-sab', sab }); } catch (_) { return null; }
-      const idle = async () => { while (Atomics.load(ctl, 0) !== 0) await g.WALIOS_BACKEND.tick(); };
-      return {
-        ctl,                                             // exposed so a probe can watch the handshake
-        state() { return [Atomics.load(ctl, 0), Atomics.load(ctl, 1)]; },
-        // prefix 'module:<key>' streams a RAW wasm binary for sync exec to compile;
-        // anything else is a gzipped package tarball to unpack. Same buffer, same
-        // handshake -- a blocked guest can only be handed one channel.
-        async mount(url, prefix) {
-          let bytes;
-          const raw = String(prefix || '').startsWith('module:');
-          try {
-            const abs = new URL(url, new URL(base, self.location ? self.location.href : undefined)).href;
-            const resp = await fetch(abs);
-            if (!resp.ok) throw new Error('HTTP ' + resp.status + ' for ' + abs);
-            bytes = raw
-              ? new Uint8Array(await resp.arrayBuffer())
-              : new Uint8Array(await new Response(resp.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-          } catch (e) {
-            await idle(); Atomics.store(ctl, 0, 3); Atomics.notify(ctl, 0);
-            return { ok: false, error: String((e && e.message) || e) };
-          }
-          const pb = new TextEncoder().encode(prefix || '/');
-          for (let off = 0;;) {
-            await idle();
-            data.fill(0, 0, PREFIX);
-            data.set(pb.subarray(0, PREFIX), 0);        // the prefix rides with every chunk
-            const n = Math.min(bytes.length - off, cap);
-            data.set(bytes.subarray(off, off + n), PREFIX);
-            off += n;
-            const last = off >= bytes.length;
-            Atomics.store(ctl, 1, n);
-            Atomics.store(ctl, 0, last ? 2 : 1);
-            Atomics.notify(ctl, 0);
-            if (last) break;
-          }
-          await idle();                                  // guest has installed it
-          return { ok: true };
-        },
-      };
-    },
-
     // The guest->host frame channel, shared by the walios() tool and terminal.html so
     // there is one implementation to debug rather than two that drift.
     //
@@ -418,17 +338,14 @@
     //   onScreen  called with everything that is NOT a frame (write it to the terminal)
     //   onCall    optional, for ops other than 'mount'; returns a promise of the reply
     //   onMountMs optional, told how long a mount took so a caller can extend a deadline
-    //   stdin     optional stdinBridge(); when given, replies go through the SAB as well
-    //             as postMessage, so the same channel works with and without JSPI
-    //   mount     optional mountBridge(); when given, bundles are fetched HERE and
-    //             streamed in, because a synchronous guest cannot mount its own
     //   pkgs      optional pkgIndex() (or a promise of one); enables the 'pkg' op that
     //             `apk add` sends -- resolved here and registered with the kernel
     //
     // A frame is normally base64; a call carrying plain:1 is plain JSON and gets a plain
     // JSON reply (the shell client has no base64). Both are one line, so the echo strip
-    // works the same way.
-    hostChannel({ worker, onScreen, onCall, onMountMs, stdin, mount, pkgs }) {
+    // works the same way. Mounts are done by the kernel itself ('mount-tar'): it is never
+    // blocked, so there is no host-side bridge any more.
+    hostChannel({ worker, onScreen, onCall, onMountMs, pkgs }) {
       const STX = String.fromCharCode(2), ETX = String.fromCharCode(3);
       const enc = (str) => {
         const b = new TextEncoder().encode(str);
@@ -444,11 +361,7 @@
         const body = JSON.stringify(Object.assign({ t: 'reply', id: f.id }, o));
         const payload = f.plain ? body : enc(body);
         echoes.push(payload);
-        // The JSPI guest reads postMessage'd chunks; the synchronous guest is parked in
-        // Atomics.wait and only ever sees the SAB. Feed both — whichever path this guest
-        // is on, exactly one of them is listening.
         try { worker.postMessage({ t: 'stdin', data: payload + '\n' }); } catch (_) {}
-        if (stdin) { try { stdin.write(payload + '\n'); } catch (_) {} }
       };
       // Strip our own echoed replies before anything reaches the screen.
       const emit = (text) => {
@@ -469,16 +382,6 @@
         if (f.op === 'mount') {
           const a = f.args || {};
           if (!a.url) return reply(f, { ok_call: false, error: 'mount without url' });
-          // A synchronous guest cannot service its own 'mount-tar', so fetch here and
-          // stream the bytes in. Under JSPI the worker still does it itself.
-          if (mount) {
-            const t0 = Date.now();
-            mount.mount(a.url, a.prefix).then((r) => {
-              if (onMountMs) onMountMs(Date.now() - t0);
-              reply(f, r.ok ? { ok_call: true } : { ok_call: false, error: r.error || 'mount failed' });
-            });
-            return;
-          }
           mounts.push({ url: a.url, f, t0: Date.now() });
           try { worker.postMessage({ t: 'mount-tar', url: a.url, prefix: a.prefix }); }
           catch (e) { reply(f, { ok_call: false, error: String((e && e.message) || e) }); }

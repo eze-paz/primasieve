@@ -3181,11 +3181,11 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=9');
+importScripts('/modules/walios-backend.js?v=10');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
-const WALIOS_LAZY_TARS = WB.eagerTars('repl');
-const WALIOS_LAZY_PKGS = WB.LAZY_PKGS;
+// This host's own manifest additions; the busybox/python builtins, the package index,
+// bundles, TLS and env come from WB.runMessage.
 const WALIOS_MANIFEST = Object.assign(WB.manifest(WALIOS_BB), {
   lua: 'lua.wasm', ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
@@ -3276,36 +3276,18 @@ function _waliosEnsure() {
 // are stripped from the visible output and answered on stdin (the wali worker delivers a
 // chunk pushed after stdin-eof ahead of the EOF, so the boot-time stdin-eof stays).
 const WALIOS_SOFFICE_URL = './walios-soffice.py?v=1';
-const WALIOS_SITECUSTOMIZE_URL = './walios-sitecustomize.py?v=1';
 const WALIOS_PRELUDE = 'chmod +x /usr/bin/soffice 2>/dev/null; ';
 let _waliosSofficeSrc = null;
-let _waliosSiteSrc = null;
-let _waliosTlsBlobs = null;
+// Blobs only THIS host seeds: the soffice bridge (LibreOffice runs on the page, reached
+// through the `office` hostcall). Everything every host needs -- TLS trust + gitconfig,
+// apk + its index, python's import-miss shim -- is assembled by WB.runMessage, so the tool
+// and the terminal cannot drift apart again.
 async function _waliosBlobs() {
   if (_waliosSofficeSrc === null) {
     try { _waliosSofficeSrc = await (await fetch(WALIOS_SOFFICE_URL)).arrayBuffer(); }
     catch (_) { _waliosSofficeSrc = false; }
   }
-  if (_waliosSiteSrc === null) {
-    try { _waliosSiteSrc = await (await fetch(WALIOS_SITECUSTOMIZE_URL)).arrayBuffer(); }
-    catch (_) { _waliosSiteSrc = false; }
-  }
   const b = {};
-  // On the default path for every python in this worker, so `python3 -c "import numpy"`
-  // in a walios() script reaches the same packages the warm REPL does. Without it the
-  // shell tool had the lazy bundle list but no way to ask for a mount, so numpy/pandas/
-  // PIL/docx simply did not exist there while terminal.html had them — measured, 4 of 7
-  // capability checks diverged.
-  if (_waliosSiteSrc) b['/site-packages/_shims/sitecustomize.py'] = _waliosSiteSrc.slice(0);
-  // TLS trust + git config, the SAME pair the terminal seeds (WB.tlsBlobs). Without
-  // them SSL_CERT_FILE pointed at certifi's bundle, which does not exist until python
-  // has run — so `git clone` in a walios() call died with "SSL certificate problem:
-  // unable to get local issuer certificate" while the identical command worked in the
-  // terminal. Cached after the first call; the bundle is ~180KB.
-  if (_waliosTlsBlobs === null) {
-    try { _waliosTlsBlobs = await WB.tlsBlobs(WALIOS_BASE); } catch (_) { _waliosTlsBlobs = false; }
-  }
-  if (_waliosTlsBlobs) for (const k of Object.keys(_waliosTlsBlobs)) b[k] = _waliosTlsBlobs[k].slice(0);
   if (_waliosSofficeSrc) {
     b['/usr/lib/sandpie/soffice.py'] = _waliosSofficeSrc.slice(0);
     b['/usr/bin/soffice'] = new TextEncoder().encode('#!/bin/sh\nexec python3 /usr/lib/sandpie/soffice.py "$@"\n').buffer;
@@ -3317,11 +3299,12 @@ async function tool_walios({ script, timeout }, ctx) {
     return { result: 'Error: "script" is required — pass it as the "script" argument, or via the <|walios|>…<|end_walios|> blob form in your reply.' };
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
   // Unlike run_python there is no second implementation to fall back to, so say why.
-  // Without JSPI every blocking syscall traps instead of suspending: measured, a bare
-  // `echo ok` exits 139 and python cannot start.
-  if (typeof WebAssembly.Suspending !== 'function' || typeof WebAssembly.promising !== 'function')
-    return { result: 'Error: the walios shell needs WebAssembly JSPI, which this browser does not have '
-                     + '(Chromium-only today). Use run_python for computation, or the shell tool for the relay host.' };
+  // The kernel runs each process on its own worker over SharedArrayBuffers, which needs
+  // cross-origin isolation (the app serves the COOP/COEP headers) -- not JSPI, so this
+  // works in every isolated browser, not only Chromium.
+  if (typeof SharedArrayBuffer !== 'function')
+    return { result: 'Error: the walios shell needs SharedArrayBuffer (cross-origin isolation), which this page does not have. '
+                     + 'Use run_python for computation, or the shell tool for the relay host.' };
   // Everything this run writes to /root must surface as THIS conversation's
   // touched-file cards: arm the owner the OPFS forwards are stamped with. The
   // global _waliosQueue serialises walios() runs, so this is unambiguous.
@@ -3329,8 +3312,10 @@ async function tool_walios({ script, timeout }, ctx) {
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
   const pkgs = await _waliosPkgIndex();
-  const blobs = await _waliosBlobs();
-  Object.assign(blobs, WB.pkgBlobs(pkgs));            // /usr/bin/apk + /etc/apk/packages.tsv
+  // ONE boot, shared with the terminal and the REPL (WB.runMessage). Only argv and the
+  // soffice bridge are this host's own.
+  const runMsg = await WB.runMessage({ kind: 'tool', base: WALIOS_BASE, busybox: WALIOS_BB, pkgs, manifest: WALIOS_MANIFEST,
+    blobs: await _waliosBlobs(), argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], pty: false, cols: 120, rows: 40 });
   return await new Promise((resolve) => {
     const chunks = []; let outLen = 0, truncated = false, done = false;
     const push = (s) => { if (!truncated) { chunks.push(s); outLen += s.length; if (outLen > 65536) truncated = true; } };
@@ -3401,25 +3386,7 @@ async function tool_walios({ script, timeout }, ctx) {
       }
     };
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
-    w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: { ...pkgs.manifest, ...WALIOS_MANIFEST },
-      tars: [['rootfs.tar.gz', '/']], opfs: '/root',
-      blobs,
-      // Lazy per-binary mounts: only fetched/extracted when that wasm is first
-      // exec'd. python_cxx (which `python` now maps to) pulls the stdlib + the
-      // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
-      // `import` just works without the model running any install step. Repo
-      // packages with companion tars ride the same map (keyed by module URL).
-      lazyTars: { ...pkgs.lazyTars, ...WALIOS_LAZY_TARS },
-      // SANDPIE_HOST_RPC tells the in-guest sitecustomize that someone is listening on
-      // fd 1, so an import miss can ask for a bundle. The terminal deliberately does not
-      // set it: there the bundles are already mounted and a frame would land in the pty.
-      // WB.tlsEnv() AFTER WB.env(): the latter's SSL_CERT_FILE points at certifi, which
-      // only exists once python's companion tar is mounted, and git/wget need trust
-      // before that. Same override the terminal applies.
-      env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
-                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8', SANDPIE_HOST_RPC: '1' },
-                         WB.env('repl'), WB.tlsEnv()),
-      cwd: '/root', argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], jspi: true, pty: false, cols: 120, rows: 40 });
+    w.postMessage(runMsg);
   });
 }
 
@@ -3610,19 +3577,13 @@ async function _wpyEnsure() {
   };
   w.onerror = () => _wpyKill('the walios Python worker crashed');
   st.booting = _wpyWait(st, f => f.t === 'ready', 180000).then((f) => { st.ready = true; st.python = f.python; return st; });
-  w.postMessage({
-    t: 'run', wasm: WALIOS_BB, manifest: { ...pkgs.manifest, ...WALIOS_MANIFEST },
-    tars: [['rootfs.tar.gz', '/']], opfs: '/root',
-    blobs: { '/sandpie/repl.py': src },
-    lazyTars: { ...pkgs.lazyTars, ...WALIOS_LAZY_TARS },
-    env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
-                         HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' }, WB.env('repl')),
-    // busybox stays the root module so the manifest's lazyTars fire on the exec
-    // (the run message compiles the ROOT directly, bypassing ensureModule); `exec`
-    // means no extra process survives.
-    cwd: '/root', argv: ['busybox', 'sh', '-c', 'exec python -u /sandpie/repl.py'],
-    jspi: true, pty: false, cols: 120, rows: 40,
-  });
+  // The same boot as the tool and the terminal (WB.runMessage). rpc:false -- repl.py
+  // brings its own import-miss mounting, so the sitecustomize shim stays out of its way.
+  // busybox stays the root module so the manifest's lazyTars fire on the exec (the run
+  // message compiles the ROOT directly, bypassing ensureModule); `exec` means no extra
+  // process survives.
+  w.postMessage(await WB.runMessage({ kind: 'repl', base: WALIOS_BASE, busybox: WALIOS_BB, pkgs, manifest: WALIOS_MANIFEST, rpc: false,
+    blobs: { '/sandpie/repl.py': src }, argv: ['busybox', 'sh', '-c', 'exec python -u /sandpie/repl.py'], pty: false, cols: 120, rows: 40 }));
   await st.booting;
   return st;
 }
