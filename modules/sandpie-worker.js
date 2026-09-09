@@ -3167,7 +3167,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=6');
+importScripts('/modules/walios-backend.js?v=7');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');

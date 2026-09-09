@@ -110,6 +110,13 @@
         SSL_CERT_FILE: this.CA_PATH,
         CURL_CA_BUNDLE: this.CA_PATH,
         GIT_CONFIG_GLOBAL: '/etc/gitconfig',
+        // Never prompt. A private repo cloned without credentials made git ask
+        // "Username for 'https://github.com':", read EOF on the tool's closed stdin,
+        // and die with exit 128 and the error swallowed -- so the clone "silently
+        // did nothing". With prompting off git fails immediately and SAYS it needs
+        // credentials, which is the actionable message; put a token in the URL for a
+        // private repo (https://x-access-token:TOKEN@github.com/owner/repo).
+        GIT_TERMINAL_PROMPT: '0',
       };
     },
 
