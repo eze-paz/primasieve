@@ -618,8 +618,10 @@ opfs._putConvertJob = function(job) {
 // sends COOP/COEP; locally via coiserver.py), we can run ZetaOffice (LibreOffice
 // WASM) directly — no popup. It lives in a hidden same-origin iframe
 // (convert/office-engine.html) which, being a child of a COI top-level, is itself
-// COI. Booted once on first use and kept warm for the session; each conversion is
-// a postMessage round-trip. Returns a promise for { convert(bytes, ext) → PDF
+// COI. Booted lazily on first use and torn down after IDLE_MS with no conversions
+// (LibreOffice WASM is ~2.3 GB resident and never shrinks); each conversion is a
+// postMessage round-trip that re-boots the iframe if it went idle. Returns a
+// promise for { convert(bytes, ext) → PDF
 // ArrayBuffer }, or null when isolation is unavailable (caller falls back to the
 // lightweight docx-preview/SheetJS/pptx-viewer path, or the popup).
 opfs._pdfjsReady = null;
@@ -708,6 +710,19 @@ opfs._officeEngine = function() {
       iframe.src = '/convert/office-engine.html?v=3';
       const pending = new Map();
       let seq = 0, ready = false;
+      // ZetaOffice (LibreOffice WASM) is ~2.3 GB resident — the iframe Window and
+      // the worker thread it spawns each hold a full copy, and WASM linear memory
+      // never shrinks. It used to stay warm for the whole session; instead we tear
+      // the iframe down after a stretch of no conversions (cleanup() nulls the
+      // cached promise, so the next call re-boots). Only arm the timer when nothing
+      // is in flight, and cancel it whenever a conversion starts.
+      const IDLE_MS = 90000;
+      let idleTimer = null;
+      const cancelIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } };
+      const armIdle = () => {
+        cancelIdle();
+        idleTimer = setTimeout(() => { if (pending.size === 0) cleanup(); }, IDLE_MS);
+      };
       const bootTimer = setTimeout(() => {
         if (!ready) { cleanup(); reject(new Error('office engine boot timed out')); }
       }, 180000);
@@ -722,17 +737,24 @@ opfs._officeEngine = function() {
         }
       };
       const cleanup = () => {
+        cancelIdle();
         window.removeEventListener('message', onMsg);
         try { iframe.remove(); } catch (_) {}
         opfs._officeEnginePromise = null;   // allow a fresh boot next time
       };
       const api = {
         convert(bytes, ext, timeoutMs = 180000) {
+          cancelIdle();
           return new Promise((res, rej) => {
             const id = 'o' + (++seq);
-            const timer = setTimeout(() => { pending.delete(id); rej(new Error('conversion timed out')); }, timeoutMs);
+            const timer = setTimeout(() => {
+              pending.delete(id);
+              if (pending.size === 0) armIdle();
+              rej(new Error('conversion timed out'));
+            }, timeoutMs);
             pending.set(id, (msg) => {
               clearTimeout(timer);
+              if (pending.size === 0) armIdle();   // last one out schedules teardown
               if (msg.type === 'converted-ok') res(msg.pdf);
               else rej(new Error(msg.error || 'conversion failed'));
             });
