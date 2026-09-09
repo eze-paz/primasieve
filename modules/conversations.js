@@ -487,7 +487,13 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   }
   // PER-CONVERSATION provider: carried forward like projectRoot (meta is rebuilt
   // from scratch on every save). null → the catalog default applies.
-  const provId = (s && s.providerId) || (prevMeta && prevMeta.providerId);
+  // Stale-save guard: the stream value only wins when THIS tab explicitly picked
+  // it (setProviderId sets _provDirty). Otherwise another tab/browser may have
+  // written a fresher providerId to meta.json since our stream loaded — the fresh
+  // meta value must win, so a background save can't silently revert that change.
+  let provId;
+  if (s && s._provDirty) { provId = s.providerId || null; s._provDirty = false; }
+  else provId = (prevMeta && prevMeta.providerId) || (s && s.providerId) || null;
   if (provId) meta.providerId = provId;
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
@@ -7397,6 +7403,10 @@ window.SandpieConv = {
     }
     const s = ensureStream(id);
     s.providerId = providerId || null;
+    // Stale-save guard: mark this tab's explicit pick so the next _saveConv gives
+    // it precedence over a concurrent meta.json change written by another
+    // tab/browser (see the PER-CONVERSATION provider merge in _saveConv).
+    s._provDirty = true;
     saveConv(id, { touchUpdated: false }).catch(() => {});
   },
 };
@@ -8262,6 +8272,31 @@ function bootConversations() {
     };
     Sandpie.events.on('file:changed', invalidateConvRow);
     Sandpie.events.on('file:deleted', invalidateConvRow);
+    // PER-CONV provider: keep WARM streams in sync with meta.json changes made by
+    // ANOTHER tab (shared OPFS) or another browser (Dropbox sync pulls the meta).
+    // Without this the stale in-memory providerId both displays the wrong model
+    // and can overwrite the fresher meta on the next saveConv (last-writer-wins
+    // with a stale value). Only the provider is synced here — title/messages
+    // stay per-pane as they are.
+    const syncWarmProvider = async (path) => {
+      try {
+        const p = String(path || '');
+        if (!p.includes('/conversations/') || !p.endsWith('.json')) return;
+        const id = (p.split('/').pop() || '').replace(/\.(?:meta\.)?json$/, '');
+        if (!id) return;
+        const s = convStreams.get(id);
+        if (!s || !s.messages || !s.messages.length) return;   // cold: mount reads meta fresh
+        if (s._provDirty) return;                              // this tab has a newer explicit pick; its save wins
+        const loc = await convLocation(id);
+        if (!loc || loc.format !== 'new') return;              // legacy .json convs carry no provider meta
+        const meta = JSON.parse(await opfs.read(metaPath(id, loc.archived)));
+        const pid = meta.providerId || null;
+        if ((s.providerId || null) === pid) return;            // own write / already in sync
+        s.providerId = pid;
+        if (window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
+      } catch (_) {}
+    };
+    Sandpie.events.on('file:changed', syncWarmProvider);
     // Auto-archive stale conversations once, after the initial Dropbox sync
     // completes (splash still visible) — not on a timer.
     Sandpie.events.on('sync:done', () => { backfillArchivedMetas().then(() => autoArchiveStale()); });
