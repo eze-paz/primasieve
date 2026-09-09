@@ -2727,6 +2727,10 @@ function refreshOpenChecklistPanel(todos, scopeEl) {
   if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(buildTodosView(todos || []), 'Checklist');
 }
 async function handleSubmit(which = 'main') {
+  // Sending must end any live dictation first - stopRecording flushes the
+  // dictated tail into the box before the text below is read. It is idempotent
+  // and a no-op when dictation is already idle.
+  try { if (window.SandpieSpeech) window.SandpieSpeech.stopRecording(); } catch (_) {}
   const ta = which === 'side' ? $('inputSide') : $('input');
   const pane = which === 'side' ? $('messagesSide') : $('messages');
   if (!ta || !pane) return;
