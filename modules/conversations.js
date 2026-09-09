@@ -495,6 +495,12 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   if (s && s._provDirty) { provId = s.providerId || null; s._provDirty = false; }
   else provId = (prevMeta && prevMeta.providerId) || (s && s.providerId) || null;
   if (provId) meta.providerId = provId;
+  // PER-CONVERSATION reasoning effort: carried forward like providerId (meta is
+  // rebuilt from scratch on every save). null → the app default applies.
+  let rsnLvl;
+  if (s && s._rsnDirty) { rsnLvl = s.reasoningLevel || null; s._rsnDirty = false; }
+  else rsnLvl = (prevMeta && prevMeta.reasoningLevel) || (s && s.reasoningLevel) || null;
+  if (rsnLvl) meta.reasoningLevel = rsnLvl;
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
     ? SandpieAugmentations.getConvPaths(convId)
@@ -1911,6 +1917,7 @@ async function loadConv(id) {
       s.projectRoot = meta.projectRoot || null;
       s.projectNs = meta.projectNs || null;
       s.providerId = meta.providerId || null;
+      s.reasoningLevel = meta.reasoningLevel || null;
 
       if (!fileSize) {
         // Empty conversation (no messages yet)
@@ -3029,7 +3036,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=222');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=223');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3810,6 +3817,19 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
       resolvedMessages.push(msg);
     }
   }
+  // PER-CONVERSATION reasoning effort: the composer model-picker slider stores
+  // 'off'|'low'|'medium'|'high' on the stream/meta; null → the app default
+  // (localStorage 'sandpie-default-reasoning'). Shipped to the worker, which
+  // turns it into the OpenRouter `reasoning` / `reasoning_effort` param.
+  const _rsnLevel = (() => {
+    try {
+      const cid = convId || activeConvId;
+      const s = cid ? convStreams.get(cid) : null;
+      const lv = (s && s.reasoningLevel) || null;
+      if (lv) return lv;
+      return (localStorage.getItem('sandpie-default-reasoning') || '').trim() || null;
+    } catch (_) { return null; }
+  })();
   const _ep = effective ? String(effective.endpoint || '').replace(/\/$/, '') : '';
   // BETA projects fork: resolve the conversation's project once (stream first, then
   // persisted meta) — reused for both the system-prompt block and the worker config.
@@ -3847,6 +3867,10 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     authRefreshUrl: (effective && effective.managed) ? new URL('/auth/token', location.href).href : null,
     _hermesMode: !!(effective && effective.type === 'hermes'),
     model: (effective && effective.model) || '',
+    // Reasoning effort for this conversation ('off'|'low'|'medium'|'high'|null).
+    // The worker maps it to the OpenRouter-native `reasoning` param (or
+    // `reasoning_effort` for OpenAI-shape upstreams); null sends nothing.
+    reasoningEffort: _rsnLevel || null,
     systemPrompt: _sysPrompt,
     messages: resolvedMessages,
     tools: _liteCfg ? [] : (_todoV2() ? toolDefs() : _todoLabTools(toolDefs())),
@@ -4318,6 +4342,9 @@ function ensureStream(id) {
       // PER-CONVERSATION provider: which catalog model this conversation uses
       // (composer model picker). null → providers.js defaultProvider() applies.
       providerId: null,
+      // PER-CONVERSATION reasoning effort: 'off'|'low'|'medium'|'high' (composer
+      // model picker slider). null → the app default (localStorage) applies.
+      reasoningLevel: null,
     };
     convStreams.set(id, s);
   }
@@ -7409,6 +7436,35 @@ window.SandpieConv = {
     s._provDirty = true;
     saveConv(id, { touchUpdated: false }).catch(() => {});
   },
+  // PER-CONVERSATION reasoning effort bridge — providers.js reads/sets the level
+  // through this (slider inside the composer model picker). Same contract as the
+  // provider bridge: convId null → home-state default in localStorage.
+  getReasoningLevel(convId) {
+    const id = convId || activeConvId;
+    if (!id) return null;
+    const s = convStreams.get(id);
+    return (s && s.reasoningLevel) || null;
+  },
+  setReasoningLevel(convId, level) {
+    const LV = ['off', 'low', 'medium', 'high'];
+    if (!LV.includes(level)) level = null;
+    const id = convId || activeConvId;
+    if (!id) {
+      // No conversation yet (home screen / brand-new chat): remember the choice
+      // as the app default — the picker reads it so THIS slider updates
+      // immediately, and the conversation the next message creates uses it.
+      try {
+        if (level) localStorage.setItem('sandpie-default-reasoning', level);
+        else localStorage.removeItem('sandpie-default-reasoning');
+      } catch (_) {}
+      return;
+    }
+    const s = ensureStream(id);
+    s.reasoningLevel = level;
+    // Stale-save guard: same pattern as _provDirty (see _saveConv merge).
+    s._rsnDirty = true;
+    saveConv(id, { touchUpdated: false }).catch(() => {});
+  },
 };
 
 window.SandpieConversations = { compact: compactConversation, getCompaction, safeSplitIndex, maybeAutoCompact, getTitle: convTitle, autoTitle: maybeAutoTitle };
@@ -8291,9 +8347,11 @@ function bootConversations() {
         if (!loc || loc.format !== 'new') return;              // legacy .json convs carry no provider meta
         const meta = JSON.parse(await opfs.read(metaPath(id, loc.archived)));
         const pid = meta.providerId || null;
-        if ((s.providerId || null) === pid) return;            // own write / already in sync
-        s.providerId = pid;
-        if (window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
+        if ((s.providerId || null) !== pid) s.providerId = pid;
+        const rl = meta.reasoningLevel || null;
+        if ((s.reasoningLevel || null) !== rl) s.reasoningLevel = rl;
+        if (((s.providerId || null) !== pid || (s.reasoningLevel || null) !== rl)
+            && window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
       } catch (_) {}
     };
     Sandpie.events.on('file:changed', syncWarmProvider);

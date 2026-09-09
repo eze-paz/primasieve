@@ -374,7 +374,82 @@ function buildModelPickerInto(host, active) {
     panel.appendChild(empty('No models — add one in Settings → AI provider'));
   }
 
+  // ---- Reasoning effort slider (mockup D) --------------------------------
+  // One shared setting per conversation: 'off'|'low'|'medium'|'high' (null =
+  // app default). Persisted via the SandpieConv bridge (stream + meta, same
+  // contract as the provider id). The slider is a real <input type=range>
+  // (0..3) styled by sandpie.css (.rs-*), so keyboard/touch work for free.
+  const RSN_LV = ['off', 'low', 'medium', 'high'];
+  const RSN_SHORT = { off: 'Off', low: 'Low', medium: 'Med', high: 'High' };
+  const RSN_NOTE = {
+    off: 'No thinking — fastest and cheapest.',
+    low: 'Quick pass — a little thinking before answering.',
+    medium: 'Balanced depth and latency.',
+    high: 'Deepest thinking, slowest and most expensive.',
+  };
+  const curLevel = (() => {
+    try {
+      const lv = (window.SandpieConv && SandpieConv.getReasoningLevel)
+        ? SandpieConv.getReasoningLevel(host.dataset.convId || null) : null;
+      if (lv && RSN_LV.includes(lv)) return lv;
+      try { return (localStorage.getItem('sandpie-default-reasoning') || '').trim() || 'medium'; }
+      catch (_) { return 'medium'; }
+    } catch (_) { return 'medium'; }
+  })();
+
+  panel.appendChild(Object.assign(document.createElement('div'), { className: 'mp-sep' }));
+  panel.appendChild(hdr('Reasoning'));
+  const rsBlock = document.createElement('div');
+  rsBlock.className = 'rs-block';
+  const rsHead = document.createElement('div');
+  rsHead.className = 'rs-head';
+  const rsName = document.createElement('span');
+  rsName.className = 'rs-name';
+  rsName.textContent = 'Effort';
+  const rsVal = document.createElement('span');
+  rsVal.className = 'rs-val';
+  rsVal.textContent = RSN_SHORT[curLevel];
+  rsHead.append(rsName, rsVal);
+  const rsSlider = document.createElement('input');
+  rsSlider.type = 'range';
+  rsSlider.min = '0'; rsSlider.max = '3'; rsSlider.step = '1';
+  rsSlider.value = String(RSN_LV.indexOf(curLevel));
+  rsSlider.className = 'rs-slider';
+  rsSlider.setAttribute('aria-label', 'Reasoning effort');
+  const rsTicks = document.createElement('div');
+  rsTicks.className = 'rs-ticks';
+  RSN_LV.forEach(lv => {
+    const t = document.createElement('span');
+    t.textContent = RSN_SHORT[lv];
+    if (lv === curLevel) t.classList.add('on');
+    rsTicks.appendChild(t);
+  });
+  const rsNote = document.createElement('div');
+  rsNote.className = 'rs-note';
+  rsNote.textContent = RSN_NOTE[curLevel];
+  const paintLevel = (lv) => {
+    rsVal.textContent = RSN_SHORT[lv];
+    rsNote.textContent = RSN_NOTE[lv];
+    [...rsTicks.children].forEach((t, i) => t.classList.toggle('on', RSN_LV[i] === lv));
+    // Mirror the level on the trigger pill: "Model · Med"
+    const lblEl = trigger.querySelector('.mp-label');
+    if (lblEl) {
+      const base = active ? (active.name || active.model || 'Model') : 'Select model';
+      lblEl.textContent = (lv === 'medium') ? base : (base + ' · ' + RSN_SHORT[lv]);
+    }
+  };
+  rsSlider.addEventListener('input', () => paintLevel(RSN_LV[Number(rsSlider.value)]));   // live label while dragging
+  rsSlider.addEventListener('change', () => {
+    const lv = RSN_LV[Number(rsSlider.value)];
+    try {
+      if (window.SandpieConv && SandpieConv.setReasoningLevel) SandpieConv.setReasoningLevel(host.dataset.convId || null, lv);
+    } catch (_) {}
+  });
+  rsBlock.append(rsHead, rsSlider, rsTicks, rsNote);
+  panel.appendChild(rsBlock);
+
   host.append(trigger, panel);
+  paintLevel(curLevel);   // initial pill suffix
   if (host.classList.contains('open')) positionModelPickerPanel(host);
 }
 

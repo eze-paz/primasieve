@@ -568,6 +568,23 @@
   .mp-item:hover { background: var(--sp-panel); }
   .mp-item.active { background: var(--sp-accent-dim); }
   .mp-empty { padding: 0.4rem 0.5rem; font-size: 0.72rem; color: var(--sp-text-dim); }
+
+
+  /* ---- Reasoning effort slider (inside the model-picker dropup) ---- */
+  .rs-block { padding: 0.35rem 0.5rem 0.45rem; }
+  .rs-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .rs-head .rs-name { font-size: 0.72rem; color: var(--sp-text); font-weight: 600; }
+  .rs-head .rs-val { font-size: 0.72rem; color: var(--sp-accent); font-weight: 600; }
+  .rs-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; cursor: pointer; margin: 0; }
+  .rs-slider:focus-visible { outline: 1px solid var(--sp-accent); outline-offset: 2px; border-radius: 4px; }
+  .rs-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--sp-success), var(--sp-accent) 70%, var(--sp-warn)); }
+  .rs-slider::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--sp-success), var(--sp-accent) 70%, var(--sp-warn)); }
+  .rs-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--sp-surface); border: 2px solid var(--sp-accent); box-shadow: 0 1px 4px rgba(0,0,0,0.5); margin-top: -5px; }
+  .rs-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--sp-surface); border: 2px solid var(--sp-accent); box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+  .rs-ticks { display: flex; justify-content: space-between; margin-top: 4px; }
+  .rs-ticks span { font-size: 0.58rem; color: var(--sp-text-dim); }
+  .rs-ticks span.on { color: var(--sp-text); font-weight: 600; }
+  .rs-note { margin-top: 7px; font-size: 0.62rem; color: var(--sp-text-dim); line-height: 1.4; }
   .send-btn {
     margin-left: auto;
     width: 32px;

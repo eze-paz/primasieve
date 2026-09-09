@@ -5062,8 +5062,19 @@ function _openRouterReasoning(config) {
   const eff = config && config.reasoningEffort;
   if (!eff) return null;
   const e = String(eff).toLowerCase();
+  if (e === 'off') return { enabled: false };  // slider 'off': disable thinking outright
   const effort = e === 'minimal' ? 'low' : e; // OpenRouter effort vocab is low|medium|high
   return { effort };
+}
+
+// 'off' must also reach the DeepSeek/Qwen chat-template flag (vLLM / SGLang /
+// DeepSeek's own API) — the same pair completeOnce() sends for title calls.
+// Sent alongside reasoning:{enabled:false}; strict servers that reject unknown
+// params are handled by the existing _REASONING_KEYS undo path.
+function _offThinkingKwargs(config) {
+  const eff = config && config.reasoningEffort;
+  if (!eff || String(eff).toLowerCase() !== 'off') return null;
+  return { thinking: false, enable_thinking: false };
 }
 
 async function runAgent(config, ctx) {
@@ -5489,6 +5500,8 @@ async function runAgent(config, ctx) {
     if (config.temperature != null) reqBody.temperature = config.temperature;
     if (config.topP != null) reqBody.top_p = config.topP;
     if (reasoning) reqBody.reasoning = reasoning;
+    const _offKw = _offThinkingKwargs(config);
+    if (_offKw) reqBody.chat_template_kwargs = _offKw;
     // OpenRouter upstream routing ({ order: [...], allow_fallbacks }): prefer these
     // providers in order, e.g. ['deepseek'] to hit DeepSeek's own endpoint first.
     if (config.providerRouting) reqBody.provider = config.providerRouting;
