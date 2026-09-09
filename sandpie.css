@@ -584,7 +584,6 @@
   .rs-ticks { display: flex; justify-content: space-between; margin-top: 4px; }
   .rs-ticks span { font-size: 0.58rem; color: var(--sp-text-dim); }
   .rs-ticks span.on { color: var(--sp-text); font-weight: 600; }
-  .rs-note { margin-top: 7px; font-size: 0.62rem; color: var(--sp-text-dim); line-height: 1.4; }
   .send-btn {
     margin-left: auto;
     width: 32px;

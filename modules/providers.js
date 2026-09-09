@@ -384,12 +384,6 @@ function buildModelPickerInto(host, active) {
   // (0..3) styled by sandpie.css (.rs-*), so keyboard/touch work for free.
   const RSN_LV = ['off', 'low', 'medium', 'high'];
   const RSN_SHORT = { off: 'Off', low: 'Low', medium: 'Med', high: 'High' };
-  const RSN_NOTE = {
-    off: 'No thinking — fastest and cheapest.',
-    low: 'Quick pass — a little thinking before answering.',
-    medium: 'Balanced depth and latency.',
-    high: 'Deepest thinking, slowest and most expensive.',
-  };
   const curLevel = (() => {
     try {
       const lv = (window.SandpieConv && SandpieConv.getReasoningLevel)
@@ -427,12 +421,8 @@ function buildModelPickerInto(host, active) {
     if (lv === curLevel) t.classList.add('on');
     rsTicks.appendChild(t);
   });
-  const rsNote = document.createElement('div');
-  rsNote.className = 'rs-note';
-  rsNote.textContent = RSN_NOTE[curLevel];
   const paintLevel = (lv) => {
     rsVal.textContent = RSN_SHORT[lv];
-    rsNote.textContent = RSN_NOTE[lv];
     [...rsTicks.children].forEach((t, i) => t.classList.toggle('on', RSN_LV[i] === lv));
     // Mirror the level on the trigger pill: "Model · Med"
     const lblEl = trigger.querySelector('.mp-label');
@@ -448,7 +438,7 @@ function buildModelPickerInto(host, active) {
       if (window.SandpieConv && SandpieConv.setReasoningLevel) SandpieConv.setReasoningLevel(host.dataset.convId || null, lv);
     } catch (_) {}
   });
-  rsBlock.append(rsHead, rsSlider, rsTicks, rsNote);
+  rsBlock.append(rsHead, rsSlider, rsTicks);
   panel.appendChild(rsBlock);
 
   host.append(trigger, panel);
