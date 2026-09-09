@@ -21,7 +21,13 @@
   // dlopen11: fork returns ENOSYS on a binary without Asyncify (CPython). It used to
   // hand back a pid and never run the child, so subprocess/os.popen waited out the
   // whole timeout; now they raise OSError immediately.
-  const WORKER_V = 'dlopen13';
+  // dlopen14: file modes persist. OPFS has no modes, so chmod lived in RAM and every
+  // OPFS-backed file came back 0644 on the next boot (ssh refused its own key again).
+  // opfs-worker.js now keeps a mode sidecar in IndexedDB (SETMODE op, returned with
+  // READDIR); the kernel guesses 0600 under .ssh/ and 0755 for *.sh when there is no
+  // record. Also: 'add-pkg' creates the /bin/<name> stub (a package added mid-session
+  // was "not found" by name), and a seeded "#!" blob lands 0755.
+  const WORKER_V = 'dlopen14';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -135,6 +141,121 @@
       b['/etc/gitconfig'] = enc('[safe]\n\tdirectory = *\n[http]\n\tsslCAInfo = ' + this.CA_PATH
                                 + '\n\textraHeader = Connection: close\n');
       return b;
+    },
+
+    // ---- Package index, for EVERY walios host --------------------------------
+    // A runnable package can come from three places, all served under /walios/:
+    //   index.json            the prebuilt repo: name -> wasm url [+ companion tars]
+    //   pkgcache/index.json   binaries users compiled in-tab and uploaded (e.g. git)
+    //   aports-catalog.json   the Alpine catalog; tier 'wasm' entries carry a wasm url,
+    //                         the rest can only be BUILT (terminal.html's build button)
+    // terminal.html folded all three into its boot manifest; the walios() tool folded
+    // only pkgcache, so a package the UI could "add" did not exist for the model, and
+    // neither host let the GUEST ask for one. One loader now, and `apk add` below asks
+    // through the frame channel. Nothing is fetched until a binary is first exec'd.
+    // `builtin` names (the host's own manifest) always win a name clash.
+    async pkgIndex(base, builtin) {
+      base = base || '/walios/';
+      builtin = builtin || {};
+      const get = async (u) => { try { const r = await fetch(base + u); return r.ok ? await r.json() : null; } catch (_) { return null; } };
+      const [repo, cache, cat] = await Promise.all([get('index.json'), get('pkgcache/index.json'), get('aports-catalog.json')]);
+      const pk = {};                                         // name -> { url, tars, ver, kind, size, desc, src }
+      const add = (name, e) => { if (!name || builtin[name] || pk[name]) return; pk[name] = e; };
+      // pkgcache first: an in-tab build of X is the newest X (the ?t= is what
+      // terminal.html does too -- pkgcache is served no-store but a wasm compile cache
+      // keys on the URL).
+      if (cache && Array.isArray(cache.packages)) for (const n of cache.packages) add(n, { url: 'pkgcache/' + n + '.wasm', kind: 'bin', src: 'pkgcache' });
+      if (repo && repo.packages) for (const p of Object.values(repo.packages)) add(p.name, { url: p.url, tars: p.tars, ver: p.ver, kind: p.kind, size: p.size, desc: p.desc, src: 'repo' });
+      // Boot manifest = repo + pkgcache, exactly what terminal.html puts on PATH at boot.
+      // Catalog tier-'wasm' entries are NOT on PATH until asked for -- the UI's "add"
+      // button and `apk add` both register them on demand -- so the two hosts agree on
+      // what a fresh shell has, and `apk add` means the same thing in both.
+      const manifest = {}, lazyTars = {};                    // lazyTars is keyed by module URL (see wali-worker ensureModule)
+      for (const [n, e] of Object.entries(pk)) { manifest[n] = e.url; if (Array.isArray(e.tars) && e.tars.length) lazyTars[e.url] = e.tars; }
+      const buildOnly = {};                                  // name -> desc; in the catalog, not built to wasm
+      if (Array.isArray(cat)) for (const p of cat) {
+        if (p.tier === 'wasm' && p.wasm) add(p.name, { url: p.wasm, desc: p.desc, kind: 'bin', src: 'catalog' });
+        else if (p.name && !pk[p.name] && !builtin[p.name]) buildOnly[p.name] = p.desc || '';
+      }
+      // /etc/apk/packages.tsv -- name, version, kind, size, description, status. What
+      // `apk search/list/info` read in the guest; only `apk add` needs the host.
+      const clean = (s) => String(s == null ? '' : s).replace(/[\t\r\n]+/g, ' ').trim();
+      const rows = [];
+      for (const n of Object.keys(builtin).sort()) rows.push([n, '', 'builtin', '', '', 'installed'].join('\t'));
+      // 'installed' = on PATH at boot (builtin, repo, pkgcache); 'available' = catalog,
+      // one `apk add` away.
+      for (const n of Object.keys(pk).sort()) { const e = pk[n]; rows.push([n, clean(e.ver), clean(e.kind), clean(e.size), clean(e.desc), manifest[n] ? 'installed' : 'available'].join('\t')); }
+      for (const n of Object.keys(buildOnly).sort()) rows.push([n, '', '', '', clean(buildOnly[n]), 'build-only'].join('\t'));
+      return {
+        pk, buildOnly, manifest, lazyTars,
+        tsv: rows.join('\n') + '\n',
+        resolve(name) { return pk[name] || null; },
+      };
+    },
+
+    // Blobs every host seeds so the guest has a package client: the index above as a
+    // TSV, and `apk` itself. Kept here so the tool and the terminal ship the same file.
+    pkgBlobs(idx) {
+      const enc = (s2) => new TextEncoder().encode(s2).buffer;
+      const b = { '/usr/bin/apk': enc(this.apkScript()) };
+      if (idx && idx.tsv) b['/etc/apk/packages.tsv'] = enc(idx.tsv);
+      return b;
+    },
+
+    // The in-guest package client. Plain busybox sh: this busybox has no base64, so the
+    // frame it sends is plain JSON and it asks (plain:1) for a plain-JSON reply -- see
+    // hostChannel, which accepts both encodings. The reply is read from stdin: under the
+    // headless tool stdin already hit EOF at boot and the host's line lands LATER, so an
+    // empty read is retried (same rule sitecustomize.py follows), not treated as the end.
+    apkScript() {
+      return [
+        '#!/bin/sh',
+        '# apk -- walios package client. Packages are wasm binaries served by the host page.',
+        '#   apk add <pkg>...    register with the running kernel (fetched on first exec)',
+        '#   apk search [pat]    search name/description   apk list    apk info <pkg>',
+        'TSV=/etc/apk/packages.tsv',
+        'usage() { echo "usage: apk add <pkg>... | search [pattern] | list [installed|available|build-only] | info <pkg>" >&2; exit 2; }',
+        '[ $# -ge 1 ] || usage',
+        'cmd=$1; shift',
+        'need_tsv() { [ -f "$TSV" ] || { echo "apk: no package index ($TSV missing)" >&2; exit 1; }; }',
+        'show() { awk -F"\\t" \'{ st=$6; if (st=="installed") st="on PATH"; if (st=="available") st="apk add first"; if (st=="build-only") st="not built to wasm - build it in the walios UI";',
+        '  printf "%-26s %-9s %s%s\\n", $1, $2, $5, "  [" st "]" }\' ; }',
+        'case "$cmd" in',
+        '  search) need_tsv; q=$(printf %s "$1" | tr A-Z a-z)',
+        '    awk -F"\\t" -v q="$q" \'index(tolower($1), q) || index(tolower($5), q)\' "$TSV" | show ;;',
+        '  list) need_tsv; f=${1:-}',
+        '    awk -F"\\t" -v f="$f" \'f=="" || $6==f\' "$TSV" | show ;;',
+        '  info) need_tsv; [ $# -ge 1 ] || usage',
+        '    awk -F"\\t" -v n="$1" \'$1==n\' "$TSV" | show',
+        '    awk -F"\\t" -v n="$1" \'$1==n{f=1} END{exit !f}\' "$TSV" || { echo "apk: unknown package $1" >&2; exit 1; } ;;',
+        '  add) [ $# -ge 1 ] || usage',
+        '    rc=0; k=0',
+        '    for p in "$@"; do',
+        '      case "$p" in *[!A-Za-z0-9._+-]*|"") echo "apk: bad package name: $p" >&2; rc=1; continue;; esac',
+        '      # Always ask the host, even if /bin/<name> exists: the stub can outlive the',
+        '      # manifest entry when a host reuses its worker for a new run. Registering',
+        '      # twice is harmless.',
+        '      if [ -f "$TSV" ] && awk -F"\\t" -v n="$p" \'$1==n && $3=="builtin"{f=1} END{exit !f}\' "$TSV"; then echo "$p: built-in"; continue; fi',
+        '      k=$((k+1)); id="$$$k"',
+        '      printf \'\\002{"t":"call","id":%s,"op":"pkg","plain":1,"args":{"name":"%s"}}\\003\\n\' "$id" "$p"',
+        '      reply=""; n=0',
+        '      while [ $n -lt 600 ]; do',
+        '        if IFS= read -r line; then',
+        '          case "$line" in *\'"t":"reply"\'*\'"id":\'"$id"[,\\}]*) reply=$line; break;; esac',
+        '        else usleep 100000 2>/dev/null || sleep 1; fi',
+        '        n=$((n+1))',
+        '      done',
+        '      case "$reply" in',
+        '        "") echo "apk: no reply from the host for $p (is this shell running under a walios host?)" >&2; rc=1;;',
+        '        *\'"ok_call":true\'*) echo "$p: added (fetched on first run)";;',
+        '        *) err=$(printf %s "$reply" | sed -n \'s/.*"error":"\\([^"]*\\)".*/\\1/p\'); echo "apk: $p: ${err:-failed}" >&2; rc=1;;',
+        '      esac',
+        '    done',
+        '    exit $rc ;;',
+        '  *) usage ;;',
+        'esac',
+        '',
+      ].join('\n');
     },
 
     // Is JSPI here? walios' blocking syscalls are WebAssembly.Suspending imports, so
@@ -293,7 +414,13 @@
     //             as postMessage, so the same channel works with and without JSPI
     //   mount     optional mountBridge(); when given, bundles are fetched HERE and
     //             streamed in, because a synchronous guest cannot mount its own
-    hostChannel({ worker, onScreen, onCall, onMountMs, stdin, mount }) {
+    //   pkgs      optional pkgIndex() (or a promise of one); enables the 'pkg' op that
+    //             `apk add` sends -- resolved here and registered with the kernel
+    //
+    // A frame is normally base64; a call carrying plain:1 is plain JSON and gets a plain
+    // JSON reply (the shell client has no base64). Both are one line, so the echo strip
+    // works the same way.
+    hostChannel({ worker, onScreen, onCall, onMountMs, stdin, mount, pkgs }) {
       const STX = String.fromCharCode(2), ETX = String.fromCharCode(3);
       const enc = (str) => {
         const b = new TextEncoder().encode(str);
@@ -306,7 +433,8 @@
       const echoes = [];                 // reply payloads we expect the pty to echo back
       const mounts = [];                 // in-flight mounts, awaiting 'tar-mounted'
       const reply = (f, o) => {
-        const payload = enc(JSON.stringify(Object.assign({ t: 'reply', id: f.id }, o)));
+        const body = JSON.stringify(Object.assign({ t: 'reply', id: f.id }, o));
+        const payload = f.plain ? body : enc(body);
         echoes.push(payload);
         // The JSPI guest reads postMessage'd chunks; the synchronous guest is parked in
         // Atomics.wait and only ever sees the SAB. Feed both — whichever path this guest
@@ -348,6 +476,28 @@
           catch (e) { reply(f, { ok_call: false, error: String((e && e.message) || e) }); }
           return;
         }
+        if (f.op === 'pkg') {
+          // `apk add <name>`: look the name up in the package index and register it with
+          // the running kernel. The wasm is fetched on first exec, so this is instant.
+          // Error strings deliberately carry no double quotes: the shell client pulls
+          // them out of the JSON with a sed that stops at the first one.
+          const a = f.args || {}, name = String(a.name || '').trim();
+          if (!pkgs) return reply(f, { ok_call: false, error: 'this walios host has no package index' });
+          if (!/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(name)) return reply(f, { ok_call: false, error: 'bad package name' });
+          Promise.resolve(pkgs).then((idx) => {
+            const e = idx && idx.resolve(name);
+            if (!e) {
+              const bo = idx && idx.buildOnly && idx.buildOnly[name];
+              return reply(f, { ok_call: false, error: bo !== undefined
+                ? name + ' is in the Alpine catalog but not built to wasm yet. It can be built from the walios UI at /walios/ (Packages panel, build), not from this shell.'
+                : 'unknown package ' + name + ' (try: apk search ' + name + ')' });
+            }
+            try { worker.postMessage({ t: 'add-pkg', name, url: e.url, tars: Array.isArray(e.tars) && e.tars.length ? e.tars : undefined }); }
+            catch (err) { return reply(f, { ok_call: false, error: String((err && err.message) || err) }); }
+            reply(f, { ok_call: true, url: e.url, src: e.src || '' });
+          }, (err) => reply(f, { ok_call: false, error: 'package index unavailable: ' + String((err && err.message) || err) }));
+          return;
+        }
         if (onCall) { Promise.resolve(onCall(f)).then((o) => reply(f, o)); return; }
         reply(f, { ok_call: false, error: 'unknown host op ' + f.op });
       };
@@ -366,7 +516,10 @@
             if (pend.startsWith('\r')) pend = pend.slice(1);
             if (pend.startsWith('\n')) pend = pend.slice(1);
             let f = null;
-            try { f = JSON.parse(dec(raw)); } catch (_) { emit(STX + raw + ETX); continue; }
+            // base64 first (Python clients); a plain-JSON frame from the shell client
+            // fails atob on its first '{' and is parsed as-is.
+            try { f = JSON.parse(dec(raw)); }
+            catch (_) { try { f = JSON.parse(raw); } catch (_2) { emit(STX + raw + ETX); continue; } }
             if (f && f.t === 'call') serve(f);
           }
         },

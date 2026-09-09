@@ -3181,7 +3181,7 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=8');
+importScripts('/modules/walios-backend.js?v=9');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
 const WALIOS_LAZY_TARS = WB.eagerTars('repl');
@@ -3200,21 +3200,18 @@ let _waliosOpfsWorker = null;      // the walios OPFS bridge (hoisted so a run c
 let _waliosActiveOwner = null;     // agentId of the walios() run currently holding _waliosQueue
 let _waliosFlushResolve = null;    // one-shot, resolved by the OPFS worker's 'flushed' ack
 
-// pkgcache: binaries other users compiled in-tab (e.g. git) live on the server
-// (/walios/pkgcache/<name>.wasm + index.json). The terminal.html page folds them
-// into its manifest; the headless tool must do the same or `git` is missing.
-// Cached once per worker lifetime; built-in WALIOS_MANIFEST entries always win.
-let _waliosPkgM = null;
-async function _waliosPkgManifest() {
-  if (_waliosPkgM) return _waliosPkgM;
-  try {
-    const r = await fetch(WALIOS_BASE + 'pkgcache/index.json');
-    const idx = r.ok ? await r.json() : null;
-    const m = {};
-    if (idx && Array.isArray(idx.packages))
-      for (const n of idx.packages) if (!WALIOS_MANIFEST[n]) m[n] = 'pkgcache/' + n + '.wasm';
-    return (_waliosPkgM = m);
-  } catch (_) { return (_waliosPkgM = {}); }
+// The package index: the prebuilt repo (index.json), user-built binaries (pkgcache/)
+// and the Alpine catalog, folded the way terminal.html folds them -- WB.pkgIndex is
+// the one loader both hosts use. This tool used to read pkgcache alone, so every
+// package the UI's "add" button offered was missing here, and the guest had no way
+// to ask for one; `apk add` (seeded by WB.pkgBlobs) now asks through the frame
+// channel. Cached once per worker lifetime; built-in WALIOS_MANIFEST entries win.
+let _waliosPkgIdx = null;
+function _waliosPkgIndex() {
+  if (!_waliosPkgIdx) {
+    _waliosPkgIdx = WB.pkgIndex(WALIOS_BASE, WALIOS_MANIFEST).catch(() => ({ pk: {}, buildOnly: {}, manifest: {}, lazyTars: {}, tsv: '', resolve() { return null; } }));
+  }
+  return _waliosPkgIdx;
 }
 // Wire an OPFS bridge worker for dehydrated (cloud-only) files: it lists them
 // from the cloud index and downloads on first open, so the shell sees the same
@@ -3331,8 +3328,9 @@ async function tool_walios({ script, timeout }, ctx) {
   _waliosActiveOwner = (ctx && ctx.agentId != null) ? ctx.agentId : null;
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
-  const pkgM = await _waliosPkgManifest();
+  const pkgs = await _waliosPkgIndex();
   const blobs = await _waliosBlobs();
+  Object.assign(blobs, WB.pkgBlobs(pkgs));            // /usr/bin/apk + /etc/apk/packages.tsv
   return await new Promise((resolve) => {
     const chunks = []; let outLen = 0, truncated = false, done = false;
     const push = (s) => { if (!truncated) { chunks.push(s); outLen += s.length; if (outLen > 65536) truncated = true; } };
@@ -3366,6 +3364,7 @@ async function tool_walios({ script, timeout }, ctx) {
     const frames = WB.hostChannel({
       worker: w,
       onScreen: push,
+      pkgs,                                          // `apk add` -> 'pkg' op -> add-pkg to this worker
       onMountMs: (ms) => { deadline += ms; },        // host time is not the guest's budget
       onCall: (f) => {
         const t0 = Date.now();
@@ -3399,14 +3398,15 @@ async function tool_walios({ script, timeout }, ctx) {
       }
     };
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
-    w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: { ...pkgM, ...WALIOS_MANIFEST },
+    w.postMessage({ t: 'run', wasm: WALIOS_BB, manifest: { ...pkgs.manifest, ...WALIOS_MANIFEST },
       tars: [['rootfs.tar.gz', '/']], opfs: '/root',
       blobs,
       // Lazy per-binary mounts: only fetched/extracted when that wasm is first
       // exec'd. python_cxx (which `python` now maps to) pulls the stdlib + the
       // C-extension site-packages (numpy/pandas + lxml/Pillow/docx/…), so
-      // `import` just works without the model running any install step.
-      lazyTars: WALIOS_LAZY_TARS,
+      // `import` just works without the model running any install step. Repo
+      // packages with companion tars ride the same map (keyed by module URL).
+      lazyTars: { ...pkgs.lazyTars, ...WALIOS_LAZY_TARS },
       // SANDPIE_HOST_RPC tells the in-guest sitecustomize that someone is listening on
       // fd 1, so an import miss can ask for a bundle. The terminal deliberately does not
       // set it: there the bundles are already mounted and a frame would land in the pty.
