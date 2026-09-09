@@ -1445,7 +1445,7 @@ function _fsTrackingDelegate() {
 }
 
 async function flushCaptureToOpfs() {
-  const removed = [], written = [], done = new Set();
+  const removed = [], written = [], failed = [], done = new Set();
   const flushOne = async (rel) => {
     if (done.has(rel)) return;
     done.add(rel);
@@ -1474,14 +1474,14 @@ async function flushCaptureToOpfs() {
           _idxPut(rel, 'file', bytes.length, Date.now());
         }
       }
-    } catch (e) { console.warn('[pyodide-worker] write-back failed:', rel, e); }
+    } catch (e) { failed.push(rel + ': ' + ((e && e.message) || e)); console.warn('[pyodide-worker] write-back failed:', rel, e); }
   };
   for (const rel of _capDeleted) {
     if (_betaMapped(rel)) { try { await _betaDelete(rel); removed.push(rel); } catch (e) { console.warn('[pyodide-worker] beta delete failed:', rel, e); } }
     else { if (await swOpfsDelete(rel, true)) removed.push(rel); _idxDrop(rel); }
   }
   for (const rel of _capTouched) await flushOne(rel);
-  return { removed, written };
+  return { removed, written, failed };
 }
 
 function _swRmTree(full) {
@@ -1587,10 +1587,19 @@ async function tool_run_python({ path, code: inlineCode, args }) {
       _capReset(); _capActive = true;
       await p.runPythonAsync(code);
       _capActive = false;
-      let removedPaths = [], writtenPaths = [];
+      let removedPaths = [], writtenPaths = [], failedPaths = [];
       if (_nativefs) {
-        try { ({ removed: removedPaths, written: writtenPaths } = await flushCaptureToOpfs()); }
+        try { ({ removed: removedPaths, written: writtenPaths, failed: failedPaths } = await flushCaptureToOpfs()); }
         catch (e) { console.warn('[pyodide-worker] OPFS write-back after run_python failed:', e); }
+      }
+      if (failedPaths.length) {
+        // Surface write-back failures: the model (and the user) must know the
+        // file does NOT exist in OPFS, instead of a silent phantom path that
+        // later fails with "Could not open ... could not be found".
+        const NL = String.fromCharCode(10);
+        const note = 'WARNING: ' + failedPaths.length + ' file(s) written by this run could NOT be saved to OPFS (they do not exist):' + NL + failedPaths.join(NL);
+        out += (out ? NL : '') + '--- write-back failed ---' + NL + note;
+        try { self.postMessage({ type: 'forward-to-page', payload: { type: 'writeback-failed', paths: failedPaths } }); } catch (_) {}
       }
       if (removedPaths.length || writtenPaths.length) {
         try {

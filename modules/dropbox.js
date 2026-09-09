@@ -1398,7 +1398,12 @@
   // and the service worker's /files/ fault-in — both need exactly this, and a
   // second copy would drift.
   async function hydrateRel(rel) {
-    const r = String(rel).replace(/^\/+/, '');
+    const r0 = String(rel).replace(/^\/+/, '');
+    // Legacy-path fallback: sandpie/artifacts/ was migrated OUT to artifacts/
+    // (migrateArtifactsOut). A stored path under the dead prefix can never be in
+    // the cloud index — retry against the migrated location before giving up.
+    let r = r0;
+    if (r0.startsWith('sandpie/artifacts/') && !cloudIndex()[r0]) r = r0.slice('sandpie/'.length);
     if (!dehydrated() || isExemptRel(r)) return false;
     if (_idxCache === null) await loadCloudIndex();   // index may still be loading from IDB at boot — don't treat "not yet loaded" as "genuinely absent"
     const e = cloudIndex()[r];

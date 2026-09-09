@@ -131,6 +131,11 @@ async function resolveArtifactPath(clean) {
   // paths — the reported "it appends sandpie/ to everything" bug.
   const LEGACY_MOVED = /^(?:artifacts|scripts|agents|skills|memory|_conversations)\//;
   if (!clean.startsWith('sandpie/') && LEGACY_MOVED.test(clean)) return 'sandpie/' + clean;
+  // Dead-prefix fallback: sandpie/artifacts/ was migrated OUT to artifacts/
+  // (migrateArtifactsOut) and the boot prune deletes anything recreated there,
+  // so a stored path under that prefix can never exist — resolve it to the
+  // migrated location instead of returning a guaranteed 404.
+  if (clean.startsWith('sandpie/artifacts/')) return clean.slice('sandpie/'.length);
   return clean;
 }
 

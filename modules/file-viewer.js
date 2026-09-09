@@ -456,6 +456,15 @@
     const candidates = [fullKey];
     if (!fullKey.startsWith('sandpie/')) candidates.push('sandpie/' + fullKey);
     else candidates.push(fullKey.slice('sandpie/'.length));
+    // Legacy-path fallback: sandpie/artifacts/ was migrated OUT to artifacts/
+    // (migrateArtifactsOut) and the boot prune deletes anything recreated there.
+    // Add the migrated location as a last candidate so stored paths under the
+    // dead prefix still open. Literal stored path always stays FIRST (no
+    // old/new name-collision surprises).
+    for (const c of [...candidates]) {
+      const m = c.replace(/^sandpie\//, '');
+      if (m.startsWith('artifacts/') && !candidates.includes(m)) candidates.push(m);
+    }
     let e0 = null;
     for (const cand of candidates) {
       try { file = await readLocal(cand); fullKey = cand; break; } catch (e) { if (!e0) e0 = e; }
