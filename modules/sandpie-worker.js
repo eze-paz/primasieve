@@ -3189,6 +3189,11 @@ const WALIOS_LAZY_PKGS = WB.LAZY_PKGS;
 const WALIOS_MANIFEST = Object.assign(WB.manifest(WALIOS_BB), {
   lua: 'lua.wasm', ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
   make: 'make.wasm', gmake: 'make.wasm',
+  // QuickJS (quickjs-ng 0.16.2, wasm32-wasi) — JS interpreter + `qjsc <file>` syntax
+  // gate (parses without executing, exit!=0 + SyntaxError on a parse error). Binaries
+  // shipped out-of-band in /walios/ like the other .wasm. NOT cc: no compiler/build
+  // toolchain in the headless tool (that stays terminal-only, deliberately).
+  qjs: 'qjs.wasm', js: 'qjs.wasm', qjsc: 'qjsc.wasm',
 });
 let _waliosWorker = null, _waliosQueue = Promise.resolve();
 let _waliosOpfsWorker = null;      // the walios OPFS bridge (hoisted so a run can flush it)
