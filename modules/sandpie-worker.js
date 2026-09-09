@@ -3584,7 +3584,7 @@ async function _wpyEnsure() {
   if (_wpy && _wpy.ready) return _wpy;
   if (_wpy && _wpy.booting) { await _wpy.booting; return _wpy; }
   const src = await (await fetch(WPY_REPL_URL)).arrayBuffer();
-  const pkgM = await _waliosPkgManifest();
+  const pkgs = await _waliosPkgIndex();
   const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
   const st = { worker: w, buf: '', waiters: [], seq: 0, ready: false, booting: null, queue: Promise.resolve(), diag: '' };
   _wpy = st;
@@ -3611,10 +3611,10 @@ async function _wpyEnsure() {
   w.onerror = () => _wpyKill('the walios Python worker crashed');
   st.booting = _wpyWait(st, f => f.t === 'ready', 180000).then((f) => { st.ready = true; st.python = f.python; return st; });
   w.postMessage({
-    t: 'run', wasm: WALIOS_BB, manifest: { ...pkgM, ...WALIOS_MANIFEST },
+    t: 'run', wasm: WALIOS_BB, manifest: { ...pkgs.manifest, ...WALIOS_MANIFEST },
     tars: [['rootfs.tar.gz', '/']], opfs: '/root',
     blobs: { '/sandpie/repl.py': src },
-    lazyTars: WALIOS_LAZY_TARS,
+    lazyTars: { ...pkgs.lazyTars, ...WALIOS_LAZY_TARS },
     env: Object.assign({ HOME: '/root', TERM: 'dumb', PATH: '/bin:/usr/bin', PS1: '',
                          HOSTNAME: 'walios', LC_ALL: 'C.UTF-8' }, WB.env('repl')),
     // busybox stays the root module so the manifest's lazyTars fire on the exec
