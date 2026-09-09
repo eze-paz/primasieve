@@ -32,7 +32,10 @@
   // next call touching it threw -> exit 139. QuickJS died on every real run (`-q`,
   // `-e`) because JS_NewRuntime grows once and then calls clock_time_get; `--version`
   // never grows. poll_oneoff also writes *nevents now instead of leaving it garbage.
-  const WORKER_V = 'dlopen15';
+  // dlopen16: every WASI process gets fd 3 = "/" preopened. Only the root module and
+  // wasi-threads binaries had one, so a WASI child exec'd from the shell (qjs) could
+  // not open any path: `qjs -e` worked, `qjs /tmp/t.js` and std.open() said ENOENT.
+  const WORKER_V = 'dlopen16';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
