@@ -121,7 +121,7 @@ const SandpieSpeech = (function () {
     const id = ++_reqId;
     return new Promise((resolve, reject) => {
       _pending.set(id, { resolve, reject });
-      getWorker().postMessage({ type: 'transcribe', id, modelId: cfgModel(), lang: cfgLang(), audio: f32 }, [f32.buffer]);
+      getWorker().postMessage({ type: 'transcribe', id, modelId: activeModelId(), lang: cfgLang(), audio: f32 }, [f32.buffer]);
     });
   }
 
@@ -263,6 +263,9 @@ const SandpieSpeech = (function () {
     enqueueSegment(total, final);
   }
 
+  function activeModelId() {
+    return cfgEngine() === 'moonshine' ? 'onnx-community/moonshine-base-ONNX' : cfgModel();
+  }
   async function engineStart() {
     if (cfgEngine() === 'webspeech' && webspeechSupported()) {
       if (wsStart()) return;   // native engine took over
@@ -280,7 +283,7 @@ const SandpieSpeech = (function () {
       const sink = _ctx.createGain(); sink.gain.value = 0;   // ScriptProcessor needs a destination; keep it silent
       _node.connect(sink); sink.connect(_ctx.destination);
       // Preload the model in the background so the first segment isn't slow.
-      try { getWorker().postMessage({ type: 'load', modelId: cfgModel() }); } catch (_) {}
+      try { getWorker().postMessage({ type: 'load', modelId: activeModelId() }); } catch (_) {}
     } catch (e) {
       console.warn('[stt] mic denied/failed:', e && e.message);
       flashTitle('Microphone unavailable: ' + (e && e.message || e));
@@ -356,6 +359,7 @@ const SandpieSpeech = (function () {
     <select id="sttEngine" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;">
       <option value="webspeech">Browser native (Web Speech) — fast, live text</option>
       <option value="whisper">Whisper on-device — private, audio never leaves the tab</option>
+      <option value="moonshine">Moonshine on-device — fast + private (best for short dictation)</option>
     </select>
     <p id="sttEngineNote" style="font-size:0.68rem; color:var(--sp-text-dim); margin:0 0 0.6rem;"></p>
     <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Model</label>
@@ -386,6 +390,9 @@ const SandpieSpeech = (function () {
           ? "Desktop Chrome/Edge route the audio through the browser's speech service; Android runs it on-device."
           : 'This browser has no Web Speech API — Whisper on-device will be used instead.';
       }
+      if (cfgEngine() === 'moonshine') {
+        return 'Moonshine runs fully in this tab (~5x faster than Whisper). English uses moonshine-base; other languages fall back to Whisper.';
+      }
       return 'Whisper runs fully in this tab; the first use downloads the model.';
     }
     engineNote.textContent = noteFor();
@@ -409,7 +416,7 @@ const SandpieSpeech = (function () {
         const pct = d && d.progress ? Math.round(d.progress * 100) : 0;
         status.textContent = 'Downloading model… ' + pct + '%';
       };
-      try { getWorker().postMessage({ type: 'load', modelId: cfgModel() }); }
+      try { getWorker().postMessage({ type: 'load', modelId: activeModelId() }); }
       catch (e) { status.textContent = 'Failed: ' + ((e && e.message) || e); preload.disabled = false; _progressCb = null; }
     });
   }
