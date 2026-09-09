@@ -63,7 +63,8 @@ const SandpieSpeech = (function () {
   }
   const cfgModel = () => cfgAll().model;
   const cfgLang  = () => cfgAll().lang;
-  const cfgEngine = () => cfgAll().engine;
+  // 'moonshine' was removed — migrate any saved pref to whisper
+  const cfgEngine = () => { const e = cfgAll().engine; return e === 'moonshine' ? 'whisper' : e; };
 
   // ── State machine: idle | recording | busy ──
   let _state = 'idle';
@@ -264,11 +265,7 @@ const SandpieSpeech = (function () {
   }
 
   function activeModelId() {
-    if (cfgEngine() !== 'moonshine') return cfgModel();
-    // Moonshine is mono-lingual: pick the model for the configured spoken language.
-    const lang = cfgLang();
-    if (lang === 'es') return 'izaaku16/moonshine-base-es-ONNX';   // Spanish base (q8, browser-ready)
-    return 'onnx-community/moonshine-base-ONNX';                    // English base
+    return cfgModel();
   }
   async function engineStart() {
     if (cfgEngine() === 'webspeech' && webspeechSupported()) {
@@ -363,8 +360,7 @@ const SandpieSpeech = (function () {
     <select id="sttEngine" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;">
       <option value="webspeech">Browser native (Web Speech) — fast, live text</option>
       <option value="whisper">Whisper on-device — private, audio never leaves the tab</option>
-      <option value="moonshine">Moonshine on-device — fast + private (best for short dictation)</option>
-    </select>
+      </select>
     <p id="sttEngineNote" style="font-size:0.68rem; color:var(--sp-text-dim); margin:0 0 0.6rem;"></p>
     <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Model</label>
     <select id="sttModel" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;"></select>
@@ -393,9 +389,6 @@ const SandpieSpeech = (function () {
         return webspeechSupported()
           ? "Desktop Chrome/Edge route the audio through the browser's speech service; Android runs it on-device."
           : 'This browser has no Web Speech API — Whisper on-device will be used instead.';
-      }
-      if (cfgEngine() === 'moonshine') {
-        return 'Moonshine runs fully in this tab (~5x faster than Whisper). English uses moonshine-base; Spanish uses moonshine-base-es (set Spoken language = Spanish).';
       }
       return 'Whisper runs fully in this tab; the first use downloads the model.';
     }

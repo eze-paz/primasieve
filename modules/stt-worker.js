@@ -86,9 +86,8 @@ self.onmessage = async (msg) => {
     }
     if (d.type === 'transcribe') {
       await ensureModel(d.modelId, d.dtype);   // no-op if already loaded
-      const isMoonshine = (d.modelId || '').includes('moonshine');
       const out = await _transcriber(d.audio, {
-        language: (!isMoonshine && d.lang && d.lang !== 'auto') ? d.lang : undefined,
+        language: (d.lang && d.lang !== 'auto') ? d.lang : undefined,
         task: 'transcribe',
         chunk_length_s: 30,
         stride_length_s: 5,
