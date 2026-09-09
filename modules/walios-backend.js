@@ -27,7 +27,12 @@
   // READDIR); the kernel guesses 0600 under .ssh/ and 0755 for *.sh when there is no
   // record. Also: 'add-pkg' creates the /bin/<name> stub (a package added mid-session
   // was "not found" by name), and a seeded "#!" blob lands 0755.
-  const WORKER_V = 'dlopen14';
+  // dlopen15: the WASI shim re-syncs its memory views before every call. A guest that
+  // grew linear memory (malloc -> memory.grow) detached the cached DataView, and the
+  // next call touching it threw -> exit 139. QuickJS died on every real run (`-q`,
+  // `-e`) because JS_NewRuntime grows once and then calls clock_time_get; `--version`
+  // never grows. poll_oneoff also writes *nevents now instead of leaving it garbage.
+  const WORKER_V = 'dlopen15';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise

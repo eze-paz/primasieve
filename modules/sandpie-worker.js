@@ -3376,7 +3376,10 @@ async function tool_walios({ script, timeout }, ctx) {
       const m = ev.data;
       if (m.t === 'tar-mounted') { frames.mounted(m); return; }
       if (m.t === 'out') {
-        if (m.fd === 2 && /^\[host\]/.test(m.s)) return;   // host diagnostics
+        // Host diagnostics are noise for the model -- EXCEPT the trap report: an exit 139
+        // used to arrive with no reason at all, so the model guessed (wrongly) at stack
+        // sizes and build flags when the actual cause was one line the host had printed.
+        if (m.fd === 2 && /^\[host\]/.test(m.s) && !/^\[host\] trap in pid/.test(m.s)) return;
         if (m.fd === 1) frames.feed(m.s); else push(m.s);
       } else if (m.t === 'boot') {
         try { w.postMessage({ t: 'stdin-eof' }); } catch (_) {}   // non-interactive: stdin reads get EOF
