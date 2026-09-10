@@ -1696,33 +1696,51 @@ function liteBtnRefresh() {
                : 'Enable LITE mode for this conversation (no tools/skills/memories)';
 }
 function registerLiteButton() {
-  if (document.getElementById('liteBtn')) return true;
-  const bar = document.querySelector('.input-bar');
+  const bar = document.querySelector('form.composer:not(.composer-side) .input-bar');
   if (!bar) return false;
-  const mic = document.getElementById('micBtn');
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id = 'liteBtn';
-  btn.className = 'attach-btn lite-btn';
-  btn.title = 'Enable LITE mode for this conversation (no tools/skills/memories)';
-  btn.setAttribute('aria-label', 'Toggle LITE mode');
-  btn.innerHTML = LITE_BOLT_SVG;
-  btn.addEventListener('click', () => {
-    const cid = activeConvId;
-    if (!cid) return;
-    const on = !_liteOn(cid);
-    _setLite(cid, on).then(() => {
-      liteBtnRefresh();
-      try { if (SandpieCommandView) SandpieCommandView.show(
-        'LITE mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'lite');
-      } catch (_) {}
-    }).catch(() => {});
-  });
-  if (mic && mic.parentNode === bar) mic.insertAdjacentElement('afterend', btn);
-  else bar.insertBefore(btn, bar.firstChild);
+  let btn = document.getElementById('liteBtn');
+  if (btn && btn.parentNode === bar) { liteBtnPlace(btn, bar); return true; }
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'liteBtn';
+    btn.className = 'attach-btn lite-btn';
+    btn.title = 'Enable LITE mode for this conversation (no tools/skills/memories)';
+    btn.setAttribute('aria-label', 'Toggle LITE mode');
+    btn.innerHTML = LITE_BOLT_SVG;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const cid = activeConvId;
+      if (!cid) return;
+      const on = !_liteOn(cid);
+      _setLite(cid, on).then(() => {
+        liteBtnRefresh();
+        try { if (SandpieCommandView) SandpieCommandView.show(
+          'LITE mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'lite');
+        } catch (_) {}
+      }).catch(() => {});
+    });
+  }
+  // Always park it right after the model picker first, so it is never left of
+  // the attach button while the mic has not been injected yet; liteBtnPlace()
+  // then moves it to the right of the mic as soon as the mic exists.
+  const picker = document.getElementById('modelPicker');
+  if (picker && picker.parentNode === bar) picker.insertAdjacentElement('afterend', btn);
+  else bar.appendChild(btn);
   return true;
 }
-setInterval(liteBtnRefresh, 700);
+// The bolt's slot is IMMEDIATELY AFTER the mic button (speech-to-text.js injects
+// micBtn after the model picker). If the mic is not there yet, wait for it and
+// re-place — never fall back to bar.firstChild (that puts the bolt left of the
+// attach "+", where a misclick opens the file picker).
+function liteBtnPlace(btn, bar) {
+  const mic = document.getElementById('micBtn');
+  if (mic && mic.parentNode === bar && mic.nextElementSibling !== btn) {
+    mic.insertAdjacentElement('afterend', btn);
+    liteBtnRefresh();
+  }
+}
+setInterval(() => { liteBtnRefresh(); const b = document.getElementById("liteBtn"); const bar = b && b.closest(".input-bar"); if (b && bar) liteBtnPlace(b, bar); }, 700);
 try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.on('file:changed', liteBtnRefresh); } catch (_) {}
 
 function registerLiteCommand() {
