@@ -1274,6 +1274,10 @@ ul.conv-list li.active {
     }
     form input, form textarea { font-size: 16px;  }
     .conv-host, #homeCenter { padding: 1rem; }
+    /* Desktop .msg-timer sits 1.75rem from the pane edge over a 1.5rem form padding
+       (0.25rem inset). Mobile form padding drops to 1rem, so match the same inset:
+       1.25rem keeps the timer's visual offset from the composer identical. */
+    .msg-timer { padding-left: 1.25rem; }
     .msg { max-width: 95%; }
 
     /* Settings modal — the desktop two-column (150px nav | panels) layout leaves
