@@ -7534,12 +7534,28 @@ function _paintCtxCounter(el, convId) {
   // "– ctx": conversationTokens(null) would fall back to the STALE
   // sandpie-active-conv id in localStorage and paint the previous session's
   // context size on the home screen (2026-09-02 boot-ctx bug).
-  if (convId == null) { c.textContent = '– ctx'; return; }
+  if (convId == null) { c.innerHTML = _CTX_RING_SVG(0); c.classList.remove('warn', 'hot'); c.title = 'Conversation context — click for details'; return; }
   Promise.resolve(
-    (typeof SandpieTokens !== 'undefined' && SandpieTokens.conversationTokens)
-      ? SandpieTokens.conversationTokens(convId) : 0,
-  ).then(t => { if (c.isConnected) c.textContent = t ? (TOK_FMT(t) + ' ctx') : '– ctx'; }).catch(() => {});
+    (typeof SandpieTokens !== 'undefined' && SandpieTokens.contextPct)
+      ? SandpieTokens.contextPct(convId) : null,
+  ).then(pct => {
+    if (!c.isConnected) return;
+    const p = (pct == null || !isFinite(pct)) ? 0 : Math.max(0, Math.min(100, pct));
+    c.innerHTML = _CTX_RING_SVG(p);
+    c.classList.toggle('warn', p >= 75 && p < 90);
+    c.classList.toggle('hot', p >= 90);
+    c.title = 'Conversation context — click for details';
+  }).catch(() => {});
 }
+// Pie-ring markup for the ctx counter: r=6, C=2*pi*6=37.699. The dash offset
+// encodes the used fraction of the context window (mockup A, no % text — the
+// exact count stays in the ctx popup + tooltip).
+const _CTX_RING_C = 37.699;
+const _CTX_RING_SVG = (pct) =>
+  '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+  '<circle class="ctx-track" cx="8" cy="8" r="6" stroke-width="2.5" fill="none"/>' +
+  '<circle class="ctx-fill" cx="8" cy="8" r="6" stroke-width="2.5" fill="none" stroke-dasharray="' + _CTX_RING_C + '" stroke-dashoffset="' + (_CTX_RING_C * (1 - pct / 100)).toFixed(2) + '"/>' +
+  '</svg>';
 // Live per-round tok/s: painted from the worker's `rate` event (exact
 // completion_tokens over the round's decode span). Hidden until the first round
 // of the turn reports; re-asserted by the tick paint so it survives the slot
