@@ -42,12 +42,20 @@
   // proxy (merged into the process worker: imported shared memory + thread mode). One
   // exec path (resolveExec + startProcess). WASI guests must link shared memory
   // (wasm32-wasi-threads); qjs/qjsc were rebuilt that way.
-  const WORKER_V = 'dlopen17';
+  // dlopen18: real pthreads. wali-musl's __wasm_thread_spawn starts a second instance of
+  // the module on the same shared memory (threadSpawn), running its exported
+  // __wasm_thread_start_libc; SYS_futex WAIT/WAKE block and wake for real in sysAsync;
+  // gettid is per thread. python_cxx.wasm ?v=8 IMPORTS its memory (a thread cannot
+  // share a memory the module defines) -- scripts/wasm-import-memory.mjs did that to the
+  // deployed binary. threading.Thread, Lock, Event, Condition, Timer work in the REPL,
+  // run_python and the walios() tool; a thread calling into a dlopen'd extension (numpy)
+  // is still not supported (the side module is linked into the main instance's table).
+  const WORKER_V = 'dlopen18';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
   // mimalloc and flood stderr (25GB across a 12-package run, ~14x slower imports).
-  const MAIN = 'python_cxx.wasm?v=7';
+  const MAIN = 'python_cxx.wasm?v=8';   // v=8: imports its memory (pthreads); same interpreter otherwise
 
   // Every package bundle, with the mount point it unpacks to.
   const BUNDLES = {
