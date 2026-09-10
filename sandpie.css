@@ -551,6 +551,12 @@
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.45; }
   }
+  /* Lite quick-toggle (conversations.js) — bolt next to the mic; lit in the
+     theme accent while LITE mode is on for the active conversation. */
+  .lite-btn { display: inline-flex !important; align-items: center; justify-content: center; }
+  .lite-btn svg { display: block; }
+  .lite-btn.active { color: var(--sp-accent) !important; }
+
   /* Composer model picker (dropup) */
   .model-picker { position: relative; display: inline-flex; }
   .mp-trigger { display: inline-flex; align-items: center; gap: 0.3rem; max-width: 220px; padding: 0.2rem 0.55rem; background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 999px; color: var(--sp-text); font: inherit; font-size: 0.72rem; cursor: pointer; white-space: nowrap; }

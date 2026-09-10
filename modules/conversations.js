@@ -1685,6 +1685,46 @@ async function _setLite(id, on) {
   try { Sandpie.events.emit('file:changed', mp); } catch (_) {}
   liteMetaCache.set(id, !!on);
 }
+/* ---- lite quick-toggle button (bolt next to the mic) -------------------- */
+const LITE_BOLT_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+function liteBtnRefresh() {
+  const b = document.getElementById('liteBtn');
+  if (!b) return;
+  const on = _liteOn();
+  b.classList.toggle('active', on);
+  b.title = on ? 'LITE mode is ON for this conversation - click to turn it off'
+               : 'Enable LITE mode for this conversation (no tools/skills/memories)';
+}
+function registerLiteButton() {
+  if (document.getElementById('liteBtn')) return true;
+  const bar = document.querySelector('.input-bar');
+  if (!bar) return false;
+  const mic = document.getElementById('micBtn');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'liteBtn';
+  btn.className = 'attach-btn lite-btn';
+  btn.title = 'Enable LITE mode for this conversation (no tools/skills/memories)';
+  btn.setAttribute('aria-label', 'Toggle LITE mode');
+  btn.innerHTML = LITE_BOLT_SVG;
+  btn.addEventListener('click', () => {
+    const cid = activeConvId;
+    if (!cid) return;
+    const on = !_liteOn(cid);
+    _setLite(cid, on).then(() => {
+      liteBtnRefresh();
+      try { if (SandpieCommandView) SandpieCommandView.show(
+        'LITE mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'lite');
+      } catch (_) {}
+    }).catch(() => {});
+  });
+  if (mic && mic.parentNode === bar) mic.insertAdjacentElement('afterend', btn);
+  else bar.insertBefore(btn, bar.firstChild);
+  return true;
+}
+setInterval(liteBtnRefresh, 700);
+try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.on('file:changed', liteBtnRefresh); } catch (_) {}
+
 function registerLiteCommand() {
   if (typeof SandpieCommands === 'undefined') return;
   SandpieCommands.register({
@@ -1794,6 +1834,7 @@ registerDriftCommand();
 registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
+registerLiteButton();
 let _memRecalcLatest = null, _memRecalcBusy = false;
 // Recompute which memories are active/standby immediately after the active
 // conversation changes — send-time systemBlock() only recalculates on submit.
