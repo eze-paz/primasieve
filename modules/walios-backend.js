@@ -369,7 +369,7 @@
         '[ $# -ge 1 ] || usage',
         'cmd=$1; shift',
         'need_tsv() { [ -f "$TSV" ] || { echo "apk: no package index ($TSV missing)" >&2; exit 1; }; }',
-        'show() { awk -F"\\t" \'{ st=$6; if (st=="installed") st="on PATH"; if (st=="available") st="apk add first"; if (st=="build-only") st="not built to wasm - build it in the walios UI";',
+        'show() { awk -F"\\t" \'{ st=$6; if (st=="installed") st="on PATH"; if (st=="available") st="apk add first"; if (st=="build-only") st="not built to wasm - try: build-pkg NAME";',
         '  printf "%-26s %-9s %s%s\\n", $1, $2, $5, "  [" st "]" }\' ; }',
         'case "$cmd" in',
         '  search) need_tsv; q=$(printf %s "$1" | tr A-Z a-z)',
@@ -495,7 +495,7 @@
             if (!e) {
               const bo = idx && idx.buildOnly && idx.buildOnly[name];
               return reply(f, { ok_call: false, error: bo !== undefined
-                ? name + ' is in the Alpine catalog but not built to wasm yet. It can be built from the walios UI at /walios/ (Packages panel, build), not from this shell.'
+                ? name + ' is in the Alpine catalog but not built to wasm yet. Try: build-pkg ' + name + ' (compiles it from Alpine source with the in-browser clang; slow, best effort)'
                 : 'unknown package ' + name + ' (try: apk search ' + name + ')' });
             }
             try { worker.postMessage({ t: 'add-pkg', name, url: e.url, tars: Array.isArray(e.tars) && e.tars.length ? e.tars : undefined }); }
