@@ -1636,9 +1636,6 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
       menuItems.push({ label: (_sortMode === 'name'  ? '● ' : '○ ') + 'Alphabetical',  action: () => setFileSortMode('name') });
       menuItems.push({ label: (_sortMode === 'size'  ? '● ' : '○ ') + 'File size',     action: () => setFileSortMode('size') });
       menuItems.push({ label: (_sortMode === 'mtime' ? '● ' : '○ ') + 'Last modified', action: () => setFileSortMode('mtime') });
-      menuItems.push({ info: true, label: 'View', className: 'ctx-sort-header' });
-      menuItems.push({ label: (fileViewMode() === 'list' ? '● ' : '○ ') + 'List',  action: () => setFileViewMode('list') });
-      menuItems.push({ label: (fileViewMode() === 'grid' ? '● ' : '○ ') + 'Grid', action: () => setFileViewMode('grid') });
       const menu = opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
       if (it.kind === 'folder') {
         const sizeEl = menu.querySelector('.ctx-size');
