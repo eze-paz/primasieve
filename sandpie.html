@@ -17,7 +17,8 @@ if("serviceWorker"in navigator){
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=196">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="sandpie.css?v=197">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -52,6 +53,7 @@ if("serviceWorker"in navigator){
   <script src="modules/tools.js?v=92"></script>
   <script src="modules/screenshot.js?v=6"></script>
   <script src="modules/opfs.js?v=53"></script>
+  <script src="modules/files-modal.js?v=1"></script>
   <script src="modules/html-editor.js?v=20"></script>
   <script src="modules/file-viewer.js?v=37"></script>
   <script src="modules/univer.js?v=1"></script>
@@ -140,7 +142,12 @@ if("serviceWorker"in navigator){
 <aside>
   <div class="sidebar-header">
     <span class="sidebar-brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>
-    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
+    <span style="display:flex; align-items:center; gap:0.4rem;">
+      <button class="files-open-btn" onclick="SandpieFilesModal.open()" title="Files">
+        <span class="material-symbols-outlined">folder</span>
+      </button>
+      <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
+    </span>
   </div>
   <details class="service" id="convSection" open>
     <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
@@ -150,23 +157,7 @@ if("serviceWorker"in navigator){
     </div>
   </details>
 
-  <!-- Global provider inputs removed: every conversation carries its own provider (providers.js + conversations.js). -->
-
-    <details class="service" id="filesSection">
-    <summary>Files <span id="fileCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
-    <div class="service-body">
-      <div class="navbar">
-        <button class="ghost back" onclick="opfsUp()" title="Up">←</button>
-        <input id="opfsPath" value="/">
-      </div>
-      <ul class="fs-list" id="fileList"></ul>
-      <div id="persistBanner" class="persist-banner" style="display:none">
-        <span class="persist-icon" id="persistIcon"></span>
-        <span class="persist-msg" id="persistMsg"></span>
-        <button class="persist-btn ghost" id="persistBtn" style="display:none">Protect files</button>
-      </div>
-    </div>
-  </details>
+  <!-- Files moved to a modal: header folder button opens SandpieFilesModal (modules/files-modal.js). -->
 
 <div style="margin-top:auto; padding:1rem 0;">
     <!-- Sidebar identity doubles as the settings button (card-lift hover + chevron) -->

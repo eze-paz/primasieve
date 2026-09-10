@@ -722,9 +722,9 @@ const SandpieMemory = (function () {
   }
 
   function _sbPlaceAboveFiles() {
-    // Sidebar order is conversations, memory, files. SandpieMenu appends new
-    // sections above the footer (below the static #filesSection), so lift the
-    // memory section to sit directly above Files.
+    // The static #filesSection was removed (Files is now a modal via the header
+    // folder button), so there is nothing to lift above — this is a no-op kept
+    // for call-site stability.
     try {
       const filesEl = document.getElementById('filesSection');
       const el = SandpieMenu.get(SB_SECTION_ID);
