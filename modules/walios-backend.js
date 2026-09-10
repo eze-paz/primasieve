@@ -63,7 +63,11 @@
   // with errnos translated -- the second copy lacked the pty kind, so a WASI program's
   // output vanished in the terminal (pty stdio) while the walios() tool (plain stdio)
   // showed it. WASI fd_read also blocks now (waitReadable) instead of reading EOF.
-  const WORKER_V = 'dlopen21';
+  // dlopen22: an OPFS bridge that cannot start (no navigator.storage.getDirectory --
+  // Playwright's WebKit on Windows) answers EIO instead of never answering, and the
+  // kernel bounds its wait on the bridge to 20s and then declares the store dead. The
+  // guest used to park forever on the first `ls /root`. Found by the browser test.
+  const WORKER_V = 'dlopen22';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
