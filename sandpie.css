@@ -60,7 +60,8 @@
     z-index: 10;
     background: transparent;
     transition: background 0.15s;
-    /* left is set dynamically by JS to sit on the right edge of <aside> */
+    /* Sensible default before JS positions it on the right edge of <aside> */
+    left: calc(var(--sidebar-width, 300px) - 2px);
   }
   .sidebar-resize-handle:hover,
   .sidebar-resize-handle.active {
@@ -147,7 +148,7 @@
   aside .navbar .back:hover { background: var(--sp-surface); }
   ul.fs-list { list-style: none; display: flex; flex-direction: column; gap: 0.2rem; min-height: 60px; border: 1px dashed transparent; border-radius: 4px; transition: border-color 0.15s, background 0.15s; }
   ul.fs-list.drag-over { border-color: var(--sp-accent); background: var(--sp-accent-dim); }
-  .ctx-menu { position: fixed; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
+  .ctx-menu { position: fixed; background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1200; padding: 0.25rem 0; font-size: 0.82rem; min-width: 140px; }
   .ctx-menu button { display: block; width: 100%; padding: 0.4rem 0.75rem; background: transparent; border: none; color: var(--sp-text); text-align: left; cursor: pointer; font: inherit; }
   .ctx-menu button:hover { background: var(--sp-panel); }
   .ctx-menu button.danger { color: var(--sp-danger); }
@@ -3579,7 +3580,8 @@ body.sp-decoding *::after {
   align-items: center; justify-content: center;
 }
 .files-open-btn:hover { background: var(--sp-surface); color: var(--sp-text); }
-.files-open-btn .material-symbols-outlined { font-size: 20px; }
+.files-open-btn .material-symbols-outlined { font-size: 20px; color: var(--sp-text-dim); font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.files-open-btn:hover .material-symbols-outlined { color: var(--sp-text); }
 .files-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1100; }
 .files-modal .fm-panel { background: var(--sp-bg); border: 1px solid var(--sp-border-bright, var(--sp-border)); border-radius: 10px; width: min(860px, 94vw); height: min(600px, 90vh); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.55); }
 .files-modal .fm-title { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--sp-border); background: var(--sp-surface); }

@@ -2013,11 +2013,12 @@ function initFileBrowser() {
 
 }
 
-// Only wire the file browser where its markup exists. Hosts that load opfs.js for
-// the filesystem API alone (/walios/ boots it for the sync engine) have no #opfsPath,
-// and initFileBrowser used to throw on them before anything else could run.
+// Wire the file browser. Since Files moved into a modal (files-modal.js),
+// #opfsPath/#fileList may not exist at DOMContentLoaded — they are created when
+// the modal first opens. The document-level listeners (ctx-menu close, Esc) and
+// the sidebar resize handle must be wired UNCONDITIONALLY; the element-specific
+// wiring below is guarded and files-modal.js attaches its own input listeners.
 function initFileBrowserIfPresent() {
-  if (!document.getElementById('opfsPath')) return;
   initFileBrowser();
 }
 if (document.readyState === 'loading') {
