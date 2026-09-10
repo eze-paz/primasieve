@@ -659,7 +659,7 @@ const SandpieImages = (function() {
     document.querySelectorAll('input[type=file].attach-input').forEach(imageInput => {
       imageInput.onchange = handleSelect;
     });
-    document.querySelectorAll('.attach-btn').forEach(attachBtn => {
+    document.querySelectorAll('.attach-btn:not(.lite-btn):not(.mic-btn)').forEach(attachBtn => {
       attachBtn.onclick = () => {
         const form = attachBtn.closest('form');
         const input = form ? form.querySelector('input[type=file].attach-input') : null;
