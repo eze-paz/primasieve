@@ -3491,7 +3491,7 @@ body.sp-decoding *::after {
   background: var(--sp-surface); color: var(--sp-accent);
   box-shadow: 0 0 20px 4px var(--sp-accent-dim), 0 0 40px 6px var(--sp-accent-dim), 0 4px 8px rgba(0,0,0,0.6);
 }
-.files-open-btn .material-symbols-outlined { font-size: 20px; color: var(--sp-text); font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.files-open-btn .material-symbols-outlined { font-size: 20px; color: var(--sp-text); font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
 .files-open-btn:hover .material-symbols-outlined { color: var(--sp-accent); }
 .files-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1100; }
 .files-modal .fm-panel { background: var(--sp-bg); border: 1px solid var(--sp-border-bright, var(--sp-border)); border-radius: 10px; width: min(860px, 94vw); height: min(600px, 90vh); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.55); }
