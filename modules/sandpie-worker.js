@@ -181,6 +181,7 @@ self.addEventListener('message', async (event) => {
     _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, homeNs: data.homeNs || '', workingRoot: data.workingRoot || '', beta: !!data.beta };
     _dehydrated = !!data.dehydrated;
     _pyBroadcast(data);   // keep the Pyodide pool's sync-hydrate context in step
+    _waliosBroadcastDbx();   // ...and the walios OPFS bridges', which hydrate cloud-only files on open
     return;
   }
 
@@ -3210,8 +3211,23 @@ function _waliosPkgIndex() {
 // from the cloud index and downloads on first open, so the shell sees the same
 // files the app's sidebar shows instead of an empty directory. Report each
 // hydration so the page records a clean sync-state entry (as the file tools do).
+// The bridge hydrates cloud-only files on open with the Dropbox token it holds. It used
+// to get that token exactly once, when the bridge was created -- and a bridge lives as
+// long as its kernel, across token rotations (~4h), so a long session hydrated with a
+// dead token and every cloud-only open failed. Now: every token the page pushes is
+// re-posted to every live bridge, and a run that starts without a token asks the page
+// for one first (the same first-login race _ensureDbxCtx covers for the file tools).
+function _waliosDbxMsg() { return { t: 'dbx', token: (_dbxCtx && _dbxCtx.token) || null, beta: !!(_dbxCtx && _dbxCtx.beta) }; }
+function _waliosBroadcastDbx() {
+  const msg = _waliosDbxMsg();
+  for (const ow of [_waliosOpfsWorker, _wpy && _wpy.ow]) { if (ow) { try { ow.postMessage(msg); } catch (_) {} } }
+}
+async function _waliosFreshDbx(ow) {
+  if (!(_dbxCtx && _dbxCtx.token)) { try { await _ensureDbxCtx(1500); } catch (_) {} }
+  if (ow) { try { ow.postMessage(_waliosDbxMsg()); } catch (_) {} }
+}
 function _waliosWireOpfs(ow) {
-  try { ow.postMessage({ t: 'dbx', token: (_dbxCtx && _dbxCtx.token) || null, beta: !!(_dbxCtx && _dbxCtx.beta) }); } catch (_) {}
+  try { ow.postMessage(_waliosDbxMsg()); } catch (_) {}
   ow.addEventListener('message', (ev) => {
     const d = ev.data; if (!d) return;
     if (d.t === 'hydrated' && d.rel) { _hydratedSet.add(d.rel); _reportHydrated(d.rel); return; }
@@ -3304,6 +3320,7 @@ async function tool_walios({ script, timeout }, ctx) {
   _waliosActiveOwner = (ctx && ctx.agentId != null) ? ctx.agentId : null;
   let w;
   try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
+  await _waliosFreshDbx(_waliosOpfsWorker);   // current Dropbox token into the bridge before the run (asks the page if there is none)
   const pkgs = await _waliosPkgIndex();
   // ONE boot, shared with the terminal and the REPL (WB.runMessage). Only argv and the
   // soffice bridge are this host's own.
