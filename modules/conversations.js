@@ -1277,8 +1277,7 @@ function _fillPlaceholderTimer(slot, convId) {
     _timerNnBtn() +
     '<span class="mt-label">idle</span>' +
     '<span class="mt-sep">·</span><span class="mt-time">0s</span>' +
-    '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
-    (convId != null ? _timerReportBtn() : '');
+    '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
   _wireCtxCounter(slot, convId);
 }
 // Seed both pane timer slots with the resting placeholder when empty, so the bar
@@ -1326,7 +1325,6 @@ function rebuildSettledTimer(target, s) {
     `<span class="mt-sep">·</span><span class="mt-time">${sec == null ? '–' : fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
-  parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' + _timerReportBtn());
   if (s.todos && s.todos.length) {
     const cur = s.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card; an active task is not "done"
     parts.push(`<span class="mt-todos">${cur}/${s.todos.length}</span>`);
@@ -4496,6 +4494,26 @@ function addMsg(role, text = '', host = null, animate = false) {
         SandpieCommands.dispatch('>>> rewind');
       });
       acts.appendChild(rewind);
+      // Report (thumbs-down) action: moved here from the idle-bar timer — it
+      // belongs with the other per-reply actions (copy / rewind).
+      const report = document.createElement('button');
+      report.type = 'button';
+      report.className = 'act-copy act-report-btn';
+      report.title = 'Report this conversation for developer review';
+      report.setAttribute('aria-label', 'Report this conversation');
+      report.innerHTML = REPORT_SVG_INLINE;
+      report.addEventListener('click', async () => {
+        const prev = report.innerHTML;
+        report.disabled = true;
+        report.classList.add('done');
+        const ok = await reportConversation('msg-actions');
+        report.innerHTML = ok
+          ? '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+          : '<span style="font-size:11px">✗</span>';
+        report.title = ok ? 'Reported — thank you' : 'Report failed (not signed in?)';
+        setTimeout(() => { report.disabled = false; report.innerHTML = prev; report.classList.remove('done'); }, 1300);
+      });
+      acts.appendChild(report);
       div.appendChild(acts);
     }
   }
@@ -7596,7 +7614,6 @@ function _wireCtxCounter(el, convId) {
   c.title = 'Conversation context — click for details';
   c.addEventListener('click', (e) => { e.stopPropagation(); openContextPopup(convId, c); });
   _paintCtxCounter(el, convId);
-  _wireTimerReport(el, convId);
 }
 
 // The msg-timer no longer lives inside the scrollable conv-host. Each PANE has
@@ -7624,7 +7641,7 @@ const _LIVE_TIMER_HTML = () =>
   _timerNnBtn() +
   '<span class="mt-time">0s</span>' +
   '<span class="mt-sep mt-rate-sep" hidden>·</span><span class="mt-rate" hidden></span>' +
-  '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' + _timerReportBtn() +
+  '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
   '<span class="mt-todos"></span>';
 
 function startTotalTimer(stream) {
@@ -7741,7 +7758,6 @@ function endTotalTimer(stream, label) {
     `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
-  parts.push('<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' + _timerReportBtn());
   if (stream.todos && stream.todos.length) {
     const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
     parts.push(`<span class="mt-todos">${cur}/${stream.todos.length}</span>`);
@@ -7770,25 +7786,6 @@ function endTotalTimer(stream, label) {
 // report action was removed (2026-09-02) — the idle-bar flag is now the ONLY report entry point.
 // Same transport as the old bubble action: best-effort POST via reportConversation, never breaks the chat.
 const REPORT_SVG_INLINE = '<svg viewBox="0 -960 960 960"><path d="M242-840h444v512L408-40l-39-31q-6-5-9-14t-3-22v-10l45-211H103q-24 0-42-18t-18-42v-81.84q0-7.16-1.5-14.66T43-499l126-290q8.88-21.25 29.59-36.13Q219.31-840 242-840Zm384 60H229L103-481v93h373l-53 249 203-214v-427Zm0 427v-427 427Zm60 25v-60h133v-392H686v-60h193v512H686Z"/></svg>';
-function _timerReportBtn() {
-  return '<button type="button" class="mt-report" title="Report this conversation for developer review">' + REPORT_SVG_INLINE + '</button>';
-}
-function _wireTimerReport(el, convId) {
-  const b = el && el.querySelector('.mt-report');
-  if (!b) return;
-  b.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    const prev = b.innerHTML;
-    b.disabled = true;
-    b.classList.add('done');
-    const ok = await reportConversation('idle-bar');
-    b.innerHTML = ok
-      ? '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
-      : '<span style="font-size:11px">✗</span>';
-    b.title = ok ? 'Reported — thank you' : 'Report failed (not signed in?)';
-    setTimeout(() => { b.disabled = false; b.innerHTML = prev; b.classList.remove('done'); }, 1300);
-  });
-}
 
 // Per-conversation context popup — the breakdown that used to live in the sidebar,
 // now anchored to the conversation's own ctx counter. Reported tokens only: size,
