@@ -99,7 +99,10 @@
   // replaced the parent: "fatal: early EOF" on every deepening fetch of a shallow clone.
   // The WISP bridge answers EBADF/EOF for a stream the relay dropped instead of throwing
   // (which parked the kernel for good); git-upload-pack/receive-pack stubs for file://.
-  const WORKER_V = 'sig29';
+  const   // sig30: the child window's cwd/umask/signal table are the forking thread's view too (a
+  // sibling thread saw the child's SIG_DFL table during the window); exit_group from any
+  // thread ends the process; a thread may fork+exec.
+WORKER_V = 'sig30';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
