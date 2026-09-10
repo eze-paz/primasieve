@@ -88,6 +88,17 @@
   // cloud-only file downloads it from Dropbox first, and one large file on a slow link
   // used to disable /root for the rest of the session. A slow op waits up to 10 min and
   // fails only itself.
+  // sig28: /root is shareable. OPFS sync-access handles (exclusive per file, origin-wide)
+  // are released 250ms after the last fd to the file closes instead of at the end of the
+  // run/session; directory listings expire after 1.5s and reconcile (another kernel's new,
+  // resized or deleted files show up); the bridge renames with FileSystemFileHandle.move()
+  // (atomic, as git assumes) and stats a listing's entries in parallel. Several kernels --
+  // terminal, tool, REPL, one per conversation -- work on the same repo at once.
+  // sig29: the vfork child window belongs to the FORKING THREAD. git's sideband thread
+  // exiting while the main thread spawned index-pack closed the window, and the execve
+  // replaced the parent: "fatal: early EOF" on every deepening fetch of a shallow clone.
+  // The WISP bridge answers EBADF/EOF for a stream the relay dropped instead of throwing
+  // (which parked the kernel for good); git-upload-pack/receive-pack stubs for file://.
   const WORKER_V = 'sig29';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
