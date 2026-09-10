@@ -3181,20 +3181,13 @@ const WALIOS_BB = 'busybox.wasm?v=net4';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=10');
+importScripts('/modules/walios-backend.js?v=11');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_WORKER_V = WB.WORKER_V;
-// This host's own manifest additions; the busybox/python builtins, the package index,
-// bundles, TLS and env come from WB.runMessage.
-const WALIOS_MANIFEST = Object.assign(WB.manifest(WALIOS_BB), {
-  lua: 'lua.wasm', ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
-  make: 'make.wasm', gmake: 'make.wasm',
-  // QuickJS (quickjs-ng 0.16.2, wasm32-wasi) — JS interpreter + `qjsc <file>` syntax
-  // gate (parses without executing, exit!=0 + SyntaxError on a parse error). Binaries
-  // shipped out-of-band in /walios/ like the other .wasm. NOT cc: no compiler/build
-  // toolchain in the headless tool (that stays terminal-only, deliberately).
-  qjs: 'qjs.wasm', js: 'qjs.wasm', qjsc: 'qjsc.wasm',
-});
+// The program set is WB.manifest, shared with the terminal; this host adds nothing (the
+// terminal adds only its page-side cc bridge). It used to list lua/ssh/make here while
+// the terminal listed those plus qjs, which is how qjs exited 127 from this tool.
+const WALIOS_MANIFEST = WB.manifest(WALIOS_BB);
 let _waliosWorker = null, _waliosQueue = Promise.resolve();
 let _waliosOpfsWorker = null;      // the walios OPFS bridge (hoisted so a run can flush it)
 let _waliosActiveOwner = null;     // agentId of the walios() run currently holding _waliosQueue
@@ -3364,7 +3357,9 @@ async function tool_walios({ script, timeout }, ctx) {
         // Host diagnostics are noise for the model -- EXCEPT the trap report: an exit 139
         // used to arrive with no reason at all, so the model guessed (wrongly) at stack
         // sizes and build flags when the actual cause was one line the host had printed.
-        if (m.fd === 2 && /^\[host\]/.test(m.s) && !/^\[host\] trap in pid/.test(m.s)) return;
+        // ...nor the "failed to start" line: a binary the kernel refuses (private memory,
+        // stale cached build) surfaced as a bare exit 127 the model read as "not found".
+        if (m.fd === 2 && /^\[host\]/.test(m.s) && !/^\[host\] (trap in pid|pid \d+ failed to start|failed to load)/.test(m.s)) return;
         if (m.fd === 1) frames.feed(m.s); else push(m.s);
       } else if (m.t === 'boot') {
         try { w.postMessage({ t: 'stdin-eof' }); } catch (_) {}   // non-interactive: stdin reads get EOF

@@ -102,11 +102,23 @@
     LAZY_PKGS,
     PY_ENV,
 
-    // python/python3 must resolve to the SAME binary run_python uses. `pydl` is kept as a
-    // historical alias so existing terminal muscle memory still works.
+    // Every program EVERY host has. python/python3 must resolve to the SAME binary
+    // run_python uses (`pydl` is a historical alias). The rest used to be added per host:
+    // the terminal had qjs/js/qjsc and rustc, the tool did not, so "qjs works in the
+    // terminal but exits 127 in walios()" was a real report. One list now; a host adds
+    // only what genuinely exists nowhere else (the terminal's page-side cc bridge).
     manifest(busybox) {
       return { busybox, sh: busybox, ash: busybox, hush: busybox,
-               python: MAIN, python3: MAIN, pydl: MAIN };
+               python: MAIN, python3: MAIN, pydl: MAIN,
+               lua: 'lua.wasm',
+               // QuickJS-ng 0.16.2, wasm32-wasi-threads. ?v=threads: the unversioned URL is
+               // cached for a day, so a browser that had the OLD (private-memory) build kept
+               // serving it after the rebuild -- the kernel refused it and qjs exited 127 in
+               // one session while working in a fresh one.
+               qjs: 'qjs.wasm?v=threads', js: 'qjs.wasm?v=threads', qjsc: 'qjsc.wasm?v=threads',
+               ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
+               make: 'make.wasm', gmake: 'make.wasm',
+               rustc: 'rustc-threads.wasm' };                       // 126MB, fetched on first `rustc` only
     },
 
     // ONE mount strategy for every host. It used to fork: 'terminal' unpacked all six
@@ -116,7 +128,8 @@
     // did not exist there. Every host now carries hostChannel() below, so every host can
     // mount on demand and the mode argument is kept only so old callers keep working.
     eagerTars(_mode) {
-      return { 'python.wasm': [BUNDLES.stdlib], [MAIN]: [BUNDLES.stdlib, BUNDLES.ext, BUNDLES.extras] };
+      return { 'python.wasm': [BUNDLES.stdlib], [MAIN]: [BUNDLES.stdlib, BUNDLES.ext, BUNDLES.extras],
+               'rustc-threads.wasm': [['wali-rust-sysroot.tar.gz', '/sysroot']] };
     },
 
     env(_mode) {
