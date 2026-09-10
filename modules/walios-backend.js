@@ -80,7 +80,7 @@
   // header was "the same file" as the source that included it), path_symlink and
   // fd_filestat_set_size/set_times in the WASI shim, and import signatures for wasm
   // binaries exec'd from the VFS (a freshly compiled ./hello could not start).
-  const WORKER_V = 'dlopen24';
+  const WORKER_V = 'sig25';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -227,7 +227,10 @@
     // seq recursed to a stack overflow, awk floats and sort -n returned garbage). Also:
     // long options, ls colours (on a tty only), base64, md5sum/sha1sum/sha256sum, stat -c.
     // Built by sandpie-server/scripts/build-busybox-wali.sh. v=net4 was the fuller-coreutils build.
-    BUSYBOX: 'busybox.wasm?v=net5',
+    // v=net6: same build plus --export=__stack_pointer/__tls_base, which the kernel needs to
+    // hand an Asyncify fork child its parent's stack pointer (busybox `timeout` killed nothing
+    // before: the grandchild's frames landed on top of the ones it inherited).
+    BUSYBOX: 'busybox.wasm?v=net6',
     async runMessage(o) {
       const base = o.base || '/walios/';
       const bb = o.busybox || this.BUSYBOX;
