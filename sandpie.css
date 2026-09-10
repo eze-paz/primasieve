@@ -650,6 +650,17 @@
   }
   form > button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Upward fade above the timer slot — mirror of .pane-titlebar::after */
+  .msg-timer-slot { position: relative; }
+  .msg-timer-slot::after {
+    content: '';
+    position: absolute;
+    bottom: 100%; left: 0; right: 0;
+    height: 5px;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--sp-bg), transparent);
+  }
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
@@ -2729,7 +2740,7 @@ ul.conv-list li.active {
   font-size: 0.82rem;
   font-weight: 500;
   transition: all 0.15s;
-  padding-right: 0.5rem;
+  padding-left: 0.5rem;
 }
 [data-theme="electric"] ul.conv-list li:hover {
   background: var(--sp-panel);
@@ -3122,7 +3133,7 @@ body.sp-decoding *::after {
   font-size: 0.82rem;
   font-weight: 500;
   transition: all 0.15s;
-  padding-right: 0.5rem;
+  padding-left: 0.5rem;
 }
 [data-theme="clear"] ul.conv-list li:hover {
   background: var(--sp-panel);

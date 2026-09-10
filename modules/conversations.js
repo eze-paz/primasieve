@@ -2366,6 +2366,7 @@ function buildConvLi(c, idx) {
   span.className = 'name';
   span.textContent = (c.pinned ? '> ' : '') + c.title;
   span.title = c.updated || '';
+  li.appendChild(meta);
   li.appendChild(span);
   // This conversation was just auto-titled: play the landing animation on the row
   // we're building (the old one is already gone — see maybeAutoTitle). The final
@@ -2399,7 +2400,7 @@ function buildConvLi(c, idx) {
     const hasNew = c.updated && (!lastViewed || new Date(c.updated) > new Date(lastViewed));
     if (hasNew && c.id !== activeConvId) meta.classList.add('unseen');
   }
-  li.appendChild(meta);
+
   // Row click: multi-select aware (shift = range, ctrl/cmd = toggle). Plain click
   // either opens the conversation or, if it lands on a selected row, keeps the
   // selection (so bulk actions stay usable).
