@@ -67,7 +67,13 @@
   // Playwright's WebKit on Windows) answers EIO instead of never answering, and the
   // kernel bounds its wait on the bridge to 20s and then declares the store dead. The
   // guest used to park forever on the first `ls /root`. Found by the browser test.
-  const WORKER_V = 'dlopen22';
+  // dlopen23: the OPFS bridge answers EBUSY (not EACCES) when another sync access handle
+  // holds a file, and the kernel names that case. A run killed on timeout left its bridge
+  // worker alive with its handles; the next run's fresh bridge could not open those files
+  // and the kernel said "in Dropbox but could not be downloaded" -- a git repo that had
+  // just been cloned "became not a git repository". Hosts must terminate the bridge when
+  // they kill a kernel (sandpie-worker does now).
+  const WORKER_V = 'dlopen23';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise

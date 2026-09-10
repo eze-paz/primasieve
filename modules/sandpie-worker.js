@@ -3326,6 +3326,13 @@ async function tool_walios({ script, timeout }, ctx) {
     const kill = (why) => {
       try { w.terminate(); } catch (_) {}
       _waliosWorker = null;
+      // The OPFS bridge must die WITH the kernel. Its exclusive sync access handles are
+      // released by the kernel's RELEASE at exit -- which a killed kernel never sends -- so
+      // an abandoned bridge kept every file the run had touched locked, and the next run's
+      // fresh bridge got EBUSY on them: a freshly cloned repo read as "not a git repository".
+      // Terminating the worker closes its handles; _waliosEnsure recreates both together.
+      try { if (_waliosOpfsWorker) _waliosOpfsWorker.terminate(); } catch (_) {}
+      _waliosOpfsWorker = null; _waliosFlushResolve = null;
       let partial = chunks.join(''); if (partial.length > 65536) partial = partial.slice(0, 65536) + '\n…[truncated]';
       finish(why + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : ''));
     };
@@ -3542,6 +3549,7 @@ function _wpyKill(reason) {
   const st = _wpy; if (!st) return;
   _wpy = null;
   try { st.worker.terminate(); } catch (_) {}
+  try { if (st.ow) st.ow.terminate(); } catch (_) {}   // release the bridge's OPFS locks with the kernel
   for (const w of st.waiters.splice(0)) { try { w.reject(new Error(reason)); } catch (_) {} }
 }
 
@@ -3551,11 +3559,12 @@ async function _wpyEnsure() {
   const src = await (await fetch(WPY_REPL_URL)).arrayBuffer();
   const pkgs = await _waliosPkgIndex();
   const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
-  const st = { worker: w, buf: '', waiters: [], seq: 0, ready: false, booting: null, queue: Promise.resolve(), diag: '' };
+  const st = { worker: w, ow: null, buf: '', waiters: [], seq: 0, ready: false, booting: null, queue: Promise.resolve(), diag: '' };
   _wpy = st;
   try {   // OPFS bridge: /root is the workspace (same namespace as /files)
     const sab = new SharedArrayBuffer(32 + (1 << 20));
     const ow = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
+    st.ow = ow;   // killed together with the kernel (see _wpyKill): an orphaned bridge keeps its file locks
     ow.postMessage({ t: 'sab', sab }); w.postMessage({ t: 'opfs-sab', sab });
   } catch (_) {}
   try {   // WISP bridge: real sockets (ssl/urllib inside the guest)
