@@ -322,7 +322,6 @@
     align-items: center; gap: 5px;
     padding: 2px 8px;
     font: 11px monospace; color: var(--sp-text-dim);
-    background: var(--sp-panel);
     position: relative;
     z-index: 1;
     user-select: none;
