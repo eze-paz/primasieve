@@ -3178,12 +3178,12 @@ async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
 // calls, and rm there deletes real workspace files. Networking goes through
 // the WISP relay (wss://<host>/wisp): wget/nc/ssh/ping work.
 const WALIOS_BASE = '/walios/';
-const WALIOS_BB = WB.BUSYBOX;   // one busybox for every host; the version (and what changed) lives in walios-backend.js
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
 importScripts('/modules/walios-backend.js?v=11');
 const WB = self.WALIOS_BACKEND;
+const WALIOS_BB = WB.BUSYBOX;   // one busybox for every host; the version (and what changed) lives in walios-backend.js
 const WALIOS_WORKER_V = WB.WORKER_V;
 // The program set is WB.manifest, shared with the terminal; this host adds nothing (the
 // terminal adds only its page-side cc bridge). It used to list lua/ssh/make here while
