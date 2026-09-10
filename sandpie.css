@@ -170,7 +170,6 @@
     font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase;
     justify-content: flex-start; gap: 0.3rem;
     padding: 0.4rem 0.2rem 0.2rem; margin-top: 0.8rem;
-    border-top: 1px solid var(--sp-border);
   }
   ul.fs-list li.sandpie-toggle:hover { color: var(--sp-text); }
   /* Children align flush with the normal/user files above (same left padding as
@@ -658,7 +657,6 @@
     padding: 0.25rem 1.75rem 0.25rem;
     user-select: none;
     font-variant-numeric: tabular-nums;
-    border-top: 1px solid var(--sp-border);
   }
   /* elapsed time leads in the accent colour; tokens + rate sit a step back */
   .msg-timer .mt-tok,
@@ -1513,7 +1511,6 @@ ul.conv-list li.active {
   .msg img[data-lr-done] { display: block; border-radius: 6px; margin: 0.35rem 0; }
   .tool-group .tg-tray {
     display: flex; align-items: center; gap: 0.6rem;
-    border-top: 1px solid var(--sp-border);
     background: var(--sp-panel);
     padding: 0.3rem 0.7rem;
   }
@@ -1777,7 +1774,6 @@ ul.conv-list li.active {
     gap: 0.5rem;
     justify-content: flex-end;
     padding-top: 0.6rem;
-    border-top: 1px solid var(--sp-border);
   }
   .ask-btn {
     font: 11px/1.4 'JetBrains Mono',monospace;
@@ -2109,7 +2105,6 @@ ul.conv-list li.active {
   .msg.think.done .repl-loader { display: none; }
     .msg.think .think-body {
     padding: 0.5rem 0.75rem;
-    border-top: 1px solid var(--sp-border);
     color: var(--sp-text-dim);
     white-space: pre-wrap;
     word-break: break-word;
