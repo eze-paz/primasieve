@@ -681,7 +681,8 @@
   /* once settled, the whole line dims to one tone */
   .msg-timer.done .mt-tok,
   .msg-timer.done .mt-rate,
-  .msg-timer.done .mt-sep { color: inherit; }
+  .msg-timer.done .mt-sep,
+  .msg-timer.done .mt-ctx { color: inherit; }   /* ctx was left out: it kept --sp-text-dim while siblings dimmed to the settled grey */
 
   .msg-timer .mt-todos {
     margin-left: 1rem;
