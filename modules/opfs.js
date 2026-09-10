@@ -1625,6 +1625,11 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
           // the cloud-index placeholder) and refresh.
           try { await opfs.remove(it.fullKey); } catch (_) {}
           if (window.Sandpie) Sandpie.events.emit('file:deleted', it.fullKey);
+          // Optimistic local forget: drop the rel from the sync state + cloud index
+          // NOW so refreshFileList() below actually shows the item gone (otherwise a
+          // dehydrated/cloud-indexed folder lingers until the remote delete confirms
+          // and a later sync trims the index).
+          try { const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null; if (sp && sp.forget) sp.forget(it.fullKey); } catch (_) {}
           await opfs.refreshFileList();
         } catch (e) { console.warn('delete failed:', it.fullKey, e); }
       }});

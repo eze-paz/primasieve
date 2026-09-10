@@ -2175,6 +2175,11 @@
       // Workspace-scoped variants (home namespace) — used by sharing.js to clean up
       // its own copies inside the user's workspace, which is NOT in the team root.
       workspaceDelete: (absPath) => del(absPath, { team: false }),
+      // Optimistic local forget (sync state + cloud index) for a just-deleted
+      // rel — lets the file viewer re-render immediately without waiting for
+      // the remote delete_v2 confirmation. The pending-deletes handshake still
+      // owns the actual remote deletion.
+      forget: (rel) => forgetFromStateAndIndex(rel),
       // --- 1:1 delivery by email (Dropbox sharing API; no team folder) --------
       // The Dropbox account's own email — the authoritative sender identity for a
       // share, independent of whatever account.js reports.
