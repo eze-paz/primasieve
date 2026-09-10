@@ -1567,8 +1567,6 @@ function mountConv(convId, pane = null) {
     if (mpHost) mpHost.dataset.convId = convId || '';
     if (window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
   } catch (_) {}
-  // Active conversation changed → re-colour the memory bank immediately.
-  if (convId) _recalcMemoryFor(convId);
   // BETA: the Files sidebar shows the ACTIVE conversation's project — refresh it
   // on every switch so it tracks the conversation now on screen.
   if (window.SANDPIE_BETA && window.opfs && opfs.refreshFileList) { try { opfs.refreshFileList(); } catch (_) {} }
@@ -1853,54 +1851,6 @@ registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
 registerLiteButton();
-let _memRecalcLatest = null, _memRecalcBusy = false;
-// Recompute which memories are active/standby immediately after the active
-// conversation changes — send-time systemBlock() only recalculates on submit.
-// Builds the same ctx as buildSystemPrompt (last user message + this
-// conversation's touched files) and asks memory.js to re-colour without
-// building the prompt block.
-function _recalcMemoryFor(id) {
-  try {
-    if (typeof SandpieMemory === 'undefined' || !SandpieMemory.refreshActive) return;
-    // Only the currently-active conversation may stage a recompute — a stale
-    // background cold-load finalising for an already-superseded id must not
-    // overwrite the newest request.
-    if (id !== activeConvId) return;
-    // Single-flight latest-wins: opening N conversations quickly must NOT queue N
-    // async memory recomputes (each mounts one via mountConv, all run to completion
-    // and re-colour the sb-net N times). Only the newest requested conversation
-    // survives; the worker below discards superseded/older ones and re-runs until
-    // the request queue is empty, honouring only the still-current active conv.
-    _memRecalcLatest = id;
-    if (_memRecalcBusy) return;   // a recompute is already in flight — it takes the latest on its next loop
-    _memRecalcBusy = true;
-    (async () => {
-      try { await _runMemoryRecalc(); }
-      catch (_) {} finally { _memRecalcBusy = false; }
-    })();
-  } catch (_) {}
-}
-function _memoryCtxFor(id) {
-  const st = ensureStream(id);
-  const msgs = (st && st.messages) || [];
-  const lastUser = [...msgs].reverse().find(m => m && m.role === 'user');
-  const c = lastUser && lastUser.content;
-  const ctx = { message: typeof c === 'string' ? c : (Array.isArray(c) ? c.map(p => (p && p.text) || '').join(' ') : '') };
-  try { if (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths) ctx.paths = SandpieAugmentations.getConvPaths(id); } catch (_) {}
-  return ctx;
-}
-async function _runMemoryRecalc() {
-  while (_memRecalcLatest !== null) {
-    const target = _memRecalcLatest;
-    _memRecalcLatest = null;
-    // Only recompute the conversation that is active RIGHT NOW. A burst of queued
-    // loads superseded an earlier one (id no longer active) is simply skipped —
-    // and even the newest is re-checked at commit so a switch that lands mid-await
-    // cannot re-colour the sb-net for a conversation we've already left.
-    if (target !== activeConvId) continue;
-    await SandpieMemory.refreshActive(_memoryCtxFor(target), () => target === activeConvId);
-  }
-}
 async function loadConv(id) {
   if (id === activeConvId) return;
 
@@ -1955,7 +1905,6 @@ async function loadConv(id) {
         if (!data) { addMsg('err', 'Failed to load conversation.'); if (prevId) mountConv(prevId); return; }
         hydrateStreamFromData(s, data);
         if (activeConvId === id) messages = s.messages;
-        _recalcMemoryFor(id);
         renderConversation(s.messages, s.compaction, s.host);
         if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
         const mEl = paneScrollEl($('messages'));
@@ -1984,7 +1933,6 @@ async function loadConv(id) {
         s.persistedCount = 0;
         s._forceJsonlRewrite = false;
         if (activeConvId === id) messages = s.messages;
-        _recalcMemoryFor(id);
         renderConversation(s.messages, s.compaction, s.host);
         if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
         await refreshConversationList();
@@ -2016,7 +1964,6 @@ async function loadConv(id) {
         saveConv(id, { touchUpdated: false }).catch(() => {});
       }
       if (activeConvId === id) messages = s.messages;
-      _recalcMemoryFor(id);
       renderConversation(allMsgs, s.compaction, s.host);
       if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
       const mEl = paneScrollEl($('messages'));
