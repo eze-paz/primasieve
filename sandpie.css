@@ -679,6 +679,7 @@
   /* ctx counter as a pie ring: track = full context window, arc = used.
      Replaces the raw "38,412 ctx" text (exact count lives in the tooltip +
      the ctx popup). Warn >=75% amber, hot >=90% red. */
+  .msg-timer .mt-ctx { display: inline-flex; align-items: center; vertical-align: middle; }
   .msg-timer .mt-ctx svg { width: 12px; height: 12px; transform: rotate(-90deg); display: block; }
   .msg-timer .mt-ctx .ctx-track { stroke: var(--sp-border); }
   .msg-timer .mt-ctx .ctx-fill {
