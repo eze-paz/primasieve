@@ -49,8 +49,18 @@ def _install():
 
     seq = [0]
 
+    # /dev/hostcall is the kernel's RPC channel that does not ride stdio. On the old
+    # channel (frame on fd 1, reply on fd 0) `python3 -c "import matplotlib" | head`
+    # sent the bundle request INTO THE PIPE and waited for a reply that went to the
+    # shell -- a hang until the timeout. Fall back to stdio only on a kernel without it.
+    _dev = [None]
+    try:
+        _dev[0] = os.open("/dev/hostcall", os.O_RDWR)
+    except OSError:
+        pass
+
     def _send(obj):
-        os.write(1, b"\x02" + base64.b64encode(json.dumps(obj).encode("utf-8")) + b"\x03\n")
+        os.write(1 if _dev[0] is None else _dev[0], b"\x02" + base64.b64encode(json.dumps(obj).encode("utf-8")) + b"\x03\n")
 
     def _read_reply(cid, timeout=600.0):
         """Same reader as soffice.py: an empty read is EOF-already-seen, not the end of
@@ -59,7 +69,7 @@ def _install():
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
-                chunk = os.read(0, 65536)
+                chunk = os.read(0 if _dev[0] is None else _dev[0], 65536)
             except OSError:
                 chunk = b""
             if chunk:

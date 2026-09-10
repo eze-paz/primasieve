@@ -39,8 +39,16 @@ WORKSPACE = "/root"
 TMPDIR = "/root/.soffice-tmp"
 
 
+# /dev/hostcall when the kernel has it: the RPC then survives `soffice ... | tail` and
+# any other redirection, which the frame-on-stdout channel did not. Else stdio.
+try:
+    _DEV = os.open("/dev/hostcall", os.O_RDWR)
+except OSError:
+    _DEV = None
+
+
 def _send(obj):
-    os.write(1, b"\x02" + base64.b64encode(json.dumps(obj).encode("utf-8")) + b"\x03\n")
+    os.write(1 if _DEV is None else _DEV, b"\x02" + base64.b64encode(json.dumps(obj).encode("utf-8")) + b"\x03\n")
 
 
 def _read_reply(cid, timeout=600.0):
@@ -50,7 +58,7 @@ def _read_reply(cid, timeout=600.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            chunk = os.read(0, 65536)
+            chunk = os.read(0 if _DEV is None else _DEV, 65536)
         except OSError:
             chunk = b""
         if chunk:

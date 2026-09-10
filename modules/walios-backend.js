@@ -52,7 +52,14 @@
   // is still not supported (the side module is linked into the main instance's table).
   // dlopen19: the run message takes `links` (symlinks seeded before the guest runs);
   // runMessage adds /files -> /root so Pyodide-style paths work on this backend.
-  const WORKER_V = 'dlopen19';
+  // dlopen20: /dev/hostcall -- the guest->host RPC as a device, independent of stdio.
+  // The frame-on-stdout / reply-on-stdin channel broke under any redirection: `python3
+  // -c "import matplotlib" | head` sent the bundle request into the pipe and waited on a
+  // stdin that was the shell's (a heredoc), and hung until the timeout. Requests written
+  // to /dev/hostcall are answered on the same fd; `mount` is served by the kernel itself,
+  // other ops reach the host as {t:'hostcall'} messages. sitecustomize, soffice and apk
+  // use the device when present and fall back to stdio on an older kernel.
+  const WORKER_V = 'dlopen20';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -329,14 +336,20 @@
         '      # twice is harmless.',
         '      if [ -f "$TSV" ] && awk -F"\\t" -v n="$p" \'$1==n && $3=="builtin"{f=1} END{exit !f}\' "$TSV"; then echo "$p: built-in"; continue; fi',
         '      k=$((k+1)); id="$$$k"',
-        '      printf \'\\002{"t":"call","id":%s,"op":"pkg","plain":1,"args":{"name":"%s"}}\\003\\n\' "$id" "$p"',
+        '      # /dev/hostcall (kernel RPC device) when present: the request then survives',
+        '      # `apk add x | ...` or $(apk add x). Else the frame goes out on stdout as before.',
+        '      if [ -e /dev/hostcall ] && exec 3<>/dev/hostcall; then via=dev; else via=stdio; fi',
+        '      if [ $via = dev ]; then printf \'{"t":"call","id":%s,"op":"pkg","plain":1,"args":{"name":"%s"}}\\n\' "$id" "$p" >&3;',
+        '      else printf \'\\002{"t":"call","id":%s,"op":"pkg","plain":1,"args":{"name":"%s"}}\\003\\n\' "$id" "$p"; fi',
         '      reply=""; n=0',
         '      while [ $n -lt 600 ]; do',
-        '        if IFS= read -r line; then',
+        '        if [ $via = dev ]; then IFS= read -r line <&3; ok=$?; else IFS= read -r line; ok=$?; fi',
+        '        if [ $ok -eq 0 ]; then',
         '          case "$line" in *\'"t":"reply"\'*\'"id":\'"$id"[,\\}]*) reply=$line; break;; esac',
         '        else usleep 100000 2>/dev/null || sleep 1; fi',
         '        n=$((n+1))',
         '      done',
+        '      [ $via = dev ] && exec 3>&-',
         '      case "$reply" in',
         '        "") echo "apk: no reply from the host for $p (is this shell running under a walios host?)" >&2; rc=1;;',
         '        *\'"ok_call":true\'*) echo "$p: added (fetched on first run)";;',
@@ -384,6 +397,10 @@
       const echoes = [];                 // reply payloads we expect the pty to echo back
       const mounts = [];                 // in-flight mounts, awaiting 'tar-mounted'
       const reply = (f, o) => {
+        // A request that came through /dev/hostcall (the kernel forwarded it as a
+        // {t:'hostcall'} message) is answered the same way; the kernel puts the reply on
+        // that fd. Nothing touches stdin and nothing is echoed to a pty.
+        if (f.__kid !== undefined) { try { worker.postMessage({ t: 'hostcall-reply', id: f.__kid, reply: o }); } catch (_) {} return; }
         const body = JSON.stringify(Object.assign({ t: 'reply', id: f.id }, o));
         const payload = f.plain ? body : enc(body);
         echoes.push(payload);
@@ -459,6 +476,14 @@
             catch (_) { try { f = JSON.parse(raw); } catch (_2) { emit(STX + raw + ETX); continue; } }
             if (f && f.t === 'call') serve(f);
           }
+        },
+        // Call from the worker's onmessage for {t:'hostcall'}: a request the guest wrote to
+        // /dev/hostcall. Served exactly like a stdout frame; the reply routes back by id.
+        hostcall(m) {
+          const f = (m && m.frame) || {};
+          if (f.t !== 'call') return;
+          f.__kid = m.id;
+          serve(f);
         },
         // Call from the worker's onmessage for {t:'tar-mounted'}. True if it was ours.
         mounted(m) {

@@ -3353,6 +3353,7 @@ async function tool_walios({ script, timeout }, ctx) {
       if (done) return;
       const m = ev.data;
       if (m.t === 'tar-mounted') { frames.mounted(m); return; }
+      if (m.t === 'hostcall') { frames.hostcall(m); return; }     // a /dev/hostcall request (soffice, apk, pip, ...)
       if (m.t === 'out') {
         // Host diagnostics are noise for the model -- EXCEPT the trap report: an exit 139
         // used to arrive with no reason at all, so the model guessed (wrongly) at stack
@@ -3469,7 +3470,9 @@ async function _wpyFetch(url, init) {
   catch (_) { return await fetch('/proxy/' + String(url).replace(/^https?:\/\//, ''), init); }
 }
 async function _wpyHostcall(st, f) {
-  const reply = (o) => _wpySend(st, { t: 'reply', id: f.id, ...o });
+  // f.__reply is set for a request that arrived through /dev/hostcall; the REPL's own
+  // protocol frames still ride stdout/stdin.
+  const reply = (o) => f.__reply ? f.__reply(o) : _wpySend(st, { t: 'reply', id: f.id, ...o });
   try {
     const a = f.args || {};
     if (f.op === 'fetch') {
@@ -3566,6 +3569,10 @@ async function _wpyEnsure() {
     if (m.t === 'out') {
       if (m.fd === 2) { if (!/^\[host\]/.test(m.s)) st.diag = (st.diag + m.s).slice(-4000); return; }
       st.buf += m.s; _wpyScan(st);
+    } else if (m.t === 'hostcall') {           // a request written to /dev/hostcall (soffice, sitecustomize)
+      const f = m.frame || {};
+      f.__reply = (o) => { try { w.postMessage({ t: 'hostcall-reply', id: m.id, reply: o }); } catch (_) {} };
+      const t0 = Date.now(); _wpyHostcall(st, f).finally(() => _wpyCredit(st, Date.now() - t0));
     } else if (m.t === 'exit') {
       _wpyKill('the walios Python interpreter exited (code ' + m.code + ')');
     }
