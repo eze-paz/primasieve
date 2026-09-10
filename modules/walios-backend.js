@@ -300,7 +300,6 @@
 
     // ---- Package index, for EVERY walios host --------------------------------
     // A runnable package can come from three places, all served under /walios/:
-    //   index.json            the prebuilt repo: name -> wasm url [+ companion tars]
     //   pkgcache/index.json   binaries users compiled in-tab and uploaded (e.g. git)
     //   aports-catalog.json   the Alpine catalog; tier 'wasm' entries carry a wasm url,
     //                         the rest can only be BUILT (terminal.html's build button)
@@ -313,15 +312,17 @@
       base = base || '/walios/';
       builtin = builtin || {};
       const get = async (u) => { try { const r = await fetch(base + u); return r.ok ? await r.json() : null; } catch (_) { return null; } };
-      const [repo, cache, cat] = await Promise.all([get('index.json'), get('pkgcache/index.json'), get('aports-catalog.json')]);
+      // Two sources: pkgcache/index.json (binaries users built) and aports-catalog.json (the
+      // Alpine catalog). A third, a prebuilt repo `index.json`, was designed and never
+      // deployed -- every boot 404'd on it -- so it is gone.
+      const [cache, cat] = await Promise.all([get('pkgcache/index.json'), get('aports-catalog.json')]);
       const pk = {};                                         // name -> { url, tars, ver, kind, size, desc, src }
       const add = (name, e) => { if (!name || builtin[name] || pk[name]) return; pk[name] = e; };
       // pkgcache first: an in-tab build of X is the newest X (the ?t= is what
       // terminal.html does too -- pkgcache is served no-store but a wasm compile cache
       // keys on the URL).
       if (cache && Array.isArray(cache.packages)) for (const n of cache.packages) add(n, { url: 'pkgcache/' + n + '.wasm', kind: 'bin', src: 'pkgcache' });
-      if (repo && repo.packages) for (const p of Object.values(repo.packages)) add(p.name, { url: p.url, tars: p.tars, ver: p.ver, kind: p.kind, size: p.size, desc: p.desc, src: 'repo' });
-      // Boot manifest = repo + pkgcache, exactly what terminal.html puts on PATH at boot.
+      // Boot manifest = pkgcache, exactly what terminal.html puts on PATH at boot.
       // Catalog tier-'wasm' entries are NOT on PATH until asked for -- the UI's "add"
       // button and `apk add` both register them on demand -- so the two hosts agree on
       // what a fresh shell has, and `apk add` means the same thing in both.
@@ -337,7 +338,7 @@
       const clean = (s) => String(s == null ? '' : s).replace(/[\t\r\n]+/g, ' ').trim();
       const rows = [];
       for (const n of Object.keys(builtin).sort()) rows.push([n, '', 'builtin', '', '', 'installed'].join('\t'));
-      // 'installed' = on PATH at boot (builtin, repo, pkgcache); 'available' = catalog,
+      // 'installed' = on PATH at boot (builtin, pkgcache); 'available' = catalog,
       // one `apk add` away.
       for (const n of Object.keys(pk).sort()) { const e = pk[n]; rows.push([n, clean(e.ver), clean(e.kind), clean(e.size), clean(e.desc), manifest[n] ? 'installed' : 'available'].join('\t')); }
       for (const n of Object.keys(buildOnly).sort()) rows.push([n, '', '', '', clean(buildOnly[n]), 'build-only'].join('\t'));
