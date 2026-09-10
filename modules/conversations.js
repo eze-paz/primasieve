@@ -3654,12 +3654,12 @@ async function resolveFilePart(f) {
       if (content.length <= ATTACH_INLINE_CAP) {
         return `[Attached file "${f.name}" — saved at ${f.path}]\n\n${content}`;
       }
-      return `[Attached file "${f.name}" — ${size} of text, saved at ${f.path}. Too large to inline; read it with the pyodide tool, e.g. open(${JSON.stringify(f.path)}).read().]`;
+      return `[Attached file "${f.name}" — ${size} of text, saved at ${f.path}. Too large to inline; read it with the run_python tool, e.g. open(${JSON.stringify(f.path)}).read().]`;
     } catch (_) {
       return `[Attached file "${f.name}" is no longer available in the workspace.]`;
     }
   }
-  return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the pyodide tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
+  return `[Attached file "${f.name}" — ${f.mime || 'binary'}, ${size}, saved at ${f.path}. Use the run_python tool to read it if you need its contents, e.g. open(${JSON.stringify(f.path)}, "rb").read().]`;
 }
 // Claude-mode (DEFAULT): swap the write_todos definition for a faithful clone
 // of Claude Code's TodoWrite — same name so dispatch/grammar are untouched;
@@ -5014,7 +5014,9 @@ function appendToolResultImage(tcId, path, scopeEl) {
 // Unknown tools fall back to the raw name (never blank).
 const TC_LABELS = {
   run_python:        { doing: 'Running code',        done: 'Ran code' },
-  pyodide:           { doing: 'Running code',        done: 'Ran code' },   // renamed from run_python
+  pyodide:           { doing: 'Running code',        done: 'Ran code' },   // former wire name of run_python
+  run_walios:        { doing: 'Running a script',    done: 'Ran script' },  // shell script in the in-browser Linux
+  walios:            { doing: 'Running a script',    done: 'Ran script' },  // former name of run_walios
   copy:              { doing: 'Importing file',      done: 'Imported file' },   // beta alias of copy_to_workspace
   write_file:        { doing: 'Creating',            done: 'Created',        target: 'path' },
   edit_file:         { doing: 'Editing',             done: 'Edited',         target: 'path' },
@@ -5058,6 +5060,7 @@ const TC_I18N = {
     'Sharing': 'Compartiendo',                 'Shared': 'Compartido',
     'Asking a helper': 'Consultando a un ayudante', 'Helper done': 'Ayudante listo',
     'Running a command': 'Ejecutando un comando', 'Ran command': 'Comando ejecutado',
+    'Running a script': 'Ejecutando un script',   'Ran script': 'Script ejecutado',
     'Saving to memory': 'Guardando en memoria','Saved to memory': 'Guardado en memoria',
     'Recalling': 'Recuperando',                'Recalled': 'Recuperado',
     'Planning': 'Planificando',                'Planned': 'Planificado',
@@ -5079,6 +5082,7 @@ const TC_I18N = {
     'Sharing': 'Compartint',                   'Shared': 'Compartit',
     'Asking a helper': 'Consultant un ajudant','Helper done': 'Ajudant llest',
     'Running a command': 'Executant una ordre','Ran command': 'Ordre executada',
+    'Running a script': 'Executant un script',  'Ran script': 'Script executat',
     'Saving to memory': 'Desant a la memòria', 'Saved to memory': 'Desat a la memòria',
     'Recalling': 'Recuperant',                 'Recalled': 'Recuperat',
     'Planning': 'Planificant',                 'Planned': 'Planificat',

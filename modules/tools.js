@@ -698,8 +698,13 @@ const BETA_DESC = { ...SHORT_DESC,
 // Same content as RUN_PYTHON_WALIOS, in the short form these maps use.
 const SHORT_DESC_WALIOS = "Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script), or `path` to run a saved .py file. Runs on walios (wasm CPython 3.14 on a real Linux userland), NOT Pyodide. Async: top-level `await` works, and asyncio.run(main()) / loop.run_until_complete() work too. Do not use time.sleep() — use await asyncio.sleep(n). REAL SOCKETS: requests and urllib work normally (import requests; r = requests.get(url)); pyodide.http.pyfetch also works and is cheaper for a simple GET — check r.ok / r.status. PACKAGES: numpy, pandas, matplotlib, Pillow, lxml, python-docx, openpyxl, python-pptx, reportlab, pypdf, bs4, xlsxwriter, requests, sqlite3 and more are BUILT IN as real compiled C extensions — just import; others via `await micropip.install(...)` (pure-Python wheels only). NO subprocess: subprocess.run/Popen and os.popen raise OSError [Errno 38] immediately (no fork) — use the walios tool for shell work. OFFICE→PDF: import soffice; soffice.convert('/root/x.docx') → '/root/x.pdf' (in-browser LibreOffice; PDF only). A relative save lands next to the script.";
 
-// BOTH modes: run_python is renamed pyodide() and takes `code` directly (REPL).
-const NAME = { run_python: 'pyodide' };
+// Wire-name overrides, both modes. run_python used to go out as `pyodide` (the name the
+// REPL A/B arm happened to use). That is a backend name, not a verb, and it is FALSE on
+// the walios backend -- the description says "runs on walios" under a tool called
+// pyodide. The tool is `run_python` on the wire again: verb form like every other tool
+// and true on both backends. The worker still dispatches `pyodide` (older conversations,
+// model habit); the REPL shape (`code` directly) is what the A/B measured, not the name.
+const NAME = {};
 const PARAMS = {
   run_python: { type: 'object', properties: {
     code: { type: 'string', description: 'Python code to run directly (preferred for one-off work).' },
