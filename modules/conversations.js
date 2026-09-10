@@ -1165,7 +1165,10 @@ function renderFileBundle(target, bundleFiles) {
     const label = _codeFileLabel(e);
     if (!seen.has(label)) { seen.add(label); distinct.push(label); }
   }
-  const typeLabel = distinct.slice(0, 4).join(', ') + (distinct.length > 4 ? ', +' + (distinct.length - 4) + ' more' : '');
+  let typeLabel = distinct.slice(0, 4).join(', ') + (distinct.length > 4 ? ', +' + (distinct.length - 4) + ' more' : '');
+  // Hard cap the rendered label length — long type names (e.g. GIT/OBJECTS hashes) blow out the subtitle
+  const TYPE_LABEL_MAX = 60;
+  if (typeLabel.length > TYPE_LABEL_MAX) typeLabel = typeLabel.slice(0, TYPE_LABEL_MAX - 1).replace(/[\s,]+$/, '') + '\u2026';
   const badge = count > 99 ? '99+' : String(count);
 
   const wrap = document.createElement('div');
