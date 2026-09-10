@@ -655,7 +655,7 @@
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
-    padding: 0.25rem 1.25rem 0.25rem;
+    padding: 0.25rem 1.75rem 0.25rem;
     user-select: none;
     font-variant-numeric: tabular-nums;
     border-top: 1px solid var(--sp-border);
