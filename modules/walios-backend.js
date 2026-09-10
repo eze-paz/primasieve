@@ -59,7 +59,11 @@
   // to /dev/hostcall are answered on the same fd; `mount` is served by the kernel itself,
   // other ops reach the host as {t:'hostcall'} messages. sitecustomize, soffice and apk
   // use the device when present and fall back to stdio on an older kernel.
-  const WORKER_V = 'dlopen20';
+  // dlopen21: WASI fd_read/fd_write are the SAME code as the Linux read/write, per iov,
+  // with errnos translated -- the second copy lacked the pty kind, so a WASI program's
+  // output vanished in the terminal (pty stdio) while the walios() tool (plain stdio)
+  // showed it. WASI fd_read also blocks now (waitReadable) instead of reading EOF.
+  const WORKER_V = 'dlopen21';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
