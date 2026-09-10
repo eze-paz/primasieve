@@ -3421,7 +3421,6 @@ body.sp-decoding *::after {
   .share-sec-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sp-text-dim); margin: 0.9rem 0 0.35rem; padding-left: 0.1rem; }
   .share-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
   .share-empty-hint { font-size: 0.72rem; color: var(--sp-text-dim); opacity: 0.8; padding: 0.2rem 0.1rem; }
-  #newChatBtn { margin-top: 0.5rem; margin-bottom: 0.5rem; }
   /* pinnedHome "+Add" tile — same footprint as every pin tile; count rides inside the icon */
   .pin-tile.add-tile { justify-content: center; background: transparent; cursor: pointer; }
   .pin-tile.add-tile:hover { background: var(--sp-panel); }
