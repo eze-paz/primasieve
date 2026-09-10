@@ -88,7 +88,7 @@
   // cloud-only file downloads it from Dropbox first, and one large file on a slow link
   // used to disable /root for the rest of the session. A slow op waits up to 10 min and
   // fails only itself.
-  const WORKER_V = 'sig28';
+  const WORKER_V = 'sig29';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
