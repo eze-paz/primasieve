@@ -230,7 +230,11 @@
     // v=net6: same build plus --export=__stack_pointer/__tls_base, which the kernel needs to
     // hand an Asyncify fork child its parent's stack pointer (busybox `timeout` killed nothing
     // before: the grandchild's frames landed on top of the ones it inherited).
-    BUSYBOX: 'busybox.wasm?v=net6',
+    // v=net7: tar (create/extract, -z/-j/-J via seamless gzip/bzip2/xz), gzip/gunzip/zcat,
+    // bzip2/bunzip2, unzip, diff/cmp built in. The catalog's GNU tar was `rmt` and its
+    // grep/diffutils/findutils were gnulib test helpers (the farm picked the wrong
+    // executable); those catalog entries are gone and busybox provides the commands.
+    BUSYBOX: 'busybox.wasm?v=net7',
     async runMessage(o) {
       const base = o.base || '/walios/';
       const bb = o.busybox || this.BUSYBOX;
