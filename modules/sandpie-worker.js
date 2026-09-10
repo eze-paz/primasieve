@@ -3121,7 +3121,7 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','pyodide','shell','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','copy','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['run_python','pyodide','shell','run_walios','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','copy','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -3708,7 +3708,8 @@ async function runTool(name, args, ctx) {
   switch (name) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
     case 'shell':         return tool_shell(args, ctx);
-    case 'walios':        return (_waliosQueue = _waliosQueue.then(() => tool_walios(args, ctx), () => tool_walios(args, ctx)));
+    case 'run_walios': case 'walios':   // 'walios' = the pre-verb name, kept for older conversations and model habit
+      return (_waliosQueue = _waliosQueue.then(() => tool_walios(args, ctx), () => tool_walios(args, ctx)));
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'share':         return tool_share(args, ctx);
     case 'html_console':  return tool_html_console(args, ctx);
@@ -3967,7 +3968,7 @@ function parseWaliosBlobCalls(text) {
     const [full, tmo, body] = m;
     const args = { script: body.replace(/^\r?\n/, '').replace(/\r?\n$/, '') };
     if (tmo) args.timeout = Number(tmo);
-    toolCalls.push({ id: 'call_walios_' + (++_toolCallSeq), type: 'function', function: { name: 'walios', arguments: JSON.stringify(args) } });
+    toolCalls.push({ id: 'call_walios_' + (++_toolCallSeq), type: 'function', function: { name: 'run_walios', arguments: JSON.stringify(args) } });
     spans.push([m.index, m.index + full.length]);
   }
   let stripped = text;

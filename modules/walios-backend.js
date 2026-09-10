@@ -50,7 +50,9 @@
   // deployed binary. threading.Thread, Lock, Event, Condition, Timer work in the REPL,
   // run_python and the walios() tool; a thread calling into a dlopen'd extension (numpy)
   // is still not supported (the side module is linked into the main instance's table).
-  const WORKER_V = 'dlopen18';
+  // dlopen19: the run message takes `links` (symlinks seeded before the guest runs);
+  // runMessage adds /files -> /root so Pyodide-style paths work on this backend.
+  const WORKER_V = 'dlopen19';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -195,6 +197,9 @@
         t: 'run', wasm: bb,
         manifest: Object.assign({}, pkgs ? pkgs.manifest : {}, this.manifest(bb), o.manifest || {}),
         tars: [['rootfs.tar.gz', '/']], opfs: '/root', blobs,
+        // /files is what the Pyodide backend calls the same OPFS root; a model that
+        // learned "/files/..." paths there must not get ENOENT here.
+        links: Object.assign({ '/files': '/root' }, o.links || {}),
         lazyTars: Object.assign({}, pkgs ? pkgs.lazyTars : {}, this.eagerTars(o.kind), o.lazyTars || {}),
         env, cwd: o.cwd || '/root', argv: o.argv, pty: !!o.pty, cols: o.cols || 120, rows: o.rows || 40,
       };
