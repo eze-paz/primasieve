@@ -207,6 +207,9 @@
         // credentials, which is the actionable message; put a token in the URL for a
         // private repo (https://x-access-token:TOKEN@github.com/owner/repo).
         GIT_TERMINAL_PROMPT: '0',
+        // No pager and no interactive editor: an agent's `git log` must not try to run less,
+        // and `rebase --continue` must not wait for an editor that cannot open.
+        GIT_PAGER: 'cat', PAGER: 'cat', GIT_EDITOR: 'true', EDITOR: 'true',
       };
     },
 
@@ -248,6 +251,7 @@
       const bb = o.busybox || this.BUSYBOX;
       const pkgs = o.pkgs ? await o.pkgs : null;
       const rpc = o.rpc !== false;
+      this._gitUser = o.gitUser || null;          // read by tlsBlobs() below
       const blobs = Object.assign({}, await this.tlsBlobs(base), await this.toolBlobs(base), pkgs ? this.pkgBlobs(pkgs) : {});
       if (rpc) {
         // On the default path for every python in the guest, so an import miss can ask
@@ -301,8 +305,20 @@
       // safe.directory: the guest runs as root over an OPFS-backed tree, which git
       // otherwise refuses as "dubious ownership". Connection: close because the WISP
       // relay does not multiplex a kept-alive connection.
+      // Read from the transcripts of an agent using git here: every `git log`/`diff` printed
+      // "error: cannot run less" (there is no less), `git rebase`/`commit` without -c user.*
+      // died with "unable to auto-detect email address (got 'root@wali.(none)')", and every
+      // clone warned "templates not found in /home/aezequiel/share/git-core/templates" (the
+      // build prefix). Each one cost the model a retry with a workaround flag. Defaults here;
+      // a host may pass its own identity via runMessage({ gitUser: { name, email } }).
+      const gu = (this._gitUser && this._gitUser.name) ? this._gitUser : { name: 'walios', email: 'walios@sandpie.invalid' };
       b['/etc/gitconfig'] = enc('[safe]\n\tdirectory = *\n[http]\n\tsslCAInfo = ' + this.CA_PATH
-                                + '\n\textraHeader = Connection: close\n');
+                                + '\n\textraHeader = Connection: close\n'
+                                + '[core]\n\tpager = cat\n\teditor = true\n'
+                                + '[user]\n\tname = ' + gu.name + '\n\temail = ' + gu.email + '\n'
+                                + '[init]\n\tdefaultBranch = main\n\ttemplateDir = /usr/share/git-core/templates\n'
+                                + '[advice]\n\tdetachedHead = false\n');
+      b['/usr/share/git-core/templates/.keep'] = enc('');
       return b;
     },
 
