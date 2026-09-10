@@ -1087,6 +1087,10 @@ ul.conv-list li.active {
     font-size: 20px;
     padding: 0;
   }
+  /* Material Symbols' own class sets font-size: 24px on the span, which beats the
+     button's inherited font-size -- size the icon directly. */
+  .sidebar-collapse-btn .material-symbols-outlined,
+  .sidebar-expand-btn .material-symbols-outlined { font-size: 20px; }
   .sidebar-collapse-btn:hover {
     background: var(--sp-surface);
     color: var(--sp-accent);
