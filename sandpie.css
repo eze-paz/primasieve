@@ -3607,3 +3607,13 @@ body.sp-decoding *::after {
 .files-modal ul.fs-list li .name .material-symbols-outlined { font-size: 17px; color: var(--sp-text-dim); }
 .files-modal ul.fs-list li .name:hover { color: var(--sp-text); }
 .files-modal ul.fs-list li.selected .name { color: var(--sp-accent); }
+
+/* Grid view (files explorer modal): icon tiles like a normal OS explorer */
+.files-modal .fm-nav button.fm-view-on { color: var(--sp-accent); background: var(--sp-accent-dim); }
+.files-modal ul.fs-list.fm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.files-modal ul.fs-list.fm-grid li { display: block; padding: 10px 6px; text-align: center; border: 1px solid transparent; border-radius: 8px; }
+.files-modal ul.fs-list.fm-grid li:hover { background: var(--sp-surface); }
+.files-modal ul.fs-list.fm-grid li .name { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.files-modal ul.fs-list.fm-grid li .name .fm-tile-icon { font-size: 26px; line-height: 1; }
+.files-modal ul.fs-list.fm-grid li .name .fm-tile-name { font-size: 0.72rem; color: var(--sp-text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files-modal ul.fs-list.fm-grid li .name .fm-tile-size { font-size: 0.65rem; color: var(--sp-text-dim); }

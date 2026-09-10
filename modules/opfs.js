@@ -1289,6 +1289,10 @@ opfs.uploadEntry = async function(entry, dirPath) {
 // File-list sort mode (the right-click "Sort by" section). Folders always group
 // first and sort by name; files sort by this mode. Persisted in localStorage.
 const FILE_SORT_KEY = 'sandpie-files-sort';
+// View mode for the files explorer modal: 'list' (rows) or 'grid' (icon tiles).
+const FILE_VIEW_KEY = 'sandpie-files-view';
+function fileViewMode() { return localStorage.getItem(FILE_VIEW_KEY) === 'grid' ? 'grid' : 'list'; }
+function setFileViewMode(m) { localStorage.setItem(FILE_VIEW_KEY, m === 'grid' ? 'grid' : 'list'); opfs.refreshFileList(); }
 function fileSortMode() { const m = localStorage.getItem(FILE_SORT_KEY); return (m === 'size' || m === 'mtime') ? m : 'name'; }
 function setFileSortMode(m) { localStorage.setItem(FILE_SORT_KEY, (m === 'size' || m === 'mtime') ? m : 'name'); opfs.refreshFileList(); }
 
@@ -1300,6 +1304,7 @@ opfs.refreshFileList = async function() {
   if (!ul) return;
   const path = opfs.currentPath();
   const frag = document.createDocumentFragment();
+  ul.classList.toggle('fm-grid', fileViewMode() === 'grid');
 
   // BETA: the Files sidebar shows the ACTIVE CONVERSATION'S project folder, listed
   // live from Dropbox (OPFS is just a render cache here). #opfsPath is a path
@@ -1457,7 +1462,23 @@ opfs.refreshFileList = async function() {
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
     const kindIcon = it.kind === 'folder' ? '📁 ' : '📄 ';
-    btn.textContent = kindIcon + it.name;
+    if (fileViewMode() === 'grid') {
+      // Grid tile: big icon above the name, size below. Same click/contextmenu
+      // wiring as the list row — only the markup differs.
+      li.classList.add('fm-grid-item');
+      const ic = document.createElement('span');
+      ic.className = 'fm-tile-icon';
+      ic.textContent = kindIcon.trim();
+      const nm = document.createElement('span');
+      nm.className = 'fm-tile-name';
+      nm.textContent = it.name;
+      const sz = document.createElement('span');
+      sz.className = 'fm-tile-size';
+      sz.textContent = it.kind === 'folder' ? '—' : opfs.formatSize(it.size);
+      btn.append(ic, nm, sz);
+    } else {
+      btn.textContent = kindIcon + it.name;
+    }
     // Hydration is invisible to the user too: a not-yet-downloaded cloud file
     // looks like any other file (📄) and reports "synced" — clicking it fetches it
     // transparently (openFile → provider.hydrate).
@@ -1469,10 +1490,12 @@ opfs.refreshFileList = async function() {
       btn.onclick = () => opfs.openFile(it.fullKey, it.name);
     }
     li.append(btn);
-    const sizeSpan = document.createElement('span');
-    sizeSpan.className = 'file-size';
-    sizeSpan.textContent = opfs.formatSize(it.size);
-    li.append(sizeSpan);
+    if (fileViewMode() !== 'grid') {
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'file-size';
+      sizeSpan.textContent = opfs.formatSize(it.size);
+      li.append(sizeSpan);
+    }
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       const menuItems = [];
@@ -1613,6 +1636,9 @@ const itExt = (it.name.split('.').pop() || '').toLowerCase();
       menuItems.push({ label: (_sortMode === 'name'  ? '● ' : '○ ') + 'Alphabetical',  action: () => setFileSortMode('name') });
       menuItems.push({ label: (_sortMode === 'size'  ? '● ' : '○ ') + 'File size',     action: () => setFileSortMode('size') });
       menuItems.push({ label: (_sortMode === 'mtime' ? '● ' : '○ ') + 'Last modified', action: () => setFileSortMode('mtime') });
+      menuItems.push({ info: true, label: 'View', className: 'ctx-sort-header' });
+      menuItems.push({ label: (fileViewMode() === 'list' ? '● ' : '○ ') + 'List',  action: () => setFileViewMode('list') });
+      menuItems.push({ label: (fileViewMode() === 'grid' ? '● ' : '○ ') + 'Grid', action: () => setFileViewMode('grid') });
       const menu = opfs.showContextMenu(ev.clientX, ev.clientY, menuItems);
       if (it.kind === 'folder') {
         const sizeEl = menu.querySelector('.ctx-size');

@@ -30,6 +30,8 @@
         '<div class="fm-nav">' +
           '<button class="fm-ic" id="fmUp" title="Up"><span class="material-symbols-outlined">arrow_upward</span></button>' +
           '<input id="opfsPath" value="/" spellcheck="false">' +
+          '<button class="fm-ic" id="fmViewList" title="List view"><span class="material-symbols-outlined">view_list</span></button>' +
+          '<button class="fm-ic" id="fmViewGrid" title="Grid view"><span class="material-symbols-outlined">grid_view</span></button>' +
         '</div>' +
         '<div class="fm-body"><ul class="fs-list" id="fileList"></ul></div>' +
         '<div class="fm-foot">' +
@@ -50,6 +52,14 @@
     wrap.querySelector('.fm-close').onclick = close;
     wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) close(); });
     el('fmUp').onclick = () => window.opfsUp();
+    const syncViewBtns = () => {
+      const grid = localStorage.getItem('sandpie-files-view') === 'grid';
+      el('fmViewList').classList.toggle('fm-view-on', !grid);
+      el('fmViewGrid').classList.toggle('fm-view-on', grid);
+    };
+    el('fmViewList').onclick = () => { localStorage.setItem('sandpie-files-view', 'list'); syncViewBtns(); opfs.refreshFileList(); };
+    el('fmViewGrid').onclick = () => { localStorage.setItem('sandpie-files-view', 'grid'); syncViewBtns(); opfs.refreshFileList(); };
+    syncViewBtns();
     el('fmUpload').onclick = () => opfs.promptUpload(window.opfsCurrentPath());
     el('fmNewFolder').onclick = () => opfs.createFolder();
     el('fmNewFile').onclick = () => opfs.createFile();
@@ -77,6 +87,9 @@
   function open() {
     ensureDom();
     el('filesModal').style.display = '';
+    const grid = localStorage.getItem('sandpie-files-view') === 'grid';
+    el('fmViewList').classList.toggle('fm-view-on', !grid);
+    el('fmViewGrid').classList.toggle('fm-view-on', grid);
     opfs.refreshFileList();
     try { if (window.sandpiePersistence && sandpiePersistence.check) sandpiePersistence.check(); } catch (_) {}
   }
