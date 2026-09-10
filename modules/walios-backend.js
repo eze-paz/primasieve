@@ -319,6 +319,12 @@
                                 + '[init]\n\tdefaultBranch = main\n\ttemplateDir = /usr/share/git-core/templates\n'
                                 + '[advice]\n\tdetachedHead = false\n');
       b['/usr/share/git-core/templates/.keep'] = enc('');
+      // git's file:// transport, and a fetch/push to a local path, run `sh -c "git-upload-pack
+      // '<dir>'"`: the DASHED helpers must be in PATH. The build's libexec (git's exec-path)
+      // is not shipped, so a local clone died with "git-upload-pack: not found". Stubs.
+      b['/bin/git-upload-pack'] = enc('#!/bin/sh\nexec git upload-pack "$@"\n');
+      b['/bin/git-receive-pack'] = enc('#!/bin/sh\nexec git receive-pack "$@"\n');
+      b['/bin/git-upload-archive'] = enc('#!/bin/sh\nexec git upload-archive "$@"\n');
       return b;
     },
 
