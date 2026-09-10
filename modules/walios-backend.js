@@ -73,12 +73,20 @@
   // and the kernel said "in Dropbox but could not be downloaded" -- a git repo that had
   // just been cloned "became not a git repository". Hosts must terminate the bridge when
   // they kill a kernel (sandpie-worker does now).
-  const WORKER_V = 'dlopen23';
+  // dlopen24: clang as a GUEST. The kernel's page-side compiler bridge (cc/ar/wfetch/
+  // wextract forwarded to the terminal page) is gone; yowasp's LLVM runs as an ordinary
+  // WASI process (clang.wasm, shared memory). Needed for that: real per-file inodes in
+  // stat (LLVM's FileManager keyed its cache on (dev, ino) and every file was ino 1, so a
+  // header was "the same file" as the source that included it), path_symlink and
+  // fd_filestat_set_size/set_times in the WASI shim, and import signatures for wasm
+  // binaries exec'd from the VFS (a freshly compiled ./hello could not start).
+  const WORKER_V = 'dlopen24';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
   // mimalloc and flood stderr (25GB across a 12-package run, ~14x slower imports).
-  const MAIN = 'python_cxx.wasm?v=8';   // v=8: imports its memory (pthreads); same interpreter otherwise
+  const MAIN = 'python_cxx.wasm?v=8';
+  const CLANG = 'clang.wasm?v=1';        // yowasp LLVM 22 core, shared+imported memory (see manifest())   // v=8: imports its memory (pthreads); same interpreter otherwise
 
   // Every package bundle, with the mount point it unpacks to.
   const BUNDLES = {
@@ -139,7 +147,13 @@
                qjs: 'qjs.wasm?v=threads', js: 'qjs.wasm?v=threads', qjsc: 'qjsc.wasm?v=threads',
                ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
                make: 'make.wasm', gmake: 'make.wasm',
-               rustc: 'rustc-threads.wasm' };                       // 126MB, fetched on first `rustc` only
+               rustc: 'rustc-threads.wasm',                         // 126MB, fetched on first `rustc` only
+               // LLVM 22 (yowasp's build, converted to shared memory: scripts/wasm-import-memory.mjs
+               // --shared) as an ordinary guest -- one 75MB module that dispatches on argv[0].
+               // `cc`/`gcc` are the driver wrapper from walios/bin (the driver cannot spawn its
+               // cc1/wasm-ld steps, the wrapper runs them as processes). It used to run on the
+               // PAGE, terminal-only: `cc` in the tool hung to the timeout.
+               clang: CLANG, 'wasm-ld': CLANG, ar: CLANG, ranlib: CLANG, nm: CLANG, strip: CLANG, objdump: CLANG, 'llvm-ar': CLANG, 'llvm-ranlib': CLANG };
     },
 
     // ONE mount strategy for every host. It used to fork: 'terminal' unpacked all six
@@ -150,7 +164,10 @@
     // mount on demand and the mode argument is kept only so old callers keep working.
     eagerTars(_mode) {
       return { 'python.wasm': [BUNDLES.stdlib], [MAIN]: [BUNDLES.stdlib, BUNDLES.ext, BUNDLES.extras],
-               'rustc-threads.wasm': [['wali-rust-sysroot.tar.gz', '/sysroot']] };
+               'rustc-threads.wasm': [['wali-rust-sysroot.tar.gz', '/sysroot']],
+               // clang's resource dir (builtin headers, compiler-rt) at /usr, the WALI musl
+               // headers + libc at /sysroot. rustc's sysroot unions into /sysroot (lib/rustlib/).
+               [CLANG]: [['llvm-resources.tar.gz', '/usr'], ['wali-sysroot.tar.gz', '/sysroot']] };
     },
 
     env(_mode) {
@@ -216,7 +233,7 @@
       const bb = o.busybox || this.BUSYBOX;
       const pkgs = o.pkgs ? await o.pkgs : null;
       const rpc = o.rpc !== false;
-      const blobs = Object.assign({}, await this.tlsBlobs(base), pkgs ? this.pkgBlobs(pkgs) : {});
+      const blobs = Object.assign({}, await this.tlsBlobs(base), await this.toolBlobs(base), pkgs ? this.pkgBlobs(pkgs) : {});
       if (rpc) {
         // On the default path for every python in the guest, so an import miss can ask
         // the host for the bundle. Without it numpy/pandas/PIL/docx simply did not exist
@@ -242,6 +259,19 @@
         lazyTars: Object.assign({}, pkgs ? pkgs.lazyTars : {}, this.eagerTars(o.kind), o.lazyTars || {}),
         env, cwd: o.cwd || '/root', argv: o.argv, pty: !!o.pty, cols: o.cols || 120, rows: o.rows || 40,
       };
+    },
+
+    // The shell tools every host seeds into /usr/bin: the `cc` driver wrapper (also `gcc`),
+    // wfetch/wextract (the fetch + unpack steps build-pkg uses; they were page requests
+    // only the terminal answered) and build-pkg itself (an Alpine aport -> a wasm binary,
+    // in-guest). Source of truth: sandpie-server/walios/bin/*, served under /walios/bin/.
+    async toolBlobs(base) {
+      const b = {};
+      await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg'].map(async (n) => {
+        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=1'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
+      }));
+      if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
+      return b;
     },
 
     // Blobs to seed into the guest before it runs. `base` lets a caller on another
