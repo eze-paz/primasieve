@@ -7786,7 +7786,7 @@ async function openContextPopup(convId, anchorEl) {
     if (win) {
       const pct = Math.min(100, (used / win) * 100);
       rows.push(`<div class="ctx-popup-bar"><div style="width:${pct.toFixed(1)}%"></div></div>`);
-      rows.push(`<div class="ctx-popup-row"><span>${pct.toFixed(pct < 10 ? 1 : 0)}% of ${TOK_FMT(win)}</span><span>${TOK_FMT(Math.max(0, win - used))} left</span></div>`);
+      rows.push(`<div class="ctx-popup-row"><span>${pct.toFixed(pct < 10 ? 1 : 0)}% of ${TOK_FMT(win)}</span></div>`);
     } else {
       rows.push('<div class="ctx-popup-note">Context window unknown for this model.</div>');
     }
