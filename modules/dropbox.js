@@ -1683,14 +1683,12 @@
     body.querySelector('#dbxfullToggleBtn')?.addEventListener('click', toggleConnection);
     renderCloudState();   // paint the live connection state on (re)render — the fix
   }
-  // Prefer the gear modal (SandpieSettings); fall back to the sidebar. The
-  // Dropbox token + app key stay in localStorage (secrets are never synced).
+  // Cloud sync lives in the gear modal (SandpieSettings). The Dropbox token +
+  // app key stay in localStorage (secrets are never synced).
   function addSection() {
     if (window.SandpieSettings) {
       SandpieSettings.register({ id: 'cloud', title: 'Cloud sync', order: 40, render(panel) { panel.innerHTML = CLOUD_HTML; wireCloudPanel(panel); } });
-      return;
     }
-    Sandpie.menu.add('cloudSection', { title: 'Cloud sync', html: CLOUD_HTML, onRender: wireCloudPanel });
   }
 
   // ===========================================================================

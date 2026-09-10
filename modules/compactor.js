@@ -159,7 +159,6 @@ const SandpieCompactor = (function () {
     // is hardcoded (see isEnabled/getPrompt/config above). HTML/wire are kept
     // intact below so this tab can be restored by uncommenting register().
     // if (window.SandpieSettings) { SandpieSettings.register({ id: 'compaction', title: 'Compaction', order: 16, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    // if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('compactionSection', { title: 'Compaction', badge: null, open: false, html: HTML, onRender: wire }); return; }
     // if (_retry++ < 40) setTimeout(init, 500);
   }
 

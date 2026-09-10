@@ -526,7 +526,6 @@ const SandpieMemory = (function () {
   function init() {
     registerCommands();
     if (window.SandpieSettings) { SandpieSettings.register({ id: 'memory', title: 'Memory', order: 17, dot: 'memoryDot', render(panel) { panel.innerHTML = HTML; wire(panel); } }); }
-    else if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('memorySection', { title: 'Memory', dot: 'memoryDot', badge: null, open: false, html: HTML, onRender: wire }); }
     else if (_retry++ < 40) { setTimeout(init, 500); return; }
     _wireAutoConsolidate();
   }

@@ -1,7 +1,6 @@
 /**
  * Notifications Module for Sandpie
  *
- * Registers a "Notifications" section in the sidebar via SandpieMenu.
  * Usage: <script type="module" src="modules/notifications.js"></script>
  */
 
@@ -183,7 +182,6 @@ const SandpieNotifications = (function() {
   }
 
   // Prefer the gear modal (SandpieSettings); fall back to the sidebar
-  // (SandpieMenu) so Notifications still appears when settings.js isn't loaded.
   function init() {
     wireEvents();
     if (!_cfgWired && window.SandpieConfig) {
@@ -197,10 +195,6 @@ const SandpieNotifications = (function() {
         id: 'notifications', title: 'Notifications', order: 30,
         render(panel) { panel.innerHTML = NOTIF_HTML; wireNotifPanel(panel); },
       });
-      return;
-    }
-    if (typeof SandpieMenu !== 'undefined') {
-      SandpieMenu.add('notificationsSection', { title: 'Notifications', dot: 'notifDot', badge: null, open: false, html: NOTIF_HTML, onRender: wireNotifPanel });
       return;
     }
     setTimeout(init, 500);   // neither host ready yet — retry

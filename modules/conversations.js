@@ -2525,8 +2525,6 @@ async function refreshConversationList() {
   const regular  = list.filter(c => !c.pinned && !c.archived);
   const archived = list.filter(c => c.archived);
 
-  const visible = pinned.length + regular.length;
-  $('convCount').textContent = visible ? `${visible}` : '';
 
   // BETA: group the sidebar by project. Each project is a header with a "+ chat"
   // button; conversations without a project fall under "Unsorted". A "New project"

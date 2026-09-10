@@ -2,11 +2,10 @@
  * Artifacts Module for Sandpie
  *
  * Handles rendering, collapsing, expanding, and managing artifact previews
- * in conversation streams. Provides both a SandpieMenu section and the
+ * in conversation streams. Provides the
  * global artifact rendering API.
  *
  * Usage:
- *   - Module auto-registers with SandpieMenu
  *   - Global functions: renderArtifact, collapseArtifact, expandArtifact, etc.
  *   - Called from stream renderer when tool returns 'artifact:<path>'
  */

@@ -149,13 +149,10 @@ if("serviceWorker"in navigator){
       <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar">&lt;</button>
     </span>
   </div>
-  <details class="service" id="convSection" open>
-    <summary>Conversations <span id="convCount" style="margin-left:auto; font-size:0.7rem;"></span></summary>
-    <div class="service-body">
-      <button class="ghost" id="newChatBtn" onclick="newConversation()">+ New chat</button>
-      <ul class="fs-list conv-list" id="convList"></ul>
-    </div>
-  </details>
+  <div id="convSection">
+    <button class="ghost" id="newChatBtn" onclick="newConversation()">+ New chat</button>
+    <ul class="fs-list conv-list" id="convList"></ul>
+  </div>
 
   <!-- Files moved to a modal: header folder button opens SandpieFilesModal (modules/files-modal.js). -->
 

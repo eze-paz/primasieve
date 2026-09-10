@@ -1,6 +1,6 @@
 /* =============================================================================
    sandpie core — host contract + foundational globals.
-   Loaded first (classic <script>, NOT a module) so $, SandpieMenu, the shared
+   Loaded first (classic <script>, NOT a module) so $, the shared
    conversation state, and window.Sandpie exist as bare globals before any
    module runs. Dependencies flow ONE way: modules depend on these; this file
    names no specific module.
@@ -8,87 +8,6 @@
 const $ = id => document.getElementById(id);
 window.$ = $;
 
-/* =============================================================================
-   SandpieMenu — Sidebar Section Registry
-   ============================================================================= */
-const SandpieMenu = (() => {
-  const sections = new Map();
-  let sidebarEl = null;
-  function ensureSidebar() {
-    if (!sidebarEl) sidebarEl = document.querySelector('aside');
-    return sidebarEl;
-  }
-  function createSectionEl(id, config) {
-    const details = document.createElement('details');
-    details.className = 'service';
-    details.id = id;
-    if (config.open) details.open = true;
-    const summary = document.createElement('summary');
-    let summaryHtml = config.title;
-    if (config.dot) {
-      summaryHtml += ` <span class="status-dot" id="${config.dot}"></span>`;
-    }
-    if (config.badge) {
-      summaryHtml += ` <span style="margin-left:auto; font-size:0.7rem;">${config.badge}</span>`;
-    }
-    summary.innerHTML = summaryHtml;
-    details.appendChild(summary);
-    const body = document.createElement('div');
-    body.className = 'service-body';
-    if (typeof config.html === 'string') {
-      body.innerHTML = config.html;
-    } else if (config.html instanceof HTMLElement) {
-      body.appendChild(config.html);
-    }
-    details.appendChild(body);
-    return details;
-  }
-  function insertBeforeFooter(el) {
-    const sidebar = ensureSidebar();
-    if (!sidebar) return;
-    // The footer is the bottom block (margin-top:auto) holding the Settings button.
-    const footer = sidebar.querySelector('div[style*="margin-top:auto"]');
-    if (footer && sidebar.contains(footer)) {
-      sidebar.insertBefore(el, footer);
-    } else {
-      sidebar.appendChild(el);
-    }
-  }
-  return {
-    add(id, config = {}) {
-      if (sections.has(id)) {
-        console.warn(`SandpieMenu: section "${id}" already exists`);
-        return false;
-      }
-      const el = createSectionEl(id, config);
-      insertBeforeFooter(el);
-      sections.set(id, { el, config });
-      if (config.onRender) config.onRender(el.querySelector('.service-body'));
-      return true;
-    },
-    remove(id) {
-      const section = sections.get(id);
-      if (!section) return false;
-      section.el.remove();
-      sections.delete(id);
-      return true;
-    },
-    get(id) {
-      return sections.get(id)?.el || null;
-    },
-    updateBadge(id, text) {
-      const section = sections.get(id);
-      if (!section) return false;
-      const badge = section.el.querySelector('summary span');
-      if (badge) badge.textContent = text;
-      return true;
-    },
-    list() {
-      return Array.from(sections.keys());
-    }
-  };
-})();
-window.SandpieMenu = SandpieMenu;
 /* =============================================================================
    SandpieCommands - Text Command Registry
    ============================================================================= */
@@ -298,7 +217,6 @@ const SandpieCommandView = (() => {
 window.SandpieCommandView = SandpieCommandView;
 
 
-
 /* =============================================================================
    Shared conversation state — host-global because several modules
    (conversations, artifacts, context, augmentations, mobile) read it as bare
@@ -421,7 +339,6 @@ const Sandpie = (() => {
     get paneScrollEl()  { return window.paneScrollEl; },
     get appendContent() { return window.appendContent; },
     get opfs()   { return opfs; },
-    get menu()   { return SandpieMenu; },
     get tokens() { return (typeof SandpieTokens !== 'undefined') ? SandpieTokens : null; },
     opfsMtime(path)        { return opfs.lastModified(path); },
     isGenerating()         { return (typeof anyStreamGenerating === 'function' && anyStreamGenerating()) || (typeof window !== 'undefined' && typeof window.anyStreamGenerating === 'function' && window.anyStreamGenerating()) || false; },

@@ -225,7 +225,6 @@ const SandpieAutoTitle = (function () {
     // (see isEnabled/getPrompt above). HTML/wire are kept intact below so this
     // tab can be restored by uncommenting the register() line.
     // if (window.SandpieSettings) { SandpieSettings.register({ id: 'titles', title: 'Titles', order: 18, render(panel) { panel.innerHTML = HTML; wire(panel); } }); return; }
-    // if (typeof SandpieMenu !== 'undefined') { SandpieMenu.add('autoTitleSection', { title: 'Titles', badge: null, open: false, html: HTML, onRender: wire }); return; }
     // if (_retry++ < 40) setTimeout(init, 500);
   }
 

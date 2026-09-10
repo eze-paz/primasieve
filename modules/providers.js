@@ -36,17 +36,13 @@ const AI_HTML = `
 
 // clearLocalModelCaches removed (local LLM engines removed)
 
-// Prefer the gear modal (SandpieSettings); fall back to the sidebar (SandpieMenu).
+// AI provider lives in the gear modal (SandpieSettings).
 function init() {
   if (window.SandpieSettings) {
     SandpieSettings.register({
       id: 'aiProvider', title: 'AI provider', order: 10,
       render(panel) { panel.innerHTML = AI_HTML; _wireProviderPanel(); },
     });
-    return;
-  }
-  if (typeof SandpieMenu !== 'undefined') {
-    SandpieMenu.add('aiSection', { title: 'AI provider', dot: 'aiDot', badge: null, open: false, html: AI_HTML, onRender: _wireProviderPanel });
     return;
   }
   setTimeout(init, 500);   // neither host ready yet — retry

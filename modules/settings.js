@@ -1,13 +1,12 @@
 // sandpie /modules/settings.js — SandpieSettings: the gear/settings surface.
 //
 // A registry + modal for set-once-and-forget configuration, so modules stop
-// crowding the sidebar (SandpieMenu) with things the user touches rarely. A
+// crowding the sidebar with things the user touches rarely. A
 // module calls SandpieSettings.register({ id, title, order, render }) and gets a
 // panel in the gear modal. The sidebar stays for runtime, per-conversation
 // things (conversations, files, agents, context, console).
 //
-// Mirrors the SandpieMenu contract: render(panel) receives a `.service-body`
-// element — the same shape as SandpieMenu's onRender(body) — so a module's
+// Modules register with render(panel); a module's
 // existing panel code works unchanged. Panels render lazily, the first time
 // they're shown.
 //

@@ -347,9 +347,7 @@ function computeAccentNeg() {
 
 
 
-/* ─── Settings UI: prefer the gear modal (SandpieSettings); fall back to the
-   sidebar (SandpieMenu) so Appearance still shows when settings.js isn't loaded
-   (e.g. the stable page). Identical markup + setup either way. ─── */
+/* ─── Settings UI: Appearance lives in the gear modal (SandpieSettings). ─── */
 var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
       <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
@@ -382,15 +380,6 @@ function injectAppearanceUI() {
     SandpieSettings.register({
       id: 'appearance', title: 'Appearance', order: 20,
       render: function(panel) { panel.innerHTML = _APPEARANCE_HTML; _setupAppearancePanel(); },
-    });
-    return;
-  }
-  if (typeof SandpieMenu !== 'undefined') {
-    if (SandpieMenu.get('themeSection')) return;
-    SandpieMenu.add('themeSection', {
-      title: 'Appearance',
-      html: _APPEARANCE_HTML,
-      onRender: function(body) { _setupAppearancePanel(); },
     });
     return;
   }
