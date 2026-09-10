@@ -3189,10 +3189,18 @@ const WALIOS_WORKER_V = WB.WORKER_V;
 // terminal adds only its page-side cc bridge). It used to list lua/ssh/make here while
 // the terminal listed those plus qjs, which is how qjs exited 127 from this tool.
 const WALIOS_MANIFEST = WB.manifest(WALIOS_BB);
-let _waliosWorker = null, _waliosQueue = Promise.resolve();
-let _waliosOpfsWorker = null;      // the walios OPFS bridge (hoisted so a run can flush it)
-let _waliosActiveOwner = null;     // agentId of the walios() run currently holding _waliosQueue
-let _waliosFlushResolve = null;    // one-shot, resolved by the OPFS worker's 'flushed' ack
+// One kernel PER CONVERSATION (keyed by ctx.agentId; '' for a bare call), each with its own
+// OPFS bridge and its own run queue. There used to be ONE kernel and ONE queue for the whole
+// worker: two chats using git at the same time took turns -- one conversation's 2-minute
+// clone parked the other's `git status` behind it until it timed out, and a timeout kill
+// threw away the shared kernel, so the innocent conversation's next call paid a cold boot
+// and re-faulted every directory. Runs within one conversation still serialise (they share
+// /root state); runs of different conversations proceed in parallel, and a kill only ever
+// costs the conversation that timed out. Idle kernels are reaped (see _waliosReap).
+const _walios = new Map();          // key -> { key, w, ow, owner, flushResolve, last, busy }
+const _waliosQueues = new Map();    // key -> tail of that conversation's run chain
+const _waliosKey = (ctx) => (ctx && ctx.agentId != null) ? String(ctx.agentId) : '';
+const WALIOS_IDLE_MS = 10 * 60 * 1000;
 
 // The package index: the prebuilt repo (index.json), user-built binaries (pkgcache/)
 // and the Alpine catalog, folded the way terminal.html folds them -- WB.pkgIndex is
@@ -3220,13 +3228,14 @@ function _waliosPkgIndex() {
 function _waliosDbxMsg() { return { t: 'dbx', token: (_dbxCtx && _dbxCtx.token) || null, beta: !!(_dbxCtx && _dbxCtx.beta) }; }
 function _waliosBroadcastDbx() {
   const msg = _waliosDbxMsg();
-  for (const ow of [_waliosOpfsWorker, _wpy && _wpy.ow]) { if (ow) { try { ow.postMessage(msg); } catch (_) {} } }
+  for (const ow of [..._walios.values()].map((k) => k.ow).concat([_wpy && _wpy.ow])) { if (ow) { try { ow.postMessage(msg); } catch (_) {} } }
 }
 async function _waliosFreshDbx(ow) {
   if (!(_dbxCtx && _dbxCtx.token)) { try { await _ensureDbxCtx(1500); } catch (_) {} }
   if (ow) { try { ow.postMessage(_waliosDbxMsg()); } catch (_) {} }
 }
-function _waliosWireOpfs(ow) {
+function _waliosWireOpfs(ow, k) {
+  k = k || { owner: null, flushResolve: null };   // the REPL's bridge: no run owner
   try { ow.postMessage(_waliosDbxMsg()); } catch (_) {}
   ow.addEventListener('message', (ev) => {
     const d = ev.data; if (!d) return;
@@ -3240,30 +3249,64 @@ function _waliosWireOpfs(ow) {
     //   opfs-deleted-by-python -> the delete handshake (remote delete + index trim)
     // A 'flushed' ack means the OPFS worker has posted every pending change batch;
     // the run may now resolve knowing its writes are recorded under its own owner.
-    if (d.t === 'flushed') { const r = _waliosFlushResolve; _waliosFlushResolve = null; if (r) r(); return; }
-    // owner = the agentId of the walios() run currently holding the queue, so these
-    // writes surface as THIS conversation's touched-file cards (same owner-routing the
-    // pyodide pool uses). _waliosQueue serialises runs, so the owner is unambiguous;
-    // the flush-on-exit below guarantees a late batch never lands after the next run
-    // has taken the slot.
+    if (d.t === 'flushed') { const r = k.flushResolve; k.flushResolve = null; if (r) r(); return; }
+    // owner = the agentId of the conversation this kernel belongs to, so these writes
+    // surface as THIS conversation's touched-file cards (same owner-routing the pyodide
+    // pool uses). A kernel serves one conversation, so the owner is unambiguous; the
+    // flush-on-exit guarantees a late batch never lands after the run has resolved.
     if (d.t === 'opfs-changed' && Array.isArray(d.rels) && d.rels.length) {
-      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: d.rels, owner: _waliosActiveOwner } }); } catch (_) {}
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: d.rels, owner: k.owner } }); } catch (_) {}
       return;
     }
     if (d.t === 'opfs-removed' && Array.isArray(d.rels) && d.rels.length) {
-      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: d.rels, owner: _waliosActiveOwner } }); } catch (_) {}
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'opfs-deleted-by-python', paths: d.rels, owner: k.owner } }); } catch (_) {}
       return;
     }
   });
   return ow;
 }
-function _waliosEnsure() {
-  if (_waliosWorker) return _waliosWorker;
+// Ask the bridge to post its pending change batch and wait (bounded) for the ack. Used
+// before the tool resolves AND before a kernel is dropped: a run killed on timeout used to
+// lose its last unreported writes, and dropbox.js deletes any local file with no ledger
+// entry as an orphan -- so a `git clone` that ran a little too long had part of its .git
+// swept away by the next sync, and the repo read as corrupt ("bad object HEAD") after.
+function _waliosFlush(k, ms) {
+  return new Promise((res) => {
+    if (!k || !k.ow) return res();
+    let settled = false; const go = () => { if (settled) return; settled = true; res(); };
+    k.flushResolve = go;
+    try { k.ow.postMessage({ t: 'flush' }); } catch (_) { return go(); }
+    setTimeout(go, ms || 600);
+  });
+}
+// Terminate a conversation's kernel and its bridge together. The bridge goes AFTER the
+// kernel (nothing can hold a call open against it any more) and after a flush, so its
+// exclusive OPFS handles close and its last writes are reported. Other kernels are untouched.
+async function _waliosDrop(k, flush) {
+  if (!k) return;
+  if (_walios.get(k.key) === k) _walios.delete(k.key);
+  try { k.w.terminate(); } catch (_) {}
+  if (flush) await _waliosFlush(k, 400);
+  try { if (k.ow) k.ow.terminate(); } catch (_) {}
+  k.ow = null; k.flushResolve = null;
+}
+// A conversation that has not used walios for WALIOS_IDLE_MS gives its kernel back (each
+// warm kernel keeps busybox, git, python compiled in memory). Its next call boots fresh.
+let _waliosReapTimer = null;
+function _waliosReap() {
+  const now = Date.now();
+  for (const k of [..._walios.values()]) if (!k.busy && now - k.last > WALIOS_IDLE_MS) _waliosDrop(k, true);
+  if (!_walios.size && _waliosReapTimer) { clearInterval(_waliosReapTimer); _waliosReapTimer = null; }
+}
+function _waliosEnsure(key) {
+  const have = _walios.get(key);
+  if (have) return have;
   const w = new Worker(WALIOS_BASE + 'wali-worker.js?v=' + WALIOS_WORKER_V);
+  const k = { key, w, ow: null, owner: null, flushResolve: null, last: Date.now(), busy: false };
   try {   // OPFS bridge: persistent /root home (full origin OPFS root). Optional.
     const opfsSab = new SharedArrayBuffer(32 + (1 << 20));
-    _waliosOpfsWorker = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
-    _waliosOpfsWorker.postMessage({ t: 'sab', sab: opfsSab });
+    k.ow = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V), k);
+    k.ow.postMessage({ t: 'sab', sab: opfsSab });
     w.postMessage({ t: 'opfs-sab', sab: opfsSab });
   } catch (_) { /* no cross-origin isolation → RAM-only VFS */ }
   try {   // WISP bridge: real TCP/UDP via the relay. Optional.
@@ -3273,8 +3316,9 @@ function _waliosEnsure() {
       url: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp' });
     w.postMessage({ t: 'wisp-sab', sab: wispSab });
   } catch (_) { /* no cross-origin isolation → no sockets */ }
-  _waliosWorker = w;
-  return w;
+  _walios.set(key, k);
+  if (!_waliosReapTimer) _waliosReapTimer = setInterval(_waliosReap, 60 * 1000);
+  return k;
 }
 // `soffice` inside the shell. LibreOffice is not a guest program here — it is the page's
 // ZetaOffice engine, reached through the `office` hostcall (see _officeConvertGuest). The
@@ -3314,13 +3358,12 @@ async function tool_walios({ script, timeout }, ctx) {
   if (typeof SharedArrayBuffer !== 'function')
     return { result: 'Error: the walios shell needs SharedArrayBuffer (cross-origin isolation), which this page does not have. '
                      + 'Use run_python for computation, or the shell tool for the relay host.' };
-  // Everything this run writes to /root must surface as THIS conversation's
-  // touched-file cards: arm the owner the OPFS forwards are stamped with. The
-  // global _waliosQueue serialises walios() runs, so this is unambiguous.
-  _waliosActiveOwner = (ctx && ctx.agentId != null) ? ctx.agentId : null;
-  let w;
-  try { w = _waliosEnsure(); } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
-  await _waliosFreshDbx(_waliosOpfsWorker);   // current Dropbox token into the bridge before the run (asks the page if there is none)
+  // This conversation's own kernel (see _walios). Everything the run writes to /root
+  // surfaces as THIS conversation's touched-file cards: the bridge stamps k.owner.
+  let k, w;
+  try { k = _waliosEnsure(_waliosKey(ctx)); w = k.w; } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
+  k.owner = (ctx && ctx.agentId != null) ? ctx.agentId : null; k.busy = true; k.last = Date.now();
+  await _waliosFreshDbx(k.ow);   // current Dropbox token into the bridge before the run (asks the page if there is none)
   const pkgs = await _waliosPkgIndex();
   // ONE boot, shared with the terminal and the REPL (WB.runMessage). Only argv and the
   // soffice bridge are this host's own.
@@ -3339,19 +3382,15 @@ async function tool_walios({ script, timeout }, ctx) {
       if (left > 0) { timer = setTimeout(tick, left); return; }
       kill('Error: walios run exceeded ' + t + 's and was terminated (worker killed; the next call starts a fresh one).');
     };
-    const finish = (result) => { if (done) return; done = true; clearTimeout(timer); resolve({ result }); };
+    const finish = (result) => { if (done) return; done = true; clearTimeout(timer); k.busy = false; k.last = Date.now(); resolve({ result }); };
     const kill = (why) => {
-      try { w.terminate(); } catch (_) {}
-      _waliosWorker = null;
-      // The OPFS bridge must die WITH the kernel. Its exclusive sync access handles are
-      // released by the kernel's RELEASE at exit -- which a killed kernel never sends -- so
-      // an abandoned bridge kept every file the run had touched locked, and the next run's
-      // fresh bridge got EBUSY on them: a freshly cloned repo read as "not a git repository".
-      // Terminating the worker closes its handles; _waliosEnsure recreates both together.
-      try { if (_waliosOpfsWorker) _waliosOpfsWorker.terminate(); } catch (_) {}
-      _waliosOpfsWorker = null; _waliosFlushResolve = null;
+      if (done) return; done = true; clearTimeout(timer);
+      // The OPFS bridge dies WITH the kernel (its exclusive handles would otherwise stay
+      // locked: EBUSY, "not a git repository" for the next run) -- but only after it has
+      // reported the killed run's writes, or the sync deletes them as orphans (_waliosDrop).
+      // Only THIS conversation's kernel goes; the others keep running.
       let partial = chunks.join(''); if (partial.length > 65536) partial = partial.slice(0, 65536) + '\n…[truncated]';
-      finish(why + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : ''));
+      _waliosDrop(k, true).then(() => { k.busy = false; resolve({ result: why + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : '') }); });
     };
     timer = setTimeout(tick, t * 1000);
     if (ctx && ctx.signal) {
@@ -3398,11 +3437,7 @@ async function tool_walios({ script, timeout }, ctx) {
         // so every file this run wrote is forwarded — under THIS run's owner — and lands
         // as a touched-file card. Bounded: a missing ack must never hang the tool.
         const out = text || '[no output]';
-        let settled = false; const go = () => { if (settled) return; settled = true; finish(out); };
-        if (_waliosOpfsWorker) { _waliosFlushResolve = go;
-          try { _waliosOpfsWorker.postMessage({ t: 'flush' }); } catch (_) {}
-          setTimeout(go, 600);
-        } else { go(); }
+        _waliosFlush(k, 600).then(() => finish(out));
       }
     };
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
@@ -3736,8 +3771,14 @@ async function runTool(name, args, ctx) {
   switch (name) {
     case 'run_python':    return tool_run_python({...args, _conv: convFileName}, ctx);
     case 'shell':         return tool_shell(args, ctx);
-    case 'run_walios': case 'walios':   // 'walios' = the pre-verb name, kept for older conversations and model habit
-      return (_waliosQueue = _waliosQueue.then(() => tool_walios(args, ctx), () => tool_walios(args, ctx)));
+    case 'run_walios': case 'walios': { // 'walios' = the pre-verb name, kept for older conversations and model habit
+      // Serialise runs WITHIN a conversation (they share one kernel and its /root state);
+      // different conversations run on their own kernels, in parallel (see _walios).
+      const key = _waliosKey(ctx);
+      const q = (_waliosQueues.get(key) || Promise.resolve()).then(() => tool_walios(args, ctx), () => tool_walios(args, ctx));
+      _waliosQueues.set(key, q);
+      q.then(() => { if (_waliosQueues.get(key) === q) _waliosQueues.delete(key); }, () => {});
+      return q; }
     case 'show_artifact': return tool_show_artifact(args, ctx);
     case 'share':         return tool_share(args, ctx);
     case 'html_console':  return tool_html_console(args, ctx);
