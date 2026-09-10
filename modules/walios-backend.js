@@ -80,7 +80,15 @@
   // header was "the same file" as the source that included it), path_symlink and
   // fd_filestat_set_size/set_times in the WASI shim, and import signatures for wasm
   // binaries exec'd from the VFS (a freshly compiled ./hello could not start).
-  const WORKER_V = 'sig25';
+  // sig26: kernel diagnostics under a pty are CRLF-framed (a bare newline left the cursor
+  // mid-line and ls staircased after a walios: warning); an OPFS directory the Dropbox index
+  // knows but has no children of lists empty instead of ENOENT.
+  // sig27: the OPFS bridge stamps "picked up" into the control block, so the kernel's 20s
+  // dead-bridge guard no longer fires on a legitimately slow operation -- opening a
+  // cloud-only file downloads it from Dropbox first, and one large file on a slow link
+  // used to disable /root for the rest of the session. A slow op waits up to 10 min and
+  // fails only itself.
+  const WORKER_V = 'sig27';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
