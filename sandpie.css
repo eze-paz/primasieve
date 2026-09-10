@@ -1272,7 +1272,7 @@ ul.conv-list li.active {
     aside details.service summary { padding: 0.75rem 0.85rem; font-size: 0.85rem; }
     ul.fs-list button { width: 28px; height: 28px; font-size: 1.1rem; }
     form {
-      padding: 0.75rem 1rem;
+      padding: 0rem 1rem;
       padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     }
     form input, form textarea { font-size: 16px;  }
