@@ -2744,7 +2744,6 @@ ul.conv-list li.active {
   font-size: 0.82rem;
   font-weight: 500;
   transition: all 0.15s;
-  padding-left: 0.5rem;
 }
 [data-theme="electric"] ul.conv-list li:hover {
   background: var(--sp-panel);
@@ -3137,7 +3136,6 @@ body.sp-decoding *::after {
   font-size: 0.82rem;
   font-weight: 500;
   transition: all 0.15s;
-  padding-left: 0.5rem;
 }
 [data-theme="clear"] ul.conv-list li:hover {
   background: var(--sp-panel);
