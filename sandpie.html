@@ -143,7 +143,7 @@ if("serviceWorker"in navigator){
     <button class="files-open-btn" onclick="SandpieFilesModal.open()" title="Files">
       <span class="material-symbols-outlined">folder</span>
     </button>
-    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar"><span class="material-symbols-outlined">menu</span></button>
+    <button class="sidebar-collapse-btn" onclick="isMobileViewport() ? toggleSidebar() : toggleSidebarCollapse()" title="Toggle sidebar"><span class="material-symbols-outlined">menu</span></button>
   </span>
 </header>
 <div class="backdrop" onclick="toggleSidebar()"></div>
@@ -157,7 +157,7 @@ if("serviceWorker"in navigator){
       <button class="files-open-btn" onclick="SandpieFilesModal.open()" title="Files">
         <span class="material-symbols-outlined">folder</span>
       </button>
-      <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse sidebar"><span class="material-symbols-outlined">menu</span></button>
+      <button class="sidebar-collapse-btn" onclick="isMobileViewport() ? toggleSidebar() : toggleSidebarCollapse()" title="Toggle sidebar"><span class="material-symbols-outlined">menu</span></button>
     </span>
   </div>
   <div id="convSection">

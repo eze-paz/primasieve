@@ -1084,7 +1084,7 @@ ul.conv-list li.active {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 20px;
     padding: 0;
   }
   .sidebar-collapse-btn:hover {
