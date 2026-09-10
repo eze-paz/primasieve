@@ -205,7 +205,12 @@
     //   rpc         seed sitecustomize + SANDPIE_HOST_RPC=1 so python can ask for bundles
     //               over the frame channel (default true; the REPL brings its own)
     //   argv, cwd, pty, cols, rows   as in the run message
-    BUSYBOX: 'busybox.wasm?v=net4',   // v=net4: fuller coreutils (expr/cmp/install/realpath/od/getopt/diff + find predicates); ash+networking, --export-table (shell ^C)
+    // v=net5: linked against a libc whose long double code matches the compiler's 128-bit
+    // layout (the old libc.a had frexpl/strtod built for the 80-bit layout: printf %f and
+    // seq recursed to a stack overflow, awk floats and sort -n returned garbage). Also:
+    // long options, ls colours (on a tty only), base64, md5sum/sha1sum/sha256sum, stat -c.
+    // Built by sandpie-server/scripts/build-busybox-wali.sh. v=net4 was the fuller-coreutils build.
+    BUSYBOX: 'busybox.wasm?v=net5',
     async runMessage(o) {
       const base = o.base || '/walios/';
       const bb = o.busybox || this.BUSYBOX;
