@@ -2308,6 +2308,23 @@ ul.conv-list li.active {
   box-shadow: 0 0 30px rgba(0,240,255,0.5), 0 0 80px rgba(0,240,255,0.2), 0 0 4px rgba(0,240,255,0.8);
 }
 
+[data-theme="cyberpunk"] .files-open-btn {
+  background: #11111a;
+  border: 1px solid #2d2d44;
+  color: #00f0ff;
+  border-radius: 4px;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  box-shadow: 0 0 20px rgba(0,240,255,0.3), 0 0 60px rgba(0,240,255,0.1);
+}
+
+[data-theme="cyberpunk"] .files-open-btn:hover {
+  background: #00f0ff; color: #000;
+  box-shadow: 0 0 30px rgba(0,240,255,0.5), 0 0 80px rgba(0,240,255,0.2), 0 0 4px rgba(0,240,255,0.8);
+}
+
+[data-theme="cyberpunk"] .files-open-btn .material-symbols-outlined { color: #00f0ff; }
+[data-theme="cyberpunk"] .files-open-btn:hover .material-symbols-outlined { color: #000; }
+
 [data-theme="cyberpunk"] aside details.service::before { background: #00f0ff; opacity: 0.15; }
 [data-theme="cyberpunk"] aside details.service summary {
   font-family: 'Orbitron', monospace;
@@ -2738,6 +2755,20 @@ ul.conv-list li.active {
   background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-bg);
   transform: rotate(-90deg);
 }
+
+[data-theme="electric"] .files-open-btn {
+  background: var(--sp-panel);
+  border: 2px solid var(--sp-border);
+  color: var(--sp-text);
+  border-radius: 10px;
+}
+
+[data-theme="electric"] .files-open-btn:hover {
+  background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-bg);
+}
+
+[data-theme="electric"] .files-open-btn .material-symbols-outlined { color: var(--sp-text); }
+[data-theme="electric"] .files-open-btn:hover .material-symbols-outlined { color: var(--sp-bg); }
 [data-theme="electric"] aside details.service summary {
   background: var(--sp-panel);
   border: 2px solid var(--sp-border);
@@ -3134,6 +3165,20 @@ body.sp-decoding *::after {
   background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-bg);
   transform: rotate(-90deg);
 }
+
+[data-theme="clear"] .files-open-btn {
+  background: var(--sp-panel);
+  border: 1px solid var(--sp-border);
+  color: var(--sp-text);
+  border-radius: 10px;
+}
+
+[data-theme="clear"] .files-open-btn:hover {
+  background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-bg);
+}
+
+[data-theme="clear"] .files-open-btn .material-symbols-outlined { color: var(--sp-text); }
+[data-theme="clear"] .files-open-btn:hover .material-symbols-outlined { color: var(--sp-bg); }
 [data-theme="clear"] aside details.service summary {
   background: var(--sp-panel);
   border: 1px solid var(--sp-border);
