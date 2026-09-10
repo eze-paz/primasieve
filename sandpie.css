@@ -783,16 +783,6 @@
     position: relative;
     --chamfer: 8px;
   }
-  aside details.service::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--sp-border);
-    clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
-    opacity: 0.6;
-    transform: translate(2px, 2px);
-    z-index: 0;
-  }
   aside details.service summary {
     list-style: none;
     cursor: pointer;
@@ -812,18 +802,10 @@
     transition: color 0.15s, background 0.15s;
   }
   aside details.service summary::-webkit-details-marker { display: none; }
-  aside details.service summary::before {
-    content: '>';
-    font-size: 0.65em;
-    color: var(--sp-accent);
-    transition: transform 0.15s;
-    width: 0.6em;
-  }
   aside details.service[open] summary {
     color: var(--sp-text);
     background: var(--sp-panel);
   }
-  aside details.service[open] summary::before { content: 'v'; transform: none; }
   aside details.service summary:hover { color: var(--sp-text); background: var(--sp-panel); }
   aside details.service[open] .service-body {
     padding: 0.5rem 0.75rem 0.75rem;
@@ -1078,27 +1060,6 @@ ul.conv-list li.active {
     position: relative;
     display: inline-block;
   }
-  .sidebar-brand::before,
-  .sidebar-brand::after {
-    content: '[sandpie]';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    opacity: 0;
-  }
-  .sidebar-brand::before {
-    color: var(--sp-accent);
-    clip-path: inset(0 40% 0 0);
-    animation: chromaShift 1.2s ease-out 1 forwards;
-  }
-  .sidebar-brand::after {
-    color: var(--sp-accent-neg);
-    clip-path: inset(0 0 0 40%);
-    animation: chromaShift2 1.2s ease-out 1 forwards;
-  }
   .sidebar-brand .bracket,
   .mobile-header .brand .bracket { color: var(--sp-accent); transition: color 0.15s; }
   .sidebar-brand .name,
@@ -1200,20 +1161,6 @@ ul.conv-list li.active {
   .sidebar-id-btn:hover .sb-email { color: var(--sp-accent); }
   .sidebar-id-btn:active { transform: translateY(0); box-shadow: none; }
 
-  @keyframes chromaShift {
-    0% { opacity: 0; transform: translateX(0); }
-    15% { opacity: 0.9; transform: translateX(-3px); }
-    40% { opacity: 0.7; transform: translateX(-2px); }
-    70% { opacity: 0.3; transform: translateX(-1px); }
-    100% { opacity: 0; transform: translateX(0); }
-  }
-  @keyframes chromaShift2 {
-    0% { opacity: 0; transform: translateX(0); }
-    15% { opacity: 0.9; transform: translateX(3px); }
-    40% { opacity: 0.7; transform: translateX(2px); }
-    70% { opacity: 0.3; transform: translateX(1px); }
-    100% { opacity: 0; transform: translateX(0); }
-  }
 
 
   @media (max-width: 768px), (hover: none) and (pointer: coarse) {
@@ -1256,41 +1203,6 @@ ul.conv-list li.active {
       color: var(--sp-text);
       position: relative;
       display: inline-block;
-    }
-    .mobile-header .brand::before,
-    .mobile-header .brand::after {
-      content: '[sandpie]';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      opacity: 0;
-    }
-    .mobile-header .brand::before {
-      color: var(--sp-accent);
-      clip-path: inset(0 40% 0 0);
-      animation: chromaShift 1.2s ease-out 1 forwards;
-    }
-    .mobile-header .brand::after {
-      color: var(--sp-accent-neg);
-      clip-path: inset(0 0 0 40%);
-      animation: chromaShift2 1.2s ease-out 1 forwards;
-    }
-    @keyframes chromaShift {
-      0% { opacity: 0; transform: translateX(0); }
-      15% { opacity: 0.9; transform: translateX(-3px); }
-      40% { opacity: 0.7; transform: translateX(-2px); }
-      70% { opacity: 0.3; transform: translateX(-1px); }
-      100% { opacity: 0; transform: translateX(0); }
-    }
-    @keyframes chromaShift2 {
-      0% { opacity: 0; transform: translateX(0); }
-      15% { opacity: 0.9; transform: translateX(3px); }
-      40% { opacity: 0.7; transform: translateX(2px); }
-      70% { opacity: 0.3; transform: translateX(1px); }
-      100% { opacity: 0; transform: translateX(0); }
     }
     aside {
       position: fixed;
@@ -2258,18 +2170,6 @@ ul.conv-list li.active {
   border-right: 1px solid #1a1a2e;
 }
 
-[data-theme="cyberpunk"] aside::after {
-  content: '';
-  position: absolute; top: 0; right: 0; bottom: 0;
-  width: 2px;
-  opacity: 0.5;
-  animation: borderPulse 3s ease-in-out infinite;
-}
-
-@keyframes borderPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
-
-[data-theme="cyberpunk"] aside::before { display: none; }
-
 [data-theme="cyberpunk"] .sidebar-brand,
 [data-theme="cyberpunk"] .mobile-header .brand {
   font-family: 'Orbitron', monospace;
@@ -2280,17 +2180,6 @@ ul.conv-list li.active {
   text-transform: uppercase;
 }
 
-[data-theme="cyberpunk"] .sidebar-brand::before,
-[data-theme="cyberpunk"] .sidebar-brand::after {
-  content: '[sandpie]';
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-  animation: chromaOrbitron 2s ease-out infinite;
-}
-
-[data-theme="cyberpunk"] .sidebar-brand::before { color: #00f0ff; clip-path: inset(0 45% 0 0); text-shadow: 0 0 20px rgba(0,240,255,0.4); }
-[data-theme="cyberpunk"] .sidebar-brand::after { color: #ff00a0; clip-path: inset(0 0 0 45%); text-shadow: 0 0 20px rgba(255,0,160,0.4); }
 [data-theme="cyberpunk"] .sidebar-brand .bracket,
 [data-theme="cyberpunk"] .mobile-header .brand .bracket { color: var(--sp-accent); }
 
@@ -2325,7 +2214,6 @@ ul.conv-list li.active {
 [data-theme="cyberpunk"] .files-open-btn .material-symbols-outlined { color: #00f0ff; }
 [data-theme="cyberpunk"] .files-open-btn:hover .material-symbols-outlined { color: #000; }
 
-[data-theme="cyberpunk"] aside details.service::before { background: #00f0ff; opacity: 0.15; }
 [data-theme="cyberpunk"] aside details.service summary {
   font-family: 'Orbitron', monospace;
   font-size: 0.7rem;
@@ -2335,14 +2223,6 @@ ul.conv-list li.active {
   border: 1px solid #1a1a2e;
 }
 
-[data-theme="cyberpunk"] aside details.service summary::before {
-  content: '\25b8';
-  font-size: 0.7em;
-  color: #00f0ff;
-  transition: transform 0.2s;
-  width: 1em; text-align: center;
-}
-
 [data-theme="cyberpunk"] aside details.service[open] summary {
   color: #e8f4f8; background: #11111a;
   border-color: #00f0ff;
@@ -2350,7 +2230,6 @@ ul.conv-list li.active {
   text-shadow: 0 0 20px rgba(0,240,255,0.3), 0 0 60px rgba(0,240,255,0.1);
 }
 
-[data-theme="cyberpunk"] aside details.service[open] summary::before { content: '\25be'; }
 
 [data-theme="cyberpunk"] aside details.service summary:hover {
   border-color: #00f0ff;
@@ -2656,8 +2535,6 @@ ul.conv-list li.active {
 }
 
 [data-theme="aurora"] aside details.service[open] summary { color: #38bdf8; }
-[data-theme="aurora"] aside details.service summary::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #94a3b8; transition: all 0.25s; }
-[data-theme="aurora"] aside details.service[open] summary::before { background: #38bdf8; box-shadow: 0 0 8px rgba(56,189,248,0.15); }
 [data-theme="aurora"] aside details.service summary:hover { color: #f1f5f9; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); }
 [data-theme="aurora"] aside details.service .service-body { background: rgba(15,23,42,0.4); border-radius: 0 0 8px 8px; margin-top: -4px; padding-top: 0.75rem; backdrop-filter: blur(12px); }
 [data-theme="aurora"] aside input { background: rgba(0,0,0,0.2); border: 1px solid rgba(148,163,184,0.1); color: #f1f5f9; border-radius: 6px; }
@@ -2775,30 +2652,17 @@ ul.conv-list li.active {
   border-radius: 10px;
   color: var(--sp-text-dim);
 }
-[data-theme="electric"] aside details.service summary::before {
-  content: '+';
-  font-size: 1em; font-weight: 700;
-  color: var(--sp-accent);
-  transition: transform 0.2s, color 0.2s;
-  width: 1em; text-align: center;
-}
 [data-theme="electric"] aside details.service[open] summary {
   color: var(--sp-bg);
   background: var(--sp-accent);
   border-color: var(--sp-accent);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 25%, transparent);
 }
-[data-theme="electric"] aside details.service[open] summary::before {
-  content: '\2212';
-  color: var(--sp-bg);
-  transform: scale(1.1);
-}
 [data-theme="electric"] aside details.service summary:hover {
   border-color: var(--sp-accent);
   color: var(--sp-text);
 }
 [data-theme="electric"] aside details.service .service-body { background: var(--sp-surface); }
-[data-theme="electric"] aside details.service::before { display: none; }
 [data-theme="electric"] aside input {
   background: var(--sp-bg);
   border: 2px solid var(--sp-border);
@@ -3098,12 +2962,7 @@ body.sp-decoding *::after {
   aside input, aside button { clip-path: none; }
   .user .bubble { clip-path: none; }
   .user::before { clip-path: none; }
-  aside details.service::before { clip-path: none; }
   aside details.service summary { clip-path: none; }
-  .sidebar-brand::before { clip-path: none; }
-  .sidebar-brand::after { clip-path: none; }
-  .mobile-header .brand::before { clip-path: none; }
-  .mobile-header .brand::after { clip-path: none; }
   .sp-item-name { color: var(--sp-text-dim); }
 
   --sp-bg: #FFFFFF;
@@ -3185,30 +3044,17 @@ body.sp-decoding *::after {
   border-radius: 10px;
   color: var(--sp-text-dim);
 }
-[data-theme="clear"] aside details.service summary::before {
-  content: '+';
-  font-size: 1em; font-weight: 700;
-  color: var(--sp-accent);
-  transition: transform 0.2s, color 0.2s;
-  width: 1em; text-align: center;
-}
 [data-theme="clear"] aside details.service[open] summary {
   color: var(--sp-bg);
   background: var(--sp-accent);
   border-color: var(--sp-accent);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--sp-accent) 25%, transparent);
 }
-[data-theme="clear"] aside details.service[open] summary::before {
-  content: '\2212';
-  color: var(--sp-bg);
-  transform: scale(1.1);
-}
 [data-theme="clear"] aside details.service summary:hover {
   border-color: var(--sp-accent);
   color: var(--sp-text-dim);
 }
 [data-theme="clear"] aside details.service .service-body { background: var(--sp-surface); }
-[data-theme="clear"] aside details.service::before { display: none; }
 [data-theme="clear"] aside input {
   background: var(--sp-bg);
   border: 1px solid var(--sp-border);
