@@ -1,0 +1,41 @@
+name: Syntax check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    name: JavaScript / HTML / JSON syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node scripts/check-syntax.mjs
+
+      - name: TDZ / use-before-init gate
+        run: |
+          npm install --no-save --silent eslint@9
+          node scripts/lint-tdz.mjs
+
+      - name: Report failure to pusher
+        if: failure()
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "  SYNTAX CHECK FAILED"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "  Commit: ${{ github.sha }}"
+          echo "  Author: ${{ github.actor }}"
+          echo "  Ref:    ${{ github.ref }}"
+          echo ""
+          echo "  Fix the syntax errors above before pushing again."
+          echo "  Run locally: node scripts/check-syntax.mjs"
+          echo "  TDZ gate:     npm i --no-save eslint@9 && node scripts/lint-tdz.mjs"
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          exit 1
