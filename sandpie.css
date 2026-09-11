@@ -707,12 +707,12 @@
   /* ---- neural-net thinking toggle icon ---- */
   .msg-timer .mt-nn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 14px; height: 14px;
+    width: 12px; height: 12px;
     cursor: pointer; color: var(--sp-text-dim);
     opacity: 0.5;
     transition: opacity 0.15s, color 0.15s;
     margin-bottom: 1px;
-    vertical-align: middle; margin-right: 0.35rem;
+    vertical-align: middle;
     background: transparent; border: none; padding: 0;
   }
   .msg-timer .mt-nn:hover { opacity: 1; }
@@ -722,7 +722,6 @@
     border-radius: 100%;
     background-color: var(--sp-accent);
     color: #fff;
-    margin-right: 0rem;
     opacity: 1;
   }
   .msg-timer .mt-nn svg {
