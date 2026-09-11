@@ -2510,6 +2510,45 @@ async function autoArchiveStale() {
   await refreshConversationList();
 }
 
+// ── Sidebar date grouping ───────────────────────────────────────────────────
+// Buckets are Today / Yesterday / This week / Last week / Older, walked
+// newest-first over an already date-sorted list, so one pass assigns them all.
+// A bucket with no rows renders NO header — that is what stops a Monday (when
+// "This week" can only hold today, which is already its own group) from showing
+// an empty heading. Day and week starts go through setDate/setHours rather than
+// millisecond arithmetic so they stay on local midnight across a DST change.
+function _startOfDay(t, offsetDays) {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  if (offsetDays) d.setDate(d.getDate() + offsetDays);
+  return d.getTime();
+}
+// Weeks start Monday: getDay() puts Sunday at 0, so shift it to the end.
+function _startOfWeek(t, offsetWeeks) {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + (offsetWeeks || 0) * 7);
+  return d.getTime();
+}
+function _convGroupBounds(now) {
+  const n = now || Date.now();
+  return {
+    today:     _startOfDay(n, 0),
+    yesterday: _startOfDay(n, -1),
+    thisWeek:  _startOfWeek(n, 0),
+    lastWeek:  _startOfWeek(n, -1),
+  };
+}
+function _convGroupLabel(iso, b) {
+  const t = iso ? new Date(iso).getTime() : NaN;
+  if (!t) return 'Older';                  // undated rows sink to the bottom group
+  if (t >= b.today)     return 'Today';
+  if (t >= b.yesterday) return 'Yesterday';
+  if (t >= b.thisWeek)  return 'This week';
+  if (t >= b.lastWeek)  return 'Last week';
+  return 'Older';
+}
+
 // Panel head counter ("19 · 1 pinned"). The sidebar head is a label for the
 // list, so it has to move whenever the list does — every exit of
 // refreshConversationList calls this, including the empty and BETA paths.
@@ -2526,17 +2565,19 @@ async function refreshConversationList() {
   let list = await listConversations();
 
   const searchInput = $('convSearch');
-  if (searchInput && searchInput.value.trim()) {
-    const query = searchInput.value.trim().toLowerCase();
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  if (query) {
     list = list.filter(c =>
       c.title.toLowerCase().includes(query) ||
       (c.messageContent && c.messageContent.includes(query))
     );
   }
 
-  const pinned   = list.filter(c => c.pinned && !c.archived);
-  const regular  = list.filter(c => !c.pinned && !c.archived);
-  const archived = list.filter(c => c.archived);
+  // listConversations() scans the ACTIVE conversation dir only, so nothing here
+  // is ever archived — the archive is reachable from the link row below and from
+  // Settings → Archive, which has its own (cloud-backed) search.
+  const pinned   = list.filter(c => c.pinned);
+  const regular  = list.filter(c => !c.pinned);
 
 
   // BETA: group the sidebar by project. Each project is a header with a "+ chat"
@@ -2552,24 +2593,64 @@ async function refreshConversationList() {
   if (!list.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = Sandpie.initialSyncDone() ? '(no chats yet)' : 'Loading…';
+    li.textContent = query
+      ? 'No chats match "' + query + '"'
+      : (Sandpie.initialSyncDone() ? '(no chats yet)' : 'Loading…');
     frag.appendChild(li);
+    if (query) frag.appendChild(_archiveSearchLink(query));
     ul.replaceChildren(frag);
     _setConvCount(0, 0);
     return;
   }
-  pinned.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
-  if (pinned.length && regular.length) {
-    const sep = document.createElement('li');
-    sep.style.cssText = 'height:6px; margin:0; cursor:default; pointer-events:none;';
-    sep.setAttribute('aria-hidden', 'true');
-    frag.appendChild(sep);
+  // selorder must stay the row's position among [data-cid] rows in DOM order —
+  // the click handler uses it to index _selectedRowCids() for shift-ranges. One
+  // running counter across every group keeps that true; group headers carry no
+  // data-cid, so every selection path (highlight, range, rubber band) skips them
+  // already, without needing to know they exist.
+  let order = 0;
+  const addRow  = (c) => frag.appendChild(buildConvLi(c, order++));
+  const addHead = (text) => {
+    const li = document.createElement('li');
+    li.className = 'conv-group';
+    li.textContent = text;
+    frag.appendChild(li);
+  };
+
+  if (query) {
+    // Flat while searching: matches span every bucket, so date headers would
+    // shatter the results into one-row groups that say nothing.
+    pinned.forEach(addRow);
+    regular.forEach(addRow);
+    frag.appendChild(_archiveSearchLink(query));
+  } else {
+    if (pinned.length) addHead('Pinned');
+    pinned.forEach(addRow);
+    const bounds = _convGroupBounds();
+    let group = null;
+    for (const c of regular) {
+      const label = _convGroupLabel(c.updated, bounds);
+      if (label !== group) { addHead(label); group = label; }
+      addRow(c);
+    }
   }
-  regular.forEach((c, i) => frag.appendChild(buildConvLi(c, pinned.length + i)));
-  // Archive management lives ONLY in the Settings → Archive tab (modal); the
-  // sidebar deliberately shows no archived row.
   ul.replaceChildren(frag);
-  _setConvCount(pinned.length + regular.length, pinned.length);
+  _setConvCount(order, pinned.length);
+}
+// Search only covers the active conversations the sidebar holds. Rather than
+// quietly return nothing for something that aged out, every search ends with a
+// row into Settings → Archive, carrying the query — that tab already searches
+// archived content through the cloud, which the sidebar cannot do locally.
+function _archiveSearchLink(query) {
+  const li = document.createElement('li');
+  li.className = 'conv-arch-link';
+  li.textContent = 'Search the archive for "' + query + '"';
+  li.title = 'Archived conversations are not in this list';
+  li.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (window.SandpieArchive) SandpieArchive.openWith(query);
+    else if (window.SandpieSettings) SandpieSettings.open('archive');
+  });
+  return li;
 }
 // BETA sidebar: a project selector under "+ New chat", then the conversations of
 // the SELECTED project only. "Personal" (the user's own Dropbox folder) is a
@@ -8171,6 +8252,19 @@ function registerArchiveSettingsTab() {
     'alpha':     (a, b) => (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase()),
   };
   let chipsEl = null, segEl = null, searchEl = null, listEl = null, countEl = null;
+
+  // Entry point for the sidebar's "Search the archive for …" row: seed the tab's
+  // own search state, open it, then refresh so the query runs immediately.
+  window.SandpieArchive = {
+    openWith(q) {
+      state.query = String(q || '').trim().toLowerCase();
+      state.filter = 'all';
+      state.shown = CHUNK;
+      if (window.SandpieSettings) SandpieSettings.open('archive');
+      if (searchEl) searchEl.value = state.query;
+      refresh();
+    }
+  };
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function highlight(title) {

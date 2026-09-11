@@ -999,6 +999,54 @@ ul.conv-list li.active {
   }
   ul.conv-list li.archived { opacity: 0.55; }
 
+  /* ── Sidebar date-group headers ────────────────────────────────────────────
+     Rendered as <li> inside the list so they flow with it, but they carry no
+     data-cid, which is what keeps every selection path (highlight, shift-range,
+     rubber band) from ever seeing them. These rules sit AFTER the row rules
+     above because they tie on specificity with `ul.conv-list li:hover`. */
+  ul.conv-list li.conv-group {
+    display: block;
+    padding: 0.75rem 0.35rem 0.2rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sp-text-dim);
+    cursor: default;
+    user-select: none;
+    /* Clicks fall through to the <ul>, so a shift+drag that starts on a header
+       still begins a rubber-band selection instead of dying on it. */
+    pointer-events: none;
+  }
+  ul.conv-list li.conv-group:first-child { padding-top: 0.1rem; }
+
+  /* Search only covers active conversations; this row is the way out to the
+     archive, which has its own cloud-backed search. */
+  ul.conv-list li.conv-arch-link {
+    display: block;
+    margin-top: 0.4rem;
+    padding: 0.5rem 0.35rem 0.1rem;
+    border-top: 1px solid var(--sp-border);
+    border-radius: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.7rem;
+    color: var(--sp-text-dim);
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  ul.conv-list li.conv-arch-link:hover {
+    background: transparent;
+    color: var(--sp-accent);
+    text-decoration: underline;
+  }
+
 /* Shared file section — mirrors Archived conversation pattern */
 .shared-toggle {
     background: transparent; border: none; color: var(--sp-text-dim);
