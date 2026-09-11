@@ -717,6 +717,14 @@
   }
   .msg-timer .mt-nn:hover { opacity: 1; }
   .msg-timer .mt-nn.on { color: var(--sp-accent); opacity: 1; }
+  /* Settled (tick) state: accent-filled circle behind the tick mark */
+  .msg-timer .mt-nn.tick {
+    border-radius: 100%;
+    background-color: var(--sp-accent);
+    color: #fff;
+    margin-right: 0rem;
+    opacity: 1;
+  }
   .msg-timer .mt-nn svg {
     width: 12px; height: 12px;
     fill: none; stroke: currentColor;

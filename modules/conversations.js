@@ -1262,7 +1262,7 @@ function renderFileBundle(target, bundleFiles) {
 // The thoughts-toggle button — shared by the live line, the settled line, and the
 // placeholder so every timer state carries the same leading icon.
 function _timerNnBtn(svg) {
-  const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
+  const nnCls = 'mt-nn' + (svg ? ' tick' : '') + (thoughtsVisible ? ' on' : '');
   const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
   return `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${svg || NN_SVG_INLINE}</button>`;
 }
