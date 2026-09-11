@@ -17,6 +17,10 @@
     --sp-success: #3fb950;
     --sp-danger: #f85149;
     --sp-warn: #d29922;
+    /* Scrollbars get their own token so a theme with hard black borders
+       (clear) does not also get hard black scrollbars. */
+    --sp-scrollbar: rgba(255,255,255,0.14);
+    --sp-scrollbar-hover: rgba(255,255,255,0.32);
   }
   [data-theme="light"] .sidebar-brand .bracket,
   [data-theme="light"] .mobile-header .brand .bracket { color: var(--sp-accent); }
@@ -33,6 +37,8 @@
     --sp-success: #1f883d;
     --sp-danger: #cf222e;
     --sp-warn: #9a6700;
+    --sp-scrollbar: rgba(0,0,0,0.12);
+    --sp-scrollbar-hover: rgba(0,0,0,0.30);
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -79,12 +85,15 @@
 
 
 
-  /* Scrollbars — cryocut style (default for all scrollables) */
-  html { scrollbar-width: thin; scrollbar-color: var(--sp-border) transparent; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  /* Scrollbars — quiet overlay style (default for all scrollables).
+     4px translucent thumb that only asserts itself on hover/drag. Colour comes
+     from --sp-scrollbar, never from --sp-border. */
+  html { scrollbar-width: thin; scrollbar-color: var(--sp-scrollbar) transparent; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
+  ::-webkit-scrollbar-thumb { background: var(--sp-scrollbar); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active { background: var(--sp-scrollbar-hover); }
   ::-webkit-scrollbar-corner { background: transparent; }
 
   /* Sidebar: hidden scrollbar + shadow + chevron hints */
@@ -2471,7 +2480,6 @@ ul.conv-list li.active {
 [data-theme="cyberpunk"] .context-menu { background: #11111a; border-color: #2d2d44; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
 [data-theme="cyberpunk"] .context-item:hover { background: #1a1a2e; }
 
-[data-theme="cyberpunk"] ::-webkit-scrollbar-thumb { background: #1a1a2e; }
 [data-theme="cyberpunk"] ::-webkit-scrollbar-thumb:hover { background: #00f0ff; box-shadow: 0 0 6px #00f0ff; }
 
 [data-theme="aurora"] {
@@ -2892,9 +2900,6 @@ ul.conv-list li.active {
 [data-theme="electric"] .ctx-menu .context-item:hover { background: var(--sp-panel); }
 [data-theme="electric"] .context-menu { background: var(--sp-surface); border-color: var(--sp-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
 [data-theme="electric"] .context-item:hover { background: var(--sp-panel); }
-[data-theme="electric"] ::-webkit-scrollbar { width: 6px; height: 6px; }
-[data-theme="electric"] ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 3px; }
-[data-theme="electric"] ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
 [data-theme="cyberpunk"] { --sp-accent: var(--sp-accent, var(--sp-cyb-00f0ff)); }
 [data-theme="aurora"]    { --sp-accent: var(--sp-accent, var(--sp-aur-38bdf8)); }
 [data-theme="electric"]   { --sp-accent: var(--sp-accent, var(--sp-accent)); }
@@ -3029,6 +3034,9 @@ body.sp-decoding *::after {
   --sp-warn: #9a6700;
 
   --sp-accent-2: #333333;
+
+  --sp-scrollbar: rgba(0,0,0,0.12);
+  --sp-scrollbar-hover: rgba(0,0,0,0.30);
 
 }
 
@@ -3277,9 +3285,6 @@ body.sp-decoding *::after {
 [data-theme="clear"] .ctx-menu .context-item:hover { background: var(--sp-panel); }
 [data-theme="clear"] .context-menu { background: var(--sp-surface); border-color: var(--sp-border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
 [data-theme="clear"] .context-item:hover { background: var(--sp-panel); }
-[data-theme="clear"] ::-webkit-scrollbar { width: 6px; height: 6px; }
-[data-theme="clear"] ::-webkit-scrollbar-thumb { background: var(--sp-border); border-radius: 1px; }
-[data-theme="clear"] ::-webkit-scrollbar-thumb:hover { background: var(--sp-text-dim); }
 
 /* ═══════════════ pinned files ═══════════════ */
 /* Pin toggle icon (viewer header + artifact header). Unpinned = greyed-out /
