@@ -1121,7 +1121,7 @@ ul.conv-list li.active {
     align-items: center;
     flex-direction: column;
     gap: 0.4rem;
-    padding: 0.75rem 0;
+    padding: 1rem 0;
   }
   /* Identity avatar pinned to the rail's bottom (mirrors the sidebar's margin-top:auto row) */
   .rail-id-btn {
@@ -1139,7 +1139,7 @@ ul.conv-list li.active {
     transform: translateY(-1px);
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
   }
-  .rail-id-btn .sb-avatar-svg { width: 20px; height: 20px; }
+  .sb-avatar-svg { width: 20px; height: 20px; margin-left: 6px; }
   .sidebar-expand-btn { display: none; }
   body.sidebar-collapsed .sidebar-rail {
     display: flex;
@@ -1165,7 +1165,6 @@ ul.conv-list li.active {
     display: flex; align-items: center; justify-content: center;
     font-weight: 600; font-size: 0.82rem;
   }
-  .sidebar-id-btn .sb-avatar-svg { width: 20px; height: 20px; margin-left: 6px; }   /* matches the rail avatar (20px) */
   .sidebar-id-btn .sb-meta {
     display: flex; flex-direction: column; min-width: 0; flex: 1;
     text-align: left; align-items: flex-start;
