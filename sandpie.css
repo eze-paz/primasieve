@@ -658,9 +658,7 @@
     height: 5px;
     z-index: 1;
     pointer-events: none;
-    /* neutral fade: black-to-transparent masked by opacity, so it reads as a
-       shadow in every theme instead of painting --sp-bg over scrolled content */
-    background: linear-gradient(to top, rgba(0,0,0,0.35), transparent);
+    background: linear-gradient(to top, var(--sp-bg), transparent);
   }
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
