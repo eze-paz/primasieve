@@ -359,7 +359,7 @@
      element itself is a flex-layout change that shoves the panes (jank). The
      sidebar-resize-handle avoids this by being position:fixed — same idea here,
      painting 3px wide over its neighbours without touching layout. */
-  #sideResizer::after { content: ''; position: absolute; inset: 0 -3px; }
+  #sideResizer::after { content: ''; position: absolute; inset: 0 -1px; z-index: 5; }
   #sideResizer:hover::after, #sideResizer.dragging::after { background: var(--sp-accent); }
   body:not(.side-open):not(.artifact-side-open):not(.viewer-side-open) #sideResizer { display: none; }
   .artifact-icon-btn {
