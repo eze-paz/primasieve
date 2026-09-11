@@ -1296,6 +1296,73 @@ function setFileViewMode(m) { localStorage.setItem(FILE_VIEW_KEY, m === 'grid' ?
 function fileSortMode() { const m = localStorage.getItem(FILE_SORT_KEY); return (m === 'size' || m === 'mtime') ? m : 'name'; }
 function setFileSortMode(m) { localStorage.setItem(FILE_SORT_KEY, (m === 'size' || m === 'mtime') ? m : 'name'); opfs.refreshFileList(); }
 
+// ---- File-list multi-select (ported from the conversations list) -----------
+// shift = range select, ctrl/cmd = toggle, plain click opens (or keeps the
+// selection when it lands on a selected row). Right-clicking a row outside the
+// selection collapses the selection to that row; right-clicking a selected row
+// with 2+ selected shows the bulk menu (only multi-file actions).
+const _selFiles = new Set();
+let _selFilesAnchor = -1;
+function _selFileRows() {
+  const ul = document.getElementById('fileList');
+  const out = [];
+  if (ul) for (const li of ul.querySelectorAll('li[data-fkey]')) out.push(li.dataset.fkey);
+  return out;
+}
+function _selFilesHighlight() {
+  const ul = document.getElementById('fileList');
+  if (ul) for (const li of ul.querySelectorAll('li[data-fkey]'))
+    li.classList.toggle('selected', _selFiles.has(li.dataset.fkey));
+}
+function _selFilesClear() { _selFiles.clear(); _selFilesAnchor = -1; _selFilesHighlight(); }
+function _selFilesRangeTo(i, j) {
+  const rows = _selFileRows();
+  const lo = Math.min(i, j), hi = Math.max(i, j);
+  for (let k = lo; k <= hi; k++) if (rows[k]) _selFiles.add(rows[k]);
+  _selFilesAnchor = hi;
+  _selFilesHighlight();
+}
+// Bulk delete: same semantics as the single-file delete (drop local copy if any,
+// ALWAYS emit file:deleted for the cloud handshake, forget from sync state).
+opfs.bulkDeleteFiles = async function(keys) {
+  for (const fullKey of keys) {
+    try { await opfs.remove(fullKey); } catch (_) {}
+    try { if (window.Sandpie) Sandpie.events.emit('file:deleted', fullKey); } catch (_) {}
+    try { const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null; if (sp && sp.forget) sp.forget(fullKey); } catch (_) {}
+  }
+  _selFilesClear();
+  await opfs.refreshFileList();
+};
+// Bulk download: one file per key (folders are skipped by the caller).
+opfs.bulkDownloadFiles = async function(keys) {
+  for (const fullKey of keys) {
+    try {
+      let bytes;
+      try { bytes = await opfs.readBytes(fullKey); }
+      catch (e) {
+        if (e.name !== 'NotFoundError') throw e;
+        const sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
+        if (sp && sp.hydrate) await sp.hydrate(fullKey);
+        bytes = await opfs.readBytes(fullKey);
+      }
+      const name = fullKey.split('/').pop();
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      const mime = ({html:'text/html', htm:'text/html', svg:'image/svg+xml',
+        png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif',
+        webp:'image/webp', csv:'text/csv', json:'application/json',
+        txt:'text/plain'})[ext] || 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      const a = document.createElement('a');
+      a.href = url; a.download = name; a.style.display = 'none';
+      document.body.appendChild(a); a.click();
+      requestAnimationFrame(() => { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
+    } catch (e) { console.error('[opfs] bulk download failed:', fullKey, e); }
+  }
+};
+opfs.bulkCopyPaths = function(keys) {
+  try { navigator.clipboard.writeText(keys.join('\n')).catch(() => {}); } catch (_) {}
+};
+
 opfs.refreshFileList = async function() {
   const ul = document.getElementById('fileList');
   // Redrawing the file browser is meaningless without one. /walios/ loads opfs.js to
@@ -1459,6 +1526,8 @@ opfs.refreshFileList = async function() {
   const renderItem = (it, liClass) => {
     const li = document.createElement('li');
     if (liClass) li.className = liClass;
+    li.dataset.fkey = it.fullKey;
+    if (_selFiles.has(it.fullKey)) li.classList.add('selected');
     const btn = document.createElement('span');
     btn.className = 'name' + (it.kind === 'folder' ? ' folder' : '');
     const kindIcon = it.kind === 'folder' ? '📁 ' : '📄 ';
@@ -1484,11 +1553,31 @@ opfs.refreshFileList = async function() {
     // transparently (openFile → provider.hydrate).
     const statusLabel = it.status === 'cloud' ? 'synced' : it.status;
     btn.title = it.fullKey;
-    if (it.kind === 'folder') {
-      btn.onclick = () => { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); };
-    } else {
-      btn.onclick = () => opfs.openFile(it.fullKey, it.name);
-    }
+    // Multi-select aware click (shift = range, ctrl/cmd = toggle). Plain click
+    // opens/drills in — unless it lands on a selected row, which keeps the
+    // selection so bulk actions stay usable.
+    const _plainActivate = () => {
+      if (it.kind === 'folder') { document.getElementById('opfsPath').value = '/' + it.fullKey; opfs.refreshFileList(); }
+      else opfs.openFile(it.fullKey, it.name);
+    };
+    btn.onclick = (ev) => {
+      const idx = _selFileRows().indexOf(it.fullKey);
+      if (ev.shiftKey || ev.ctrlKey || ev.metaKey) {
+        ev.preventDefault(); ev.stopPropagation();
+        if (ev.shiftKey) {
+          if (_selFiles.size === 0) { _selFiles.add(it.fullKey); _selFilesAnchor = idx; _selFilesHighlight(); }
+          else _selFilesRangeTo(_selFilesAnchor, idx);
+        } else {
+          if (_selFiles.has(it.fullKey)) _selFiles.delete(it.fullKey); else _selFiles.add(it.fullKey);
+          _selFilesAnchor = idx;
+          _selFilesHighlight();
+        }
+        return;
+      }
+      if (_selFiles.size > 0 && _selFiles.has(it.fullKey)) return;   // keep selection
+      _selFilesClear();
+      _plainActivate();
+    };
     li.append(btn);
     if (fileViewMode() !== 'grid') {
       const sizeSpan = document.createElement('span');
@@ -1498,6 +1587,27 @@ opfs.refreshFileList = async function() {
     }
     li.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
+      // Right-clicking a row that is NOT part of the current selection collapses
+      // the selection to just that row (standard multi-select UX).
+      if (_selFiles.size > 0 && !_selFiles.has(it.fullKey)) {
+        _selFiles.clear(); _selFiles.add(it.fullKey); _selFilesHighlight();
+      }
+      if (_selFiles.size > 1) {
+        const keys = [..._selFiles];
+        const names = keys.map(k => k.split('/').pop());
+        const allFiles = keys.every(k => {
+          const li2 = [...document.querySelectorAll('#fileList li[data-fkey]')].find(x => x.dataset.fkey === k);
+          return li2 ? !li2.querySelector('.name.folder') : true;
+        });
+        const items = [
+          { info: true, label: keys.length + ' items selected' },
+          { label: 'Copy paths', action: () => opfs.bulkCopyPaths(keys) },
+        ];
+        if (allFiles) items.push({ label: 'Download all', action: () => opfs.bulkDownloadFiles(keys) });
+        items.push({ label: 'Delete all', danger: true, action: () => opfs.bulkDeleteFiles(keys) });
+        opfs.showContextMenu(ev.clientX, ev.clientY, items);
+        return;
+      }
       const menuItems = [];
       // Show the full filename first so long names are always readable.
       menuItems.push({ info: true, label: it.fullKey });

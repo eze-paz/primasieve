@@ -3531,7 +3531,12 @@ body.sp-decoding *::after {
 .files-modal ul.fs-list li .name { cursor: pointer; display: flex; align-items: center; gap: 0.35rem; }
 .files-modal ul.fs-list li .name .material-symbols-outlined { font-size: 17px; color: var(--sp-text-dim); }
 .files-modal ul.fs-list li .name:hover { color: var(--sp-text); }
-.files-modal ul.fs-list li.selected .name { color: var(--sp-accent); }
+/* Multi-select (shift/ctrl click): a row in the active selection — mirrors the conv-list treatment */
+.files-modal ul.fs-list li.selected {
+  background: var(--sp-accent-dim);
+  border-color: var(--sp-accent);
+}
+.files-modal ul.fs-list li.selected .name { color: var(--sp-text); }
 
 /* Grid view (files explorer modal): icon tiles like a normal OS explorer */
 .files-modal .fm-nav button.fm-view-on { color: var(--sp-accent); background: var(--sp-accent-dim); }
