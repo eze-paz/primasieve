@@ -2510,6 +2510,16 @@ async function autoArchiveStale() {
   await refreshConversationList();
 }
 
+// Panel head counter ("19 · 1 pinned"). The sidebar head is a label for the
+// list, so it has to move whenever the list does — every exit of
+// refreshConversationList calls this, including the empty and BETA paths.
+function _setConvCount(total, pinned) {
+  const el = $('convCount');
+  if (!el) return;
+  if (!total) { el.textContent = ''; return; }
+  el.textContent = pinned ? total + ' \u00b7 ' + pinned + ' pinned' : String(total);
+}
+
 async function refreshConversationList() {
   const ul = $('convList');
   if (!ul) return;
@@ -2533,6 +2543,7 @@ async function refreshConversationList() {
   // button; conversations without a project fall under "Unsorted". A "New project"
   // button sits at the top. When there are no projects at all, prompt to create one.
   if (window.SANDPIE_BETA && window.SandpieProjects) {
+    _setConvCount(pinned.length + regular.length, pinned.length);
     await _renderBetaConvList(ul, [...pinned, ...regular]);
     return;
   }
@@ -2544,6 +2555,7 @@ async function refreshConversationList() {
     li.textContent = Sandpie.initialSyncDone() ? '(no chats yet)' : 'Loading…';
     frag.appendChild(li);
     ul.replaceChildren(frag);
+    _setConvCount(0, 0);
     return;
   }
   pinned.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
@@ -2557,6 +2569,7 @@ async function refreshConversationList() {
   // Archive management lives ONLY in the Settings → Archive tab (modal); the
   // sidebar deliberately shows no archived row.
   ul.replaceChildren(frag);
+  _setConvCount(pinned.length + regular.length, pinned.length);
 }
 // BETA sidebar: a project selector under "+ New chat", then the conversations of
 // the SELECTED project only. "Personal" (the user's own Dropbox folder) is a

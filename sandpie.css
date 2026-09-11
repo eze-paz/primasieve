@@ -21,6 +21,21 @@
        (clear) does not also get hard black scrollbars. */
     --sp-scrollbar: rgba(255,255,255,0.14);
     --sp-scrollbar-hover: rgba(255,255,255,0.32);
+    /* -- Icon rail ---------------------------------------------------------
+       The rail is its own plane, one step away from the panel, and is styled
+       ONLY through these tokens + the .rail-* classes -- no per-theme
+       .files-open-btn or .sidebar-collapse-btn override reaches into it. Dark
+       themes deepen the surface; light themes invert it (see the "light" and
+       "clear" blocks). Each colour token declares a static fallback first, for
+       browsers without color-mix(). */
+    --rail-w: 46px;
+    --sp-rail: #0a0d12;
+    --sp-rail: color-mix(in srgb, var(--sp-surface, #161b22) 62%, #000);
+    --sp-rail-border: var(--sp-border, #30363d);
+    --sp-rail-ink: var(--sp-text-dim, #9ab0c8);
+    --sp-rail-ink-hot: var(--sp-accent, #58a6ff);
+    --sp-rail-hot-bg: rgba(255,255,255,0.07);
+    --sp-rail-hot-bg: color-mix(in srgb, var(--sp-accent, #58a6ff) 15%, transparent);
   }
   [data-theme="light"] .sidebar-brand .bracket,
   [data-theme="light"] .mobile-header .brand .bracket { color: var(--sp-accent); }
@@ -39,6 +54,16 @@
     --sp-warn: #9a6700;
     --sp-scrollbar: rgba(0,0,0,0.12);
     --sp-scrollbar-hover: rgba(0,0,0,0.30);
+    /* Light themes invert the rail onto the theme's own ink, so a customised
+       palette carries the rail with it instead of hard-coding black. */
+    --sp-rail: #1f2328;
+    --sp-rail: var(--sp-text, #1f2328);
+    --sp-rail-border: var(--sp-rail, #1f2328);
+    --sp-rail-ink: #b9bec4;
+    --sp-rail-ink: color-mix(in srgb, var(--sp-bg, #fff) 66%, var(--sp-rail, #1f2328));
+    --sp-rail-ink-hot: var(--sp-bg, #ffffff);
+    --sp-rail-hot-bg: rgba(255,255,255,0.16);
+    --sp-rail-hot-bg: color-mix(in srgb, var(--sp-bg, #fff) 18%, transparent);
   }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
@@ -71,8 +96,9 @@
     z-index: 10;
     background: transparent;
     transition: background 0.15s;
-    /* Sensible default before JS positions it on the right edge of <aside> */
-    left: calc(var(--sidebar-width, 300px) - 2px);
+    /* Sensible default before JS positions it on the right edge of <aside>.
+       JS measures getBoundingClientRect(), so it already clears the rail. */
+    left: calc(var(--rail-w, 46px) + var(--sidebar-width, 300px) - 2px);
   }
   .sidebar-resize-handle:hover,
   .sidebar-resize-handle.active {
@@ -1079,13 +1105,30 @@ ul.conv-list li.active {
   .mobile-header { display: none; }
   .backdrop { display: none; }
 
+  /* Panel head -- the brand and the icon buttons moved to the rail, so this row
+     is now just a label for what the panel holds. */
   .sidebar-header {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    padding: 0 1rem 0.5rem 0.25rem;
-    margin-bottom: 0.25rem;
+    gap: 0.5rem;
+    padding: 0 1rem 0.6rem 0.25rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 1px solid var(--sp-border);
     flex-shrink: 0;
+  }
+  .sp-panel-title {
+    font-size: 0.86rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--sp-text);
+  }
+  .sp-panel-count {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.62rem;
+    color: var(--sp-text-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .sidebar-brand {
     font-family: 'Share Tech Mono', monospace;
@@ -1141,63 +1184,89 @@ ul.conv-list li.active {
   aside.collapsed .navbar {
     display: none;
   }
-  /* Collapsed state: the expand button lives in its own thin fixed rail column
-     (40px) instead of floating over the messages area. */
+  /* -- Icon rail ----------------------------------------------------------
+     ALWAYS visible: a normal flex child of <body>, to the left of <aside>,
+     holding the brand mark, the panel toggle, new chat, files and the identity
+     avatar. It survives the panel being collapsed, which is the point --
+     collapsing now hides the chat list only, never the controls. */
   .sidebar-rail {
-    display: none;
-    position: fixed;
-    top: 0; bottom: 0; left: 0;
-    width: 40px;
-    z-index: 50;
-    background: var(--sp-surface);
-    border-right: 1px solid var(--sp-border);
-    align-items: center;
+    flex: none;
+    width: var(--rail-w, 46px);
+    background: var(--sp-rail);
+    border-right: 1px solid var(--sp-rail-border);
+    display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    padding: 1rem 0;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.85rem 0 max(0.85rem, env(safe-area-inset-bottom));
+    z-index: 3;
   }
-  /* Identity avatar pinned to the rail's bottom (mirrors the sidebar's margin-top:auto row) */
+  [data-theme="aurora"] .sidebar-rail { backdrop-filter: blur(14px); }
+  .rail-mark {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    color: var(--sp-rail-ink-hot);
+    margin-bottom: 0.5rem;
+    user-select: none;
+  }
+  /* One button style for the whole rail, driven only by the rail tokens, so no
+     per-theme .files-open-btn / .sidebar-collapse-btn rule can leak in. */
+  .rail-btn {
+    width: 32px; height: 32px;
+    flex: none;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--sp-rail-ink);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    clip-path: none;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .rail-btn .material-symbols-outlined { font-size: 19px; color: inherit; }
+  .rail-btn:hover {
+    background: var(--sp-rail-hot-bg);
+    color: var(--sp-rail-ink-hot);
+  }
+  .rail-btn:focus-visible {
+    outline: 2px solid var(--sp-rail-ink-hot);
+    outline-offset: 1px;
+  }
+  /* Identity avatar pinned to the rail's bottom */
   .rail-id-btn {
     margin-top: auto;
     width: 32px; height: 32px;
+    flex: none;
     display: flex; align-items: center; justify-content: center;
     border-radius: 50%;
     cursor: pointer; user-select: none;
-    background: var(--sp-accent-dim);
-    color: var(--sp-text);
-    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    background: var(--sp-rail-hot-bg);
+    color: var(--sp-rail-ink);
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
   }
   .rail-id-btn:hover {
-    background: var(--sp-panel);
+    color: var(--sp-rail-ink-hot);
     transform: translateY(-1px);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
   }
   .sb-avatar-svg { width: 20px; height: 20px; margin-left: 6px; }
-  .sidebar-expand-btn { display: none; }
-  body.sidebar-collapsed .sidebar-rail {
-    display: flex;
-  }
-  body.sidebar-collapsed .sidebar-expand-btn {
-    display: flex;
-  }
-  body.sidebar-collapsed main {
-    margin-left: 40px;   /* clear the rail column */
-  }
+  /* The old floating expand button is gone -- the rail's toggle replaces it. */
+  .sidebar-expand-btn { display: none !important; }
 
   /* Sidebar identity row = settings button (card-lift hover + always-visible chevron) */
   .sidebar-id-btn {
     display: flex; align-items: center; gap: 0.55rem;
-    border-radius: 10px;
+    padding: 0.55rem 0.5rem 0 0.25rem;
+    margin-right: 1rem;
+    border-top: 1px solid var(--sp-border);
+    border-radius: 0;
     cursor: pointer; user-select: none;
     border: 1px solid transparent;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
-  .sidebar-id-btn .sb-avatar {
-    flex: none; aspect-ratio: 1; width: 36px; height: 36px; border-radius: 50%;
-    background: var(--sp-accent-dim);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: 0.82rem;
-  }
+  /* The avatar moved to the rail; the panel keeps a quiet text footer. */
+  .sidebar-id-btn .sb-avatar { display: none; }
   .sidebar-id-btn .sb-meta {
     display: flex; flex-direction: column; min-width: 0; flex: 1;
     text-align: left; align-items: flex-start;
@@ -1276,7 +1345,9 @@ ul.conv-list li.active {
       padding: 1rem;
       left: -100%;
     }
-    .sidebar-header { display: none; }
+    /* The mobile header already carries brand + new chat + files + toggle, so
+       the rail would only duplicate it beside an off-screen drawer. */
+    .sidebar-rail { display: none; }
     .sidebar-expand-btn { display: none !important; }
     .sidebar-resize-handle { display: none; }
     body.sidebar-open aside { left: 0; }
@@ -2191,6 +2262,12 @@ ul.conv-list li.active {
    ============================================================================== */
 
 [data-theme="aurora"] {
+  /* Aurora is glass, not flat: the rail gets its own translucent ground. */
+  --sp-rail: rgba(6,10,18,0.72);
+  --sp-rail-border: rgba(148,163,184,0.16);
+  --sp-rail-ink: var(--sp-text-dim, #94a3b8);
+  --sp-rail-ink-hot: var(--sp-accent, #38bdf8);
+  --sp-rail-hot-bg: rgba(56,189,248,0.16);
   --sp-bg: #070b14;
   --sp-surface: rgba(15,23,42,0.6);
   --sp-border: rgba(148,163,184,0.12);
@@ -2348,6 +2425,13 @@ ul.conv-list li.active {
 
 [data-theme="electric"] {
   --sp-accent-2: #ffcc00;
+  /* Electric is high-contrast by design -- take the rail all the way to black. */
+  --sp-rail: #000000;
+  --sp-rail-border: var(--sp-border, #2a2a2a);
+  --sp-rail-ink: var(--sp-text-dim, #888888);
+  --sp-rail-ink-hot: var(--sp-accent, #77C078);
+  --sp-rail-hot-bg: rgba(255,255,255,0.10);
+  --sp-rail-hot-bg: color-mix(in srgb, var(--sp-accent, #77C078) 18%, transparent);
 }
 [data-theme="electric"] body {
   background: var(--sp-bg); color: var(--sp-text);
@@ -2744,6 +2828,15 @@ body.sp-decoding *::after {
 
   --sp-scrollbar: rgba(0,0,0,0.12);
   --sp-scrollbar-hover: rgba(0,0,0,0.30);
+
+  --sp-rail: #000000;
+  --sp-rail: var(--sp-text, #000000);
+  --sp-rail-border: var(--sp-rail, #000000);
+  --sp-rail-ink: #bdbdbd;
+  --sp-rail-ink: color-mix(in srgb, var(--sp-bg, #fff) 70%, var(--sp-rail, #000));
+  --sp-rail-ink-hot: var(--sp-bg, #ffffff);
+  --sp-rail-hot-bg: rgba(255,255,255,0.18);
+  --sp-rail-hot-bg: color-mix(in srgb, var(--sp-bg, #fff) 20%, transparent);
 
 }
 
