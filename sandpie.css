@@ -266,6 +266,10 @@
   #settingsModal button.ghost { background: var(--sp-panel); color: var(--sp-text-dim); border: 1px solid var(--sp-border); border-radius: 6px; padding: 0.35rem 0.6rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
   #settingsModal button.ghost:hover:not(:disabled) { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-border-bright); }
   #settingsModal button.ghost.active { background: var(--sp-accent-dim); color: var(--sp-text); border-color: var(--sp-accent); }
+  /* Chat width slider (Appearance panel) */
+  .chat-width-row { display: flex; align-items: center; gap: 0.6rem; }
+  .chat-width-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--sp-accent); cursor: pointer; }
+  .chat-width-val { font: 0.72rem 'JetBrains Mono', Consolas, monospace; color: var(--sp-text); min-width: 4.5ch; text-align: right; font-variant-numeric: tabular-nums; }
   .subs-modal .subs-pick { width: 100%; margin-bottom: 0.6rem; background: var(--sp-accent-dim); border: 1px solid var(--sp-accent); color: var(--sp-text); border-radius: 6px; padding: 0.45rem; font: inherit; font-size: 0.82rem; cursor: pointer; }
   .subs-modal .subs-pick:hover:not(:disabled) { background: var(--sp-accent); color: var(--sp-bg); }
   .subs-modal .subs-pick:disabled { opacity: 0.5; cursor: default; }
@@ -686,6 +690,8 @@
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
     padding: 0.25rem 1.75rem 0.25rem;
+    /* Follow the chat width cap: composer padding + the usual 0.25rem inset. */
+    padding-inline: calc(max(1.5rem, (100% - var(--sp-chat-max-w)) / 2) + 0.25rem);
     user-select: none;
     font-variant-numeric: tabular-nums;
   }
@@ -1313,8 +1319,10 @@ ul.conv-list li.active {
     /* Desktop .msg-timer sits 1.75rem from the pane edge over a 1.5rem form padding
        (0.25rem inset). Mobile form padding drops to 1rem, so match the same inset:
        1.25rem keeps the timer's visual offset from the composer identical. */
-    .msg-timer { padding-left: 1.25rem; }
-    .conv-host, form.composer { padding-inline: 1rem; }   /* chat width cap is desktop-only */
+    .msg-timer { padding-left: 1.25rem; padding-right: 1.75rem; }
+    /* Chat width cap is desktop-only: pin every capped element back to its
+       fixed mobile padding so --sp-chat-max-w has no effect on phones. */
+    .conv-host, form.composer { padding-inline: 1rem; }
     .msg { max-width: 95%; }
 
     /* Settings modal — the desktop two-column (150px nav | panels) layout leaves

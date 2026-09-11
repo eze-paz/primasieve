@@ -352,24 +352,20 @@ function computeAccentNeg() {
    monitor want different widths, so this stays a per-device localStorage pref.
    0 / missing = fill the pane (the historical behaviour). */
 var _CHAT_WIDTH_KEY = 'sandpie-chat-max-w';
-var _CHAT_WIDTHS = [
-  { px: 720,  label: 'Narrow', title: 'Narrow — 720px' },
-  { px: 900,  label: 'Medium', title: 'Medium — 900px' },
-  { px: 1100, label: 'Wide',   title: 'Wide — 1100px' },
-  { px: 0,    label: 'Full',   title: 'Fill the pane' },
-];
+var _CHAT_W_MIN = 560, _CHAT_W_MAX = 1600, _CHAT_W_STEP = 20;   // slider range; at MAX = fill the pane
 function getChatWidth() {
   try { var v = parseInt(localStorage.getItem(_CHAT_WIDTH_KEY), 10); return v > 0 ? v : 0; } catch (e) { return 0; }
 }
+function _chatWidthLabel(w) { return w ? w + 'px' : 'Full'; }
 function applyChatWidth() {
   var w = getChatWidth();
   document.documentElement.style.setProperty('--sp-chat-max-w', w ? w + 'px' : '100%');
-  document.querySelectorAll('.chat-width-btn[data-w]').forEach(function (b) {
-    b.classList.toggle('active', parseInt(b.dataset.w, 10) === w);
-  });
+  var r = document.getElementById('chatWidthRange'); if (r) r.value = w || _CHAT_W_MAX;
+  var v = document.getElementById('chatWidthVal'); if (v) v.textContent = _chatWidthLabel(w);
 }
 function setChatWidth(px) {
   px = parseInt(px, 10) || 0;
+  if (px >= _CHAT_W_MAX) px = 0;   // slider parked at the right end = no cap
   try { px ? localStorage.setItem(_CHAT_WIDTH_KEY, String(px)) : localStorage.removeItem(_CHAT_WIDTH_KEY); } catch (e) {}
   applyChatWidth();
 }
@@ -378,10 +374,10 @@ window.setChatWidth = setChatWidth;
 /* ─── Settings UI: Appearance lives in the gear modal (SandpieSettings). ─── */
 var _CHAT_WIDTH_HTML = '<div style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">' +
   '<div style="font-size:0.72rem;color:var(--sp-text-dim);margin-bottom:0.35rem;">Chat width <span style="opacity:0.7">(this device only)</span></div>' +
-  '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' +
-  _CHAT_WIDTHS.map(function (o) {
-    return '<button class="ghost chat-width-btn" data-w="' + o.px + '" onclick="setChatWidth(' + o.px + ')" title="' + o.title + '">' + o.label + '</button>';
-  }).join('') +
+  '<div class="chat-width-row">' +
+  '<input type="range" id="chatWidthRange" min="' + _CHAT_W_MIN + '" max="' + _CHAT_W_MAX + '" step="' + _CHAT_W_STEP + '" ' +
+  'oninput="setChatWidth(this.value)" title="Drag right to the end for full width">' +
+  '<span class="chat-width-val" id="chatWidthVal"></span>' +
   '</div></div>';
 var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
