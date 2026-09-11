@@ -1063,7 +1063,10 @@ ul.conv-list li.active {
   .mobile-header .brand .bracket { color: var(--sp-accent); transition: color 0.15s; }
   .sidebar-brand .name,
   .mobile-header .brand .name { transition: color 0.15s; }
-  .sidebar-collapse-btn {
+  /* Shared look for the sidebar toggle buttons (collapse in the header, expand
+     in the rail) -- one base rule so their border/background/hover can't drift. */
+  .sidebar-collapse-btn,
+  .sidebar-expand-btn {
     background: var(--sp-bg);
     border: 1px solid var(--sp-border);
     color: var(--sp-text);
@@ -1082,7 +1085,8 @@ ul.conv-list li.active {
      button's inherited font-size -- size the icon directly. */
   .sidebar-collapse-btn .material-symbols-outlined,
   .sidebar-expand-btn .material-symbols-outlined { font-size: 20px; }
-  .sidebar-collapse-btn:hover {
+  .sidebar-collapse-btn:hover,
+  .sidebar-expand-btn:hover {
     background: var(--sp-surface);
     color: var(--sp-accent);
     box-shadow: 0 0 20px 4px var(--sp-accent-dim), 0 0 40px 6px var(--sp-accent-dim), 0 4px 8px rgba(0,0,0,0.6);
@@ -1132,31 +1136,12 @@ ul.conv-list li.active {
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
   }
   .rail-id-btn .sb-avatar-svg { width: 20px; height: 20px; }
-  .sidebar-expand-btn {
-    display: none;
-    width: 32px;
-    height: 32px;
-    background: var(--sp-panel);
-    border: none;
-    border-radius: 6px;
-    color: var(--sp-text);
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0;
-  }
-  .sidebar-expand-btn:hover {
-    background: var(--sp-surface);
-    color: var(--sp-accent);
-    box-shadow: 0 0 24px 4px var(--sp-accent-dim), 0 0 48px 6px var(--sp-accent-dim), 0 4px 8px rgba(0,0,0,0.6);
-  }
+  .sidebar-expand-btn { display: none; }
   body.sidebar-collapsed .sidebar-rail {
     display: flex;
   }
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
-    border: 1px solid var(--sp-accent);
   }
   body.sidebar-collapsed main {
     margin-left: 40px;   /* clear the rail column */
