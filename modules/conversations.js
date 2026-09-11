@@ -3056,7 +3056,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=226');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=227');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3454,7 +3454,7 @@ async function sendSingle(text, stream, opts = {}) {
   if (config.routedViaVision && userBubbleEl) {
     const mk = document.createElement('span');
     mk.style.cssText = 'display:block;font-size:0.7rem;color:var(--sp-text-dim);margin-top:0.25rem;';
-    mk.textContent = '📷 first round → ' + ((config.visionRoute && config.visionRoute.model) || 'vision model');
+    mk.textContent = '📷 described by ' + ((config.vision && config.vision.fallback && config.vision.fallback.model) || 'the vision model');
     userBubbleEl.appendChild(mk);
   }
   // Context limits are guarded three ways: maybeAutoCompact above (reported
@@ -3481,6 +3481,20 @@ async function sendSingle(text, stream, opts = {}) {
     // Worker mid-turn compaction uses the SAME spinner as pre-send compaction.
     if (ev.type === 'compaction_start') { showCompactionProgress(convId); return; }
     if (ev.type === 'compaction_end')   { hideCompactionProgress(convId); return; }
+    // Vision pre-step: the fallback described the attached image(s). Persist the
+    // description ON the user message so later turns can ship it in place of the
+    // image (see the stripImages branch in buildAgentConfig).
+    if (ev.type === 'vision_caption') {
+      const um = [...convMessages].reverse().find(m => m && m.role === 'user' && Array.isArray(m.content) && m.content.some(p => p && p.type === 'image_url'));
+      if (um && Array.isArray(ev.captions)) {
+        um._visionCaptions = ev.captions; um._visionModel = ev.model || '';
+        // The user message is already on disk: an append-only save would skip it,
+        // so force a full JSONL rewrite on the next save.
+        const st = convStreams.get(convId); if (st) st._forceJsonlRewrite = true;
+        scheduleIncrementalSave(convId);
+      }
+      return;
+    }
     // Worker compacted its active slice mid-turn — advance the PAGE's persisted
     // boundary to match, so the NEXT send ships only [summary, …tail] and not
     // everything this turn piled up (the "sends way more than the active context"
@@ -3792,20 +3806,14 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     && lastUser.content.some(p => p.type === 'image_url'));
   const visionFallback = (!canSee && typeof SandpieProviders.resolveVisionFallback === 'function')
     ? SandpieProviders.resolveVisionFallback(active) : null;
-  // The conversation's OWN model stays the turn's provider. The fallback is
-  // shipped separately as a per-ROUND route (config.visionRoute): the worker sends
-  // only the round whose newest user message still carries image parts to it, then
-  // collapses the image to a note and hands the turn back to this model. Routing
-  // the whole turn here was the bug: one pasted screenshot moved every round of a
-  // 20-round agentic turn to the fallback model (aezequiel, 2026-09-11).
+  // The conversation's OWN model is ALWAYS the turn's provider. When the current
+  // message carries an image it cannot see, the worker asks the vision fallback
+  // (config.vision.fallback, below) ONCE, with no tools, to describe the image, and
+  // the description replaces the image for the whole agent loop. Routing the turn
+  // itself here was the bug: one pasted screenshot moved every round of a 20-round
+  // agentic turn to the fallback model (aezequiel, 2026-09-11).
   const effective = active;
   const routedViaVision = !!(!canSee && currentHasImages && visionFallback);
-  const visionRoute = routedViaVision ? {
-    url: new URL(api(String(visionFallback.endpoint || '').replace(/\/$/, '') + '/chat/completions', visionFallback.proxyUrl), location.href).href,
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (visionFallback.apiKey || '') },
-    model: visionFallback.model || '',
-    authRefreshUrl: visionFallback.managed ? new URL('/auth/token', location.href).href : null,
-  } : null;
   const stripImages = !canSee && !currentHasImages;   // never silently drop a fresh attachment
   const resolvedMessages = [];
   for (const msg of sendMessages) {
@@ -3827,7 +3835,12 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
           continue;
         }
         if (part.type === 'image_url' && stripImages) {
-          continue;                                   // history image → not for a text-only model
+          // history image → not for a text-only model. If the vision pre-step described
+          // it (persisted on the message as _visionCaptions), keep the description.
+          const caps = Array.isArray(msg._visionCaptions) ? msg._visionCaptions : null;
+          const idx = msg.content.filter(p => p.type === 'image_url').indexOf(part);
+          if (caps && caps[idx]) resolvedContent.push({ type: 'text', text: '[Attached image ' + (idx + 1) + ', described by the vision model ' + (msg._visionModel || '') + ':\n' + caps[idx] + ']' });
+          continue;
         }
         if (part.type === 'image_url' && part.image_url.url.startsWith('opfs://')) {
           const dataUrl = await SandpieImages.dataUrlFromPath(part.image_url.url.slice(7));
@@ -3908,12 +3921,9 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // open-todos stop guard. window.__todoV2 = 1 (console) restores the
     // guarded v2 tool for comparison/rollback.
     todoMode: _todoV2() ? '' : 'claude',
-    // The user attached an image to a text-only model: visionRoute carries the
-    // fallback's request coordinates and the worker sends ONLY the image-bearing
-    // round there (see runAgent). url/headers/model above stay the conversation's
-    // own model. routedViaVision marks the user bubble.
+    // The user attached an image to a text-only model: the worker's vision pre-step
+    // describes it via vision.fallback (below) before the loop. Marks the user bubble.
     routedViaVision: !!routedViaVision,
-    visionRoute,
     // Python backend for run_python. Default (unset/anything else) = Pyodide.
     // localStorage 'sandpie-python-backend' = 'walios' routes run_python at the
     // WARM walios interpreter instead: native-wasm numpy/pandas/matplotlib with

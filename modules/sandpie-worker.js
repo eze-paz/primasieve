@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.27.0-vision-round';
+const WORKER_VERSION = '2.28.0-vision-describe';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // Page-visibility mirror. The worker can't read `document`, so the page forwards
@@ -2289,6 +2289,45 @@ async function _captionImage(dataUrl, ctx, what) {
     return caption ? String(caption).trim() : 'Error: vision fallback returned no caption.';
   } catch (e) {
     return 'Error: vision fallback captioning request failed (' + ((e && e.message) || e) + ').';
+  }
+}
+
+// Vision pre-step helper: describe an image the USER attached, for the request they
+// made, so a text-only conversation model can act on it. One request, no tools.
+// Reports its usage (attributed to the fallback model) like a round would.
+async function _describeUserImage(dataUrl, ctx, requestText) {
+  const _vis = ctx && ctx._agentConfig && ctx._agentConfig.vision;
+  const fb = _vis && _vis.fallback;
+  if (!fb || !fb.endpoint || !fb.apiKey || !fb.model) return 'Error: no vision fallback is configured — the attached image could not be examined.';
+  const prompt = 'The user attached this image together with the request below. You are the eyes of a text-only assistant that will carry out the request but cannot see the image. '
+    + 'Describe the image content precisely and completely: what it shows, its structure and layout, every visible text transcribed verbatim, colours, states, and anything that looks broken or notable. '
+    + 'Do NOT carry out the request yourself and do NOT propose solutions — only describe what is in the image.'
+    + (requestText ? '\n\nThe user\'s request:\n' + requestText.slice(0, 4000) : '');
+  try {
+    const res = await fetch(String(fb.endpoint).replace(/\/$/, '') + '/chat/completions', {
+      method: 'POST', credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + fb.apiKey },
+      body: JSON.stringify({
+        model: fb.model,
+        messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: dataUrl } }] }],
+        max_tokens: 3000,
+      }),
+      signal: (ctx && ctx.signal) || undefined,
+    });
+    if (!res.ok) {
+      let txt = ''; try { txt = (await res.text()).slice(0, 300); } catch (_) {}
+      return 'Error: the vision model could not describe the attached image (HTTP ' + res.status + (txt ? ': ' + txt : '') + ').';
+    }
+    const j = await res.json();
+    if (j && j.usage) ctx.emit({ type: 'usage', usage: j.usage, model: fb.model });
+    const m = j && j.choices && j.choices[0] && j.choices[0].message;
+    let text = m && m.content;
+    if (!text && m && (Array.isArray(m.reasoning_details) || m.reasoning)) {
+      text = Array.isArray(m.reasoning_details) ? m.reasoning_details.map(x => (x && x.text) || '').join('\n') : m.reasoning;
+    }
+    return text ? String(text).trim() : 'Error: the vision model returned no description.';
+  } catch (e) {
+    return 'Error: the vision model request failed (' + ((e && e.message) || e) + ').';
   }
 }
 
@@ -5408,6 +5447,38 @@ async function runAgent(config, ctx) {
   };
   ctx._reportTiming = _emitTiming;
 
+  // ---- Vision pre-step (not a round) ---------------------------------------
+  // The conversation model cannot see (vision.canSee false) and the user's message
+  // carries image parts: ask the vision fallback ONCE, with NO tools, to describe
+  // each image for the user's request, and replace the image parts with that text.
+  // The whole agent loop below then runs on config.model. The description is echoed
+  // to the page (vision_caption) so it is persisted on the user message and later
+  // turns keep it (the page strips image parts for a text-only model).
+  // History: the page used to point the WHOLE turn at the fallback (2026-09-11:
+  // a 20-round agentic turn ran on Kimi, which looped on ask()).
+  if (!maxRounds && config.vision && !config.vision.canSee && config.vision.fallback && config.vision.fallback.model) {
+    const vUser = (() => { for (let i = messages.length - 1; i >= 0; i--) { const m = messages[i]; if (m && m.role === 'user') return m; } return null; })();
+    const parts = vUser && Array.isArray(vUser.content) ? vUser.content : null;
+    if (parts && parts.some(p => p && p.type === 'image_url')) {
+      const askText = parts.filter(p => p && p.type === 'text').map(p => p.text).join('\n').trim();
+      const fbModel = config.vision.fallback.model;
+      const captions = [];
+      for (const p of parts) {
+        if (!(p && p.type === 'image_url' && p.image_url && p.image_url.url)) continue;
+        if (ctx.signal && ctx.signal.aborted) break;
+        const c = await _describeUserImage(p.image_url.url, ctx, askText);
+        captions.push(c);
+      }
+      if (captions.length) {
+        let ci = 0;
+        vUser.content = parts.map(p => (p && p.type === 'image_url')
+          ? { type: 'text', text: '[Attached image ' + (++ci) + ', described by the vision model ' + fbModel + ' (you cannot see images):\n' + captions[ci - 1] + ']' }
+          : p);
+        ctx.emit({ type: 'vision_caption', model: fbModel, captions });
+      }
+    }
+  }
+
   while (true) {
     if (ctx.signal && ctx.signal.aborted) break;
     if (maxRounds && _roundNo >= maxRounds) {
@@ -5544,21 +5615,10 @@ async function runAgent(config, ctx) {
     // OpenRouter upstream routing ({ order: [...], allow_fallbacks }): prefer these
     // providers in order, e.g. ['deepseek'] to hit DeepSeek's own endpoint first.
     if (config.providerRouting) reqBody.provider = config.providerRouting;
-    // Vision round. When the user's message carries an image the conversation model
-    // cannot see, the page ships the fallback as config.visionRoute. ONLY the round
-    // whose newest user message still carries image parts goes there; once it
-    // completes the image is collapsed to a note (below), so the next round returns
-    // to config.model. Previously the page pointed url/headers/model of the WHOLE
-    // turn at the fallback and every round ran there.
-    const _routeUser = (() => { for (let i = messages.length - 1; i >= 0; i--) { const m = messages[i]; if (m && m.role === 'user') return m; } return null; })();
-    const _routeHasImage = !!(_routeUser && Array.isArray(_routeUser.content) && _routeUser.content.some(p => p && p.type === 'image_url'));
-    const route = (config.visionRoute && config.visionRoute.url && config.visionRoute.model && _routeHasImage) ? config.visionRoute : config;
-    if (route !== config) reqBody.model = route.model;
-    ctx._authRefreshUrl = (route.authRefreshUrl !== undefined ? route.authRefreshUrl : config.authRefreshUrl) || null;
     let round;
     const _cWaitStart = _profNow();
     try {
-      round = await streamOneRoundWithRetry(route.url, route.headers, reqBody, ctx);
+      round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
       _prof.completionMs += _profNow() - _cWaitStart; _prof.completionCalls++;
     } catch (e) {
       _prof.completionMs += _profNow() - _cWaitStart;   // the failed wait still cost wall time
@@ -5576,7 +5636,7 @@ async function runAgent(config, ctx) {
           _prof.compactionMs += _profNow() - _cmpStart;
           // Rebuild reqBody with compacted messages and retry
           const compactedReqBody = {
-            model: route.model,
+            model: config.model,
             messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
@@ -5589,7 +5649,7 @@ async function runAgent(config, ctx) {
           if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
           if (config.providerRouting) compactedReqBody.provider = config.providerRouting;
           const _cWaitStart2 = _profNow();
-          round = await streamOneRoundWithRetry(route.url, route.headers, compactedReqBody, ctx);
+          round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
           _prof.completionMs += _profNow() - _cWaitStart2; _prof.completionCalls++;
         } catch (compactErr) {
           if (compactErr && compactErr.compactionFailed) {
@@ -5601,16 +5661,6 @@ async function runAgent(config, ctx) {
       } else {
         throw e;
       }
-    }
-    // The vision round is done: collapse the image parts of the message that
-    // triggered it into a text note, so every later round of this turn goes back to
-    // the conversation's own model without image parts (a vision:no model 400s on
-    // them). The fallback's reply above carries what it saw; load_image on the file
-    // re-examines it through the caption path.
-    if (route !== config && _routeUser && Array.isArray(_routeUser.content)) {
-      _routeUser.content = _routeUser.content.map(p => (p && p.type === 'image_url')
-        ? { type: 'text', text: '[image attached — examined by the vision model ' + route.model + ' in the previous step; its reply above reflects what it saw. Call load_image on the file to look again.]' }
-        : p);
     }
     // respond() is the user-facing-reply whitelist: whatever it carries in "text"
     // IS the visible reply, and it ends the turn. Pre-scan the round so the reply
