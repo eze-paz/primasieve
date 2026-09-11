@@ -91,7 +91,6 @@
     color: var(--sp-text);
     font: inherit;
     align-self: stretch;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
   }
   aside button { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-text); cursor: pointer; }
   aside button:hover { background: #79b8ff; }
