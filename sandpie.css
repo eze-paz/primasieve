@@ -1111,12 +1111,22 @@ ul.conv-list li.active {
   aside.collapsed .navbar {
     display: none;
   }
-  .sidebar-expand-btn {
+  /* Collapsed state: the expand button lives in its own thin fixed rail column
+     (40px) instead of floating over the messages area. */
+  .sidebar-rail {
     display: none;
     position: fixed;
-    top: 0.75rem;
-    left: 0.75rem;
+    top: 0; bottom: 0; left: 0;
+    width: 40px;
     z-index: 50;
+    background: var(--sp-surface);
+    border-right: 1px solid var(--sp-border);
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 0.75rem;
+  }
+  .sidebar-expand-btn {
+    display: none;
     width: 32px;
     height: 32px;
     background: var(--sp-panel);
@@ -1128,19 +1138,21 @@ ul.conv-list li.active {
     cursor: pointer;
     font-size: 0.9rem;
     padding: 0;
-    box-shadow: 0 0 18px 2px var(--sp-accent-dim), 0 0 36px 4px var(--sp-accent-dim), 0 2px 6px rgba(0,0,0,0.5);
   }
   .sidebar-expand-btn:hover {
     background: var(--sp-surface);
     color: var(--sp-accent);
     box-shadow: 0 0 24px 4px var(--sp-accent-dim), 0 0 48px 6px var(--sp-accent-dim), 0 4px 8px rgba(0,0,0,0.6);
   }
+  body.sidebar-collapsed .sidebar-rail {
+    display: flex;
+  }
   body.sidebar-collapsed .sidebar-expand-btn {
     display: flex;
     border: 1px solid var(--sp-accent);
   }
   body.sidebar-collapsed main {
-    margin-left: 0;
+    margin-left: 40px;   /* clear the rail column */
   }
 
   /* Sidebar identity row = settings button (card-lift hover + always-visible chevron) */
