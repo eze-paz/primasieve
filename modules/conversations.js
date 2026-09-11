@@ -1328,7 +1328,7 @@ function rebuildSettledTimer(target, s) {
   parts.push(`<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>`);   // was dropped with the report-button cleanup: the ring vanished on done/idle
   if (s.todos && s.todos.length) {
     const cur = s.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card; an active task is not "done"
-    parts.push(`<span class="mt-todos">${cur}/${s.todos.length}</span>`);
+    parts.push(`<span class="mt-sep">·</span><span class="mt-todos">${cur}/${s.todos.length}</span>`);
   }
   // Fill the persistent per-pane slot (never create a timer element).
   slot.classList.add('done');
@@ -7761,7 +7761,7 @@ function endTotalTimer(stream, label) {
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
   if (stream.todos && stream.todos.length) {
     const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
-    parts.push(`<span class="mt-todos">${cur}/${stream.todos.length}</span>`);
+    parts.push(`<span class="mt-sep">·</span><span class="mt-todos">${cur}/${stream.todos.length}</span>`);
   }
   slot.innerHTML = parts.join('');
   slot.classList.add('done');

@@ -699,15 +699,8 @@
   .msg-timer.done .mt-ctx { color: inherit; }   /* ctx was left out: it kept --sp-text-dim while siblings dimmed to the settled grey */
 
   .msg-timer .mt-todos {
-    margin-left: 1rem;
-    padding: 0.05rem 0.35rem;
-    border-radius: 8px;
-    background: var(--sp-accent);
-    color: var(--sp-bg);
-    font-size: 0.65rem;
-    font-weight: 600;
+    color: var(--sp-text-dim);   /* matches mt-tok / mt-rate / mt-ctx */
     cursor: pointer;
-    line-height: 1;
   }
 
   /* ---- neural-net thinking toggle icon ---- */
