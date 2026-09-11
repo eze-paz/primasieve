@@ -1261,11 +1261,13 @@ function renderFileBundle(target, bundleFiles) {
 // timer is already mounted.
 // The thoughts-toggle button — shared by the live line, the settled line, and the
 // placeholder so every timer state carries the same leading icon.
-function _timerNnBtn() {
+function _timerNnBtn(svg) {
   const nnCls = 'mt-nn' + (thoughtsVisible ? ' on' : '');
   const nnTitle = thoughtsVisible ? 'Hide thoughts' : 'Show thoughts';
-  return `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${NN_SVG_INLINE}</button>`;
+  return `<button class="${nnCls}" title="${nnTitle}" onclick="toggleThoughts()">${svg || NN_SVG_INLINE}</button>`;
 }
+// Tick mark shown in place of the ripple icon once a turn settles (done/stopped).
+const TICK_SVG_INLINE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
 // Resting placeholder for a slot with no live/finished turn to show. Mirrors the
 // settled timer's shape (nn icon · idle · 0s · – ctx) and dims via .done, so an
 // idle conversation shows a real-looking bar — never a bare "· idle ·".
@@ -1275,7 +1277,6 @@ function _fillPlaceholderTimer(slot, convId) {
   slot.dataset.convId = convId == null ? '' : '' + convId;
   slot.innerHTML =
     _timerNnBtn() +
-    '<span class="mt-label">idle</span>' +
     '<span class="mt-sep">·</span><span class="mt-time">0s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
   _wireCtxCounter(slot, convId);
@@ -1320,8 +1321,7 @@ function rebuildSettledTimer(target, s) {
   // persisted inside lastTurn — restore it so the popup works after a reload.
   if (!s._turnProfile && s.lastTurn && s.lastTurn.profile) s._turnProfile = s.lastTurn.profile;
   const parts = [
-    _timerNnBtn(),
-    `<span class="mt-label">${label}</span>`,
+    _timerNnBtn(TICK_SVG_INLINE),   // settled: tick mark replaces the ripple icon (still toggles thoughts)
     `<span class="mt-sep">·</span><span class="mt-time">${sec == null ? '–' : fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
@@ -7754,8 +7754,7 @@ function endTotalTimer(stream, label) {
   // computed above (decode-only when available, else completion/wall fallback).
 
   const parts = [
-    _timerNnBtn(),
-    `<span class="mt-label">${label}</span>`,
+    _timerNnBtn(TICK_SVG_INLINE),   // settled: tick mark replaces the ripple icon (still toggles thoughts)
     `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
