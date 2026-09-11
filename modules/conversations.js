@@ -2511,6 +2511,31 @@ async function autoArchiveStale() {
   await refreshConversationList();
 }
 
+// ── "finished while you were looking elsewhere" ─────────────────────────────
+// A turn that ENDS while its conversation is neither the main pane's nor the
+// side pane's is work nobody has seen yet. Those ids collect here and surface as
+// a count on the sidebar toggle, which is the only sidebar affordance left once
+// the list is collapsed. Opening the conversation in either pane clears it.
+const _doneUnseen = new Set();
+function _convOnScreen(id) {
+  if (!id) return false;
+  if (id === activeConvId) return true;
+  return !!(sidePanel && sidePanel.isOpen && id === sidePanel.sideId);
+}
+// liveIds (when given) drops conversations that no longer exist, so a delete can
+// never strand a phantom in the count. The on-screen sweep makes this
+// self-correcting: anything now visible falls out here even if a hook was missed.
+function updateConvAlerts(liveIds) {
+  if (liveIds) for (const id of [..._doneUnseen]) if (!liveIds.has(id)) _doneUnseen.delete(id);
+  for (const id of [..._doneUnseen]) if (_convOnScreen(id)) _doneUnseen.delete(id);
+  const n = _doneUnseen.size;
+  for (const el of document.querySelectorAll('.sp-badge')) {
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.hidden = n === 0;
+    el.title = n === 1 ? '1 conversation finished' : n + ' conversations finished';
+  }
+}
+
 // ── Sidebar date grouping ───────────────────────────────────────────────────
 // Buckets are Today / Yesterday / This week / Last week / Older, walked
 // newest-first over an already date-sorted list, so one pass assigns them all.
@@ -2564,6 +2589,7 @@ async function refreshConversationList() {
   const ul = $('convList');
   if (!ul) return;
   let list = await listConversations();
+  updateConvAlerts(new Set(list.map(c => c.id)));   // before the search filter narrows it
 
   const searchInput = $('convSearch');
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
@@ -2750,6 +2776,12 @@ function setStreamSending(stream, sending) {
   } else {
     stream.abort = null;
     stream.generating = false;
+    // Ends off-screen (including an abort — the work stopped either way, and
+    // there is something to come back to) → it becomes a badge on the toggle.
+    try {
+      if (stream.id && !_convOnScreen(stream.id)) _doneUnseen.add(stream.id);
+      updateConvAlerts();
+    } catch (_) {}
     // Turn ended (normal or abort) → restore default anchoring so reading/loading
     // never jiggles.
     try { if (stream.host) stream.host.classList.remove('sp-streaming'); } catch (_) {}

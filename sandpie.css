@@ -1266,6 +1266,7 @@ ul.conv-list li.active {
   /* One button style for the whole rail, driven only by the rail tokens, so no
      per-theme .files-open-btn / .sidebar-collapse-btn rule can leak in. */
   .rail-btn {
+    position: relative;
     width: 32px; height: 32px;
     flex: none;
     padding: 0;
@@ -1304,6 +1305,31 @@ ul.conv-list li.active {
     transform: translateY(-1px);
   }
   .sb-avatar-svg { width: 20px; height: 20px; margin-left: 6px; }
+  /* ── Unseen-completion badge ───────────────────────────────────────────────
+     Rides the sidebar toggle. Hidden by default; JS sets [hidden] when the count
+     is zero, and the :not([hidden]) rules below opt it back in for exactly the
+     states where the list itself is not already on screen. */
+  .sp-badge {
+    display: none;
+    position: absolute; top: -3px; right: -3px;
+    min-width: 15px; height: 15px;
+    padding: 0 3px;
+    border-radius: 999px;
+    font: 600 9px/1 'JetBrains Mono', Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  /* Desktop: only while the list is collapsed — with it open you can read the
+     rows themselves. Colours come from the RAIL tokens, so the ball stays
+     legible on a rail that inverts to near-black in the light themes. */
+  body.sidebar-collapsed .sidebar-rail .sp-badge:not([hidden]) {
+    display: flex;
+    background: var(--sp-rail-ink-hot);
+    color: var(--sp-rail);
+    box-shadow: 0 0 0 2px var(--sp-rail);
+  }
+
   /* The old floating expand button is gone -- the rail's toggle replaces it. */
   .sidebar-expand-btn { display: none !important; }
 
@@ -1372,6 +1398,19 @@ ul.conv-list li.active {
     /* The mobile header already carries brand + new chat + files + toggle, so
        the rail would only duplicate it beside an off-screen drawer. */
     .sidebar-rail { display: none; }
+    /* No rail here, so the badge rides the header hamburger, and the drawer
+       being OPEN is the mobile equivalent of the desktop list being expanded —
+       body.sidebar-collapsed means nothing on this breakpoint. Neutral ink
+       rather than the accent: it sits on --sp-surface, where a pale accent (the
+       light theme's #85c4f0) would not hold its own against white. */
+    .mobile-header .sidebar-collapse-btn { position: relative; }
+    .mobile-header .sp-badge:not([hidden]) {
+      display: flex;
+      background: var(--sp-text);
+      color: var(--sp-bg);
+      box-shadow: 0 0 0 2px var(--sp-surface);
+    }
+    body.sidebar-open .mobile-header .sp-badge { display: none; }
     .sidebar-expand-btn { display: none !important; }
     .sidebar-resize-handle { display: none; }
     body.sidebar-open aside { left: 0; }

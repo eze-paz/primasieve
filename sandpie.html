@@ -18,7 +18,7 @@ if("serviceWorker"in navigator){
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=217">
+<link rel="stylesheet" href="sandpie.css?v=218">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -64,7 +64,7 @@ if("serviceWorker"in navigator){
   <script type="module" src="modules/mobile.js?v=1"></script>
   <script src="modules/augmentations.js?v=22"></script>
   <script src="modules/projects.js?v=5"></script>
-  <script type="module" src="modules/conversations.js?v=438"></script>
+  <script type="module" src="modules/conversations.js?v=439"></script>
 </head>
 <body>
 <!-- Device-switch splash: first paint so a sync-on-reload never janks the chat.
@@ -146,7 +146,7 @@ if("serviceWorker"in navigator){
     <button class="files-open-btn" onclick="SandpieSettings.open()" title="Settings">
       <span class="material-symbols-outlined">settings</span>
     </button>
-    <button class="sidebar-collapse-btn" onclick="isMobileViewport() ? toggleSidebar() : toggleSidebarCollapse()" title="Toggle sidebar"><span class="material-symbols-outlined">menu</span></button>
+    <button class="sidebar-collapse-btn" onclick="isMobileViewport() ? toggleSidebar() : toggleSidebarCollapse()" title="Toggle sidebar"><span class="material-symbols-outlined">menu</span><span class="sp-badge" hidden></span></button>
   </span>
 </header>
 <div class="backdrop" onclick="toggleSidebar()"></div>
@@ -154,6 +154,7 @@ if("serviceWorker"in navigator){
   <span class="rail-mark" aria-hidden="true">[s]</span>
   <button class="rail-btn" onclick="isMobileViewport() ? toggleSidebar() : toggleSidebarCollapse()" title="Toggle chat list">
     <span class="material-symbols-outlined">menu</span>
+    <span class="sp-badge" hidden></span>
   </button>
   <button class="rail-btn" id="railNewChatBtn" onclick="newConversation()" title="New chat">
     <span class="material-symbols-outlined">add_comment</span>
