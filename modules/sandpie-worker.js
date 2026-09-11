@@ -148,7 +148,7 @@ function _metacogReminder(s, cfg) {
 }
 // ═══ END METACOG ════════════════════════════════════════════════════════════
 
-const WORKER_VERSION = '2.26.0-abort-all';
+const WORKER_VERSION = '2.27.0-vision-round';
 console.log('[sandpie-worker] boot — version=' + WORKER_VERSION);
 
 // Page-visibility mirror. The worker can't read `document`, so the page forwards
@@ -5544,10 +5544,21 @@ async function runAgent(config, ctx) {
     // OpenRouter upstream routing ({ order: [...], allow_fallbacks }): prefer these
     // providers in order, e.g. ['deepseek'] to hit DeepSeek's own endpoint first.
     if (config.providerRouting) reqBody.provider = config.providerRouting;
+    // Vision round. When the user's message carries an image the conversation model
+    // cannot see, the page ships the fallback as config.visionRoute. ONLY the round
+    // whose newest user message still carries image parts goes there; once it
+    // completes the image is collapsed to a note (below), so the next round returns
+    // to config.model. Previously the page pointed url/headers/model of the WHOLE
+    // turn at the fallback and every round ran there.
+    const _routeUser = (() => { for (let i = messages.length - 1; i >= 0; i--) { const m = messages[i]; if (m && m.role === 'user') return m; } return null; })();
+    const _routeHasImage = !!(_routeUser && Array.isArray(_routeUser.content) && _routeUser.content.some(p => p && p.type === 'image_url'));
+    const route = (config.visionRoute && config.visionRoute.url && config.visionRoute.model && _routeHasImage) ? config.visionRoute : config;
+    if (route !== config) reqBody.model = route.model;
+    ctx._authRefreshUrl = (route.authRefreshUrl !== undefined ? route.authRefreshUrl : config.authRefreshUrl) || null;
     let round;
     const _cWaitStart = _profNow();
     try {
-      round = await streamOneRoundWithRetry(config.url, config.headers, reqBody, ctx);
+      round = await streamOneRoundWithRetry(route.url, route.headers, reqBody, ctx);
       _prof.completionMs += _profNow() - _cWaitStart; _prof.completionCalls++;
     } catch (e) {
       _prof.completionMs += _profNow() - _cWaitStart;   // the failed wait still cost wall time
@@ -5565,7 +5576,7 @@ async function runAgent(config, ctx) {
           _prof.compactionMs += _profNow() - _cmpStart;
           // Rebuild reqBody with compacted messages and retry
           const compactedReqBody = {
-            model: config.model,
+            model: route.model,
             messages: fixToolPairing([config.systemPrompt, ...messages, volatileMsg, reminderMsg].filter(Boolean)),
             stream: true,
             stream_options: { include_usage: true },
@@ -5578,7 +5589,7 @@ async function runAgent(config, ctx) {
           if (config.reasoningEffort) compactedReqBody.reasoning_effort = config.reasoningEffort;
           if (config.providerRouting) compactedReqBody.provider = config.providerRouting;
           const _cWaitStart2 = _profNow();
-          round = await streamOneRoundWithRetry(config.url, config.headers, compactedReqBody, ctx);
+          round = await streamOneRoundWithRetry(route.url, route.headers, compactedReqBody, ctx);
           _prof.completionMs += _profNow() - _cWaitStart2; _prof.completionCalls++;
         } catch (compactErr) {
           if (compactErr && compactErr.compactionFailed) {
@@ -5590,6 +5601,16 @@ async function runAgent(config, ctx) {
       } else {
         throw e;
       }
+    }
+    // The vision round is done: collapse the image parts of the message that
+    // triggered it into a text note, so every later round of this turn goes back to
+    // the conversation's own model without image parts (a vision:no model 400s on
+    // them). The fallback's reply above carries what it saw; load_image on the file
+    // re-examines it through the caption path.
+    if (route !== config && _routeUser && Array.isArray(_routeUser.content)) {
+      _routeUser.content = _routeUser.content.map(p => (p && p.type === 'image_url')
+        ? { type: 'text', text: '[image attached — examined by the vision model ' + route.model + ' in the previous step; its reply above reflects what it saw. Call load_image on the file to look again.]' }
+        : p);
     }
     // respond() is the user-facing-reply whitelist: whatever it carries in "text"
     // IS the visible reply, and it ends the turn. Pre-scan the round so the reply
@@ -5683,7 +5704,9 @@ async function runAgent(config, ctx) {
     }
     ctx.emit({ type: 'round_end', content: round.content, tool_calls: round.tool_calls, locale: respondLocaleOverride || undefined });
     if (round.content) ctx._finalText = round.content;   // last non-empty assistant text = the subagent's returned result
-    if (round.usage) ctx.emit({ type: 'usage', usage: round.usage });
+    // model: the one that actually served this round (the vision round runs on the
+    // fallback) so the page's usage rows attribute tokens to the real model.
+    if (round.usage) ctx.emit({ type: 'usage', usage: round.usage, model: reqBody.model });
     // Per-round live rate: exact completion_tokens over this round's decode span
     // (first token -> stream end). The page paints it into the live msg-timer so
     // tok/s updates at every ROUND boundary, not only when the whole turn ends.

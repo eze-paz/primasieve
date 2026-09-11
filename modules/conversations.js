@@ -3043,7 +3043,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=225');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=226');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -3441,7 +3441,7 @@ async function sendSingle(text, stream, opts = {}) {
   if (config.routedViaVision && userBubbleEl) {
     const mk = document.createElement('span');
     mk.style.cssText = 'display:block;font-size:0.7rem;color:var(--sp-text-dim);margin-top:0.25rem;';
-    mk.textContent = '📷 → ' + ((config.model || 'vision model'));
+    mk.textContent = '📷 first round → ' + ((config.visionRoute && config.visionRoute.model) || 'vision model');
     userBubbleEl.appendChild(mk);
   }
   // Context limits are guarded three ways: maybeAutoCompact above (reported
@@ -3497,7 +3497,7 @@ async function sendSingle(text, stream, opts = {}) {
     if (ev.type === 'usage') {
       stream.lastUsage = ev.usage;   // authoritative counts → settled tok/s + ctx counter
       Sandpie.events.emit('tokens:record', {convId, usage: ev.usage});
-      reportTurnUsage(convId, ev.usage, convMessages.length);
+      reportTurnUsage(convId, ev.usage, convMessages.length, ev.model);
       // Round boundary: recordUsage just wrote the fresh reported size, so repaint
       // the live ctx counter now instead of waiting for the whole turn to end.
       if (stream.timerEl) _paintCtxCounter(stream.timerEl, convId);
@@ -3779,12 +3779,20 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     && lastUser.content.some(p => p.type === 'image_url'));
   const visionFallback = (!canSee && typeof SandpieProviders.resolveVisionFallback === 'function')
     ? SandpieProviders.resolveVisionFallback(active) : null;
-  let effective = active;
-  let routedViaVision = false;
-  if (!canSee && currentHasImages && visionFallback) {
-    effective = visionFallback;
-    routedViaVision = true;
-  }
+  // The conversation's OWN model stays the turn's provider. The fallback is
+  // shipped separately as a per-ROUND route (config.visionRoute): the worker sends
+  // only the round whose newest user message still carries image parts to it, then
+  // collapses the image to a note and hands the turn back to this model. Routing
+  // the whole turn here was the bug: one pasted screenshot moved every round of a
+  // 20-round agentic turn to the fallback model (aezequiel, 2026-09-11).
+  const effective = active;
+  const routedViaVision = !!(!canSee && currentHasImages && visionFallback);
+  const visionRoute = routedViaVision ? {
+    url: new URL(api(String(visionFallback.endpoint || '').replace(/\/$/, '') + '/chat/completions', visionFallback.proxyUrl), location.href).href,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (visionFallback.apiKey || '') },
+    model: visionFallback.model || '',
+    authRefreshUrl: visionFallback.managed ? new URL('/auth/token', location.href).href : null,
+  } : null;
   const stripImages = !canSee && !currentHasImages;   // never silently drop a fresh attachment
   const resolvedMessages = [];
   for (const msg of sendMessages) {
@@ -3887,10 +3895,12 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // open-todos stop guard. window.__todoV2 = 1 (console) restores the
     // guarded v2 tool for comparison/rollback.
     todoMode: _todoV2() ? '' : 'claude',
-    // Rerouted to the vision fallback for this turn (user attached an image to a
-    // text-only model). The composer marks the user bubble; the worker just uses
-    // this config as-is (url/headers/model already point at the fallback).
+    // The user attached an image to a text-only model: visionRoute carries the
+    // fallback's request coordinates and the worker sends ONLY the image-bearing
+    // round there (see runAgent). url/headers/model above stay the conversation's
+    // own model. routedViaVision marks the user bubble.
     routedViaVision: !!routedViaVision,
+    visionRoute,
     // Python backend for run_python. Default (unset/anything else) = Pyodide.
     // localStorage 'sandpie-python-backend' = 'walios' routes run_python at the
     // WARM walios interpreter instead: native-wasm numpy/pandas/matplotlib with
@@ -4039,7 +4049,7 @@ function reportDegeneration(ev) {
   } catch (_) { /* analytics must never break the chat */ }
 }
 
-function reportTurnUsage(convId, usage, turnIndex) {
+function reportTurnUsage(convId, usage, turnIndex, routedModel) {
   try {
     if (!convId || !usage || typeof usage.prompt_tokens !== 'number') return;
     const active = (typeof SandpieProviders !== 'undefined' && SandpieProviders.resolve) ? SandpieProviders.resolve(convId) : null;
@@ -4049,7 +4059,9 @@ function reportTurnUsage(convId, usage, turnIndex) {
     const body = {
       conversation_id: convId,
       turn_index: turnIndex | 0,
-      model: (active && active.model) || usage.model || null,
+      // The model that actually served the round (worker reports it per round —
+      // a vision-routed round runs on the fallback, not the picker model).
+      model: routedModel || (active && active.model) || usage.model || null,
       provider_type: active ? (active.managed ? 'managed' : (active.type || 'personal')) : null,
       usage: {
         prompt_tokens: usage.prompt_tokens || 0,
