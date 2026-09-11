@@ -1153,6 +1153,11 @@ ul.conv-list li.active {
   .mobile-header { display: none; }
   .backdrop { display: none; }
 
+  /* The chat list is the panel's only body content now that the identity footer
+     is gone, so it takes the whole remaining column height instead of stopping
+     at the height of its rows. */
+  #convSection { flex: 1 1 auto; min-height: 0; }
+
   /* Panel head -- the brand and the icon buttons moved to the rail, so this row
      is now just a label for what the panel holds. */
   .sidebar-header {
@@ -1302,35 +1307,6 @@ ul.conv-list li.active {
   /* The old floating expand button is gone -- the rail's toggle replaces it. */
   .sidebar-expand-btn { display: none !important; }
 
-  /* Sidebar identity row = settings button (card-lift hover + always-visible chevron) */
-  .sidebar-id-btn {
-    display: flex; align-items: center; gap: 0.55rem;
-    padding: 0.55rem 0.5rem 0 0.25rem;
-    margin-right: 1rem;
-    border-top: 1px solid var(--sp-border);
-    border-radius: 0;
-    cursor: pointer; user-select: none;
-    border: 1px solid transparent;
-    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  /* The avatar moved to the rail; the panel keeps a quiet text footer. */
-  .sidebar-id-btn .sb-avatar { display: none; }
-  .sidebar-id-btn .sb-meta {
-    display: flex; flex-direction: column; min-width: 0; flex: 1;
-    text-align: left; align-items: flex-start;
-  }
-  .sidebar-id-btn .sb-email {
-    font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    max-width: 100%; color: var(--sp-text-dim); transition: color 0.15s ease;
-  }
-  .sidebar-id-btn .sb-role { font-size: 0.68rem; color: var(--sp-text-dim); }
-  .sidebar-id-btn:hover {
-    background: var(--sp-panel);
-    transform: translateY(-1px);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-  }
-  .sidebar-id-btn:hover .sb-email { color: var(--sp-accent); }
-  .sidebar-id-btn:active { transform: translateY(0); box-shadow: none; }
 
 
 
