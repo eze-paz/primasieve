@@ -7640,10 +7640,10 @@ function _streamViewed(s) { return !!(s && s.host && s.host.isConnected); }
 // Live-line markup, rebuilt into the slot whenever this conversation owns it.
 const _LIVE_TIMER_HTML = () =>
   _timerNnBtn() +
-  '<span class="mt-time">0s</span>' +
+  '<span class="mt-sep">·</span><span class="mt-time">0s</span>' +
   '<span class="mt-sep mt-rate-sep" hidden>·</span><span class="mt-rate" hidden></span>' +
   '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
-  '<span class="mt-todos"></span>';
+  '<span class="mt-sep mt-todos-sep" hidden>·</span><span class="mt-todos"></span>';
 
 function startTotalTimer(stream) {
   if (!stream || stream.timerEl) return;
@@ -7692,6 +7692,8 @@ function startTotalTimer(stream) {
     const todosEl = slot.querySelector('.mt-todos');
     if (todosEl) {
       const t = stream.todos;
+      const tsep = slot.querySelector('.mt-todos-sep');
+      if (tsep) tsep.hidden = !t || !t.length;
       if (!t || !t.length) { set(todosEl, ''); }
       else {
         const cur = t.filter(x => x && x.status === 'completed').length;   // completed only — match the checklist card
