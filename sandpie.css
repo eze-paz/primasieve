@@ -676,7 +676,7 @@
   form > button:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Upward fade above the timer slot — mirror of .pane-titlebar::after */
-  .msg-timer-slot { position: relative; }
+  .msg-timer-slot { position: relative; padding-bottom: 0.25rem; }
   .msg-timer-slot::after {
     content: '';
     position: absolute;

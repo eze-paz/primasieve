@@ -1324,7 +1324,7 @@ function rebuildSettledTimer(target, s) {
     _timerNnBtn(TICK_SVG_INLINE),   // settled: tick mark replaces the ripple icon (still toggles thoughts)
     `<span class="mt-sep">·</span><span class="mt-time">${sec == null ? '–' : fmtElapsed(sec, true)}</span>`,
   ];
-  if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+  parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate > 0 ? rate : 0)}</span>`);   // ALWAYS present: 0 tok/s when unknown
   parts.push(`<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>`);   // was dropped with the report-button cleanup: the ring vanished on done/idle
   if (s.todos && s.todos.length) {
     const cur = s.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card; an active task is not "done"
@@ -7596,11 +7596,14 @@ function _paintRate(el, rate, convId) {
   const sep = el && el.querySelector('.mt-rate-sep');
   const c = el && el.querySelector('.mt-rate');
   if (!c) return;
-  const show = !!(rate && rate > 0);
-  if (sep) sep.hidden = !show;
-  c.hidden = !show;
-  if (show) {
-    c.textContent = RATE_FMT(rate);
+  // ALWAYS visible: an unknown/zero rate renders as "0 tok/s" instead of hiding
+  // the readout (the slot must keep a stable width and the indicator must never
+  // pop in/out).
+  const show = true;
+  if (sep) sep.hidden = false;
+  c.hidden = false;
+  {
+    c.textContent = RATE_FMT(rate && rate > 0 ? rate : 0);
     if (convId != null && !c._rateWired) {
       c._rateWired = true;
       c.style.cursor = 'pointer';
@@ -7653,7 +7656,7 @@ function _streamViewed(s) { return !!(s && s.host && s.host.isConnected); }
 const _LIVE_TIMER_HTML = () =>
   _timerNnBtn() +
   '<span class="mt-sep">·</span><span class="mt-time">0s</span>' +
-  '<span class="mt-sep mt-rate-sep" hidden>·</span><span class="mt-rate" hidden></span>' +
+  '<span class="mt-sep mt-rate-sep">·</span><span class="mt-rate">0 tok/s</span>' +
   '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>' +
   '<span class="mt-sep mt-todos-sep" hidden>·</span><span class="mt-todos"></span>';
 
@@ -7771,7 +7774,7 @@ function endTotalTimer(stream, label) {
     _timerNnBtn(TICK_SVG_INLINE),   // settled: tick mark replaces the ripple icon (still toggles thoughts)
     `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
   ];
-  if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+  parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate > 0 ? rate : 0)}</span>`);   // ALWAYS present: 0 tok/s when unknown
   parts.push(`<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>`);   // ALWAYS present: the ring must never vanish on settle (matches rebuildSettledTimer)
   if (stream.todos && stream.todos.length) {
     const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
