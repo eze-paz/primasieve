@@ -1,5 +1,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
+    /* Max width of the chat column (messages + composer). Per-device preference,
+       set by the Appearance panel via localStorage; 100% = fill the pane. The cap
+       is applied as horizontal PADDING on the scroll container so the scrollbar
+       stays on the pane's right edge instead of hugging the narrowed content. */
+    --sp-chat-max-w: 100%;
     --sp-bg: #0d1117;
     --sp-surface: #161b22;
     --sp-border: #30363d;
@@ -477,7 +482,12 @@
   /* Composer pinned to the bottom of its pane (main + side). Sticky so it stays
      visible while messages scroll; the artifact-mode rule hides the side one so
      an open artifact gets the full pane height. */
-  form.composer { position: sticky; bottom: 0; z-index: 1; background: var(--sp-bg); }
+  form.composer {
+    position: sticky; bottom: 0; z-index: 1; background: var(--sp-bg);
+    /* Same cap as .conv-host so the input box lines up under the messages while
+       the form's background/border still span the full pane. */
+    padding-inline: max(1.5rem, calc((100% - var(--sp-chat-max-w)) / 2));
+  }
   #messagesSide form.composer { }
   .input-wrap {
     display: flex;
@@ -1042,6 +1052,7 @@ ul.conv-list li.active {
        KaTeX). Measured: overflow-anchor:auto = 0px drift vs 150px with manual
        compensation. */
     overflow-y: auto; padding: 1.5rem; scrollbar-gutter: stable; overflow-anchor: auto;
+    padding-inline: max(1.5rem, calc((100% - var(--sp-chat-max-w)) / 2));
   }
   /* Only during active streaming do we hand scroll control back to the app's
      manual token-by-token scroll-to-bottom — auto anchoring would fight it. */
@@ -1294,6 +1305,7 @@ ul.conv-list li.active {
        (0.25rem inset). Mobile form padding drops to 1rem, so match the same inset:
        1.25rem keeps the timer's visual offset from the composer identical. */
     .msg-timer { padding-left: 1.25rem; }
+    .conv-host, form.composer { padding-inline: 1rem; }   /* chat width cap is desktop-only */
     .msg { max-width: 95%; }
 
     /* Settings modal — the desktop two-column (150px nav | panels) layout leaves

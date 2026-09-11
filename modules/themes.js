@@ -347,7 +347,42 @@ function computeAccentNeg() {
 
 
 
+/* ─── Chat column width ──────────────────────────────────────────────────────
+   Deliberately NOT routed through SandpieConfig: a phone, a laptop and a 4K
+   monitor want different widths, so this stays a per-device localStorage pref.
+   0 / missing = fill the pane (the historical behaviour). */
+var _CHAT_WIDTH_KEY = 'sandpie-chat-max-w';
+var _CHAT_WIDTHS = [
+  { px: 720,  label: 'Narrow', title: 'Narrow — 720px' },
+  { px: 900,  label: 'Medium', title: 'Medium — 900px' },
+  { px: 1100, label: 'Wide',   title: 'Wide — 1100px' },
+  { px: 0,    label: 'Full',   title: 'Fill the pane' },
+];
+function getChatWidth() {
+  try { var v = parseInt(localStorage.getItem(_CHAT_WIDTH_KEY), 10); return v > 0 ? v : 0; } catch (e) { return 0; }
+}
+function applyChatWidth() {
+  var w = getChatWidth();
+  document.documentElement.style.setProperty('--sp-chat-max-w', w ? w + 'px' : '100%');
+  document.querySelectorAll('.chat-width-btn[data-w]').forEach(function (b) {
+    b.classList.toggle('active', parseInt(b.dataset.w, 10) === w);
+  });
+}
+function setChatWidth(px) {
+  px = parseInt(px, 10) || 0;
+  try { px ? localStorage.setItem(_CHAT_WIDTH_KEY, String(px)) : localStorage.removeItem(_CHAT_WIDTH_KEY); } catch (e) {}
+  applyChatWidth();
+}
+window.setChatWidth = setChatWidth;
+
 /* ─── Settings UI: Appearance lives in the gear modal (SandpieSettings). ─── */
+var _CHAT_WIDTH_HTML = '<div style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">' +
+  '<div style="font-size:0.72rem;color:var(--sp-text-dim);margin-bottom:0.35rem;">Chat width <span style="opacity:0.7">(this device only)</span></div>' +
+  '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' +
+  _CHAT_WIDTHS.map(function (o) {
+    return '<button class="ghost chat-width-btn" data-w="' + o.px + '" onclick="setChatWidth(' + o.px + ')" title="' + o.title + '">' + o.label + '</button>';
+  }).join('') +
+  '</div></div>';
 var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
       <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
@@ -363,8 +398,9 @@ var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
         <button class="ghost" onclick="saveThemeColors()" style="font-size:0.72rem;">Save colors</button>
       </div>
     </div>
-    <div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look.</div>`;
+    <div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look.</div>` + _CHAT_WIDTH_HTML;
 function _setupAppearancePanel() {
+  applyChatWidth();   // highlight the active width button
   var saved = getThemeName() || 'classic-dark';
   if (_themePalettes[saved]) {
     updateThemeButtons();
@@ -392,6 +428,7 @@ function _refreshAppearancePanel() {
 }
 function _bootThemes() {
   applySavedCustom();            // apply the theme immediately from the local mirror
+  applyChatWidth();              // per-device chat column width (localStorage)
   injectAppearanceUI();          // register the gear panel (or sidebar fallback)
   var c = window.SandpieConfig;
   if (c) {
