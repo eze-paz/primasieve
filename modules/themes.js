@@ -12,12 +12,6 @@ const _themePalettes = {
     border: '#d0d7de', borderBright: '#b0b7be',
     success: '#1f883d', danger: '#cf222e', warn: '#9a6700'
   },
-  'cyberpunk': {
-    bg: '#050505', surface: '#0a0a0f', panel: '#11111a',
-    accent: '#00f0ff', text: '#e8f4f8', textDim: '#7a8a9a',
-    border: '#1a1a2e', borderBright: '#2d2d44',
-    success: '#00ff88', danger: '#ff3366', warn: '#ffaa00'
-  },
   'aurora': {
     bg: '#070b14', surface: 'rgba(15,23,42,0.6)', panel: 'rgba(30,41,59,0.5)',
     accent: '#38bdf8', text: '#f1f5f9', textDim: '#94a3b8',
@@ -106,7 +100,7 @@ function _importLegacyAppearance() {
 // must NEVER write back to SandpieConfig — that would re-fire the 'appearance'
 // subscriber and loop.
 function applyTheme(name) {
-  var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
+  var map = { 'midnight': 'classic-dark', 'light': 'classic-light', 'cyberpunk': 'electric' };
   name = map[name] || name;
   if (!_themePalettes[name]) name = 'electric';
   if (name === 'classic-dark') document.documentElement.removeAttribute('data-theme');
@@ -120,7 +114,7 @@ function applyTheme(name) {
 }
 // setTheme — user action: persist the choice, then apply it.
 function setTheme(name) {
-  var map = { 'midnight': 'classic-dark', 'light': 'classic-light' };
+  var map = { 'midnight': 'classic-dark', 'light': 'classic-light', 'cyberpunk': 'electric' };
   var resolved = map[name] || name;
   if (!_themePalettes[resolved]) resolved = 'electric';
   setThemeName(resolved);
@@ -382,7 +376,6 @@ var _CHAT_WIDTH_HTML = '<div style="margin-top:0.75rem;padding-top:0.5rem;border
 var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
       <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
-      <button class="ghost theme-btn" data-t="cyberpunk" onclick="setTheme('cyberpunk')" title="Neon cyberpunk">Cybr</button>
       <button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>
       <button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>
       <button class="ghost theme-btn" data-t="clear" onclick="setTheme('clear')" title="Clear minimal">Clear</button>
