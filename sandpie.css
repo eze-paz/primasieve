@@ -475,7 +475,7 @@
      visible while messages scroll; the artifact-mode rule hides the side one so
      an open artifact gets the full pane height. */
   form.composer { position: sticky; bottom: 0; z-index: 1; background: var(--sp-bg); }
-  #messagesSide form.composer { border-top: 1px solid var(--sp-border); }
+  #messagesSide form.composer { }
   .input-wrap {
     display: flex;
     flex-direction: column;
@@ -1113,10 +1113,28 @@ ul.conv-list li.active {
     z-index: 50;
     background: var(--sp-surface);
     border-right: 1px solid var(--sp-border);
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 0.75rem;
+    align-items: center;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.75rem 0;
   }
+  /* Identity avatar pinned to the rail's bottom (mirrors the sidebar's margin-top:auto row) */
+  .rail-id-btn {
+    margin-top: auto;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    cursor: pointer; user-select: none;
+    background: var(--sp-accent-dim);
+    color: var(--sp-text);
+    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .rail-id-btn:hover {
+    background: var(--sp-panel);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  }
+  .rail-id-btn .sb-avatar-svg { width: 20px; height: 20px; }
   .sidebar-expand-btn {
     display: none;
     width: 32px;

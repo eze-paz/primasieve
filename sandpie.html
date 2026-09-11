@@ -203,6 +203,13 @@ if("serviceWorker"in navigator){
 <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
 <div class="sidebar-rail" id="sidebarRail">
   <button class="sidebar-expand-btn" onclick="toggleSidebarCollapse()" title="Expand sidebar"><span class="material-symbols-outlined">menu</span></button>
+  <button class="files-open-btn" id="railNewChatBtn" onclick="newConversation()" title="New chat">
+    <span class="material-symbols-outlined">add_comment</span>
+  </button>
+  <button class="files-open-btn" onclick="SandpieFilesModal.open()" title="Files">
+    <span class="material-symbols-outlined">folder</span>
+  </button>
+  <div id="railIdentity" class="rail-id-btn" onclick="SandpieSettings.open()" title="Settings"></div>
 </div>
 <main>
 
