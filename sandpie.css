@@ -681,7 +681,7 @@
      the ctx popup). Warn >=75% amber, hot >=90% red. */
   .msg-timer .mt-ctx { display: inline-flex; align-items: center; vertical-align: middle; margin-bottom: 1px; }
   .msg-timer .mt-ctx svg { width: 12px; height: 12px; transform: rotate(-90deg); display: block; }
-  .msg-timer .mt-ctx .ctx-track { stroke: var(--sp-border); }
+  .msg-timer .mt-ctx .ctx-track { stroke: var(--sp-text-dim); opacity: 0.45; }   /* --sp-border is near-invisible on the clear theme (black on black) */
   .msg-timer .mt-ctx .ctx-fill {
     stroke: var(--sp-accent); stroke-linecap: round;
     transition: stroke-dashoffset 0.4s, stroke 0.3s;
