@@ -1278,6 +1278,7 @@ function _fillPlaceholderTimer(slot, convId) {
   slot.innerHTML =
     _timerNnBtn() +
     '<span class="mt-sep">·</span><span class="mt-time">0s</span>' +
+    '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
   _wireCtxCounter(slot, convId);
 }
