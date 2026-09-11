@@ -283,7 +283,6 @@
   #messages { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #messagesSide {
     flex: 1; display: flex; flex-direction: column; min-width: 0;
-    border-left: 1px solid var(--sp-border);
   }
 
   body:not(.side-open):not(.artifact-side-open):not(.viewer-side-open) #messagesSide { display: none; }
@@ -353,11 +352,11 @@
   .file-viewer.side .body { flex: 1; min-height: 0; }
 
   #sideResizer {
-    width: 5px; flex-shrink: 0; cursor: col-resize;
-    background: var(--sp-border); transition: background 0.15s; position: relative;
+    width: 1px; flex-shrink: 0; cursor: col-resize;
+    background: var(--sp-border); transition: background 0.15s, width 0.15s; position: relative;
   }
-  #sideResizer::after { content: ''; position: absolute; inset: 0 -3px; }
-  #sideResizer:hover, #sideResizer.dragging { background: var(--sp-accent); }
+  #sideResizer::after { content: ''; position: absolute; inset: 0 -3px; }   /* keeps the easy grab target */
+  #sideResizer:hover, #sideResizer.dragging { width: 3px; background: var(--sp-accent); }
   body:not(.side-open):not(.artifact-side-open):not(.viewer-side-open) #sideResizer { display: none; }
   .artifact-icon-btn {
     cursor: pointer; background: var(--sp-surface); border: 1px solid var(--sp-border);
