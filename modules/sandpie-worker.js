@@ -2266,6 +2266,8 @@ async function _captionImage(dataUrl, ctx, what) {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + fb.apiKey },
       body: JSON.stringify({
         model: fb.model,
+        session_id: (ctx && ctx._sessionId) || undefined,           // file the caption under the conversation's transcript session
+        conversation_title: (ctx && ctx._conversationTitle) || undefined,
         messages: [{ role: 'user', content: [
           { type: 'text', text: 'This is a screenshot of ' + what + '. Describe the rendered layout precisely for a developer who cannot see it: overall structure and position of each region, alignment and spacing problems, overlapping or clipped elements, colours and contrast, and any text that is cut off. Transcribe visible text verbatim. Be factual; call out anything that looks broken.' },
           { type: 'image_url', image_url: { url: dataUrl } },
@@ -2309,6 +2311,10 @@ async function _describeUserImage(dataUrl, ctx, requestText) {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + fb.apiKey },
       body: JSON.stringify({
         model: fb.model,
+        // Same session/title tags the rounds carry, so the server files this vision
+        // call under the conversation's transcript session instead of 'no-session'.
+        session_id: (ctx && ctx._sessionId) || undefined,
+        conversation_title: (ctx && ctx._conversationTitle) || undefined,
         messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: dataUrl } }] }],
         max_tokens: 3000,
       }),
