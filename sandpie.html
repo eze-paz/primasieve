@@ -135,6 +135,9 @@ if("serviceWorker"in navigator){
   }
 </script>
 <header class="mobile-header">
+  <button class="files-open-btn" onclick="SandpieSettings.open()" title="Settings">
+    <span class="material-symbols-outlined">settings</span>
+  </button>
   <span class="brand"><span class="bracket">[</span><span class="name">sandpie</span><span class="bracket">]</span></span>
   <span style="display:flex; align-items:center; gap:0.4rem; margin-left:auto;">
     <button class="files-open-btn" id="newChatBtn" onclick="newConversation()" title="New chat">
@@ -142,9 +145,6 @@ if("serviceWorker"in navigator){
     </button>
     <button class="files-open-btn" onclick="SandpieFilesModal.open()" title="Files">
       <span class="material-symbols-outlined">folder</span>
-    </button>
-    <button class="files-open-btn" onclick="SandpieSettings.open()" title="Settings">
-      <span class="material-symbols-outlined">settings</span>
     </button>
     <button class="sidebar-collapse-btn" onclick="isMobileViewport() ? toggleSidebar() : toggleSidebarCollapse()" title="Toggle sidebar"><span class="material-symbols-outlined">menu</span><span class="sp-badge" hidden></span></button>
   </span>
