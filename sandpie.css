@@ -1165,7 +1165,7 @@ ul.conv-list li.active {
     display: flex; align-items: center; justify-content: center;
     font-weight: 600; font-size: 0.82rem;
   }
-  .sidebar-id-btn .sb-avatar-svg { width: 22px; height: 22px; margin-left: 6px; }
+  .sidebar-id-btn .sb-avatar-svg { width: 20px; height: 20px; margin-left: 6px; }   /* matches the rail avatar (20px) */
   .sidebar-id-btn .sb-meta {
     display: flex; flex-direction: column; min-width: 0; flex: 1;
     text-align: left; align-items: flex-start;
