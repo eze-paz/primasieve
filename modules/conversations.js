@@ -7759,6 +7759,7 @@ function endTotalTimer(stream, label) {
     `<span class="mt-sep">·</span><span class="mt-time">${fmtElapsed(sec, true)}</span>`,
   ];
   if (rate > 0) parts.push(`<span class="mt-sep">·</span><span class="mt-rate">${RATE_FMT(rate)}</span>`);
+  parts.push(`<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>`);   // ALWAYS present: the ring must never vanish on settle (matches rebuildSettledTimer)
   if (stream.todos && stream.todos.length) {
     const cur = stream.todos.filter(t => t && t.status === 'completed').length;   // completed only — match the checklist card
     parts.push(`<span class="mt-sep">·</span><span class="mt-todos">${cur}/${stream.todos.length}</span>`);
