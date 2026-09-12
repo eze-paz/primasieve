@@ -369,15 +369,6 @@
     z-index: 1;
     user-select: none;
   }
-  .pane-titlebar::after {
-    content: '';
-    position: absolute;
-    top: 100%; left: 0; right: 0;
-    height: 5px;
-    z-index: 1;
-    pointer-events: none;
-    background: linear-gradient(to bottom, var(--sp-bg), transparent);
-  }
   .pt-title {
     flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -702,22 +693,12 @@
   }
   form > button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  /* Upward fade above the timer slot — mirror of .pane-titlebar::after */
   /* Timer slot must sit on the SAME background as the composer/form in every
      theme (never transparent). --slot-bg feeds both the slot fill and the
      upward fade so the seam is seamless. */
   .msg-timer-slot { --slot-bg: var(--sp-bg); position: relative; padding-bottom: 0.25rem; background: var(--slot-bg); }
   [data-theme="aurora"] .msg-timer-slot { --slot-bg: rgba(15,23,42,0.55); }   /* matches [data-theme=aurora] form */
   [data-theme="clear"] .msg-timer-slot { --slot-bg: var(--sp-surface); }      /* matches [data-theme=clear] form */
-  .msg-timer-slot::after {
-    content: '';
-    position: absolute;
-    bottom: 100%; left: 0; right: 0;
-    height: 5px;
-    z-index: 1;
-    pointer-events: none;
-    background: linear-gradient(to top, var(--slot-bg, var(--sp-surface)), transparent);
-  }
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
