@@ -347,8 +347,14 @@ function computeAccentNeg() {
    0 / missing = fill the pane (the historical behaviour). */
 var _CHAT_WIDTH_KEY = 'sandpie-chat-max-w';
 var _CHAT_W_MIN = 560, _CHAT_W_MAX = 1600, _CHAT_W_STEP = 20;   // slider range; at MAX = fill the pane
+var _CHAT_W_DEFAULT = 1240;   // used when the device has never set a width
+// Storage: missing key = default (1240); "0" = user explicitly chose Full; else px.
 function getChatWidth() {
-  try { var v = parseInt(localStorage.getItem(_CHAT_WIDTH_KEY), 10); return v > 0 ? v : 0; } catch (e) { return 0; }
+  try {
+    var raw = localStorage.getItem(_CHAT_WIDTH_KEY);
+    if (raw === null || raw === '') return _CHAT_W_DEFAULT;
+    var v = parseInt(raw, 10); return v > 0 ? v : 0;
+  } catch (e) { return _CHAT_W_DEFAULT; }
 }
 function _chatWidthLabel(w) { return w ? w + 'px' : 'Full'; }
 function applyChatWidth() {
@@ -360,7 +366,7 @@ function applyChatWidth() {
 function setChatWidth(px) {
   px = parseInt(px, 10) || 0;
   if (px >= _CHAT_W_MAX) px = 0;   // slider parked at the right end = no cap
-  try { px ? localStorage.setItem(_CHAT_WIDTH_KEY, String(px)) : localStorage.removeItem(_CHAT_WIDTH_KEY); } catch (e) {}
+  try { localStorage.setItem(_CHAT_WIDTH_KEY, String(px)); } catch (e) {}   // "0" is stored on purpose (explicit Full)
   applyChatWidth();
 }
 window.setChatWidth = setChatWidth;
