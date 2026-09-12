@@ -3403,6 +3403,10 @@ body.sp-decoding *::after {
 .files-modal .fm-nav button.fm-ic:hover { color: var(--sp-text); background: var(--sp-surface); }
 .files-modal .fm-nav input { flex: 1; background: var(--sp-panel); border: 1px solid var(--sp-border); border-radius: 4px; color: var(--sp-text); font: 0.8rem 'JetBrains Mono', Consolas, monospace; padding: 0.35rem 0.6rem; }
 .files-modal .fm-body { flex: 1; overflow: auto; padding: 0.5rem 0.9rem; }
+/* Apps launcher: same shell as Files, sized to its grid rather than the viewport. */
+.apps-modal .fm-panel { width: min(600px, 94vw); height: auto; max-height: min(640px, 88vh); }
+.apps-modal .fm-body { padding: 1.4rem 1.2rem 1.6rem; }
+.apps-modal .pinned-home { margin-bottom: 0; }
 .files-modal .fm-foot { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.9rem; border-top: 1px solid var(--sp-border); background: var(--sp-surface); font-size: 0.78rem; color: var(--sp-text-dim); }
 .files-modal .fm-foot .fm-sp { flex: 1; }
 .files-modal .fm-foot button { background: var(--sp-panel); border: 1px solid var(--sp-border); color: var(--sp-text); border-radius: 4px; padding: 0.3rem 0.7rem; font-size: 0.78rem; cursor: pointer; }

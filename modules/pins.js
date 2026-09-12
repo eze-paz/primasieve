@@ -133,6 +133,7 @@
       return btn;
     },
   };
+  Pins.refreshFromDisk = refreshFromDisk;   // launcher re-syncs pins.json on open
   window.SandpiePins = Pins;
 
   /* ─────────────── thumbnails ─────────────── */
@@ -269,8 +270,11 @@
   function renderHome() {
     for (const u of liveThumbUrls) { try { URL.revokeObjectURL(u); } catch (_) {} }
     liveThumbUrls = [];
-    // Home lists share one centered parent (#homeCenter holds pinnedHome; the shared/team list now lives in Settings → Sharing).
-    const host = document.getElementById('homeCenter') || document.getElementById('messages');
+    // The grid lives in the Apps launcher modal (rail "apps" button →
+    // SandpieAppsModal); #homeCenter is only the fallback if that module is
+    // missing, so a fresh chat's pane stays empty.
+    const host = (window.SandpieAppsModal && SandpieAppsModal.host && SandpieAppsModal.host())
+      || document.getElementById('homeCenter') || document.getElementById('messages');
     if (!host) return;
     let box = document.getElementById('pinnedHome');
     if (!box) {
