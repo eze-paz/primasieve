@@ -710,7 +710,7 @@
     height: 5px;
     z-index: 1;
     pointer-events: none;
-    background: linear-gradient(to top, var(--sp-bg), transparent);
+    background: linear-gradient(to top, var(--sp-surface), transparent);
   }
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
