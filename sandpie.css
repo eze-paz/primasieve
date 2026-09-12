@@ -2521,7 +2521,6 @@ ul.conv-list li.active {
 }
 [data-theme="electric"] .sidebar-collapse-btn:hover {
   background: var(--sp-accent); border-color: var(--sp-accent); color: var(--sp-bg);
-  transform: rotate(-90deg);
 }
 
 [data-theme="electric"] .files-open-btn {
