@@ -16,7 +16,11 @@
    drift to a crawl rather than removing the sky. */
 (function () {
   'use strict';
-  const CELL = 4;
+  // Cell size follows the pane width: 4px on desktop, 3 on tablets, 2 on phones —
+  // a 4px cell on a 390px-wide pane reads as blocks, not pixels. Cloud scale and drift
+  // are expressed in CSS px and converted to cells, so the picture keeps its
+  // size and slows down rather than shrinking and speeding up on a phone.
+  let cell = 4;
   const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + .5) / 16);
   const reduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -98,14 +102,18 @@
     const r = canvas.getBoundingClientRect();
     const W = Math.max(1, r.width | 0), H = Math.max(1, r.height | 0);
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-    gw = Math.ceil(W / CELL); gh = Math.ceil(H / CELL);
+    cell = W < 500 ? 2 : W < 900 ? 3 : 4;
+    gw = Math.ceil(W / cell); gh = Math.ceil(H / cell);
     off.width = gw; off.height = gh; img = octx.createImageData(gw, gh);
     ctx.imageSmoothingEnabled = false;
     dirty = true;
   }
   function paint() {
     if (!img || !pal) return;
-    const d = img.data, k1 = .035 / tune.size, k2 = .045 / tune.size, thr = tune.cover, sky = tune.mode === 'sky';
+    // Keep the clouds' size in CSS px constant across cell sizes (finer cells →
+    // more cells per cloud), slightly smaller on phones so a few whole shapes fit.
+    const narrow = gw * cell < 700, sf = (cell / 4) * (narrow ? 1.15 : 1);
+    const d = img.data, k1 = .035 / tune.size * sf, k2 = .045 / tune.size * sf, thr = tune.cover, sky = tune.mode === 'sky';
     for (let y = 0; y < gh; y++) {
       const band = 1 - Math.pow(y / gh, 2.2) * FALL;
       for (let x = 0; x < gw; x++) {
@@ -117,14 +125,18 @@
       }
     }
     octx.putImageData(img, 0, 0);
-    ctx.drawImage(off, 0, 0, gw * CELL, gh * CELL);
+    ctx.drawImage(off, 0, 0, gw * cell, gh * cell);
   }
   function frame() {
     raf = 0;
     if (!running) return;
     tick++;
-    const every = tune.tempo * (reduced() ? 4 : 1);
-    if (tick % every === 0) { drift += tune.speed; dirty = true; }
+    // Drift is set in CSS px per frame (desktop ≈ 0.08px/frame ≈ 5px/s) and
+    // converted to cells, so phones — finer cells, narrower pane — get the same
+    // or slower motion, never faster. Phones run at 40% of desktop speed.
+    const narrow = gw * cell < 700;
+    const every = (tune.tempo + (narrow ? 1 : 0)) * (reduced() ? 4 : 1);
+    if (tick % every === 0) { drift += (tune.speed * 4 / tune.tempo) * (narrow ? .4 : 1) * every / cell; dirty = true; }
     if (dirty && !document.hidden) { paint(); dirty = false; }
     raf = requestAnimationFrame(frame);
   }
