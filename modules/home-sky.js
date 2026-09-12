@@ -29,11 +29,11 @@
      bg→tint ramp the top step sits; light themes need far less because the eye
      is more sensitive on a bright ground. Unknown themes fall back by luminance. */
   const TUNE = {
-    'classic-dark': { mode: 'clouds', tint: 'dim',  reach: .62, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
-    'aurora':       { mode: 'clouds', tint: 'dim',  reach: .58, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
-    'electric':     { mode: 'clouds', tint: 'dim',  reach: .55, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
-    'classic-light':{ mode: 'sky',    tint: 'text', reach: .14, size: 1.15, cover: .51, tempo: 3, speed: .06 },
-    'clear':        { mode: 'sky',    tint: 'text', reach: .10, size: 1.2,  cover: .53, tempo: 4, speed: .05 },
+    'classic-dark': { mode: 'clouds', tint: 'dim',  reach: .50, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
+    'aurora':       { mode: 'clouds', tint: 'dim',  reach: .46, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
+    'electric':     { mode: 'clouds', tint: 'dim',  reach: .44, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
+    'classic-light':{ mode: 'sky',    tint: 'text', reach: .17, size: 1.15, cover: .51, tempo: 3, speed: .06 },
+    'clear':        { mode: 'sky',    tint: 'text', reach: .12, size: 1.2,  cover: .53, tempo: 4, speed: .05 },
   };
   const FALLBACK_DARK  = TUNE['classic-dark'];
   const FALLBACK_LIGHT = TUNE['classic-light'];
