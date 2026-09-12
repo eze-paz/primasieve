@@ -514,7 +514,7 @@
      visible while messages scroll; the artifact-mode rule hides the side one so
      an open artifact gets the full pane height. */
   form.composer {
-    position: sticky; bottom: 0; z-index: 1; background: var(--sp-bg);
+    position: sticky; bottom: 0; z-index: 1;
     /* Same cap as .conv-host so the input box lines up under the messages while
        the form's background/border still span the full pane. */
     padding-inline: max(1.5rem, calc((100% - var(--sp-chat-max-w)) / 2));
@@ -696,7 +696,7 @@
   /* Timer slot must sit on the SAME background as the composer/form in every
      theme (never transparent). --slot-bg feeds both the slot fill and the
      upward fade so the seam is seamless. */
-  .msg-timer-slot { --slot-bg: var(--sp-bg); position: relative; padding-bottom: 0.25rem; background: var(--slot-bg); }
+  .msg-timer-slot { position: relative; padding-bottom: 0.25rem; background: var(--slot-bg); }
   [data-theme="aurora"] .msg-timer-slot { --slot-bg: rgba(15,23,42,0.55); }   /* matches [data-theme=aurora] form */
   [data-theme="clear"] .msg-timer-slot { --slot-bg: var(--sp-surface); }      /* matches [data-theme=clear] form */
   .msg-timer {
