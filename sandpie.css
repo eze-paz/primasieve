@@ -2709,9 +2709,6 @@ ul.conv-list li.active {
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
   color: var(--sp-text-dim);
 }
-[data-theme="electric"] form {
-  background: var(--sp-surface);
-}
 [data-theme="electric"] .input-wrap {
   background: var(--sp-bg);
   border: 2px solid var(--sp-border);
