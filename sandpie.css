@@ -697,8 +697,7 @@
      theme (never transparent). --slot-bg feeds both the slot fill and the
      upward fade so the seam is seamless. */
   .msg-timer-slot { position: relative; padding-bottom: 0.25rem; background: var(--slot-bg); }
-  [data-theme="aurora"] .msg-timer-slot { --slot-bg: rgba(15,23,42,0.55); }   /* matches [data-theme=aurora] form */
-  [data-theme="clear"] .msg-timer-slot { --slot-bg: var(--sp-surface); }      /* matches [data-theme=clear] form */
+    [data-theme="clear"] .msg-timer-slot { --slot-bg: var(--sp-surface); }      /* matches [data-theme=clear] form */
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
@@ -2451,7 +2450,6 @@ ul.conv-list li.active {
 [data-theme="aurora"] .assistant pre { background: rgba(15,23,42,0.8); border-left: 2px solid #38bdf8; }
 [data-theme="aurora"] .assistant pre code { background: transparent; color: #94a3b8; }
 
-[data-theme="aurora"] form { background: rgba(15,23,42,0.55); backdrop-filter: blur(16px); }
 [data-theme="aurora"] .input-wrap { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
 [data-theme="aurora"] .mp-panel { background: rgba(15,23,42,0.92); border: 1px solid rgba(148,163,184,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
 [data-theme="aurora"] .input-wrap:focus-within { border-color: rgba(56,189,248,0.3); background: rgba(0,0,0,0.4); box-shadow: 0 0 0 3px rgba(56,189,248,0.08), 0 8px 32px rgba(0,0,0,0.2); }
