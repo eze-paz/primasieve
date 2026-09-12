@@ -697,7 +697,7 @@
      theme (never transparent). --slot-bg feeds both the slot fill and the
      upward fade so the seam is seamless. */
   .msg-timer-slot { position: relative; padding-bottom: 0.25rem; background: var(--slot-bg); }
-    [data-theme="clear"] .msg-timer-slot { --slot-bg: var(--sp-surface); }      /* matches [data-theme=clear] form */
+  [data-theme="clear"] .msg-timer-slot { --slot-bg: var(--sp-surface); }      /* matches [data-theme=clear] form */
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
