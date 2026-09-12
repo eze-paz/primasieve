@@ -1514,6 +1514,16 @@ function parkPaneConv(pane) {
     s.host.parentNode.removeChild(s.host);
     _placeHome();
   }
+  // Detach the parked conversation from the pane's timer slot. Without this, a
+  // still-generating stream keeps stream.timerEl + its _tickTimer interval alive
+  // and re-claims the shared slot on its next tick — painting the OLD conv's
+  // tok/s and ctx ring into the NEW chat's bar (2026-09-12 bug). Nulling
+  // timerEl makes the tick's _streamViewed/paint guards skip, and endTotalTimer
+  // already handles timerEl == null (persists lastTurn, skips painting);
+  // rebuildSettledTimer repaints the settled line when the conv is re-opened.
+  s.timerEl = null;
+  const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
+  if (slot && slot.dataset.convId === '' + id) _fillPlaceholderTimer(slot, null);
 }
 function mountConv(convId, pane = null) {
   // Conversation switch: blank a stale timer only in the pane being mounted —
@@ -7787,7 +7797,14 @@ function _timerSlotFor(stream) {
 // timer must only ever touch it while its own conversation is the one shown —
 // otherwise a backgrounded generating conv would clobber the viewed one, or write
 // to detached nodes (the "· idle ·" on switch-back bug).
-function _streamViewed(s) { return !!(s && s.host && s.host.isConnected); }
+function _streamViewed(s) {
+  if (!s || !s.host || !s.host.isConnected) return false;
+  // The host must still sit INSIDE a pane (#messages / #messagesSide). A detached
+  // host would fall through _timerSlotFor's ancestor walk to the main-pane slot
+  // as a default — which let a parked (unmounted) generating conv re-claim the
+  // new chat's timer bar. Requiring a real pane ancestor closes that path.
+  return !!(s.host.closest && s.host.closest('#messages, #messagesSide'));
+}
 
 // Live-line markup, rebuilt into the slot whenever this conversation owns it.
 const _LIVE_TIMER_HTML = () =>
