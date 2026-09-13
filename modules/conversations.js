@@ -6497,13 +6497,11 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     try { content += SandpieMindframe.systemBlock(convMessages); }
     catch (e) { console.warn('[sandpie] mindframe block failed:', e); }
   }
-  // Optional capability: memory.js injects all durable facts (sandpie/memory/*.md).
-  // maybeConsolidate runs FIRE-AND-FORGET: it is an LLM housekeeping pass that can
-  // take minutes (and 504), and awaiting it here blocked every completion —
-  // behind it. The pruned store simply
-  // lands on the NEXT prompt build; this one injects the current store as-is.
+  // Optional capability: memory.js injects durable facts (sandpie/memory/*.md),
+  // TIERED: standing user/feedback in full, active-project facts promoted up to a
+  // budget, the rest as a one-line index (recall() expands). Consolidation is
+  // deterministic and event-driven off memory writes — nothing per-turn here.
   if (!_lite && typeof SandpieMemory !== 'undefined' && SandpieMemory.systemBlock) {
-    // (consolidation is event-driven off memory writes now — no per-turn / clock trigger)
     // Context for tiered injection: the latest user message (keyword activation) +
     // the files touched recently (path activation) decide which project's memories
     // get promoted to full this turn (the rest are indexed). Both best-effort.

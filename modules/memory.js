@@ -1,23 +1,26 @@
 /**
  * Memory module for Sandpie — durable, cross-conversation facts.
  *
- * Modeled on Claude Code's own memory: one fact per `.md` file under
- * sandpie/memory/, each with YAML-ish frontmatter (name, description, type,
- * created, last_verified). There is NO lazy fetch and NO recall tool — the
- * facts are small, so ALL of them are injected into the system prompt every
- * turn (systemBlock, wired into buildSystemPrompt). The store is kept bounded
- * by an automatic consolidation/prune pass that fires when the injected block
- * grows past the token budget.
+ * One fact per `.md` file under sandpie/memory/, each with YAML-ish frontmatter
+ * (name, description, type, created, last_verified, paths, project, supersedes).
  *
  *   - Capture: the `remember` tool (worker) writes a fact file (gated by its own
- *     description: durable + non-derivable). Enabled by default.
- *   - Injection: systemBlock() concatenates every fact into the prompt.
- *   - Prune: maybeConsolidate() runs an LLM merge/dedupe/prune pass over budget,
- *     tombstoning removed facts to sandpie/memory/.pruned/ (recoverable).
- *   - Commands: >>> memory [show <name> | consolidate], >>> forget <name>.
+ *     description: durable + non-derivable + tool evidence for project/reference).
+ *     Enabled by default; the remember/recall tools are the ONLY capture channel
+ *     (the auto-harvester was eliminated 2026-08-07).
+ *   - Injection (TIERED): systemBlock() injects Tier-0 user/feedback facts in full
+ *     ("Standing"), promotes active-project facts in full up to TIER2_BUDGET chars,
+ *     and lists the rest as a one-line index the model expands with recall().
+ *     Project activation = recency-weighted path hits + keyword hits on the last
+ *     user message (see _activeProjects). Legacy "inject everything" path survives
+ *     behind localStorage 'sandpie-memory-tiered' = '0'.
+ *   - Prune: DETERMINISTIC consolidation (no LLM) — explicit supersedes: execution
+ *     plus Jaccard near-dup supersession within a project; archived facts go to
+ *     sandpie/memory/.pruned/ (recoverable). Event-driven off memory writes.
+ *   - Commands: >>> memory [show <name> | consolidate | restore <name>], >>> forget.
  *
- * Config (enabled) lives in localStorage; a "Memory" section
- * in the Settings modal edits it.
+ * Config (enabled) lives in localStorage; a "Memory" section in the Settings modal
+ * edits it.
  */
 const SandpieMemory = (function () {
   'use strict';
@@ -172,25 +175,6 @@ const SandpieMemory = (function () {
   }
 
   // ---- injection ------------------------------------------------------------
-  // Char length of the block last produced by systemBlock(), so the (synchronous)
-  // context-token estimator in context.js can attribute memory's context cost
-  // without re-reading OPFS. buildSystemPrompt calls systemBlock() every send, so
-  // this stays fresh; 0 when memory is off/empty.
-  let _lastBlockChars = 0;
-  function blockChars() { return _lastBlockChars; }
-  // Names of the facts injected IN FULL on the last systemBlock() call = "activated"
-  // this turn (Tier-0 standing user/feedback + Tier-2 promoted active-project facts).
-  // The sidebar graph reads this to colour nodes (accent = activated, dim = not).
-  // Changing the set emits memory:active so an open graph re-colours live.
-  let _lastActiveNames = new Set();
-  function activeNames() { return _lastActiveNames; }
-  function _setActive(names) {
-    const next = names instanceof Set ? names : new Set(names);
-    let changed = next.size !== _lastActiveNames.size;
-    if (!changed) for (const n of next) if (!_lastActiveNames.has(n)) { changed = true; break; }
-    _lastActiveNames = next;
-    if (changed) { try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('memory:active', {}); } catch (_) {} }
-  }
   // Char budget for Tier-2 promoted bodies (~5K tokens). Beyond this, active-project
   // memories that don't fit drop to the index and the cluster is flagged to consolidate.
   const TIER2_BUDGET = 20000;
@@ -204,19 +188,19 @@ const SandpieMemory = (function () {
   // ctx (optional): { message: <latest user text>, paths: [recent file paths] } — drives
   // which project's memories are promoted to full this turn. Absent ctx (cold) = index only.
   async function systemBlock(ctx) {
-    if (!isEnabled()) { _lastBlockChars = 0; _setActive([]); return ''; }
+    if (!isEnabled()) return '';
     const facts = await list();
     const lines = ['', '', '# Memory', _INSTRUCTION];
     if (!facts.length) {
       lines.push('', '_(No memories saved yet. Save the first durable, non-derivable fact you learn this session.)_');
-      const b = lines.join('\n'); _lastBlockChars = b.length; _setActive([]); return b;
+      return lines.join('\n');
     }
     const now = Date.now();
     const full = f => `\n## ${f.description} _(${f.type}${_badge(f, now)})_\n${f.body}`;
     // Legacy path (flag off): inject every body in full, as before.
     if (localStorage.getItem('sandpie-memory-tiered') === '0') {
       for (const f of facts) lines.push('', `## ${f.description} _(${f.type}${_badge(f, now)})_`, f.body);
-      const b = lines.join('\n'); _lastBlockChars = b.length; _setActive(facts.map(f => f.name)); return b;
+      return lines.join('\n');
     }
     // TIERED. Tier 0: user/feedback always full (identity + how-to-work).
     const cl = _clusterFacts(facts);
@@ -240,73 +224,7 @@ const SandpieMemory = (function () {
       for (const p of Object.keys(byProj).sort()) { lines.push('', `### ${p}`); for (const f of byProj[p]) lines.push(`- ${f.name}: ${f.description}`); }
       if (overflow) lines.push('', `_(+${overflow} active-project memories over budget — recall() to load; consider consolidating this project)_`);
     }
-    // Record what got injected in full = "activated" this turn (standing + promoted).
-    const activated = new Set(always.map(f => f.name));
-    for (const i of promoted) activated.add(facts[i].name);
-    _setActive(activated);
-    const block = lines.join('\n');
-    _lastBlockChars = block.length;
-    return block;
-  }
-
-  // ---- consolidation / prune ------------------------------------------------
-  const CONSOLIDATE_PROMPT = [
-    "You are sandpie's memory consolidator. You receive the current memory store as one JSON object per line, each: {name, description, type, created, last_verified, body}. Rewrite it into a CLEANER set and return the desired end-state.",
-    "",
-    "Rules:",
-    "- MERGE duplicates and near-duplicates into one fact (union the detail, keep the clearest description).",
-    "- RESOLVE contradictions: keep the newer / more-recently-verified fact, drop the loser. Never keep both sides of a contradiction.",
-    "- DELETE obsolete facts: superseded, or that point at a file/function/flag/project that has clearly ended.",
-    "- DROP derivable facts: anything recoverable from source code or git history does not belong in memory.",
-    "- PROTECT by type: NEVER drop a user or feedback fact merely to save space — they capture who the user is and how they want you to work. This pass may be running because the store exceeded its size budget; when you must shrink it, prune in THIS order: obsolete/stale first, then reference, then project. Drop a user or feedback fact ONLY when it is directly contradicted or clearly obsolete, never just to fit.",
-    "- TIGHTEN: compress each body to the durable essence.",
-    "- LINKS: [[name]] in a body references another fact by its name slug. Preserve links whose target you keep; when you MERGE facts, retarget links that pointed at the absorbed name to the surviving name; add [[links]] between clearly related facts you keep. A dangling link (no fact with that name) is allowed — it marks a fact worth writing — but do not invent new dangling links.",
-    "- Keep type one of: user, feedback, project, reference. Preserve created. PRESERVE last_verified — surviving this pass is NOT verification; only a real-world re-check bumps it. When merging facts, the merged fact takes the NEWEST last_verified among its sources.",
-    "",
-    "Output ONLY a JSON array of the kept/merged facts: [{name, description, type, created, last_verified, body}, ...]. No prose, no markdown fences.",
-  ].join('\n');
-
-  function _extractJsonArray(s) {
-    if (!s) return null;
-    try { return JSON.parse(s); } catch (_) {}
-    const a = s.indexOf('['), b = s.lastIndexOf(']');
-    if (a >= 0 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch (_) {} }
-    return null;
-  }
-
-
-  // ---- path clustering ------------------------------------------------------
-  function _parsePaths(fact) {
-    if (!fact.paths) return [];
-    return String(fact.paths).split(',').map(p => p.trim()).filter(Boolean);
-  }
-  function clusterByPaths(facts, minShared) {
-    minShared = minShared || 2;
-    const clusters = [];
-    const used = new Set();
-    for (let i = 0; i < facts.length; i++) {
-      if (used.has(i)) continue;
-      const fi = facts[i];
-      const pi = _parsePaths(fi);
-      if (!pi.length) continue;
-      const cluster = { id: fi.name, memories: [fi], sharedPaths: pi.slice(), types: new Set([fi.type]) };
-      used.add(i);
-      for (let j = i + 1; j < facts.length; j++) {
-        if (used.has(j)) continue;
-        const fj = facts[j];
-        const pj = _parsePaths(fj);
-        if (!pj.length) continue;
-        const shared = pi.filter(p => pj.some(q => q === p || p.startsWith(q + '/') || q.startsWith(p + '/')));
-        if (shared.length >= minShared) {
-          cluster.memories.push(fj);
-          shared.forEach(p => { if (!cluster.sharedPaths.includes(p)) cluster.sharedPaths.push(p); });
-          cluster.types.add(fj.type);
-          used.add(j);
-        }
-      }
-      if (cluster.memories.length >= 3) clusters.push(cluster);
-    }
-    return clusters;
+    return lines.join('\n');
   }
 
   // ---- deterministic consolidation (supersede near-duplicates) --------------
@@ -323,7 +241,6 @@ const SandpieMemory = (function () {
   function _memTokens(f) { return new Set((`${f.name} ${f.description} ${f.body}`.toLowerCase().match(/[a-z0-9][a-z0-9_-]{2,}/g) || []).filter(w => !_MEM_STOP.has(w))); }
   function _jaccard(a, b) { let inter = 0; for (const x of a) if (b.has(x)) inter++; const uni = a.size + b.size - inter; return uni ? inter / uni : 0; }
   let _lastReport = null;
-  function lastConsolidateReport() { return _lastReport; }
 
   // Run the deterministic pass. opts.dryRun => detect only, archive nothing.
   async function consolidate(facts, opts) {
@@ -412,9 +329,6 @@ const SandpieMemory = (function () {
     Sandpie.events.on('memory:changed', scheduleConsolidate);
     Sandpie.events.on('file:changed', (p) => { if (typeof p === 'string' && /(^|\/)sandpie\/memory\/[^/]+\.md$/.test(p) && !p.includes('/.pruned/')) scheduleConsolidate(); });
   }
-  // Back-compat: any remaining caller just nudges a (debounced) pass.
-  function maybeConsolidate() { scheduleConsolidate(); return Promise.resolve(); }
-
   // ---- commands -------------------------------------------------------------
   function registerCommands() {
     if (typeof SandpieCommands === 'undefined') return;
@@ -455,11 +369,10 @@ const SandpieMemory = (function () {
           ? `\n\n(nothing injected — "${DIR}" has no local files. If Dropbox is connected they re-download on sync; otherwise none saved yet.)`
           : '\n\n(nothing injected — files present but none parsed as facts)';
         else injected = '\n\n──────── injected into system prompt ────────' + block;
-        // Also surface the augmentations content that lives in this folder and is
-        // injected via a SEPARATE path (augmentations.systemBlock): recent-paths
-        // (*.recent-paths.json). Old *.lessons.md files may still exist but are
-        // INERT — the auto-harvester that replaced them was eliminated 2026-08-07
-        // (the remember tool is the only capture channel); flag leftovers as removable.
+        // Also surface auxiliary files that live in this folder: recent-paths
+        // (*.recent-paths.json, tracked by augmentations.js, no longer injected)
+        // and legacy *.lessons.md leftovers (inert since the harvester was
+        // eliminated 2026-08-07 — safe to delete).
         let aux = '';
         if (Array.isArray(entries)) {
           for (const e of entries) {
@@ -501,7 +414,6 @@ const SandpieMemory = (function () {
     </label>
     <span id="memStatus" style="font-size:0.7rem; color:var(--sp-text-dim); display:block; margin-bottom:0.6rem;"></span>
     <hr style="border:none; border-top:1px solid var(--sp-border); margin:0.8rem 0;">
-    <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.4rem;"><strong>Recent paths</strong> &mdash; files touched in this project, injected into every prompt while memory is on (always the most recent 50).</p>
     <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0.6rem 0 0.4rem;"><strong>Auto-consolidation</strong> &mdash; always on, deterministic: archives near-identical memories within a project.</p>
     `;
 
@@ -511,21 +423,12 @@ const SandpieMemory = (function () {
   function wire(panel) {
     const cfg = config();
     const en = panel.querySelector('#memEnabled');
-    if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); setMemoryDot(); }); }
-  }
-
-  let _retry = 0;
-  function setMemoryDot() {
-    const dot = document.getElementById('memoryDot');
-    if (!dot) return;
-    const hasMem = isEnabled();
-    dot.classList.remove('ok', 'warn', 'err', 'busy');
-    dot.classList.add(hasMem ? 'mem' : '');
+    if (en) { en.checked = cfg.enabled; en.addEventListener('change', () => { localStorage.setItem(K_ENABLED, en.checked ? '1' : '0'); flash('Saved'); }); }
   }
 
   function init() {
     registerCommands();
-    if (window.SandpieSettings) { SandpieSettings.register({ id: 'memory', title: 'Memory', order: 17, dot: 'memoryDot', render(panel) { panel.innerHTML = HTML; wire(panel); } }); }
+    if (window.SandpieSettings) { SandpieSettings.register({ id: 'memory', title: 'Memory', order: 17, render(panel) { panel.innerHTML = HTML; wire(panel); } }); }
     else if (_retry++ < 40) { setTimeout(init, 500); return; }
     _wireAutoConsolidate();
   }
@@ -533,45 +436,7 @@ const SandpieMemory = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  // Recompute the activated set from a conversation's context WITHOUT building
-  // the prompt block — called on conversation switch so the sidebar re-colours
-  // immediately (send-time systemBlock() would be too late). Mirrors the tiered
-  // semantics: standing user/feedback always active, plus contextual memories of
-  // the projects active for this conversation's ctx.
-  async function refreshActive(ctx, stillActive) {
-    if (!isEnabled()) { _setActive([]); return; }
-    const facts = await list();
-    if (stillActive && !stillActive()) return;   // superseded mid-flight — a newer conversation switch won; drop without re-colouring
-    if (!facts.length) { _setActive([]); return; }
-    const cl = _clusterFacts(facts);
-    const active = _activeProjects(facts, cl, ctx || {});
-    const activated = new Set();
-    facts.forEach((f, i) => {
-      if (f.type === 'user' || f.type === 'feedback') activated.add(f.name);
-      else if (active.has(cl.projectOf[i])) activated.add(f.name);
-    });
-    _setActive(activated);
-  }
-
-  // Page-side fact writer for automatic capture (the harvester, Loop Lab's
-  // run-end [MEMORY] harvest). Same file format + dirty-sync as tool_remember;
-  // same-name save = update (bumps last_verified — saving IS verifying).
-  async function save({ name, description, type, body }) {
-    if (!isEnabled() || !body || !String(body).trim()) return { ok: false, reason: 'disabled or empty' };
-    const slug = _slug(name || description || 'note');
-    const t = VALID_TYPES.includes(type) ? type : 'reference';
-    const today = _today();
-    let created = today;
-    try { const old = (await list()).find(f => f.name === slug); if (old && old.created) created = old.created; } catch (_) {}
-    const desc = String(description || String(body).split(/\r?\n/)[0]).replace(/\s*\n\s*/g, ' ').trim().slice(0, 160);
-    const text = `---\nname: ${slug}\ndescription: ${desc}\ntype: ${t}\ncreated: ${created}\nlast_verified: ${today}\n---\n` + String(body).trim() + '\n';
-    const fpath = DIR + '/' + slug + '.md';
-    await opfs.write(fpath, text);
-    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', fpath); } catch (_) {}
-    return { ok: true, name: slug };
-  }
-
-  return { config, isEnabled, list, systemBlock, refreshActive, blockChars, activeNames, maybeConsolidate, consolidate, restore, lastConsolidateReport, notify, init, save };
+  return { config, isEnabled, list, systemBlock, consolidate, restore, notify, init };
 })();
 window.SandpieMemory = SandpieMemory;
 

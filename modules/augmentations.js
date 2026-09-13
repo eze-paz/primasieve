@@ -1,5 +1,15 @@
-// augmentations.js — Tool-call logger, recent-paths tracker, and tool-outcome capture.
-// Loaded before conversations.js so SandpieAugmentations is available during dispatchAgentEvent().
+// augmentations.js — per-conversation tool-call/file tracking.
+//
+// What this module does NOW:
+//   - logToolStarted/logToolResult: records each tool call + the files it touched
+//     (RAM, per conversation). getConvPaths() feeds memory.js project activation.
+//   - trackRecentPath: maintains sandpie/memory/global.recent-paths.json (data
+//     retention only — the recent-paths PROMPT INJECTION was removed 2026-09-02
+//     because it churned the system prompt and killed the provider cache prefix).
+//
+// Removed features (kept out deliberately): recent-paths prompt injection,
+// file co-occurrence preload advisor, lessons/harvest capture (eliminated
+// 2026-08-07 — the remember tool is the only memory capture channel).
 
 (function (global) {
   'use strict';
@@ -39,7 +49,7 @@
   // each other (only the last write survives → paths get lost).
   let _rpChain = Promise.resolve();
   function trackRecentPath(convId, path) {
-    // BETA: recent-paths is removed (not injected — see systemBlock). Don't write
+    // BETA: recent-paths is no longer injected into prompts. Don't write
     // to the shared global recent-paths.json either, or beta's absolute Dropbox
     // paths would pollute /app's recent-paths block on the same device.
     if (window.SANDPIE_BETA) return _rpChain;
@@ -48,7 +58,7 @@
     return _rpChain;
   }
   async function _trackRecentPathInner(path) {
-    // Use the SAME project id the read side (systemBlock) uses. Deriving it from
+    // Use the SAME project id the memory.js read side uses. Deriving it from
     // and wrote to a garbage nested dir that the reader never looked in.
     // Recent paths: single global list (was per-project)
     const storePath = MEMORY_DIR + '/global.recent-paths.json';
@@ -61,11 +71,6 @@
     await opfs.write(storePath, JSON.stringify(list, null, 2));
     // Mark dirty so it uploads and survives the Dropbox sync orphan-cleanup.
     try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', storePath); } catch (_) {}
-  }
-
-  async function getRecentPaths() {
-    try { const raw = await opfs.read(MEMORY_DIR + '/global.recent-paths.json'); if (raw) return JSON.parse(raw); } catch (_) {}
-    return [];
   }
 
   /* ── tool-call logging (called from conversations.js dispatch loop) ── */
@@ -148,34 +153,10 @@
 
 
   
-  /* ── system prompt injection block ─────────────────────────────────── */
-  async function systemBlock() {
-    let block = '';
-    // BETA: the "Recent paths" list is a SINGLE GLOBAL list across all
-    // conversations + projects, and its existence filter checks OPFS — both wrong
-    // for the beta projects fork, where each conversation has its own Dropbox
-    // project folder and files don't live in OPFS. Injecting another project's
-    // recent paths here made the model adopt a stale "projects/<x>/…" working
-    // folder and nest files under it. Suppress it in beta; the model orients with
-    // list_files against its own project root instead.
-    if (window.SANDPIE_BETA) return block;
-    // Recent paths: always on when memory is enabled — the separate enable lever
-    // was removed 2026-08-07; the single "Enable automatic memory" checkbox gates
-    // both the memory facts (memory.js systemBlock) and this recent-paths block.
-    // Recent-paths injection REMOVED 2026-09-02: the list reshuffled on every
-    // tool call and the model kept re-reading stale paths instead of listing
-    // the workspace itself. systemBlock() now always returns empty; tracking
-    // (trackRecentPath) still runs so the data survives if it's ever re-enabled.
-    // (Lessons/harvest injection removed: the auto-harvester (distillLessons) was
-    // eliminated 2026-08-07 — the remember tool is the only capture channel. Old
-    // *.lessons.md files are inert; memory.js already skips them.)
-    return block;
-  }
 /* ── public API ───────────────────────────────────────────────────── */
   global.SandpieAugmentations = {
     
     trackRecentPath,
-    getRecentPaths,
     getConvMeta: getMeta,
     getConvPaths(convId) {
       const meta = convMeta.get(convId);
@@ -184,17 +165,5 @@
     },
     logToolStarted,
     logToolResult,
-    systemBlock,
-    stats() {
-      const out = { conversations: convMeta.size, files: new Set(), toolCalls: 0 };
-      for (const m of convMeta.values()) {
-        out.toolCalls += m.toolCalls.length;
-        m.files.forEach(f => out.files.add(f));
-      }
-      out.fileCount = out.files.size;
-      _augLog('[Aug] stats:', out);
-      return out;
-    },
-    _rawMeta: convMeta,
   };
 })(window);
