@@ -5770,6 +5770,7 @@ class RoundRenderer {
       // (author-in-English / native regimes): the reply is painted as authored,
       // once. No display-side translation layer.
       this._paintContent();
+      this._unveilLadder();
       return;
     }
     // CASE B - anything already live-typed (local models, or completions that leaked
@@ -6061,6 +6062,46 @@ class RoundRenderer {
     this.reply = addMsg('assistant', '', this.host);
     if (this._boundMessage) bindBubble(this.reply, this._boundMessage);
     return this.reply;
+  }
+  // Line Ladder unveil — stagger-reveal the top-level blocks of a freshly
+  // painted respond() reply. Pure visual overlay on the already-rendered DOM:
+  // no re-render, no layout properties animated. Blocks = direct children of
+  // the bubble; a <table> (or <pre>) adopts the sibling right before it so a
+  // table never detaches from its intro/caption line. Lists reveal as ONE
+  // block (per-<li> staggering made bullets appear detached from markers).
+  // Idempotent: re-entry while a reveal runs finishes it instantly first.
+  _unveilLadder() {
+    const el = this.reply;
+    if (!el || !el.isConnected) return;
+    if (this._llTimer) { clearTimeout(this._llTimer); this._llTimer = null; }
+    el.classList.remove('ll-play');
+    const bubble = el.querySelector('.bubble') || el;
+    const kids = Array.from(bubble.children);
+    if (kids.length < 2) return;                       // single-block reply: nothing to ladder
+    const groups = [];
+    for (const k of kids) {
+      const prev = groups[groups.length - 1];
+      if (prev && (k.tagName === 'TABLE' || k.tagName === 'PRE') && !prev._llKeep) {
+        prev.appendChild(k); prev._llKeep = true;      // table/pre travels with its intro
+      } else {
+        const g = document.createElement('div');
+        g.className = 'll-block';
+        bubble.replaceChild(g, k); g.appendChild(k);
+        groups.push(g);
+      }
+    }
+    const STEP = 120;
+    groups.forEach((g, i) => { g.style.setProperty('--ll-d', (i * STEP) + 'ms'); });
+    void bubble.offsetWidth;                           // commit hidden state before playing
+    el.classList.add('ll-play');
+    this._llTimer = setTimeout(() => {
+      this._llTimer = null;
+      el.classList.remove('ll-play');
+      for (const g of groups) {                        // unwrap: restore original DOM
+        while (g.firstChild) bubble.insertBefore(g.firstChild, g);
+        g.remove();
+      }
+    }, groups.length * STEP + 450);
   }
   _paintContent() {
     // Nothing to show yet → don't materialize an empty bubble; drop a stale empty one.

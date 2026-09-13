@@ -3435,3 +3435,21 @@ body.sp-decoding *::after {
 .files-modal ul.fs-list.fm-grid li .name .fm-tile-icon { font-size: 26px; line-height: 1; }
 .files-modal ul.fs-list.fm-grid li .name .fm-tile-name { font-size: 0.72rem; color: var(--sp-text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .files-modal ul.fs-list.fm-grid li .name .fm-tile-size { font-size: 0.65rem; color: var(--sp-text-dim); }
+
+  /* ---- Line Ladder unveil (respond() one-shot paint, 2026-09-13) ----
+     Top-level blocks of a freshly painted assistant reply pop in one by one.
+     The full markdown is rendered exactly once by _paintContent(); this is a
+     pure visual overlay (opacity/transform only, no layout properties), so it
+     never reintroduces the O(n^2) re-render the 2026-09-02 one-shot fix removed.
+     Hidden state is gated on .ll-play so history re-renders, streaming paints
+     and reduced-motion always show the reply instantly. */
+  .assistant.ll-play > .ll-block {
+    opacity: 0;
+    transform: translateY(0.5em);
+    animation: llPop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+    animation-delay: var(--ll-d, 0ms);
+  }
+  @keyframes llPop { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .assistant.ll-play > .ll-block { animation: none; opacity: 1; transform: none; }
+  }
