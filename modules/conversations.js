@@ -639,6 +639,12 @@ function hydrateLocalRefs(root) {
   }
 }
 function renderHistoricalMessage(m, host = null) {
+  // STRICT parentage (2026-09-13 follow-up): every caller passes a real host
+  // (a conv-host or a detached fragment). A null host used to fall back to the
+  // MAIN pane's mounted conversation, so a background conv's replayed history —
+  // including its show_artifact cards — spawned inside whatever conv was on
+  // screen. Refuse to render without an explicit host instead of misrouting.
+  if (!host) return;
   if (m.role === 'user') {
     if (m._loadedImage) return;   // model-only image (load_image); shown in its tool-call box, not as a bubble
     bindBubble(addMsg('user', m.content, host), m);
