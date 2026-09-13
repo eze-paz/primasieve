@@ -5222,6 +5222,7 @@ const TC_LABELS = {
   recall:            { doing: 'Recalling',           done: 'Recalled' },
   write_todos:       { doing: 'Planning',            done: 'Planned' },
   ask:               { doing: 'Asking you',          done: 'Asked you' },
+  web_search:        { doing: 'Searching the web',   done: 'Searched the web', target: 'query' },
 };
 // Localized verbs, keyed by base language code, mapping the canonical English
 // phrase (from TC_LABELS) → its translation. The tool-call label sits inline in
@@ -5251,6 +5252,7 @@ const TC_I18N = {
     'Recalling': 'Recuperando',                'Recalled': 'Recuperado',
     'Planning': 'Planificando',                'Planned': 'Planificado',
     'Asking you': 'Preguntándote',             'Asked you': 'Te preguntó',
+    'Searching the web': 'Buscando en la web', 'Searched the web': 'Búsqueda web completada',
   },
   ca: {
     'Running code': 'Executant codi',          'Ran code': 'Codi executat',
@@ -5273,6 +5275,7 @@ const TC_I18N = {
     'Recalling': 'Recuperant',                 'Recalled': 'Recuperat',
     'Planning': 'Planificant',                 'Planned': 'Planificat',
     'Asking you': 'Preguntant-te',             'Asked you': "T'ha preguntat",
+    'Searching the web': 'Cercant al web',     'Searched the web': 'Cerca web completada',
   },
 };
 // Base language code the conversation is in (e.g. 'es' from 'es'/'es-419').
