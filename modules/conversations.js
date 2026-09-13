@@ -1097,6 +1097,10 @@ function renderFilesTouched(host, files, opts) {
   // host or a pane showing a different conversation (2026-09-13 cross-conv bug).
   const _as = activeStream();
   const target = host || ((_as && _as.host && _streamOwnsPaneSlot(_as)) ? _as.host : null);
+  try { const _ch = target && target.closest ? target.closest('.conv-host') : null;
+    console.debug('[artifact-trace] renderFilesTouched -> conv',
+      (_ch && _ch.dataset.convId) || (target && target.id) || 'null/detached',
+      'hostParam=', !!host, JSON.stringify((files||[]).map(f => f && f.path)), new Error().stack); } catch (_) {}
   if (!target) return;
   tgBreak(target);   // file cards end the current tool-group run
   // Individual cards = HTML / images / office (the deliverables). Everything else
