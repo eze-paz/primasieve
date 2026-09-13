@@ -223,7 +223,14 @@ function renderArtifact(host, path, opts) {
   // there), and a small ↗ on the card opens a new tab directly. This strips the
   // old six-icon header bar (⊞ ↗ ⬇ − 📌 🔗) that made the stream feel loaded.
   // (opts.collapsed is now a no-op — kept so old callers don't break.)
-  const target = host || (_activeStream() && _activeStream().host) || _paneScrollEl(_$('messages'));
+  // Parentage guard (2026-09-13): never let a card spawn in whatever conv
+  // happens to be focused. Fall back to the ACTIVE stream's host only when that
+  // stream is the one actually mounted in a pane; otherwise render into a
+  // detached container (the card is discarded — the owning conv re-renders its
+  // cards from its persisted filesTouched list when it is next mounted).
+  const _as = (typeof activeStream === 'function') ? activeStream() : _activeStream();
+  const _ownHost = _as && _as.host && (typeof _streamOwnsPaneSlot === 'function' ? _streamOwnsPaneSlot(_as) : _as.host.isConnected);
+  const target = host || (_ownHost ? _as.host : document.createElement('div'));
   const clean = path ? String(path).replace(/^\/+/, '') : '';
   // Resolve once (legacy artifacts/ → sandpie/artifacts/ remap); handlers await it.
   const resolvedP = clean ? resolveArtifactPath(clean) : Promise.resolve(clean);
@@ -655,7 +662,11 @@ async function readArtifactConsole(path) {
     // console read may precede any card. Render the requested file expanded and
     // read from that fresh frame.
     try {
-      renderArtifact(null, want);
+      // Render into the CURRENT conversation's mounted host (html_console is a
+      // tool call of the focused conv); detached container if none is mounted.
+      const _cs = (typeof activeStream === 'function') ? activeStream() : _activeStream();
+      const _ch = (_cs && _cs.host && (typeof _streamOwnsPaneSlot === 'function' ? _streamOwnsPaneSlot(_cs) : _cs.host.isConnected)) ? _cs.host : document.createElement('div');
+      renderArtifact(_ch, want);
       const wrap = Array.from(document.querySelectorAll('.artifact-wrap')).reverse().find(w => {
         const c = norm(w.dataset.artifactPath || '');
         return c && (wantForms.has(c) || wantForms.has(strip(c)));
@@ -749,8 +760,13 @@ function _artifactEnsureHeader(wrap) {
     const next = wrap.nextSibling;
     wrap.remove();
     if (!path || !target) return;
-    renderArtifact(null, path);
-    const fresh = [...document.querySelectorAll('.artifact-wrap')].reverse().find(w => w.dataset.artifactPath === path);
+    // Rebuild into a DETACHED container, then splice the fresh wrap back at the
+    // recorded position. The old renderArtifact(null, path) + global
+    // document.querySelectorAll search spawned the card in whatever conversation
+    // happened to be focused (2026-09-13 cross-conv artifact bug).
+    const pen = document.createElement('div');
+    renderArtifact(pen, path);
+    const fresh = pen.querySelector('.artifact-wrap');
     if (fresh) target.insertBefore(fresh, next);
   } catch (_) {}
 }

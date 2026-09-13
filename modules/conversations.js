@@ -1086,7 +1086,11 @@ function applyGridOverflow(grid) {
 function renderFilesTouched(host, files, opts) {
   if (!Array.isArray(files) || !files.length) return;
   const partial = !!(opts && opts.partial);
-  const target = host || (activeStream() && activeStream().host) || paneScrollEl($('messages'));
+  // Parentage guard: fall back to the ACTIVE stream's host only when it is the
+  // conversation actually mounted on screen — never park cards into a detached
+  // host or a pane showing a different conversation (2026-09-13 cross-conv bug).
+  const _as = activeStream();
+  const target = host || ((_as && _as.host && _streamOwnsPaneSlot(_as)) ? _as.host : null);
   if (!target) return;
   tgBreak(target);   // file cards end the current tool-group run
   // Individual cards = HTML / images / office (the deliverables). Everything else
@@ -3651,7 +3655,8 @@ async function sendSingle(text, stream, opts = {}) {
       reportTurnUsage(convId, ev.usage, convMessages.length, ev.model);
       // Round boundary: recordUsage just wrote the fresh reported size, so repaint
       // the live ctx counter now instead of waiting for the whole turn to end.
-      if (stream.timerEl) _paintCtxCounter(stream.timerEl, convId);
+      { const _sl = _streamOwnsPaneSlot(stream) ? _timerSlotFor(stream) : null;
+        if (_sl) _paintCtxCounter(_sl, convId); }
     }
     if (ev.type === 'rate') {
       // Per-round live tok/s (exact completion tokens / decode span). Accumulated
@@ -3668,7 +3673,8 @@ async function sendSingle(text, stream, opts = {}) {
         stream.lastRate = _tk / (_ms / 1000);
         stream._turnToks = (stream._turnToks || 0) + _tk;
         stream._turnDecodeMs = (stream._turnDecodeMs || 0) + _ms;
-        if (stream.timerEl) _paintRate(stream.timerEl, stream.lastRate, convId);
+        { const _sl = _streamOwnsPaneSlot(stream) ? _timerSlotFor(stream) : null;
+          if (_sl) _paintRate(_sl, stream.lastRate, convId); }
       }
     }
     if (ev.type === 'degeneration') {
@@ -5747,7 +5753,9 @@ class RoundRenderer {
     if (secs < 0.25) return;
     const rate = (this._liveChars / 4) / secs;     // ~tokens/s, UNCAPPED (real render rate)
     const s = convStreams.get(this.convId);
-    if (s) { s.lastRate = rate; if (s.timerEl) _paintRate(s.timerEl, rate, this.convId); }
+    if (s) { s.lastRate = rate;
+      const _sl = _streamOwnsPaneSlot(s) ? _timerSlotFor(s) : null;
+      if (_sl) _paintRate(_sl, rate, this.convId); }
   }
   endRound(finalContent, localeOverride) {
     this._finishThinking();
@@ -7839,6 +7847,18 @@ function _timerSlotFor(stream) {
 // timer must only ever touch it while its own conversation is the one shown —
 // otherwise a backgrounded generating conv would clobber the viewed one, or write
 // to detached nodes (the "· idle ·" on switch-back bug).
+// STRONGER than _streamViewed: true only when this stream's host is the
+// conversation ACTUALLY MOUNTED in a pane right now (pane's .conv-host === s.host).
+// This is the pull-guard for every timer paint: a background generating conv can
+// never paint the shared per-pane slot, even if its host is still connected
+// somewhere or its stale timerEl survived a park (2026-09-13 tok/s/ctx leak).
+function _streamOwnsPaneSlot(s) {
+  if (!s || !s.host || !s.host.isConnected) return false;
+  const pane = s.host.closest && s.host.closest('#messages, #messagesSide');
+  if (!pane) return false;
+  const mounted = pane.querySelector(':scope > .conv-host');
+  return !!mounted && mounted === s.host;
+}
 function _streamViewed(s) {
   if (!s || !s.host || !s.host.isConnected) return false;
   // The host must still sit INSIDE a pane (#messages / #messagesSide). A detached
@@ -7882,10 +7902,14 @@ function startTotalTimer(stream) {
   //    this is what re-attaches the ticking timer when you return to a still-
   //    generating conversation (the "shows · idle · on switch-back" bug).
   const paint = () => {
-    if (!_streamViewed(stream)) return;
+    if (!_streamOwnsPaneSlot(stream)) return;
     const slot = _timerSlotFor(stream);
     if (!slot) return;
     stream.timerEl = slot;
+    // Never steal a slot another conversation owns: only rebuild when the slot is
+    // ours or unowned. mountConv blanks a stale slot before re-attaching, so the
+    // switch-back path still works.
+    if (slot.dataset.convId && slot.dataset.convId !== '' + (stream.id || '')) return;
     if (slot.dataset.convId !== '' + (stream.id || '') || slot.classList.contains('done') || !slot.querySelector('.mt-time')) {
       slot.classList.remove('done');
       slot.dataset.convId = '' + (stream.id || '');
@@ -7955,7 +7979,7 @@ function endTotalTimer(stream, label) {
   // a backgrounded turn finishing must not overwrite the viewed conversation's bar.
   // When it isn't viewed, rebuildSettledTimer paints the settled line from lastTurn
   // the moment the user switches back.
-  const slot = _streamViewed(stream) ? _timerSlotFor(stream) : null;
+  const slot = _streamOwnsPaneSlot(stream) ? _timerSlotFor(stream) : null;
   if (!slot) { stream.timerEl = null; return; }
   if (label === null) {
     // Turn cancelled with nothing to show → resting placeholder (never a bare slot).
