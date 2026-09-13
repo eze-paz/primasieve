@@ -112,9 +112,11 @@
 
 
 
-  /* Scrollbars — quiet overlay style (default for all scrollables).
-     4px translucent thumb that only asserts itself on hover/drag. Colour comes
-     from --sp-scrollbar, never from --sp-border. */
+  /* Scrollbars — quiet native style (default for all scrollables).
+     4px translucent thumb that FADES IN when its container is hovered/focused
+     and fades back out when it isn't. scrollbar-color is animatable in modern
+     Chromium/Firefox, so the fade is a plain CSS transition — no JS. Colour
+     comes from --sp-scrollbar, never from --sp-border. */
   html { scrollbar-width: thin; scrollbar-color: var(--sp-scrollbar) transparent; }
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -122,6 +124,23 @@
   ::-webkit-scrollbar-thumb:hover,
   ::-webkit-scrollbar-thumb:active { background: var(--sp-scrollbar-hover); }
   ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* Fade: idle = barely-there (alpha 0.05), hover/focus-within = full token.
+     transition on scrollbar-color animates the thumb+track color pair. */
+  * {
+    scrollbar-color: rgba(127,127,127,0.05) transparent;
+    transition: scrollbar-color 0.35s ease;
+  }
+  *:hover, *:focus-within {
+    scrollbar-color: var(--sp-scrollbar) transparent;
+  }
+  aside:hover, aside:focus-within,
+  .conv-host:hover, .conv-host:focus-within {
+    scrollbar-color: var(--sp-scrollbar-hover) transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none; }
+  }
 
   /* Sidebar: hidden scrollbar + shadow + chevron hints */
   aside input[type="color"] { padding: 0; }
