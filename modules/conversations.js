@@ -5743,7 +5743,6 @@ function _tgBuild(title, st) {
     '<span class="tg-row">' +
       '<span class="tg-prompt">&gt;&gt;&gt;</span>' +
       `<span class="tg-title" title="${tcEscape(title)}">${tcEscape(title)}</span>` +
-      '<span class="tg-chevron">▸</span>' +
     '</span>' +
     '<span class="tg-tray">' +
       '<span class="tg-strip"></span>' +

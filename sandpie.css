@@ -1822,7 +1822,7 @@ ul.conv-list li.active {
   /* The title is the user's main feedback — never truncate it; wrap by WORD
      (break-word: mid-word breaks only when a single word can't fit at all). */
   .tool-group .tg-title {
-    color: var(--sp-text); font-weight: 600;
+    color: var(--sp-text-dim);
     flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
   }
   /* Untitled register (no active task): VISIBLE — Claude-mode todos have no
@@ -1843,7 +1843,6 @@ ul.conv-list li.active {
   .tool-group .tg-count { flex: none; margin-left: auto; color: var(--sp-text-dim); font-size: 10.5px; white-space: nowrap; }
   .tool-group .tg-count.tick { animation: tg-count-pop 0.3s ease; }
   @keyframes tg-count-pop { 30% { transform: scale(1.2); color: var(--sp-accent); } }
-  .tool-group .tg-chevron { line-height: 18px; }
   .tool-group .tg-strip {
     display: flex; align-items: center; gap: 3px;
     flex-wrap: wrap; justify-content: flex-start;
@@ -1868,11 +1867,6 @@ ul.conv-list li.active {
   @media (prefers-reduced-motion: reduce) {
     .tool-group .tg-cell, .tool-group .tg-cell.run, .tool-group .tg-count.tick { animation: none; }
   }
-  .tool-group .tg-chevron {
-    flex: none; color: var(--sp-text-dim); opacity: 0.5; font-size: 10px;
-    transition: transform 0.2s ease;
-  }
-  .tool-group.tg-open .tg-chevron { transform: rotate(90deg); }
   .tool-group .tg-log { display: flex; flex-direction: column; padding: 0.15rem 0.3rem; }
   /* Planning (write_todos) rows are bookkeeping, not work: never shown, in any
      state, grouped OR loose (the pre-plan call lands ungrouped) — the checklist
