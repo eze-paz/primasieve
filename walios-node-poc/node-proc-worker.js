@@ -43,11 +43,9 @@ function hostCall(idx, args) {
   return ret;
 }
 
-// ---- marshalling arena inside the shared memory -----------------------------
-// The kernel reads guest pointers straight out of memory.buffer, so anything we pass
-// by pointer has to live there. A bump allocator over a fixed region is enough: every
-// syscall wrapper resets it as soon as the call returns.
-function makeArena(mem, base) {
+// (makeArena / makeSyscalls now live in syscall-bridge.js, shared with the
+// headless tests so both exercise the same code.)
+function __unused_makeArena(mem, base) {
   let top = base;
   const api = {
     u8: () => new Uint8Array(mem.buffer),
@@ -66,8 +64,7 @@ function makeArena(mem, base) {
   return api;
 }
 
-// ---- syscall bag ------------------------------------------------------------
-function makeSyscalls() {
+function __unused_makeSyscalls() {
   const idx = {};
   for (let i = 0; i < names.length; i++) idx[names[i]] = i;
   const call = (name) => {
@@ -87,8 +84,7 @@ function makeSyscalls() {
   };
 }
 
-// ---- stdout straight to the kernel ------------------------------------------
-function makeOut(sys, arena) {
+function __unused_makeOut(sys, arena) {
   const enc = new TextEncoder();
   return (s, fd = 1) => {
     const b = enc.encode(s);
@@ -141,85 +137,19 @@ self.onmessage = async (ev) => {
 };
 
 function runNode() {
-  const sys = makeSyscalls();
-  // Arena starts well above 0 so a stray null-pointer write is not silently legal.
-  const arena = makeArena(memory, 1 << 16);
-  const out = makeOut(sys, arena);
-
+  const { makeArena, makeSyscalls } = require('./syscall-bridge.js');
   const { KernelVfs } = require('./kernel-vfs.js');
   const { boot } = require('./boot.js');
+  const { main } = require('./node-main.js');
 
+  const sys = makeSyscalls(names, hostCall);
+  // Arena starts above 0 so a stray null-pointer write is not silently legal.
+  const arena = makeArena(memory, 1 << 16);
   const vfs = new KernelVfs(sys, arena);
   const rt = boot(null, { sources: libSources, vfs });
-  const R = rt.require;
 
-  // ---- suite 1, verbatim in intent: node's real lib/ over real syscalls -----
-  const ok = [], bad = [];
-  const t = (name, fn) => {
-    try { const r = fn(); ok.push(name + (r === undefined ? '' : '  -> ' + r)); }
-    catch (e) { bad.push(name + '\n      ' + String((e && e.message) || e).split('\n')[0]); }
-  };
-
-  out('=== node lib/ on the REAL walios kernel (pid via syscalls) ===\n\n');
-
-  t('require("path")', () => typeof R('path').join === 'function');
-  t('path.join("/a","b","../c")', () => R('path').join('/a', 'b', '../c'));
-  t('require("events") + emit', () => {
-    const EE = R('events'); const e = new EE(); let got = null;
-    e.on('x', (v) => { got = v; }); e.emit('x', 'fired');
-    if (got !== 'fired') throw new Error('listener did not fire');
-    return got;
-  });
-  t('require("buffer")', () => R('buffer').Buffer.from('hello walios').toString());
-  t('require("fs")', () => typeof R('fs').writeFileSync === 'function');
-
-  const fs = R('fs');
-  const Buffer = R('buffer').Buffer;
-
-  t('fs.mkdirSync /tmp/nodepoc  [SYS_mkdir]', () => { try { fs.mkdirSync('/tmp/nodepoc'); } catch (e) { if (e.code !== 'EEXIST') throw e; } return 'ok'; });
-  t('fs.writeFileSync           [SYS_open+write]', () => { fs.writeFileSync('/tmp/nodepoc/x', 'hi from node lib'); return 'wrote via syscalls'; });
-  t('fs.readFileSync utf8       [SYS_open+read]', () => fs.readFileSync('/tmp/nodepoc/x', 'utf8'));
-  t('fs.readFileSync buffer', () => { const b = fs.readFileSync('/tmp/nodepoc/x'); return b.constructor.name + '(' + b.length + ') = ' + b.toString(); });
-  t('fs.existsSync              [SYS_stat]', () => fs.existsSync('/tmp/nodepoc/x'));
-  t('fs.statSync().size', () => fs.statSync('/tmp/nodepoc/x').size);
-  t('fs.statSync().isFile()', () => fs.statSync('/tmp/nodepoc/x').isFile());
-  t('fs.statSync("/").isDirectory()', () => fs.statSync('/').isDirectory());
-  t('fs.readdirSync             [SYS_getdents64]', () => {
-    fs.writeFileSync('/tmp/nodepoc/a.txt', 'a');
-    fs.writeFileSync('/tmp/nodepoc/b.txt', 'b');
-    return JSON.stringify(fs.readdirSync('/tmp/nodepoc').sort());
-  });
-  t('fs.appendFileSync', () => { fs.appendFileSync('/tmp/nodepoc/x', '!'); return fs.readFileSync('/tmp/nodepoc/x', 'utf8'); });
-  t('fs.unlinkSync              [SYS_unlink]', () => { fs.unlinkSync('/tmp/nodepoc/a.txt'); return JSON.stringify(fs.readdirSync('/tmp/nodepoc').sort()); });
-  t('binary round-trip 256B', () => {
-    const b = Buffer.alloc(256); for (let i = 0; i < 256; i++) b[i] = i;
-    fs.writeFileSync('/tmp/nodepoc/bin', b);
-    const rb = fs.readFileSync('/tmp/nodepoc/bin');
-    if (Buffer.compare(b, rb) !== 0) throw new Error('binary mismatch');
-    return rb.length + ' bytes identical through the kernel';
-  });
-  t('ENOENT is a real fs error', () => { try { fs.readFileSync('/definitely/missing', 'utf8'); return 'NO THROW (bad)'; } catch (e) { return e.code + ' / ' + (e.syscall || '?'); } });
-  t('reads a file the SHELL made', () => {
-    // /etc/gitconfig is seeded by walios-backend runMessage() -- proof we are on the
-    // same filesystem as busybox/python, not a private heap.
-    const names2 = fs.readdirSync('/etc');
-    return '/etc has ' + names2.length + ' entries incl. ' + names2.slice(0, 4).join(',');
-  });
-  t('require("util") + inspect', () => R('util').inspect({ a: [1, 2] }));
-  t('require("assert")', () => { try { R('assert').strictEqual(1, 2); return 'NO THROW'; } catch (e) { return e.code; } });
-  t('require("stream")', () => typeof R('stream').Readable === 'function');
-
-  out('PASS (' + ok.length + ')\n');
-  for (const s of ok) out('  + ' + s + '\n');
-  if (bad.length) { out('\nFAIL (' + bad.length + ')\n'); for (const s of bad) out('  - ' + s + '\n'); }
-
-  out('\n=== kernel interaction ===\n');
-  out('syscalls issued    : ' + vfs.calls + '\n');
-  out('lib modules loaded : ' + rt.trace.loaded.length + '\n');
-  out('bindings requested : ' + rt.trace.bindings.size + '\n');
-  out('binding fns used   : ' + rt.trace.used.size + '\n');
-
-  self.postMessage({ t: 'result', pass: ok.length, fail: bad.length, calls: vfs.calls,
+  const code = main(rt, sys, arena);
+  self.postMessage({ t: 'result', code, calls: vfs.calls,
                      loaded: rt.trace.loaded.length, bindings: rt.trace.bindings.size });
-  return bad.length ? 1 : 0;
+  return code;
 }

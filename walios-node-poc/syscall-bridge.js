@@ -72,6 +72,12 @@ function makeSyscalls(names, hostCall) {
       ? () => { throw new Error('syscall not in stub imports: ' + n); }
       : (...a) => hostCall(i, a);
   }
+  // WALI passes argv through three non-SYS imports, not a pointer array.
+  const wali = (n) => { const i = idx['wali.' + n]; return i === undefined ? null : i; };
+  const iArgc = wali('__cl_get_argc'), iLen = wali('__cl_get_argv_len'), iCopy = wali('__cl_copy_argv');
+  if (iArgc !== null) sys.argc = () => Number(hostCall(iArgc, []));
+  if (iLen !== null) sys.argvLen = (i) => Number(hostCall(iLen, [i]));
+  if (iCopy !== null) sys.copyArgv = (buf, i) => Number(hostCall(iCopy, [buf, i]));
   sys._idx = idx;
   return sys;
 }

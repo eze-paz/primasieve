@@ -191,7 +191,11 @@ function makeBindings(vfs, trace, realm) {
       getExternalValue: () => 0n,
       propertyFilter: { ALL_PROPERTIES: 0, ONLY_ENUMERABLE: 2, SKIP_STRINGS: 8, SKIP_SYMBOLS: 16 },
       shouldRetainSymbols: () => false, isInsideNodeModules: () => false,
-      getCallerLocation: () => [], defineLazyProperties: () => {}, guessHandleType: () => 'FILE',
+      getCallerLocation: () => [], defineLazyProperties: () => {},
+      // 'FILE' makes node build stdout/stderr as internal/fs/sync_write_stream,
+      // which writes through fs.writeSync -> our fs binding -> SYS_write. 'TTY'
+      // would pull in tty_wrap, which we do not serve yet.
+      guessHandleType: () => 'FILE',
       WeakReference: class { constructor(v) { this._r = new WeakRef(v); } get() { return this._r.deref(); } incRef() {} decRef() {} },
       setHiddenValue: () => true, getHiddenValue: () => undefined, arrayBufferViewHasBuffer: () => true,
       kPending: 0, kFulfilled: 1, kRejected: 2,
@@ -274,11 +278,15 @@ function makeBindings(vfs, trace, realm) {
       // so user code saw platform=win32. We shadow the realm globals as parameters,
       // which is what the worker gets for free.
       compileFunctionForCJSLoader: (content, filename) => {
+        // EVERY realm global must be shadowed BY NAME. Missing one does not fail --
+        // it silently resolves to the HOST's. That is how console.log ended up on the
+        // host terminal instead of going through SYS_write, and how process.platform
+        // reported win32 before `process` joined this list.
         const inner = new Function(
-          'process', 'Buffer', 'globalThis', 'global', 'require', 'module', 'exports', '__filename', '__dirname',
+          'process', 'Buffer', 'console', 'globalThis', 'global', 'require', 'module', 'exports', '__filename', '__dirname',
           content + '\n//# sourceURL=' + filename);
         function wrapper(exports, require, module, __filename, __dirname) {
-          return inner.call(this, realm.process, realm.Buffer, realm.global, realm.global,
+          return inner.call(this, realm.process, realm.Buffer, realm.console, realm.global, realm.global,
             require, module, exports, __filename, __dirname);
         }
         return { __proto__: null, function: wrapper, sourceMapURL: undefined, sourceURL: filename, canParseAsESM: false };

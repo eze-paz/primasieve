@@ -46,7 +46,7 @@ async function boot() {
   const msg = await WB.runMessage({
     kind: 'tool',
     base: '/walios/',
-    argv: ['node'],
+    argv: ['node', '-e', 'console.log("hello from node " + process.version + " on " + require("os").hostname()); const fs=require("fs"); fs.writeFileSync("/tmp/from-node","written by node -e"); console.log("/tmp/from-node =", fs.readFileSync("/tmp/from-node","utf8")); console.log("/etc =", fs.readdirSync("/etc").join(" "));'],
     cwd: '/root',
     rpc: false,
     manifest: { node: '/walios-node-poc/node-stub.wasm' },

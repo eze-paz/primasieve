@@ -10,7 +10,7 @@
 // round trip end to end.
 import { parentPort, workerData } from 'node:worker_threads';
 
-const { ctl, mem, names } = workerData;
+const { ctl, mem, names, argv: ARGV = ['/bin/node'] } = workerData;
 const i32 = new Int32Array(ctl);
 const i64 = new BigInt64Array(ctl);
 const ARGS = 64, RET = 192;
@@ -186,6 +186,13 @@ for (;;) {
   let ret = 0n;
   try {
     if (full.startsWith('wali.SYS_')) ret = syscall(full.slice(9), a);
+    else if (full === 'wali.__cl_get_argc') ret = BigInt(ARGV.length);
+    else if (full === 'wali.__cl_get_argv_len') ret = BigInt(te.encode(ARGV[a[0]] || '').length);
+    else if (full === 'wali.__cl_copy_argv') {
+      const b = te.encode(ARGV[a[1]] || '');
+      u8().set(b, a[0]); u8()[a[0] + b.length] = 0;
+      ret = BigInt(b.length);
+    }
     else ret = 0n;
   } catch (e) {
     parentPort.postMessage({ t: 'kernel-error', s: full + ': ' + (e.message || e) });

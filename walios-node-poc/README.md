@@ -10,6 +10,7 @@ kernel. Two phases done so far.
 | `run2.js` | encodings, stream data flow, CJS, perf | 22/22 |
 | `run3.js` | a multi-file user app via node's real CJS loader | runs |
 | `test-kernel-vfs.mjs` | **node's fs over the walios syscall protocol** | 19/19 |
+| `test-node-cli.mjs` | **`node -e` and `node script.js`, argv+stdio via syscalls** | 23/23 |
 
 ---
 
@@ -184,6 +185,57 @@ node walios-node-poc/serve.mjs          # COOP/COEP, port 8788
 The mock kernel's layouts were read out of `wali-worker.js` (`putStat`, the
 `getdents64` case, the control block), so the wire format should match — but "should"
 is exactly what the browser run is for.
+
+---
+
+# Rung one — `node` as a shell command
+
+Turning `ash: node: not found` into a working command. `node-main.js` is the entry
+point, shared by the browser worker and `test-node-cli.mjs`.
+
+**argv** comes from the kernel over WALI's three imports (`__cl_get_argc`,
+`__cl_get_argv_len`, `__cl_copy_argv`) — not a pointer array.
+
+**stdout/stderr are node's own streams.** `guessHandleType(fd)` returns `'FILE'`, so
+node builds `internal/fs/sync_write_stream`, which writes through `fs.writeSync` -> our
+fs binding -> `SYS_write`. And `console` is node's real `Console`, so `%s/%d`,
+`util.inspect` formatting and `console.table` all come for free.
+
+## Works (23/23, `node test-node-cli.mjs ./lib`)
+
+```
+node -e "console.log(2+2)"            -> 4
+node -e 'console.log("%s:%d","x",7)'  -> x:7
+node -e "console.log({a:[1,2]})"      -> { a: [ 1, 2 ] }
+node -p "1+1"                         -> 2
+node -v                               -> v22.23.2
+node -e "console.error('boom')"       -> boom  (on fd 2, not fd 1)
+node -e "throw new Error('nope')"     -> stack on stderr, exit 1
+node script.js one two                -> process.argv.slice(2) == ["one","two"]
+node /app/main.js                     -> require("./dep.js") resolves
+node -e fs.writeFileSync/readFileSync -> real SYS_open/write/read
+node missing.js                       -> "cannot find module", exit 1
+node --bogus                          -> exit 9
+```
+
+Exit codes propagate, so `node build.js && echo ok` and `$?` work.
+
+## Not done
+
+`node` with no args prints a message and exits 1. The REPL needs `vm`/contextify, and
+there are no real realms in a worker. stdin is not wired, so `echo x | node` and
+`node < file` do not work yet.
+
+## Another realm leak, same shape as before
+
+Every `console.log` test passed *and* printed nothing — the output was going to the
+**host** terminal. `compileFunctionForCJSLoader` shadows realm globals by name, and
+`console` was not in the list, so user code resolved the host's. Exactly the bug that
+made `process.platform` report `win32` in Phase 0.
+
+Worth stating as a rule: **a missing realm global does not fail, it silently binds to
+the host's.** In the real worker the realm is ours so this is free, but every global
+has to be enumerated deliberately.
 
 ## Known gaps (Phase 2+)
 
