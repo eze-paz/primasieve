@@ -40,16 +40,40 @@ async function boot() {
     else if (m.t === 'result') write(out, '\n[' + (m.fail ? 'FAILURES' : 'ALL PASS') + ' pass=' + m.pass + ' fail=' + m.fail + ' syscalls=' + m.calls + ']\n');
   };
 
-  // The standard walios boot, plus one manifest entry: `node` -> our stub module.
-  // Everything else (busybox root, /etc seeding, env) is the same as any host, which
-  // is the point — the node process lands on the SAME filesystem as the shell.
+  // The root process is ALWAYS busybox (runMessage sets wasm: busybox and argv is
+  // what busybox dispatches on) -- the manifest is only consulted on execve. So boot
+  // a SHELL and let it exec `node`, which is both the correct wiring and the real
+  // test: node as an ordinary command spawned by ash.
+  const demo = [
+    'echo "--- node -v ---"',
+    'node -v',
+    'echo "--- node -e ---"',
+    'node -e \'console.log("hello from node " + process.version + " on " + require("os").hostname())\'',
+    'echo "--- node writes, busybox reads ---"',
+    'node -e \'require("fs").writeFileSync("/tmp/from-node", "written by node\n")\'',
+    'cat /tmp/from-node',
+    'echo "--- node reads what the shell made ---"',
+    'echo hello-from-ash > /tmp/from-ash',
+    'node -e \'console.log(require("fs").readFileSync("/tmp/from-ash","utf8").trim())\'',
+    'echo "--- node script.js with args ---"',
+    'echo \'console.log("script says: " + process.argv.slice(2).join(","))\' > /tmp/s.js',
+    'node /tmp/s.js one two',
+    'echo "--- pipe node into grep ---"',
+    'node -e \'console.log("findme-123"); console.log("ignore-me")\' | grep findme',
+    'echo "--- exit codes ---"',
+    'node -e \'console.log("ok")\' && echo "&& worked"',
+    'node -e \'process.exitCode = 3\'; echo "exit code was $?"',
+    'echo "--- done ---"',
+  ].join('\n') + '\n';
+
   const msg = await WB.runMessage({
     kind: 'tool',
     base: '/walios/',
-    argv: ['node', '-e', 'console.log("hello from node " + process.version + " on " + require("os").hostname()); const fs=require("fs"); fs.writeFileSync("/tmp/from-node","written by node -e"); console.log("/tmp/from-node =", fs.readFileSync("/tmp/from-node","utf8")); console.log("/etc =", fs.readdirSync("/etc").join(" "));'],
+    argv: ['sh', '/demo.sh'],
     cwd: '/root',
     rpc: false,
     manifest: { node: '/walios-node-poc/node-stub.wasm' },
+    blobs: { '/demo.sh': new TextEncoder().encode(demo).buffer },
   });
   kernel.postMessage(msg);
 }

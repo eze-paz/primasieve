@@ -29,7 +29,9 @@ createServer(async (req, res) => {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Resource-Policy': 'same-origin',
-      'Cache-Control': 'no-store',
+      // node-lib.json is ~4MB and every `node` invocation is a fresh worker that
+      // fetches it. Under no-store an 8-command demo refetches 32MB.
+      'Cache-Control': /node-lib\.json$/.test(p) ? 'public, max-age=300' : 'no-store',
     });
     res.end(body);
   } catch (e) {

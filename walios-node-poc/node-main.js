@@ -130,7 +130,8 @@ function main(rt, sys, arena) {
         const v = m.exports === undefined ? result : m.exports;
         out(typeof v === 'string' ? v + '\n' : R('util').inspect(v) + '\n');
       }
-      return 0;
+      // `node -e 'process.exitCode = 3'` must exit 3, like real node.
+      return typeof process.exitCode === 'number' ? process.exitCode : 0;
     } catch (e) {
       errOut(formatErr(e) + '\n');
       return 1;
