@@ -694,27 +694,32 @@ function rewindToUserMessage(div) {
 }
 document.addEventListener('selectionchange', () => {
   const sel = window.getSelection();
-  document.querySelectorAll('.msg.user > .msg-actions.show').forEach(acts => {
+  // Only HIDE when a real (non-collapsed) selection exists somewhere else —
+  // a collapsed selection must never close a toolbar that a tap/click opened
+  // (this was breaking mobile: the tap's selection collapse fired
+  // selectionchange and instantly hid the just-opened toolbar).
+  document.querySelectorAll('.msg > .msg-actions.show').forEach(acts => {
     const bubble = acts.parentNode.querySelector(':scope > .bubble');
     if (!bubble) { acts.classList.remove('show'); return; }
-    const inBubble = sel && sel.rangeCount && !sel.isCollapsed && bubble.contains(sel.getRangeAt(0).commonAncestorContainer);
-    if (!inBubble) acts.classList.remove('show');
+    if (sel && sel.rangeCount && !sel.isCollapsed && !bubble.contains(sel.getRangeAt(0).commonAncestorContainer)) acts.classList.remove('show');
   });
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
   const node = sel.getRangeAt(0).commonAncestorContainer;
-  const bubble = (node.nodeType === 1 ? node : node.parentNode)?.closest?.('.msg.user > .bubble');
+  const bubble = (node.nodeType === 1 ? node : node.parentNode)?.closest?.('.msg > .bubble');
   if (!bubble) return;
   const acts = bubble.parentNode.querySelector(':scope > .msg-actions');
   if (acts) acts.classList.add('show');
 });
 
-// Click-to-open: a plain click (no text selection) on a user bubble toggles
-// its toolbar, so the actions are reachable without selecting text. Only one
+// Click/tap-to-open: a plain click (no text selection) on a message toggles
+// its toolbar, so the actions are reachable without selecting text (this is
+// the primary path on touch devices, where there is no hover). Only one
 // toolbar is open at a time; clicking anywhere else closes it. A click that
 // ends a drag-selection is ignored — selectionchange already handled it.
 document.addEventListener('click', (e) => {
-  const msg = e.target.closest?.('.msg.user');
-  const openActs = document.querySelectorAll('.msg.user > .msg-actions.show');
+  if (e.target.closest?.('.msg-actions')) return;
+  const msg = e.target.closest?.('.msg');
+  const openActs = document.querySelectorAll('.msg > .msg-actions.show');
   if (!msg) {
     openActs.forEach(a => a.classList.remove('show'));
     return;
@@ -4836,9 +4841,9 @@ function addMsg(role, text = '', host = null, animate = false) {
     }
     div.appendChild(bubble);
     if (role === 'user') {
-      // Selection-triggered toolbar (copy / rewind): hidden until the user
-      // selects text inside this bubble. Same .msg-actions/.act-copy material
-      // and icons as the assistant strip; positioned above the bubble.
+      // Floating toolbar (copy / rewind): hidden until hover (PC), tap
+      // (mobile) or a text selection inside this bubble. Same .msg-actions/
+      // .act-copy material as the assistant toolbar; rendered below the bubble.
       const acts = document.createElement('div');
       acts.className = 'msg-actions';
       const copy = document.createElement('button');

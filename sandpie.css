@@ -492,8 +492,22 @@
     display: block;
   }
 
-  /* Copy action under assistant replies (always visible) */
-  .msg-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; opacity: 1; }
+  /* Floating action toolbar (copy / rewind / report) — hidden until the
+     message is hovered (PC), tapped (mobile) or text inside it is selected */
+  .msg { position: relative; }
+  .msg-actions {
+    position: absolute; z-index: 6; bottom: -34px; right: 8px;
+    display: flex; align-items: center; gap: 2px;
+    background: var(--sp-panel); border: 1px solid var(--sp-border-bright);
+    border-radius: 8px; padding: 2px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    opacity: 0; pointer-events: none; transform: translateY(-3px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+  .msg-actions.show { opacity: 1; pointer-events: auto; transform: none; }
+  @media (hover:hover) and (pointer:fine) {
+    .msg:hover > .msg-actions { opacity: 1; pointer-events: auto; transform: none; }
+  }
   .msg-actions .act-copy {
     width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
     background: transparent; border: 1px solid transparent; border-radius: 6px;
@@ -503,17 +517,6 @@
   .msg-actions .act-copy svg { width: 14px; height: 14px; fill: currentColor; }
   .msg-actions .act-copy:hover { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-border-bright); }
   .msg-actions .act-copy.done { color: var(--sp-accent); background: var(--sp-accent-dim); border-color: var(--sp-accent); }
-  /* Selection-triggered toolbar on user bubbles (copy / rewind) */
-  .msg.user { position: relative; }
-  .msg.user .msg-actions {
-    position: absolute; z-index: 6; bottom: -34px; right: 8px;
-    background: var(--sp-panel); border: 1px solid var(--sp-border-bright);
-    border-radius: 8px; padding: 2px; gap: 2px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    opacity: 0; pointer-events: none; transform: translateY(-3px);
-    transition: opacity 0.12s ease, transform 0.12s ease;
-  }
-  .msg.user .msg-actions.show { opacity: 1; pointer-events: auto; transform: none; }
   /* Report action outside the assistant actions strip (err/status bubbles) */
   .msg > .act-copy.act-report {
     display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
