@@ -452,15 +452,23 @@
       req.onerror = () => reject(req.error);
     });
   }
-  // Write-through: update cache synchronously, persist to IDB in the background.
-  // Never throws — a failed IDB write logs but does not crash the sync.
+  // Write-through: update cache synchronously, persist to IDB. Resolves true when
+  // the transaction COMMITTED, false otherwise — never rejects. Callers that also
+  // advance the Dropbox cursor MUST await this and only move the cursor on true:
+  // the cursor lives in localStorage (durable instantly) while the index lives in
+  // IDB (async). Advancing the cursor before the index landed — a reload racing
+  // the put, or a failed put — leaves the cursor past a delta whose entries the
+  // persisted index never received. Dropbox never re-reports unchanged files, so
+  // every file in that delta became invisible to sync for good (2026-09-13
+  // conversation lost this way: cloud had it, index/ledger did not, cursor valid).
   function _idbPutIndex(idx) {
-    _idbOpen().then(db => {
+    return _idbOpen().then(db => new Promise(resolve => {
       const tx = db.transaction(IDB_STORE, 'readwrite');
       tx.objectStore(IDB_STORE).put(JSON.stringify(idx), IDB_KEY);
-      tx.oncomplete = () => db.close();
-      tx.onerror = () => { db.close(); console.warn('[dropbox] IDB index write failed:', tx.error); };
-    }).catch(e => console.warn('[dropbox] IDB open (put) failed:', e));
+      tx.oncomplete = () => { db.close(); resolve(true); };
+      tx.onerror = () => { db.close(); console.warn('[dropbox] IDB index write failed:', tx.error); resolve(false); };
+      tx.onabort = () => { db.close(); console.warn('[dropbox] IDB index write aborted:', tx.error); resolve(false); };
+    })).catch(e => { console.warn('[dropbox] IDB open (put) failed:', e); return false; });
   }
   function _idbClearIndex() {
     _idbOpen().then(db => {
@@ -529,7 +537,10 @@
   function syncState() { return Ledger.read(); }
   function setSyncState(s) { Ledger.write(s); }
   function cloudIndex() { return _idxCache || {}; }   // synchronous — populated by loadCloudIndex() at boot
-  function setCloudIndex(i) { _idxCache = i; _idbPutIndex(i); }   // write-through to IndexedDB
+  function setCloudIndex(i) { _idxCache = i; _idbPutIndex(i); }   // write-through to IndexedDB (fire-and-forget; fine when no cursor moves)
+  // Durable variant for the listing paths: resolves only once IDB has the index,
+  // so the caller can gate the cursor advance on the result (see _idbPutIndex).
+  async function commitCloudIndex(i) { _idxCache = i; return await _idbPutIndex(i); }
   function dehydrated() { return !!tokens(); }  // always on-demand when Dropbox is connected
   function isExemptRel(rel) {
     const r = String(rel).replace(/^\/+/, '').toLowerCase();
@@ -755,7 +766,11 @@
         // Deletions the server confirms (ours or another device's) are no longer
         // pending — drop them from the handshake ledger so retries don't churn.
         if (deletions.length) setPendingDeletes(pendingDeletes().filter(r => !deletions.includes(r)));
-        setCursor(result.cursor); setCloudIndex(idx);
+        // Index FIRST, cursor only once the index is durable. On a failed commit the
+        // cursor stays put: the next sync re-fetches the same delta and re-applies it
+        // (idempotent — idx[rel] = e / delete idx[rel]) and retries the write.
+        if (await commitCloudIndex(idx)) setCursor(result.cursor);
+        else console.warn('[dropbox] index commit failed — cursor NOT advanced; this delta (' + delta.length + ' entries) will be re-fetched next sync');
         return { index: idx, delta, deletions, deltaOwn: delta.filter(([rel]) => pendingBefore[rel]).map(([rel]) => rel) };
       } catch (err) {
         console.warn('[dropbox] cursor sync failed, full re-list:', err.message);
@@ -784,7 +799,11 @@
       if (e.kind !== 'deleted') { out[rel] = e; confirmed.push(rel); }
     }
     if (confirmed.length) clearPending(confirmed);
-    setCursor(result.cursor); setCloudIndex(out);
+    // Same ordering as the delta path: a cursor that outlives its index is a
+    // permanent gap. If the commit fails we keep NO cursor, so the next sync
+    // re-lists (correct, just slower) instead of trusting an index that isn't there.
+    if (await commitCloudIndex(out)) setCursor(result.cursor);
+    else { setCursor(null); console.warn('[dropbox] index commit failed after full re-list — cursor cleared, will re-list next sync'); }
     // An empty enumeration of an existing working root is likewise treated as
     // non-authoritative for deletion. A genuinely-empty cloud (brand-new account)
     // has nothing local to delete anyway, so skipping the delete passes is a no-op
