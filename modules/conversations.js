@@ -1352,6 +1352,9 @@ const escAttr = escHtml;
 // chats inherit. touch() refreshes the registry MRU so the picker lists the
 // most recently used project first.
 function _setProjBinding(convId, projectId) {
+  // Placeholder-painted chips carry convId null — resolve to the focused
+  // conversation so a pick on an idle/new-chat slot still binds something real.
+  if (convId == null || convId === '') convId = activeConvId;
   const id = '' + (convId == null ? '' : convId);
   if (!id) {
     try {
@@ -1368,6 +1371,7 @@ function _setProjBinding(convId, projectId) {
 }
 
 function _projChipHtml(convId) {
+  if (convId == null || convId === '') convId = activeConvId;
   const s = convStreams.get('' + (convId == null ? '' : convId));
   // No explicit project → the DEFAULT project (the sync workspace root, e.g.
   // "sandpie"). There is no "no project" state anymore.
@@ -1380,6 +1384,7 @@ function _projChipHtml(convId) {
 // chip is re-stamped after each rebuild instead of being a separate node.
 function _paintProjChip(slot, convId) {
   if (!slot) return;
+  if (convId == null || convId === '') convId = activeConvId;
   let chip = slot.querySelector('.mt-proj');
   const html = _projChipHtml(convId);
   if (!chip) {
@@ -1411,6 +1416,7 @@ function _closeProjPanel() {
   document.querySelectorAll('.mt-proj.open').forEach(el => el.classList.remove('open'));
 }
 function _toggleProjPanel(chip, convId) {
+  if (convId == null || convId === '') convId = activeConvId;
   if (_projPanelFor === '' + (convId == null ? '' : convId)) { _closeProjPanel(); return; }
   _closeProjPanel();
   const r = chip.getBoundingClientRect();
