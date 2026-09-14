@@ -6,6 +6,8 @@ const { VfsError } = require('./vfs.js');
 const CONST = require('./constants.json');
 const { makeBufferBinding } = require('./buffer-binding.js');
 const { makeTcpWrap } = require('./tcp-wrap.js');
+const { makeDnsWrap } = require('./dns-wrap.js');
+const { makeHttpParser } = require('./http-parser.js');
 
 // privateSymbols is read off internalBinding('util') (lib/internal/errors.js:939),
 // and must be STABLE across reads -- a fresh Symbol per access silently breaks
@@ -353,7 +355,17 @@ function makeBindings(vfs, trace, realm) {
       toASCII: (s) => s, toUnicode: (s) => s,
     },
     url: { domainToASCII: (s) => s, domainToUnicode: (s) => s, parse: () => undefined, format: () => '', canParse: () => false, pathToFileURL: (p) => 'file://' + p },
-    performance: { now: () => performance.now(), constants: {}, installGarbageCollectionTracking: () => {}, removeGarbageCollectionTracking: () => {}, markMilestone: () => {}, setupObservers: () => {}, timeOrigin: Date.now(), timeOriginTimestamp: Date.now(), loopIdleTime: () => 0, createELDHistogram: () => ({}), nodeTiming: {} },
+    // observerCounts is read as observerCounts[getObserverType(type)] by
+    // internal/perf/observe.js hasObserver(); absent, dns.lookup died on
+    // "Cannot read properties of undefined (reading 'undefined')".
+    performance: { now: () => performance.now(),
+      observerCounts: new Uint32Array(16),
+      constants: {
+        NODE_PERFORMANCE_ENTRY_TYPE_GC: 0, NODE_PERFORMANCE_ENTRY_TYPE_HTTP2: 1,
+        NODE_PERFORMANCE_ENTRY_TYPE_HTTP: 2, NODE_PERFORMANCE_ENTRY_TYPE_NET: 3,
+        NODE_PERFORMANCE_ENTRY_TYPE_DNS: 4,
+        NODE_PERFORMANCE_MILESTONE_TIME_ORIGIN: 0,
+      }, milestones: new Float64Array(8), installGarbageCollectionTracking: () => {}, removeGarbageCollectionTracking: () => {}, markMilestone: () => {}, setupObservers: () => {}, timeOrigin: Date.now(), timeOriginTimestamp: Date.now(), loopIdleTime: () => 0, createELDHistogram: () => ({}), nodeTiming: {} },
     trace_events: { trace: () => {}, isTraceCategoryEnabled: () => false, getCategoryEnabledBuffer: () => new Uint8Array(1), setTraceCategoryState: () => {}, trace_category_state: new Uint8Array(1) },
     contextify: {
       ContextifyScript: class {}, makeContext: () => {}, isContext: () => false,
@@ -404,9 +416,25 @@ function makeBindings(vfs, trace, realm) {
         kReadBytesOrError: 0, kArrayBufferOffset: 1, kBytesWritten: 2, kLastWriteWasAsync: 3,
         getBuffer: () => realm.Buffer,
         pending: realm.pending,
+        trace: (m) => realm.trace && realm.trace('[tcp] ' + m),
         uvErrno: { UV_EOF: -4095 },
       });
     })(),
+    // DNS over REAL UDP sockets: the kernel's sockaddr carries only an address, so a
+    // guest must resolve names itself. walios serves UDP through wisp, so this speaks
+    // actual DNS rather than reaching for fetch.
+    cares_wrap: (() => {
+      if (!realm.sys || !realm.mem) return null;
+      return makeDnsWrap(realm.sys, realm.mem, {
+        readFileSync: (p2, e) => realm.readFileSync(p2, e),
+        pending: realm.pending,
+        servers: ['1.1.1.1', '8.8.8.8'],
+      });
+    })(),
+
+    // HTTP/1.1 in JS in place of llhttp, driven through node's callback-slot protocol.
+    http_parser: makeHttpParser({ getBuffer: () => realm.Buffer }),
+
     stream_wrap: {
       streamBaseState: STREAM_BASE_STATE,
       kReadBytesOrError: 0, kArrayBufferOffset: 1, kBytesWritten: 2,

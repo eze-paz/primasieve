@@ -34,9 +34,9 @@ process.on('exit', stop);
 
 // The WISP relay: without it the kernel has no egress and `net`/`http` cannot work.
 // serve.mjs proxies /wisp to it. Permissive allow-list because this is a local test.
-const wisp = spawn(process.execPath, ['../sandpie-server/scripts/wisp-standalone.mjs', '6970'], {
+const wisp = spawn(process.execPath, ['../../sandpie-server/scripts/wisp-standalone.mjs', '6970'], {
   cwd: new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
-  env: { ...process.env, WISP_ENABLED: '1', WISP_ALLOW_HOSTS: '*', WISP_ALLOW_PORTS: '80,443', WISP_ALLOW_ORIGINS: '*' },
+  env: { ...process.env, WISP_ENABLED: '1', WISP_ALLOW_HOSTS: '*', WISP_ALLOW_PORTS: '53,80,443', WISP_ALLOW_ORIGINS: 'http://localhost:' + PORT },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let wispLog = '';
@@ -112,6 +112,7 @@ await type('echo BACK-IN-ASH');
 await type('exit');
 await settle(1200);
 replText = await page2.evaluate(() => window.__text());
+if (wispLog.trim()) { console.log(BAR + 'wisp relay' + BAR); console.log(wispLog.trim().split(String.fromCharCode(10)).slice(-14).join(String.fromCharCode(10))); }
 console.log(BAR + 'interactive pty session' + BAR);
 
 console.log(replText.trimEnd() || '(empty)');
@@ -145,6 +146,7 @@ const checks = [
   ['tarball sha512 was verified', /integrity sha512 ok/.test(outText)],
   ['the installed package runs', /\[00000042\]/.test(outText)],
   ['net.connect over REAL sockets', /NET-CONNECT-OK/.test(outText)],
+  ['node http over REAL sockets', /HTTP-OVER-SYSCALLS/.test(outText)],
 ];
 console.log('\n================ verdict ================');
 let pass = 0;

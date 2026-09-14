@@ -50,6 +50,18 @@ echo "--- require the installed package ---"
 echo 'console.log("[" + require("/node_modules/left-pad")("42", 8, "0") + "]")' > /tmp/use.js
 node /tmp/use.js
 
+echo "--- node http over REAL walios sockets (no fetch) ---"
+cat > /tmp/http.js <<'HTTPEOF'
+// node's OWN lib/_http_client.js, on our http_parser and tcp_wrap. No fetch.
+const http = require('http');
+http.get({ hostname: 'example.com', port: 80, path: '/' }, (res) => {
+  let n = 0;
+  res.on('data', (c) => { n += c.length; });
+  res.on('end', () => console.log('HTTP-OVER-SYSCALLS status=' + res.statusCode + ' bytes=' + n));
+}).on('error', (e) => console.log('http failed: ' + e.message));
+HTTPEOF
+node /tmp/http.js
+
 echo "--- net.connect over REAL walios sockets ---"
 cat > /tmp/net.js <<'NETEOF'
 // node's own lib/net.js on walios socket syscalls -- no fetch, no shim.

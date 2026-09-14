@@ -22,7 +22,7 @@ function boot(libDir, opts = {}) {
   // Outstanding async work, so the process can wait for it instead of exiting the
   // instant main() returns. Declared here because tcp_wrap captures it at construction.
   const pending = { n: 0, onError: (e) => { throw e; } };
-  const realm = { sys: opts.sys || null, mem: opts.mem || null, pending };
+  const realm = { sys: opts.sys || null, mem: opts.mem || null, pending, trace: opts.trace || null };
   const internalBinding = makeBindings(vfs, trace, realm);
 
   // ---- primordials: node's own file, run as node runs it --------------------
@@ -209,6 +209,8 @@ function boot(libDir, opts = {}) {
   } catch (e) { trace.stderr.push('debuglog init: ' + e.message); }
 
   try { realm.Buffer = requireBuiltin('buffer').Buffer; realm.global.Buffer = realm.Buffer; } catch (_) {}
+  // cares_wrap reads /etc/hosts before going to the wire, like any resolver.
+  realm.readFileSync = (p2, e) => requireBuiltin('fs').readFileSync(p2, e);
 
   // http/https need the guest's own EventEmitter, so they are wired after boot.
   if (opts.shimFactories) {

@@ -47,12 +47,26 @@ function makeTcpWrap(sys, mem, deps) {
   // constructed -- so it is resolved on first use, not captured.
   const Buffer = new Proxy({}, { get: (_t, k) => deps.getBuffer()[k] });
 
-  const call = (n, ...a) => { try { return Number(sys[n](...a)); } catch (_) { return -EAGAIN; } };
+  const T = deps.trace || (() => {});
+  const call = (n, ...a) => {
+    try { const r = Number(sys[n](...a)); if (r < 0 && -r !== EAGAIN) T('sys.' + n + ' -> ' + r); return r; }
+    catch (e) { T('sys.' + n + ' THREW ' + ((e && e.message) || e)); return -EAGAIN; }
+  };
+
+  // The read/accept pumps must keep the process ALIVE. The worker's raw setTimeout
+  // does not register with `pending`, so the process exited the moment main() returned
+  // and every response arrived after nobody was listening.
+  const later = (fn, ms) => {
+    if (pending) pending.n++;
+    return setTimeout(() => { if (pending) pending.n--; fn(); }, ms);
+  };
+  const cancel = (t) => { if (t) { clearTimeout(t); if (pending && pending.n > 0) pending.n--; } };
 
   class TCP {
     constructor() {
       this.fd = -1;
       this.reading = false;
+      this._pumping = false;
       this.onread = null;
       this.onconnection = null;
       this._closed = false;
@@ -85,6 +99,7 @@ function makeTcpWrap(sys, mem, deps) {
       const sa = mem.alloc(16);
       writeSockaddrIn(mem, sa, ip, port);
       const r = call('connect', this.fd, sa, 16);
+      T('connect ' + ip + ':' + port + ' fd=' + this.fd + ' -> ' + r);
       mem.reset();
       if (r < 0 && -r !== EINPROGRESS) return r;
       this._setNonBlock(true);
@@ -103,6 +118,7 @@ function makeTcpWrap(sys, mem, deps) {
         const chunk = bytes.subarray(sent);
         const p = mem.bytes(chunk);
         const n = call('sendto', this.fd, p, chunk.length, 0, 0, 0);
+        T('send fd=' + this.fd + ' len=' + chunk.length + ' -> ' + n);
         mem.reset();
         if (n < 0) {
           if (-n === EAGAIN || -n === EINTR) continue;     // kernel serves blocking sends
@@ -112,8 +128,11 @@ function makeTcpWrap(sys, mem, deps) {
         sent += n;
       }
       streamBaseState[kBytesWritten] = sent;
+      // 0 = the write finished synchronously. node then completes the request ITSELF,
+      // inline, so calling req.oncomplete here as well is a second callback --
+      // "ERR_MULTIPLE_CALLBACK: Callback called multiple times".
       streamBaseState[kLastWriteWasAsync] = 0;
-      if (req) { req.bytes = sent; queueMicrotask(() => { if (req.oncomplete) req.oncomplete(0, this, req); }); }
+      if (req) req.bytes = sent;
       return 0;
     }
     writeBuffer(req, buf) { return this._write(req, buf); }
@@ -136,15 +155,20 @@ function makeTcpWrap(sys, mem, deps) {
 
     // ---- read ---------------------------------------------------------------
     readStart() {
-      if (this.reading || this._closed) return 0;
-      this.reading = true;
+      // `reading` is NODE's flag: internal/stream_base_commons sets handle.reading =
+      // true BEFORE calling readStart, so guarding on it meant the pump never started.
+      if (this._pumping || this._closed) return 0;
+      this._pumping = true;
       this._setNonBlock(true);
       const BUF = 64 * 1024;
+      let ticks = 0;
       const tick = () => {
-        if (!this.reading || this._closed) return;
+        if (++ticks <= 3 || ticks % 50 === 0) T('tick ' + ticks + ' fd=' + this.fd);
+        if (!this._pumping || this._closed) return;
         for (;;) {
           const p = mem.alloc(BUF);
           const n = call('recvfrom', this.fd, p, BUF, 0, 0, 0);
+          if (n !== -EAGAIN) T('recv fd=' + this.fd + ' -> ' + n);
           if (n > 0) {
             const bytes = mem.u8().slice(p, p + n);
             mem.reset();
@@ -157,24 +181,24 @@ function makeTcpWrap(sys, mem, deps) {
           mem.reset();
           if (n === 0) {                                // orderly EOF
             streamBaseState[kReadBytesOrError] = uvErrno.UV_EOF;
-            this.reading = false;
+            this._pumping = false;
             if (this.onread) this.onread(Buffer.alloc(0));
             return;
           }
           if (-n === EAGAIN || -n === EINTR) break;      // nothing right now
           streamBaseState[kReadBytesOrError] = n;        // real error
-          this.reading = false;
+          this._pumping = false;
           if (this.onread) this.onread(Buffer.alloc(0));
           return;
         }
-        this._pump = setTimeout(tick, 1);               // poll; see header
+        this._pump = later(tick, 1);                    // poll; see header
       };
-      this._pump = setTimeout(tick, 0);
+      this._pump = later(tick, 0);
       return 0;
     }
     readStop() {
-      this.reading = false;
-      if (this._pump) { clearTimeout(this._pump); this._pump = null; }
+      this._pumping = false;
+      if (this._pump) { cancel(this._pump); this._pump = null; }
       return 0;
     }
 
@@ -202,9 +226,9 @@ function makeTcpWrap(sys, mem, deps) {
           client._setNonBlock(true);
           if (this.onconnection) this.onconnection(0, client);
         }
-        this._pump = setTimeout(tick, 5);
+        this._pump = later(tick, 5);
       };
-      this._pump = setTimeout(tick, 0);
+      this._pump = later(tick, 0);
       return 0;
     }
 

@@ -215,7 +215,7 @@ function runNode() {
   try {
     vfs = new KernelVfs(sys, arena);
 
-    rt = boot(null, { sources: libSources, vfs, shimFactories, sys, mem: arena });
+    rt = boot(null, { sources: libSources, vfs, shimFactories, sys, mem: arena, trace });
     raw('boot ok; lib modules=' + rt.trace.loaded.length);
   } catch (e) {
     raw('BOOT FAILED: ' + ((e && e.stack) || e));

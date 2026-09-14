@@ -39,7 +39,23 @@ async function boot() {
   const WB = self.WALIOS_BACKEND;
   if (!WB) throw new Error('walios-backend.js did not load (serve the repo root)');
 
+  self.WALIOS_NODE_DEBUG = new URLSearchParams(location.search).has('debug');
   kernel = new Worker('/walios/wali-worker.js');
+
+  // WISP bridge: the kernel does not own the WebSocket -- a sibling worker does, and
+  // they share a SAB. Without this the kernel answers every socket call with
+  // "no WISP bridge (sockets unavailable)", so net/dns/http cannot work.
+  try {
+    const wispSab = new SharedArrayBuffer(32 + 65536);
+    const wispWorker = new Worker('/walios/wisp-worker.js');
+    wispWorker.postMessage({
+      t: 'sab', sab: wispSab,
+      url: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp',
+    });
+    kernel.postMessage({ t: 'wisp-sab', sab: wispSab });
+  } catch (e) {
+    write(err, 'no wisp bridge: ' + (e && e.message) + String.fromCharCode(10));
+  }
   kernel.onerror = (e) => write(err, 'kernel worker error: ' + (e.message || e) + '\n');
   kernel.onmessage = (ev) => {
     const m = ev.data;
