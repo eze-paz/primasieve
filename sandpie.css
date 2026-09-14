@@ -3158,10 +3158,6 @@ body.sp-decoding *::after {
   box-shadow: none;
   transition: none;
 }
-[data-theme="clear"] .assistant:hover {
-  border-color: var(--sp-accent-dim);
-  box-shadow: none;
-}
 [data-theme="clear"] .assistant code {
   padding: 0.15em 0.35em;
   color: var(--sp-accent);
