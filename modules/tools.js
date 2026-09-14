@@ -547,35 +547,21 @@ const RUN_PYTHON_WALIOS = (() => {
 
 // walios runs every guest process on its own worker and its kernel reads guest memory
 // through SharedArrayBuffers, so it needs cross-origin isolation (the app serves the
-// COOP/COEP headers) -- and nothing else, so it is not Chromium-only. Without
-// isolation there is no SharedArrayBuffer and the OS cannot start; fall back to Pyodide.
+// COOP/COEP headers) -- and nothing else, so it is not Chromium-only.
 //
-// Since 2026-09-14 run_python is walios, full stop -- there is no preference and no
-// opt-in any more. It is a real CPython 3.14 kept WARM between calls (imports and
-// globals persist: a reused import measured ~3ms against ~650ms for a fresh
+// Since 2026-09-14 run_python IS walios: no preference, no opt-in, and no silent fall
+// back to Pyodide. It is a real CPython 3.14 kept WARM between calls (imports and
+// globals persist -- a reused import measured ~3ms against ~650ms for a fresh
 // interpreter), with real sockets/TLS and the heavy packages built in.
 //
-// Pyodide is deliberately still here, as the one thing it is now for: the fallback for
-// a page that is NOT cross-origin isolated, where SharedArrayBuffer does not exist and
-// the OS genuinely cannot start. That is the only way to land on it.
-//
-// THE SAME predicate must decide the tool DESCRIPTION and the tool's actual BACKEND, or
-// the model is told walios's rules while running on Pyodide — that exact mismatch was a
-// real bug once already. conversations.js calls SandpieTools.waliosPython() for the
-// worker's config so there is one answer, not two.
-function _waliosCapable() {
-  return typeof WebAssembly !== 'undefined' && typeof SharedArrayBuffer === 'function';
-}
-let _waliosWarned = false;
-function _waliosPython() {
-  if (_waliosCapable()) return true;
-  if (!_waliosWarned) {
-    _waliosWarned = true;
-    console.warn('[sandpie] this page has no SharedArrayBuffer (not cross-origin isolated), '
-                 + 'so the walios python backend cannot start — falling back to Pyodide.');
-  }
-  return false;
-}
+// A page with no cross-origin isolation has no SharedArrayBuffer and cannot start the
+// OS at all. It gets an ERROR that says exactly that (see tool_run_python_walios), NOT
+// a different engine: quietly swapping the interpreter underneath the model is the
+// failure this file has warned about all along -- it was handed walios's rules and ran
+// on Pyodide, and that was a real bug once. With one backend the description is always
+// true, so the predicate is now a constant and kept only as the single place to change
+// if that ever stops being so.
+function _waliosPython() { return true; }
 
 const SandpieTools = {
   // The single answer to "is run_python actually running on walios right now?" —

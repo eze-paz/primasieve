@@ -3392,7 +3392,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=231');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=232');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -4246,19 +4246,10 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     routedViaVision: !!routedViaVision,
     // Python backend for run_python: walios, the WARM interpreter -- native-wasm
     // numpy/pandas/matplotlib with imports paid once per session rather than once per
-    // call, and globals that survive between calls. There is no preference to set.
-    // Pyodide remains only as the fallback for a page that is not cross-origin isolated,
-    // where SharedArrayBuffer does not exist and walios cannot start.
-    // Asks SandpieTools rather than testing capability here, because it must be the SAME
-    // answer that picked the tool description -- telling the model walios's rules while
-    // running on Pyodide was a real bug once. Not Chromium-only: see _waliosCapable in
-    // tools.js, which tests WebAssembly + SharedArrayBuffer and nothing else.
-    pythonBackend: (() => {
-      try { if (window.SandpieTools && window.SandpieTools.waliosPython) return window.SandpieTools.waliosPython() ? 'walios' : ''; } catch (_) {}
-      // SandpieTools missing (load failure): mirror its rule rather than silently
-      // disagreeing with whatever description the model was handed.
-      try { return (typeof SharedArrayBuffer === 'function') ? 'walios' : ''; } catch (_) { return ''; }
-    })(),
+    // call, and globals that survive between calls. There is no preference to set and no
+    // fallback: a page that cannot start walios gets an error from the tool saying so,
+    // rather than a quietly different interpreter than the description it was handed.
+    pythonBackend: 'walios',
     // web_search primary backend: the first configured OpenRouter provider's
     // endpoint+key (active provider preferred), so the tool gets real Exa-backed
     // results even when the active model is NOT on OpenRouter. The worker calls

@@ -915,10 +915,10 @@ function truncateToolResult(result) {
 // keep streaming — and lets several scripts run in parallel. The pool worker
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
-// walios unless this context cannot run it (no cross-origin isolation -> no
-// SharedArrayBuffer). An 'agent' run overwrites this from its config; the default has to
-// agree with that rule on its own, or a direct tool call silently runs the other engine.
-let _pyBackend = (typeof SharedArrayBuffer === 'function') ? 'walios' : 'pyodide';
+// run_python is walios, always. An 'agent' run sets this from its config, which says the
+// same thing; the default has to agree on its own, or a direct tool call would run a
+// different interpreter than the description the model was handed.
+let _pyBackend = 'walios';
 
 // The run_python description shipped in tools.js describes PYODIDE: ~100 prebuilt wheels,
 // micropip, and "no sockets, use pyfetch". On the walios backend three of those are wrong,
@@ -3513,6 +3513,12 @@ function waliosPythonRun({ code, timeout, cwd, signal, file, argv }) {
 // run_python on the walios backend. Same contract as the Pyodide one: stdout +
 // stderr as text, `path` runs a saved script, `code` runs a snippet.
 async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
+  // The kernel reads guest memory over SharedArrayBuffers, so without cross-origin
+  // isolation the OS cannot start. Say that, rather than quietly running a different
+  // interpreter than the description the model was handed.
+  if (typeof SharedArrayBuffer !== 'function')
+    return { result: 'Error: run_python needs SharedArrayBuffer (cross-origin isolation), which this page does not have. '
+                     + 'The app serves the COOP/COEP headers, so this usually means the page was opened outside it.' };
   let src = code, cwd = '/root';
   let guestFile = null;
   if (!src) {
