@@ -12,9 +12,12 @@
 //
 // REQUIREMENTS: the walios runtime assets are NOT in this repo (gitignored, ~22MB).
 // Put them in walios/ at the repo root before running:
-//   scp sandpie:/opt/sandpie-server/walios/{wali-worker.js,opfs-worker.js,wisp-worker.js,\
-//   busybox.wasm,rootfs.tar.gz,python_cxx.wasm,pylib.tar.gz,walios-ext.tar.gz,\
-//   walios-extras.tar.gz} walios/
+//   scp sandpie:/opt/sandpie-server/walios/{wali-worker.js,wali-proc-worker.js,\
+//   opfs-worker.js,wisp-worker.js,busybox.wasm,rootfs.tar.gz,python_cxx.wasm,\
+//   pylib.tar.gz,walios-ext.tar.gz,walios-extras.tar.gz} walios/
+// Keep these in sync with the deployed kernel: a STALE wali-worker.js, or a missing
+// wali-proc-worker.js (every process runs on one), makes every guest exit 127 rather
+// than skip -- which reads like a broken bridge instead of a stale checkout.
 // The LibreOffice engine itself is fetched from cdn.zetaoffice.net, so the run needs
 // internet access. Skips (exit 0) with a clear message when either is missing.
 //
@@ -33,8 +36,9 @@ const HEADED = process.argv.includes('--headed');
 // slow part (~20-90s), the walios side is seconds.
 const CONVERT_TIMEOUT_MS = 210000;
 
-const ASSETS = ['wali-worker.js', 'opfs-worker.js', 'wisp-worker.js', 'busybox.wasm',
-  'rootfs.tar.gz', 'python_cxx.wasm', 'pylib.tar.gz', 'walios-ext.tar.gz', 'walios-extras.tar.gz'];
+const ASSETS = ['wali-worker.js', 'wali-proc-worker.js', 'opfs-worker.js', 'wisp-worker.js',
+  'busybox.wasm', 'rootfs.tar.gz', 'python_cxx.wasm', 'pylib.tar.gz', 'walios-ext.tar.gz',
+  'walios-extras.tar.gz'];
 const missing = ASSETS.filter(a => !fs.existsSync(path.join(repoRoot, 'walios', a)));
 if (missing.length) {
   console.log('SKIP: walios runtime assets missing from walios/ — ' + missing.join(', '));
@@ -71,24 +75,22 @@ const server = spawn(process.platform === 'win32' ? 'python' : 'python3', ['cois
 let browser;
 try {
   await waitPort(PORT, 10000);
-  browser = await chromium.launch({
-    headless: !HEADED,
-    args: ['--enable-features=WebAssemblyExperimentalJSPI', '--js-flags=--experimental-wasm-jspi'],
-  });
+  browser = await chromium.launch({ headless: !HEADED });
   const page = await browser.newPage();
   page.on('pageerror', e => console.log('  [pageerror]', String(e).slice(0, 200)));
   await page.goto(`http://127.0.0.1:${PORT}/sandpie.html`);
   await page.waitForFunction(() => !!window._sandpieWorker && !!window.opfs, null, { timeout: 30000 });
 
+  // walios needs cross-origin isolation (SharedArrayBuffer) and nothing else: every
+  // process runs on its own worker and the kernel serves blocking syscalls
+  // asynchronously, so there is no engine flag to enable.
   const env = await page.evaluate(() => ({
     coi: crossOriginIsolated,
-    jspi: typeof WebAssembly.Suspending === 'function',
     engine: typeof (window.opfs && window.opfs._officeEngine) === 'function',
   }));
   check('page is cross-origin isolated', env.coi);
-  check('JSPI available (walios needs it)', env.jspi);
   check('page exposes the office engine', env.engine);
-  if (!env.coi || !env.jspi) throw new Error('environment cannot run walios: ' + JSON.stringify(env));
+  if (!env.coi) throw new Error('environment cannot run walios: ' + JSON.stringify(env));
 
   // Seed the workspace: /root in the guest IS the OPFS root.
   await page.evaluate(async (docxUrl) => {

@@ -36,8 +36,8 @@
   // wasi-threads binaries had one, so a WASI child exec'd from the shell (qjs) could
   // not open any path: `qjs -e` worked, `qjs /tmp/t.js` and std.open() said ENOENT.
   // dlopen17: ONE engine. Every process runs on its own worker; the kernel is a
-  // never-blocked async syscall server. The JSPI engine (Chrome-only) and the in-kernel
-  // synchronous engine are gone, and with them the stdin/mount SAB bridges that only
+  // never-blocked async syscall server. The two older execution engines are gone, and
+  // with them the stdin/mount SAB bridges that only
   // existed to feed a parked kernel, the sync lazy-fetch, and the separate wasi-threads
   // proxy (merged into the process worker: imported shared memory + thread mode). One
   // exec path (resolveExec + startProcess). WASI guests must link shared memory
@@ -194,7 +194,12 @@ WORKER_V = 'sig30';
 
     env(_mode) {
       const e = Object.assign({}, PY_ENV);
-      e.SANDPIE_ASYNCIO = '1';                            // the browser worker has JSPI, so asyncio works
+      // This backend is the BROWSER host: every process gets its own worker and the
+      // kernel answers blocking syscalls asynchronously (dlopen17), so epoll — and
+      // therefore asyncio — works.
+      // Hosts that cannot do this (the node one) simply never set the flag, and
+      // walios-repl.py's _loop_usable() then drives coroutines directly.
+      e.SANDPIE_ASYNCIO = '1';
       e.SANDPIE_LAZY_PKGS = JSON.stringify(LAZY_PKGS);
       return e;
     },

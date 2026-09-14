@@ -4249,9 +4249,11 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // WARM walios interpreter instead: native-wasm numpy/pandas/matplotlib with
     // imports paid once per session rather than once per call. Staged as a shadow
     // backend so the default path is untouched.
-    // Asks SandpieTools rather than reading the preference directly: walios needs JSPI
-    // (Chromium-only) and traps without it, so the answer is preference AND capability —
-    // and it must be the SAME answer that picked the tool description.
+    // Asks SandpieTools rather than reading the preference directly: walios needs
+    // cross-origin isolation (SharedArrayBuffer) and cannot start without it, so the
+    // answer is preference AND capability — and it must be the SAME answer that picked
+    // the tool description. Not Chromium-only: see _waliosCapable in tools.js, which
+    // tests WebAssembly + SharedArrayBuffer and nothing else.
     pythonBackend: (() => {
       try { if (window.SandpieTools && window.SandpieTools.waliosPython) return window.SandpieTools.waliosPython() ? 'walios' : ''; } catch (_) {}
       try { return (localStorage.getItem('sandpie-python-backend') || '').trim(); } catch (_) { return ''; }

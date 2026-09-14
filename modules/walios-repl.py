@@ -86,9 +86,10 @@ class _Immediate:
 
     Our shims block on a host round-trip inside `_hostcall`, so they never actually
     yield to an event loop — modelling them as coroutines only forced one to exist.
-    That mattered: asyncio needs epoll, which needs JSPI, so `await pyfetch(...)` worked
-    in the browser but hung forever on the node host. With this, `await` on a shim works
-    under any driver, including the trivial one in `_maybe_await`."""
+    That mattered: asyncio needs epoll, which needs a kernel that can serve a blocking
+    syscall, so `await pyfetch(...)` worked in the browser but hung forever on the node
+    host. With this, `await` on a shim works under any driver, including the trivial one
+    in `_maybe_await`."""
 
     __slots__ = ("_fn",)
 
@@ -663,10 +664,12 @@ def _get_loop():
 def _loop_usable():
     """Can asyncio actually run here? The HOST says so; the guest must not try to find out.
 
-    asyncio needs epoll, which needs JSPI. The browser worker has it, the node host does
-    not — and where it is missing the loop BLOCKS rather than failing, so a probe cannot
-    be bounded (SIGALRM does not interrupt it). So the host that knows its own capability
-    sets SANDPIE_ASYNCIO=1, and everything else falls back to driving coroutines directly.
+    asyncio needs epoll, which needs a kernel that can serve a blocking syscall. The
+    browser host does (each process on its own worker, async syscall server); the node
+    host does not — and where it is missing the loop BLOCKS rather than failing, so a
+    probe cannot be bounded (SIGALRM does not interrupt it). So the host that knows its
+    own capability sets SANDPIE_ASYNCIO=1, and everything else falls back to driving
+    coroutines directly.
     """
     return os.environ.get("SANDPIE_ASYNCIO") == "1"
 

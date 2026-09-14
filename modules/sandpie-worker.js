@@ -3155,8 +3155,8 @@ async function tool_walios({ script, timeout }, ctx) {
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
   // Unlike run_python there is no second implementation to fall back to, so say why.
   // The kernel runs each process on its own worker over SharedArrayBuffers, which needs
-  // cross-origin isolation (the app serves the COOP/COEP headers) -- not JSPI, so this
-  // works in every isolated browser, not only Chromium.
+  // cross-origin isolation (the app serves the COOP/COEP headers) -- and nothing else,
+  // so this works in every isolated browser, not only Chromium.
   if (typeof SharedArrayBuffer !== 'function')
     return { result: 'Error: the walios shell needs SharedArrayBuffer (cross-origin isolation), which this page does not have. '
                      + 'Use run_python for computation, or the shell tool for the relay host.' };

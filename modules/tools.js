@@ -547,7 +547,7 @@ const RUN_PYTHON_WALIOS = (() => {
 
 // walios runs every guest process on its own worker and its kernel reads guest memory
 // through SharedArrayBuffers, so it needs cross-origin isolation (the app serves the
-// COOP/COEP headers) -- and nothing else: no JSPI, so it is not Chromium-only. Without
+// COOP/COEP headers) -- and nothing else, so it is not Chromium-only. Without
 // isolation there is no SharedArrayBuffer and the OS cannot start; fall back to Pyodide.
 //
 // THE SAME predicate must decide the tool DESCRIPTION and the tool's actual BACKEND, or
