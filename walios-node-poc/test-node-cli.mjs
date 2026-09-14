@@ -56,6 +56,10 @@ async function runNode(argv, seed, opts) {
   let code, thrown = null;
   try { code = main(rt, sys, arena); }
   catch (e) { thrown = e; code = 139; }
+  // Same exit rule as the worker: wait for outstanding async work.
+  const deadline = Date.now() + 5000;
+  while (rt.pending && rt.pending.n > 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 1));
+  if (typeof rt.process.exitCode === 'number') code = rt.process.exitCode;
   await new Promise((r) => setTimeout(r, 30));      // let stdout flush
   await kernel.terminate();
   return { out, err, code, thrown, calls: vfs.calls };
@@ -151,6 +155,34 @@ await t('REPL: console.log inside the REPL', ['/bin/node'], (r) => /repl-log/.te
 await t('REPL: fs works (real syscalls)', ['/bin/node'], (r) => /etc-ok/.test(r.out),
   null, { tty: true, stdin: 'require("fs").readFileSync("/etc/hosts","utf8") ? "etc-ok" : "no"' + N + '.exit' + N });
 
+
+// ---- async: timers, promises, nextTick, fs.promises -------------------------
+await t('setTimeout fires before exit', ['/bin/node', '-e', 'setTimeout(()=>console.log("TIMER"),5)'], 'TIMER');
+await t('setImmediate fires', ['/bin/node', '-e', 'setImmediate(()=>console.log("IMM"))'], 'IMM');
+await t('process.nextTick fires', ['/bin/node', '-e', 'process.nextTick(()=>console.log("TICK"))'], 'TICK');
+await t('nextTick runs after main body', ['/bin/node', '-e', 'process.nextTick(()=>console.log("B"));console.log("A")'], 'A' + N + 'B');
+await t('promise .then', ['/bin/node', '-e', 'Promise.resolve("P").then(v=>console.log(v))'], 'P');
+await t('async/await', ['/bin/node', '-e', '(async()=>{console.log(await Promise.resolve("AW"))})()'], 'AW');
+await t('await fs.promises.readFile', ['/bin/node', '-e',
+  '(async()=>{const s=await require("fs").promises.readFile("/etc/hosts","utf8");console.log(s.trim())})()'],
+  '127.0.0.1 localhost');
+await t('await fs.promises write+read round trip', ['/bin/node', '-e',
+  '(async()=>{const fsp=require("fs").promises;await fsp.writeFile("/tmp/p.txt","promised");console.log(await fsp.readFile("/tmp/p.txt","utf8"))})()'],
+  'promised');
+await t('await fs.promises.readdir', ['/bin/node', '-e',
+  '(async()=>{const d=await require("fs").promises.readdir("/etc");console.log(d.sort().join(","))})()'],
+  'gitconfig,hosts,passwd');
+await t('await fs.promises.stat', ['/bin/node', '-e',
+  '(async()=>{const st=await require("fs").promises.stat("/etc/hosts");console.log("size="+(st.size>0))})()'],
+  'size=true');
+await t('fs.promises.mkdir + rm round trip', ['/bin/node', '-e',
+  '(async()=>{const fsp=require("fs").promises;await fsp.mkdir("/tmp/pd");await fsp.writeFile("/tmp/pd/f","x");console.log((await fsp.readdir("/tmp/pd")).join(","))})()'],
+  'f');
+await t('async exitCode is honoured', ['/bin/node', '-e', 'setTimeout(()=>{process.exitCode=4},2)'],
+  (r) => r.code === 4);
+await t('rejected promise surfaces', ['/bin/node', '-e',
+  '(async()=>{try{await require("fs").promises.readFile("/nope/x")}catch(e){console.log("caught "+e.code)}})()'],
+  'caught ENOENT');
 
 console.log('PASS (' + ok.length + ')');
 for (const s of ok) console.log('  + ' + s);

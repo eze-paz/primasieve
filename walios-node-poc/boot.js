@@ -34,6 +34,9 @@ function boot(libDir, opts = {}) {
   // ---- a minimal process object (Phase 1 replaces this with the real bootstrap)
   const listeners = new Map();
   const tickQueue = [];
+  // Outstanding async work, so the process can wait for it instead of exiting the
+  // instant main() returns. Timers and nextTick both register here.
+  const pending = { n: 0, onError: (e) => { throw e; } };
   const process = {
     platform: 'linux', arch: 'wasm32',
     version: 'v22.23.2',
@@ -46,7 +49,9 @@ function boot(libDir, opts = {}) {
     chdir: () => {},
     exitCode: undefined,
     exit(code) { this.exitCode = code; },
-    nextTick(fn, ...a) { tickQueue.push([fn, a]); },
+    // Onto the REAL microtask queue. The old synthetic queue was drained by nothing,
+    // so every process.nextTick callback was silently dropped.
+    nextTick(fn, ...a) { pending.n++; queueMicrotask(() => { pending.n--; try { fn(...a); } catch (e) { pending.onError(e); } }); },
     emitWarning(w) { trace.stderr.push('Warning: ' + (w && w.message ? w.message : w)); },
     on(ev, fn) { (listeners.get(ev) || listeners.set(ev, []).get(ev)).push(fn); return this; },
     once(ev, fn) { return this.on(ev, fn); },
@@ -65,7 +70,17 @@ function boot(libDir, opts = {}) {
   };
 
   realm.process = process;
-  realm.global = { process, console: { log: (...a) => trace.stderr.push(a.join(' ')) } };
+  // Timers go through the realm so outstanding ones can be counted; user code that
+  // calls setTimeout must keep the process alive, exactly as in node.
+  const timers = {
+    setTimeout: (fn, ms, ...a) => { pending.n++; return setTimeout(() => { pending.n--; try { fn(...a); } catch (e) { pending.onError(e); } }, ms); },
+    setInterval: (fn, ms, ...a) => setInterval(fn, ms, ...a),
+    setImmediate: (fn, ...a) => { pending.n++; return setTimeout(() => { pending.n--; try { fn(...a); } catch (e) { pending.onError(e); } }, 0); },
+    clearTimeout: (t) => { if (t !== undefined) { clearTimeout(t); if (pending.n > 0) pending.n--; } },
+    clearInterval: (t) => clearInterval(t),
+  };
+  Object.assign(realm, timers);
+  realm.global = Object.assign({ process, console: { log: (...a) => trace.stderr.push(a.join(' ')) } }, timers);
 
   // ---- the builtin loader (mirrors BuiltinModule.compileForInternalLoader) ---
   const cache = new Map();
@@ -187,7 +202,7 @@ function boot(libDir, opts = {}) {
 
   try { realm.Buffer = requireBuiltin('buffer').Buffer; realm.global.Buffer = realm.Buffer; } catch (_) {}
 
-  return { require: requireBuiltin, process, primordials, internalBinding, vfs, trace, realm };
+  return { require: requireBuiltin, process, primordials, internalBinding, vfs, trace, realm, pending };
 }
 
 module.exports = { boot };

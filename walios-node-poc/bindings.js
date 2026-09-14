@@ -75,6 +75,45 @@ function makeBindings(vfs, trace, realm) {
     access: wrap('access')((path) => { vfs.statPath(path); }),
     realpath: wrap('realpath')((path) => vfs._norm(path)),
     existsSync: (path) => vfs.exists(path) >= 0,
+
+    // ---- fs.promises -------------------------------------------------------
+    // node's promises layer passes kUsePromises as the request argument and awaits
+    // the result. Our bindings return synchronously, and `await` on a plain value
+    // is fine -- so the whole promises surface works without an async kernel path.
+    // What it is NOT is concurrent: two awaited reads still run one after the other.
+    openFileHandle: wrap('open')((path, flags, mode) => {
+      const fd = vfs.open(path, flags, mode === undefined ? 0o666 : mode);
+      return {
+        fd,
+        // Awaited inside a promise chain, so it must return a real Promise.
+        close: () => { try { vfs.close(fd); } catch (_) {} return Promise.resolve(); },
+        release: () => {},
+        getAsyncId: () => 0,
+      };
+    }),
+    // Cheap POSIX bits promises.js reaches for. No ownership or permission model
+    // here, so these succeed rather than pretending to enforce something.
+    chmod: () => 0, fchmod: () => 0, lchmod: () => 0,
+    chown: () => 0, fchown: () => 0, lchown: () => 0,
+    utimes: () => 0, futimes: () => 0, lutimes: () => 0,
+    fdatasync: () => 0, fsync: () => 0,
+    copyFile: wrap('copyfile')((src, dest) => {
+      const st = vfs.statPath(src);
+      const rfd = vfs.open(src, 0, 0);
+      const buf = new Uint8Array(st.size);
+      vfs.read(rfd, buf, 0, st.size, 0);
+      vfs.close(rfd);
+      const wfd = vfs.open(dest, 1 | 0o100 | 0o1000, 0o644);
+      vfs.write(wfd, buf, null);
+      vfs.close(wfd);
+      return 0;
+    }),
+    mkdtemp: wrap('mkdtemp')((prefix) => {
+      const p = String(prefix).replace(/X{6}$/, '') + Math.random().toString(36).slice(2, 8);
+      vfs.mkdir(p);
+      return p;
+    }),
+    statfs: () => new Float64Array([4096, 4096, 1 << 20, 1 << 19, 1 << 19, 1 << 16, 1 << 15, 0, 255, 0, 0]),
     // Pass the caller's flags THROUGH. Force-ORing O_TRUNC here truncated on every
     // append: fs.appendFileSync('/x','!') returned '!' instead of '<old>!'.
     // stringToFlags() already sets O_CREAT|O_TRUNC for 'w', O_CREAT|O_APPEND for 'a'.
@@ -97,6 +136,24 @@ function makeBindings(vfs, trace, realm) {
     getFormatOfExtensionlessFile: () => 1,
     getValidatedPath: (p) => p,
   };
+
+  // node's promises layer passes kUsePromises as the request argument and then calls
+  // PromisePrototypeThen on the RESULT -- which must therefore be a genuine Promise,
+  // not a plain value ("Promise.prototype.then called on incompatible receiver").
+  // Wrap every fs entry: called with the sentinel, return a real Promise; otherwise
+  // behave exactly as before, so the sync paths are untouched.
+  const K_USE_PROMISES = Symbol('kUsePromises');
+  for (const [name, fn] of Object.entries(fsBinding)) {
+    if (typeof fn !== 'function' || name === 'FSReqCallback') continue;
+    fsBinding[name] = function (...a) {
+      const promised = a.length && a[a.length - 1] === K_USE_PROMISES;
+      if (promised) a = a.slice(0, -1);
+      if (!promised) return fn.apply(this, a);
+      try { return Promise.resolve(fn.apply(this, a)); }
+      catch (e) { return Promise.reject(e); }
+    };
+  }
+  fsBinding.kUsePromises = K_USE_PROMISES;
 
   const errnoEntries = Object.entries(CONST.os.errno);
 
@@ -244,7 +301,36 @@ function makeBindings(vfs, trace, realm) {
       resourceUsage: () => [0, 0], uptime: () => performance.now() / 1000,
       _rawDebug: (s) => trace.stderr.push(String(s)), reallyExit: () => {}, patchProcessObject: () => {},
     },
-    string_decoder: { encodings: ['ascii', 'utf8', 'base64', 'ucs2', 'binary', 'hex', 'utf16le', 'base64url'], kIncompleteCharactersStart: 0, kIncompleteCharactersEnd: 4, kMissingBytes: 4, kBufferedBytes: 5, kEncodingField: 6, kNumFields: 7 },
+    // A real decoder, not a stub: fs.promises.readFile decodes its chunks through
+    // StringDecoder, and a stub failed with ERR_INVALID_ARG_TYPE. The encoding index
+    // lives in the handle buffer at kEncodingField; state is kept per handle.
+    string_decoder: (() => {
+      const ENC = ['ascii', 'utf8', 'base64', 'ucs2', 'binary', 'hex', 'utf16le', 'base64url'];
+      const state = new WeakMap();
+      const mk = (enc) => {
+        if (enc === 'utf8') { const d = new TextDecoder('utf-8'); return { write: (b) => d.decode(b, { stream: true }), end: () => d.decode(new Uint8Array(0)) }; }
+        if (enc === 'ucs2' || enc === 'utf16le') { const d = new TextDecoder('utf-16le'); return { write: (b) => d.decode(b, { stream: true }), end: () => '' }; }
+        const conv = (b) => {
+          if (enc === 'hex') { let o = ''; for (const x of b) o += x.toString(16).padStart(2, '0'); return o; }
+          if (enc === 'base64' || enc === 'base64url') return makeBufferBinding().base64Slice.call(b, 0, b.length);
+          let o = ''; for (const x of b) o += String.fromCharCode(enc === 'ascii' ? x & 0x7f : x); return o;
+        };
+        return { write: conv, end: () => '' };
+      };
+      const get = (h) => {
+        const enc = ENC[h[6]] || 'utf8';
+        let st = state.get(h);
+        if (!st || st.enc !== enc) { st = { enc, dec: mk(enc) }; state.set(h, st); }
+        return st;
+      };
+      return {
+        encodings: ENC,
+        decode: (h, buf) => get(h).dec.write(buf),
+        flush: (h) => { const st = state.get(h); const s2 = st ? st.dec.end() : ''; state.delete(h); return s2; },
+        kIncompleteCharactersStart: 0, kIncompleteCharactersEnd: 4,
+        kMissingBytes: 4, kBufferedBytes: 5, kEncodingField: 6, kNumFields: 7, kSize: 7,
+      };
+    })(),
     blob: { createBlob: () => ({}), getDataObject: () => undefined, storeDataObject: () => {}, revokeDataObject: () => {}, concat: () => new Uint8Array(0), FixedSizeBlobCopyJob: class {} },
     messaging: { MessageChannel: class {}, MessagePort: class {}, JSTransferable: class {}, setDeserializerCreateObjectFunction: () => {}, broadcastChannel: () => ({}), structuredClone: (v) => v },
     modules: {
@@ -283,10 +369,13 @@ function makeBindings(vfs, trace, realm) {
         // host terminal instead of going through SYS_write, and how process.platform
         // reported win32 before `process` joined this list.
         const inner = new Function(
-          'process', 'Buffer', 'console', 'globalThis', 'global', 'require', 'module', 'exports', '__filename', '__dirname',
+          'process', 'Buffer', 'console', 'setTimeout', 'setInterval', 'setImmediate', 'clearTimeout', 'clearInterval',
+          'globalThis', 'global', 'require', 'module', 'exports', '__filename', '__dirname',
           content + '\n//# sourceURL=' + filename);
         function wrapper(exports, require, module, __filename, __dirname) {
-          return inner.call(this, realm.process, realm.Buffer, realm.console, realm.global, realm.global,
+          return inner.call(this, realm.process, realm.Buffer, realm.console,
+            realm.setTimeout, realm.setInterval, realm.setImmediate, realm.clearTimeout, realm.clearInterval,
+            realm.global, realm.global,
             require, module, exports, __filename, __dirname);
         }
         return { __proto__: null, function: wrapper, sourceMapURL: undefined, sourceURL: filename, canParseAsESM: false };

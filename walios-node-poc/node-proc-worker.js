@@ -144,6 +144,17 @@ self.onmessage = async (ev) => {
       if (e instanceof ProcExit) code = e.code;
       else { trace('RUN THREW: ' + String((e && e.stack) || e).slice(0, 500)); code = 139; self.postMessage({ t: 'trap', error: String((e && e.stack) || e).slice(0, 800) }); }
     }
+    // Drain the event loop before exiting, the way node does. Bounded so a runaway
+    // interval cannot wedge the process forever.
+    const pending = runNode.pending;
+    if (pending) {
+      const deadline = Date.now() + 10000;
+      while (pending.n > 0 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1));
+      }
+      const rt = runNode.rt;
+      if (rt && typeof rt.process.exitCode === 'number') code = rt.process.exitCode;
+    }
     Atomics.store(i32, 3, code | 0);
     Atomics.store(i32, 0, ST_DONE);
     Atomics.notify(i32, 0);
@@ -196,6 +207,11 @@ function runNode() {
     raw('MAIN THREW: ' + String((e && e.stack) || e).slice(0, 600));
     return 70;
   }
+  // Node exits when the loop is empty, not when the main script ends. Hand the
+  // pending count back so the caller can drain before retiring the process --
+  // without this, a setTimeout or an unresolved promise is simply dropped.
+  runNode.pending = rt.pending;
+  runNode.rt = rt;
 
   self.postMessage({ t: 'result', code, calls: vfs.calls,
                      loaded: rt.trace.loaded.length, bindings: rt.trace.bindings.size });
