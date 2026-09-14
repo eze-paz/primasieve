@@ -616,7 +616,7 @@
      theme accent while LITE mode is on for the active conversation. */
   .lite-btn { display: inline-flex !important; align-items: center; justify-content: center; }
   .lite-btn svg { display: block; }
-  .lite-btn.active { color: var(--sp-accent) !important; }
+  .lite-btn.active { color: var(--sp-success) !important; filter: drop-shadow(0 0 4px var(--sp-success)); }
 
   /* Composer model picker (dropup) */
   .model-picker { position: relative; display: inline-flex; }
