@@ -492,24 +492,22 @@
     display: block;
   }
 
-  /* Floating action toolbar (copy / rewind / report) — hidden until the
-     message is hovered (PC), tapped (mobile) or text inside it is selected */
-  .msg { position: relative; }
-  .msg-actions {
-    position: absolute; z-index: 6; bottom: -34px; right: 8px;
-  }
-  .msg.assistant > .msg-actions { right: auto; left: 8px; }
-  .msg-actions {
-    display: flex; align-items: center; gap: 2px;
+  /* Assistant replies: original inline actions strip (always visible).
+     User bubbles: floating toolbar below the bubble — hover (PC), tap
+     (mobile) or text selection reveals it. */
+  .msg-actions { display: flex; align-items: center; gap: 4px; margin-top: 4px; opacity: 1; }
+  .msg.user { position: relative; }
+  .msg.user > .msg-actions {
+    position: absolute; z-index: 6; bottom: -34px; right: 8px; margin-top: 0;
     background: var(--sp-panel); border: 1px solid var(--sp-border-bright);
     border-radius: 8px; padding: 2px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.45);
     opacity: 0; pointer-events: none; transform: translateY(-3px);
     transition: opacity 0.12s ease, transform 0.12s ease;
   }
-  .msg-actions.show { opacity: 1; pointer-events: auto; transform: none; }
+  .msg.user > .msg-actions.show { opacity: 1; pointer-events: auto; transform: none; }
   @media (hover:hover) and (pointer:fine) {
-    .msg:hover > .msg-actions { opacity: 1; pointer-events: auto; transform: none; }
+    .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; transform: none; }
   }
   .msg-actions .act-copy {
     width: 26px; height: 26px; padding: 0; display: grid; place-items: center;

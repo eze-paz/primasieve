@@ -624,14 +624,14 @@ document.addEventListener('selectionchange', () => {
   // a collapsed selection must never close a toolbar that a tap/click opened
   // (this was breaking mobile: the tap's selection collapse fired
   // selectionchange and instantly hid the just-opened toolbar).
-  document.querySelectorAll('.msg > .msg-actions.show').forEach(acts => {
+  document.querySelectorAll('.msg.user > .msg-actions.show').forEach(acts => {
     const bubble = acts.parentNode.querySelector(':scope > .bubble');
     if (!bubble) { acts.classList.remove('show'); return; }
     if (sel && sel.rangeCount && !sel.isCollapsed && !bubble.contains(sel.getRangeAt(0).commonAncestorContainer)) acts.classList.remove('show');
   });
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
   const node = sel.getRangeAt(0).commonAncestorContainer;
-  const bubble = (node.nodeType === 1 ? node : node.parentNode)?.closest?.('.msg > .bubble');
+  const bubble = (node.nodeType === 1 ? node : node.parentNode)?.closest?.('.msg.user > .bubble');
   if (!bubble) return;
   const acts = bubble.parentNode.querySelector(':scope > .msg-actions');
   if (acts) acts.classList.add('show');
@@ -644,8 +644,8 @@ document.addEventListener('selectionchange', () => {
 // ends a drag-selection is ignored — selectionchange already handled it.
 document.addEventListener('click', (e) => {
   if (e.target.closest?.('.msg-actions')) return;
-  const msg = e.target.closest?.('.msg');
-  const openActs = document.querySelectorAll('.msg > .msg-actions.show');
+  const msg = e.target.closest?.('.msg.user');
+  const openActs = document.querySelectorAll('.msg.user > .msg-actions.show');
   if (!msg) {
     openActs.forEach(a => a.classList.remove('show'));
     return;
