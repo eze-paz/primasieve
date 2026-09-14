@@ -3,18 +3,14 @@
 // What this module does NOW:
 //   - logToolStarted/logToolResult: records each tool call + the files it touched
 //     (RAM, per conversation). getConvPaths() feeds memory.js project activation.
-//   - trackRecentPath: maintains sandpie/memory/global.recent-paths.json (data
-//     retention only — the recent-paths PROMPT INJECTION was removed 2026-09-02
-//     because it churned the system prompt and killed the provider cache prefix).
 //
-// Removed features (kept out deliberately): recent-paths prompt injection,
+// Removed features (kept out deliberately): recent-paths tracking + its prompt injection,
 // file co-occurrence preload advisor, lessons/harvest capture (eliminated
 // 2026-08-07 — the remember tool is the only memory capture channel).
 
 (function (global) {
   'use strict';
 
-  const MEMORY_DIR = 'sandpie/memory';
   const META_NS = '_sp_augment';
 
   // Per-tool-call [Aug] logging is chatty (two lines per tool call); off by
@@ -43,35 +39,6 @@
 
 
   /* ── project ID from paths ────────────────────────────────────────── */
-
-  // Serialize the read-modify-write: a turn fires many trackRecentPath calls
-  // concurrently, and without a queue they race on the same file and clobber
-  // each other (only the last write survives → paths get lost).
-  let _rpChain = Promise.resolve();
-  function trackRecentPath(convId, path) {
-    // BETA: recent-paths is no longer injected into prompts. Don't write
-    // to the shared global recent-paths.json either, or beta's absolute Dropbox
-    // paths would pollute /app's recent-paths block on the same device.
-    if (window.SANDPIE_BETA) return _rpChain;
-    if (!path) return _rpChain;
-    _rpChain = _rpChain.then(() => _trackRecentPathInner(path)).catch(() => {});
-    return _rpChain;
-  }
-  async function _trackRecentPathInner(path) {
-    // Use the SAME project id the memory.js read side uses. Deriving it from
-    // and wrote to a garbage nested dir that the reader never looked in.
-    // Recent paths: single global list (was per-project)
-    const storePath = MEMORY_DIR + '/global.recent-paths.json';
-    let list = [];
-    try { const raw = await opfs.read(storePath); if (raw) list = JSON.parse(raw); } catch (_) {}
-    list = list.filter(p => p !== path);
-    list.unshift(path);
-    const max = 50;   // hardcoded 2026-08-07: recent-paths count is fixed (lever removed from Settings → Memory)
-    if (list.length > max) list = list.slice(0, max);
-    await opfs.write(storePath, JSON.stringify(list, null, 2));
-    // Mark dirty so it uploads and survives the Dropbox sync orphan-cleanup.
-    try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', storePath); } catch (_) {}
-  }
 
   /* ── tool-call logging (called from conversations.js dispatch loop) ── */
   // Pull the files a `shell` command WRITES (output redirects + tee) plus its
@@ -110,13 +77,13 @@
     try { args = JSON.parse(tc?.function?.arguments || '{}'); } catch (_) {}
     meta.toolCalls.push({ name, args, phase: 'started', turn: meta.toolCalls.length + 1, ts: Date.now() });
     // Track file args
-    if (args.path) { meta.files.add(args.path); trackRecentPath(convId, args.path); }
-    if (args.src) { meta.files.add(args.src); trackRecentPath(convId, args.src); }
+    if (args.path) meta.files.add(args.path);
+    if (args.src) meta.files.add(args.src);
     // shell() has no path arg — capture its cwd + the files it writes so shell
-    // work isn't invisible to recent-paths / lessons.
+    // work isn't invisible to the file tracker.
     if (name === 'shell') {
-      if (args.cwd) { meta.files.add(args.cwd); trackRecentPath(convId, args.cwd); }
-      for (const p of _shellFileTargets(args.command)) { meta.files.add(p); trackRecentPath(convId, p); }
+      if (args.cwd) meta.files.add(args.cwd);
+      for (const p of _shellFileTargets(args.command)) meta.files.add(p);
     }
     // Track script references from run_python
     if (name === 'run_python' && args.path) meta.scripts.add(args.path);
@@ -156,7 +123,6 @@
 /* ── public API ───────────────────────────────────────────────────── */
   global.SandpieAugmentations = {
     
-    trackRecentPath,
     getConvMeta: getMeta,
     getConvPaths(convId) {
       const meta = convMeta.get(convId);

@@ -369,19 +369,14 @@ const SandpieMemory = (function () {
           ? `\n\n(nothing injected — "${DIR}" has no local files. If Dropbox is connected they re-download on sync; otherwise none saved yet.)`
           : '\n\n(nothing injected — files present but none parsed as facts)';
         else injected = '\n\n──────── injected into system prompt ────────' + block;
-        // Also surface auxiliary files that live in this folder: recent-paths
-        // (*.recent-paths.json, tracked by augmentations.js, no longer injected)
-        // and legacy *.lessons.md leftovers (inert since the harvester was
-        // eliminated 2026-08-07 — safe to delete).
+        // Legacy *.lessons.md leftovers (inert since the harvester was
+        // eliminated 2026-08-07 — safe to delete) are surfaced as inert.
         let aux = '';
         if (Array.isArray(entries)) {
           for (const e of entries) {
             if (e.kind !== 'file') continue;
             try {
-              if (e.name.endsWith('.recent-paths.json')) {
-                const arr = JSON.parse(await opfs.read(DIR + '/' + e.name) || '[]');
-                if (arr.length) aux += `\n\nRecent paths (${e.name}, injected via augmentations):\n` + arr.slice(0, 20).map(p => '  • ' + p).join('\n');
-              } else if (e.name.endsWith('.lessons.md')) {
+              if (e.name.endsWith('.lessons.md')) {
                 aux += `\n\n(${e.name}: legacy lessons file — NO LONGER injected; safe to delete)`;
               }
             } catch (_) {}
