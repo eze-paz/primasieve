@@ -78,7 +78,9 @@
     return [defaultProject(), ...rest];
   }
   function cached() { return _cache ? _cache.slice() : null; }
-  function byId(id) { return (_cache || []).find(x => x.id === id) || null; }
+  // The default project is synthesized, not stored in the registry - resolve it
+  // here too so callers never have to special-case its id.
+  function byId(id) { return id === 'default' ? defaultProject() : ((_cache || []).find(x => x.id === id) || null); }
   async function create(root, ns) {
     const reg = await loadRegistry();
     const existing = reg.find(x => norm(x.root) === norm(root));
@@ -221,7 +223,7 @@
   }
 
   window.SandpieProjects = {
-    REG_PATH, loadRegistry, saveRegistry, list, cached, byId,
+    REG_PATH, loadRegistry, saveRegistry, list, cached, byId, defaultProject,
     create, rename, remove, touch, pickFolder, newProjectFlow,
   };
 })();

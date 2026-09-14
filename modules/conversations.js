@@ -1331,6 +1331,19 @@ let _projPanelEl = null;              // singleton picker panel
 let _projPanelFor = null;             // convId the panel was opened for
 const _projById = (id) => { try { return (window.SandpieProjects && SandpieProjects.byId(id)) || null; } catch { return null; } };
 const _projName = (id) => { const p = _projById(id); return p ? p.name : ''; };
+// byId() reads projects.js's in-memory cache, which is only filled by an async
+// OPFS read (loadRegistry/list) — so before the picker has ever been opened a
+// bound project id resolves to nothing and the chip silently reads as the
+// default project. Warm the registry once per session; callers repaint when it
+// lands. cached() === null is the "never loaded" sentinel (an empty registry
+// caches as []).
+let _projWarming = null;
+function _warmProjRegistry() {
+  if (_projWarming) return _projWarming;
+  if (!window.SandpieProjects) return null;
+  _projWarming = SandpieProjects.loadRegistry().catch((e) => { console.warn('[projects] registry warm failed:', e); return null; });
+  return _projWarming;
+}
 
 const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const escAttr = escHtml;
@@ -1381,6 +1394,16 @@ function _paintProjChip(slot, convId) {
       fresh._wired = true;
       fresh.addEventListener('click', (e) => { e.stopPropagation(); _toggleProjPanel(fresh, convId); });
     }
+  }
+  // This conversation is bound to a project the registry hasn't produced yet:
+  // load it once, then repaint with the real name. After the warm, cached() is
+  // non-null, so this never loops (an id that is genuinely gone keeps the
+  // default-project fallback).
+  const s = convStreams.get('' + (convId == null ? '' : convId));
+  const pid = s && s.projectId;
+  if (pid && !_projById(pid) && window.SandpieProjects && SandpieProjects.cached() === null) {
+    const w = _warmProjRegistry();
+    if (w) w.then(() => { if (slot.isConnected) _paintProjChip(slot, convId); });
   }
 }
 function _closeProjPanel() {
