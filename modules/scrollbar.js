@@ -1,4 +1,4 @@
-/* sandpie — rail scrollbar (v=2)
+/* sandpie — rail scrollbar (v=5)
    Hides the browser's scrollbar on a host and draws a custom "rail": a
    hairline track, a square thumb, and (optionally) one accent tick where each
    of the user's turns begins, so the bar doubles as a turn index.
@@ -25,6 +25,19 @@
    inside the host, so it never touches the host's flex gap, scroll anchoring,
    or first-child home plumbing. The side pane in artifact/viewer mode hides its
    host via display:none; the ResizeObserver sees the 0×0 box and hides the rail.
+
+   Two states a rail must never be in, both fixed in v=5:
+     - VISIBLE BEFORE ITS FIRST SYNC. The rail is created with `hidden` set and
+       is only unhidden by a sync that also writes top/left/height, so it can
+       never paint at its CSS static position (the mount's left edge, i.e. over
+       the conversation) and then jump right on the first scroll. That first
+       sync is a rAF, which does not run while the tab is hidden or occluded --
+       exactly when the un-positioned rail used to become visible.
+     - VISIBLE ON A HOST THAT ONLY *LOOKS* SCROLLABLE. A collapsed sidebar keeps
+       its full height and its content wraps into zero width, so scrollHeight
+       still exceeds clientHeight. geom() now checks the host generates a box and
+       has non-zero width before reporting a scroll range; otherwise the rail
+       hides and stops taking pointer events.
 
    Cost while streaming: a MutationObserver on the host coalesces every token
    into one requestAnimationFrame that reads scrollHeight/scrollTop and writes
@@ -55,6 +68,7 @@
       const rail = this.rail = document.createElement('div');
       rail.className = 'osb-rail' + (this.opts.cls ? ' ' + this.opts.cls : '');
       rail.setAttribute('aria-hidden', 'true');   // keyboard + wheel scrolling of the host is untouched
+      rail.hidden = true;                         // unhidden only by a sync that also positions it
       const thumb = this.thumb = document.createElement('div');
       thumb.className = 'osb-thumb';
       rail.appendChild(thumb);
@@ -63,23 +77,37 @@
       rail.appendChild(ticks);
       pane.appendChild(rail);
 
-      this._raf = 0; this._idleT = 0; this._tickCount = -1; this._tickMeasured = 0; this._tickTops = []; this._hover = false; this._focus = false; this._drag = false;
+      // Hover is tracked separately for host and rail: the rail only takes pointer
+      // events while shown, so moving onto it makes the host fire pointerleave.
+      // One shared flag would drop to false there and flicker.
+      this._raf = 0; this._idleT = 0; this._tickCount = -1; this._tickMeasured = 0; this._tickTops = [];
+      this._hoverHost = false; this._hoverRail = false; this._focus = false; this._drag = false;
 
       // ---- sync triggers ------------------------------------------------
       this._onScroll = () => { this.request(); this.activity(); };
       host.addEventListener('scroll', this._onScroll, { passive: true });
-      this._ro = new ResizeObserver(() => { this._tickCount = -1; this.request(); });   // size change ⇒ ticks move
+      this._ro = new ResizeObserver(() => { this._tickCount = -1; this.request(); });   // size change => ticks move
       this._ro.observe(host);
+      // The rail's left edge comes from the host's right edge in mount coordinates,
+      // so a mount that resizes or moves (side pane opening, sidebar drag, window
+      // resize) must resync even when the host's own box is unchanged.
+      this._roMount = new ResizeObserver(() => this.request());
+      this._roMount.observe(pane);
+      // A rAF queued while the tab is hidden never runs; resync on return.
+      this._onVis = () => { if (!document.hidden) this.request(); };
+      document.addEventListener('visibilitychange', this._onVis);
       this._mo = new MutationObserver(() => this.request());
       this._mo.observe(host, { childList: true, subtree: true, characterData: true });
 
       // ---- ghost visibility --------------------------------------------
-      this._enter = () => { this._hover = true; this.show(); };
-      this._leave = () => { this._hover = false; this.show(); };
+      this._enter = () => { this._hoverHost = true; this.show(); };
+      this._leave = () => { this._hoverHost = false; this.show(); };
+      this._enterRail = () => { this._hoverRail = true; this.show(); };
+      this._leaveRail = () => { this._hoverRail = false; this.show(); };
       host.addEventListener('pointerenter', this._enter);
       host.addEventListener('pointerleave', this._leave);
-      rail.addEventListener('pointerenter', this._enter);
-      rail.addEventListener('pointerleave', this._leave);
+      rail.addEventListener('pointerenter', this._enterRail);
+      rail.addEventListener('pointerleave', this._leaveRail);
       this._focusIn = () => { this._focus = true; this.show(); };
       this._focusOut = () => { this._focus = host.contains(document.activeElement); this.show(); };
       host.addEventListener('focusin', this._focusIn);
@@ -114,8 +142,12 @@
     }
 
     geom() {
-      const h = this.host, sh = h.scrollHeight, ch = h.clientHeight, max = sh - ch;
-      if (ch === 0 || max <= 1) return null;   // hidden host (side pane in artifact mode) or nothing to scroll
+      const h = this.host, sh = h.scrollHeight, ch = h.clientHeight, cw = h.clientWidth, max = sh - ch;
+      // No box at all (display:none - side pane in artifact/viewer mode, or an
+      // unmounted host), zero width (aside.collapsed is width 0 at full height,
+      // and its content wraps tall enough that scrollHeight still exceeds
+      // clientHeight), or nothing to scroll.
+      if (cw === 0 || ch === 0 || !h.getClientRects().length || max <= 1) return null;
       const trackH = Math.max(0, ch - INSET * 2);
       // Proportional thumb, floored at MIN_THUMB and capped at MAX_THUMB of the
       // track. Position is still frac * (trackH - thumbH), so a capped thumb just
@@ -170,14 +202,15 @@
       clearTimeout(this._idleT);
       this._idleT = setTimeout(() => { this.rail.classList.remove('osb-scrolling'); this.show(); }, IDLE_MS);
     }
-    show() { this.rail.classList.toggle('osb-show', this._hover || this._focus || this._drag); }
+    show() { this.rail.classList.toggle('osb-show', this._hoverHost || this._hoverRail || this._focus || this._drag); }
 
     detach() {
       const h = this.host;
       h.removeEventListener('scroll', this._onScroll);
       h.removeEventListener('pointerenter', this._enter); h.removeEventListener('pointerleave', this._leave);
       h.removeEventListener('focusin', this._focusIn); h.removeEventListener('focusout', this._focusOut);
-      this._ro.disconnect(); this._mo.disconnect();
+      document.removeEventListener('visibilitychange', this._onVis);
+      this._ro.disconnect(); this._roMount.disconnect(); this._mo.disconnect();
       cancelAnimationFrame(this._raf); clearTimeout(this._idleT);
       this.rail.remove();
       h.classList.remove('osb-host');
