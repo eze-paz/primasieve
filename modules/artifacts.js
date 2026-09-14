@@ -231,6 +231,7 @@ function renderArtifact(host, path, opts) {
   const _as = (typeof activeStream === 'function') ? activeStream() : _activeStream();
   const _ownHost = _as && _as.host && (typeof _streamOwnsPaneSlot === 'function' ? _streamOwnsPaneSlot(_as) : _as.host.isConnected);
   const target = host || (_ownHost ? _as.host : document.createElement('div'));
+  const clean = path ? String(path).replace(/^\/+/, '') : '';
   // DEBUG-TRACE (remove once the cross-conv spawn is pinned down): log every card
   // render with its landing conv + creation stack.
   try {
@@ -239,7 +240,6 @@ function renderArtifact(host, path, opts) {
       (_ch2 && _ch2.dataset.convId) || (target.id || 'detached/other'),
       'hostParam=', !!host, new Error().stack);
   } catch (_) {}
-  const clean = path ? String(path).replace(/^\/+/, '') : '';
   // Resolve once (legacy artifacts/ → sandpie/artifacts/ remap); handlers await it.
   const resolvedP = clean ? resolveArtifactPath(clean) : Promise.resolve(clean);
 

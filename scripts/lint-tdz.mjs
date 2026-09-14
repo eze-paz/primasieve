@@ -4,9 +4,15 @@
 // JS module the app loads. Fails the build only on NEW findings; pre-existing
 // ones live in scripts/lint-tdz-baseline.txt so the debt shrinks over time.
 // Regenerate the baseline with: node scripts/lint-tdz.mjs --update-baseline
+//
+// Baseline identity is (file + message) WITHOUT line:column. Line numbers shift
+// on every unrelated edit above a finding, so every baselined entry read as
+// "new" on the next commit and the gate failed on literally every push. The
+// trade: a second misuse of an already-baselined symbol in the same file slips
+// through. Worth it - a gate that always fails is a gate everyone ignores.
 import { ESLint } from 'eslint';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { cwd } from 'node:process';
 
 const MODULES = 'modules';
@@ -30,16 +36,23 @@ const eslint = new ESLint({
 });
 
 const results = await eslint.lintFiles(files);
-const errors = results.flatMap(r =>
-  r.messages
+const findings = results.flatMap(r => {
+  // Normalise separators: relative() yields backslashes on Windows and forward
+  // slashes on the Linux runner, so an unnormalised path never matches locally.
+  const file = relative(cwd(), r.filePath).split(sep).join('/');
+  return r.messages
     .filter(m => m.ruleId === 'no-use-before-define')
-    .map(m => relative(cwd(), r.filePath) + ':' + m.line + ':' + m.column + '  ' + m.message)
-);
+    .map(m => ({
+      key: file + '  ' + m.message,
+      label: file + ':' + m.line + ':' + m.column + '  ' + m.message,
+    }));
+});
 
 const update = process.argv.includes('--update-baseline');
 if (update) {
-  writeFileSync(BASELINE, errors.map(e => '  ' + e).join('\n') + '\n');
-  console.log('baseline updated: ' + errors.length + ' known findings');
+  const keys = [...new Set(findings.map(f => f.key))].sort();
+  writeFileSync(BASELINE, keys.map(k => '  ' + k).join('\n') + '\n');
+  console.log('baseline updated: ' + keys.length + ' known finding(s)');
   process.exit(0);
 }
 
@@ -48,13 +61,13 @@ try {
   known = new Set(readFileSync(BASELINE, 'utf8').split('\n').map(s => s.trim()).filter(Boolean));
 } catch { /* no baseline yet: everything counts as new */ }
 
-const fresh = errors.filter(e => !known.has(e));
+const fresh = findings.filter(f => !known.has(f.key));
 if (fresh.length) {
   console.error('X ' + fresh.length + ' NEW use-before-define (TDZ risk) error(s):\n');
-  for (const e of fresh) console.error('  ' + e);
+  for (const f of fresh) console.error('  ' + f.label);
   console.error('\nThese will throw "Cannot access X before initialization" at runtime.');
   console.error('Fix them, or if genuinely pre-existing, refresh the baseline:');
   console.error('  node scripts/lint-tdz.mjs --update-baseline');
   process.exit(1);
 }
-console.log('OK no NEW use-before-define findings (' + errors.length + ' known/baselined, ' + files.length + ' files checked)');
+console.log('OK no NEW use-before-define findings (' + findings.length + ' known/baselined, ' + files.length + ' files checked)');

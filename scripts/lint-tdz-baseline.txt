@@ -1,151 +1,62 @@
-modules/conversations.js:265:7  'liteMetaCache' was used before it was defined.
-modules/conversations.js:654:23  'renderMd' was used before it was defined.
-modules/conversations.js:830:3  '_askingConvs' was used before it was defined.
-modules/conversations.js:890:5  '_askingConvs' was used before it was defined.
-modules/conversations.js:1265:28  'thoughtsVisible' was used before it was defined.
-modules/conversations.js:1266:19  'thoughtsVisible' was used before it was defined.
-modules/conversations.js:1267:84  'NN_SVG_INLINE' was used before it was defined.
-modules/conversations.js:1328:82  'RATE_FMT' was used before it was defined.
-modules/conversations.js:1388:87  'SP_SUMMARY_MARKER' was used before it was defined.
-modules/conversations.js:1395:55  'SP_SUMMARY_MARKER' was used before it was defined.
-modules/conversations.js:1521:42  'sidePanel' was used before it was defined.
-modules/conversations.js:1521:54  'sidePanel' was used before it was defined.
-modules/conversations.js:1547:29  'sidePanel' was used before it was defined.
-modules/conversations.js:1547:41  'sidePanel' was used before it was defined.
-modules/conversations.js:1656:19  'liteMetaCache' was used before it was defined.
-modules/conversations.js:1860:7  'sidePanel' was used before it was defined.
-modules/conversations.js:1860:35  'sidePanel' was used before it was defined.
-modules/conversations.js:1860:55  'sidePanel' was used before it was defined.
-modules/conversations.js:1999:7  '_askingConvs' was used before it was defined.
-modules/conversations.js:2038:7  'sidePanel' was used before it was defined.
-modules/conversations.js:2038:28  'sidePanel' was used before it was defined.
-modules/conversations.js:2038:53  'sidePanel' was used before it was defined.
-modules/conversations.js:2252:7  'sidePanel' was used before it was defined.
-modules/conversations.js:2252:18  'sidePanel' was used before it was defined.
-modules/conversations.js:2258:22  'sidePanel' was used before it was defined.
-modules/conversations.js:2361:7  'sidePanel' was used before it was defined.
-modules/conversations.js:2361:37  'sidePanel' was used before it was defined.
-modules/conversations.js:2374:7  '_titleAnim' was used before it was defined.
-modules/conversations.js:2375:5  '_titleAnim' was used before it was defined.
-modules/conversations.js:2384:7  '_askingConvs' was used before it was defined.
-modules/conversations.js:2455:22  'sidePanel' was used before it was defined.
-modules/conversations.js:2457:43  'sidePanel' was used before it was defined.
-modules/conversations.js:2459:63  'sidePanel' was used before it was defined.
-modules/conversations.js:2462:61  'sidePanel' was used before it was defined.
-modules/conversations.js:2655:5  '_askingConvs' was used before it was defined.
-modules/conversations.js:2818:7  'sidePanel' was used before it was defined.
-modules/conversations.js:2818:28  'sidePanel' was used before it was defined.
-modules/conversations.js:2819:5  'sidePanel' was used before it was defined.
-modules/conversations.js:2989:32  '_pageAbortPool' was used before it was defined.
-modules/conversations.js:3292:43  'messageHandler' was used before it was defined.
-modules/conversations.js:3293:53  'onAbort' was used before it was defined.
-modules/conversations.js:3754:32  'SP_SUMMARY_MARKER' was used before it was defined.
-modules/conversations.js:4005:123  'SP_SUMMARY_MARKER' was used before it was defined.
-modules/conversations.js:4848:13  'isLast' was used before it was defined.
-modules/conversations.js:5798:69  'renderMd' was used before it was defined.
-modules/conversations.js:5898:67  'renderMd' was used before it was defined.
-modules/conversations.js:7168:8  'sidePanel' was used before it was defined.
-modules/conversations.js:7168:21  'sidePanel' was used before it was defined.
-modules/conversations.js:7185:9  'sidePanel' was used before it was defined.
-modules/conversations.js:7185:22  'sidePanel' was used before it was defined.
-modules/conversations.js:7185:40  'sidePanel' was used before it was defined.
-modules/conversations.js:7189:7  'sidePanel' was used before it was defined.
-modules/conversations.js:7189:20  'sidePanel' was used before it was defined.
-modules/conversations.js:7191:5  'sidePanel' was used before it was defined.
-modules/core.js:34:15  'SandpieCommandView' was used before it was defined.
-modules/core.js:34:35  'SandpieCommandView' was used before it was defined.
-modules/core.js:36:15  'SandpieCommandView' was used before it was defined.
-modules/core.js:36:35  'SandpieCommandView' was used before it was defined.
-modules/core.js:39:13  'SandpieCommandView' was used before it was defined.
-modules/core.js:39:33  'SandpieCommandView' was used before it was defined.
-modules/core.js:121:11  'SandpieCommandView' was used before it was defined.
-modules/core.js:121:31  'SandpieCommandView' was used before it was defined.
-modules/core.js:139:74  'convStreams' was used before it was defined.
-modules/core.js:139:88  'convStreams' was used before it was defined.
-modules/core.js:139:104  'activeConvId' was used before it was defined.
-modules/core.js:140:45  'messages' was used before it was defined.
-modules/core.js:169:13  'activeConvId' was used before it was defined.
-modules/file-viewer.js:102:21  'filesUrl' was used before it was defined.
-modules/file-viewer.js:205:65  'modeSel' was used before it was defined.
-modules/file-viewer.js:214:65  'modeSel' was used before it was defined.
-modules/file-viewer.js:232:64  'modeSel' was used before it was defined.
-modules/fonts.js:205:27  'fileInput' was used before it was defined.
-modules/html-editor.js:264:76  'pageSel' was used before it was defined.
-modules/html-editor.js:264:139  'eachPage' was used before it was defined.
-modules/html-editor.js:309:11  'place' was used before it was defined.
-modules/html-editor.js:313:112  'place' was used before it was defined.
-modules/html-editor.js:315:81  'place' was used before it was defined.
-modules/html-editor.js:315:160  'place' was used before it was defined.
-modules/html-editor.js:394:19  'wIn' was used before it was defined.
-modules/html-editor.js:394:35  'stSel' was used before it was defined.
-modules/html-editor.js:394:52  'cIn' was used before it was defined.
-modules/html-editor.js:513:43  'globalOf' was used before it was defined.
-modules/opfs.js:724:64  'cleanup' was used before it was defined.
-modules/opfs.js:727:23  'cleanup' was used before it was defined.
-modules/opfs.js:732:89  'api' was used before it was defined.
-modules/opfs.js:733:42  'cleanup' was used before it was defined.
-modules/pyodide-worker.js:243:10  'py' was used before it was defined.
-modules/pyodide-worker.js:248:37  'py' was used before it was defined.
-modules/pyodide-worker.js:249:15  'py' was used before it was defined.
-modules/pyodide-worker.js:250:31  'py' was used before it was defined.
-modules/pyodide-worker.js:258:10  'py' was used before it was defined.
-modules/pyodide-worker.js:258:17  '_nativefs' was used before it was defined.
-modules/pyodide-worker.js:271:30  'py' was used before it was defined.
-modules/pyodide-worker.js:276:9  '_cloudDeleted' was used before it was defined.
-modules/pyodide-worker.js:279:15  'py' was used before it was defined.
-modules/pyodide-worker.js:285:46  'py' was used before it was defined.
-modules/pyodide-worker.js:286:9  'py' was used before it was defined.
-modules/pyodide-worker.js:301:11  'py' was used before it was defined.
-modules/pyodide-worker.js:304:40  'py' was used before it was defined.
-modules/pyodide-worker.js:309:41  'py' was used before it was defined.
-modules/pyodide-worker.js:310:24  'py' was used before it was defined.
-modules/pyodide-worker.js:322:25  'py' was used before it was defined.
-modules/pyodide-worker.js:322:31  'py' was used before it was defined.
-modules/pyodide-worker.js:322:45  'py' was used before it was defined.
-modules/pyodide-worker.js:322:66  'py' was used before it was defined.
-modules/pyodide-worker.js:437:27  '_HYDRATE_AUDIT_PY' was used before it was defined.
-modules/pyodide-worker.js:438:27  '_CLOUD_FS_PY' was used before it was defined.
-modules/pyodide-worker.js:461:3  '_lookupOrigRef' was used before it was defined.
-modules/pyodide-worker.js:1601:9  'out' was used before it was defined.
-modules/pyodide-worker.js:1601:17  'out' was used before it was defined.
-modules/sandpie-worker.js:266:5  '_pyBackend' was used before it was defined.
-modules/sandpie-worker.js:267:9  '_pyBackend' was used before it was defined.
-modules/sandpie-worker.js:283:7  '_touchSinks' was used before it was defined.
-modules/sandpie-worker.js:309:15  '_shareReqs' was used before it was defined.
-modules/sandpie-worker.js:310:14  '_shareReqs' was used before it was defined.
-modules/sandpie-worker.js:316:15  '_consoleReqs' was used before it was defined.
-modules/sandpie-worker.js:317:14  '_consoleReqs' was used before it was defined.
-modules/sandpie-worker.js:324:15  '_officeReqs' was used before it was defined.
-modules/sandpie-worker.js:325:14  '_officeReqs' was used before it was defined.
-modules/sandpie-worker.js:332:15  '_shotReqs' was used before it was defined.
-modules/sandpie-worker.js:333:14  '_shotReqs' was used before it was defined.
-modules/sandpie-worker.js:340:15  '_askReqs' was used before it was defined.
-modules/sandpie-worker.js:341:14  '_askReqs' was used before it was defined.
-modules/sandpie-worker.js:363:82  '_touchSinks' was used before it was defined.
-modules/sandpie-worker.js:369:78  '_ftExcluded' was used before it was defined.
-modules/sandpie-worker.js:373:7  '_touchSinks' was used before it was defined.
-modules/sandpie-worker.js:1043:3  '_emittedFileHashes' was used before it was defined.
-modules/sandpie-worker.js:1840:20  'timer' was used before it was defined.
-modules/sandpie-worker.js:1841:70  'onAbort' was used before it was defined.
-modules/sandpie-worker.js:1875:20  'timer' was used before it was defined.
-modules/sandpie-worker.js:1876:70  'onAbort' was used before it was defined.
-modules/sandpie-worker.js:2028:20  'timer' was used before it was defined.
-modules/sandpie-worker.js:2029:70  'onAbort' was used before it was defined.
-modules/sandpie-worker.js:2137:12  'resolved' was used before it was defined.
-modules/sandpie-worker.js:2137:24  'resolved' was used before it was defined.
-modules/sandpie-worker.js:2945:67  '_wpy' was used before it was defined.
-modules/sandpie-worker.js:2945:75  '_wpy' was used before it was defined.
-modules/sandpie-worker.js:3097:7  'kill' was used before it was defined.
-modules/sandpie-worker.js:4223:26  '_seenTcIds' was used before it was defined.
-modules/sandpie-worker.js:4546:17  'subId' was used before it was defined.
-modules/sharing.js:228:45  'hubRead' was used before it was defined.
-modules/sharing.js:253:27  'hubRead' was used before it was defined.
-modules/sharing.js:254:21  '_forceNext' was used before it was defined.
-modules/sharing.js:378:159  'markDirtyForWorkspace' was used before it was defined.
-modules/speech-to-text.js:105:44  '_pending' was used before it was defined.
-modules/speech-to-text.js:105:64  '_pending' was used before it was defined.
-modules/speech-to-text.js:107:19  '_pending' was used before it was defined.
-modules/speech-to-text.js:108:18  '_pending' was used before it was defined.
-modules/speech-to-text.js:207:28  '_stopping' was used before it was defined.
-modules/tools.js:636:22  'toolDefs' was used before it was defined.
-modules/tools.js:637:31  'toolDefs' was used before it was defined.
+  modules/conversations.js  'NN_SVG_INLINE' was used before it was defined.
+  modules/conversations.js  'RATE_FMT' was used before it was defined.
+  modules/conversations.js  'REPORT_SVG_INLINE' was used before it was defined.
+  modules/conversations.js  'SP_SUMMARY_MARKER' was used before it was defined.
+  modules/conversations.js  '_CTX_RING_SVG' was used before it was defined.
+  modules/conversations.js  '_MONTHS' was used before it was defined.
+  modules/conversations.js  '_askingConvs' was used before it was defined.
+  modules/conversations.js  '_pageAbortPool' was used before it was defined.
+  modules/conversations.js  '_titleAnim' was used before it was defined.
+  modules/conversations.js  'isLast' was used before it was defined.
+  modules/conversations.js  'liteMetaCache' was used before it was defined.
+  modules/conversations.js  'messageHandler' was used before it was defined.
+  modules/conversations.js  'onAbort' was used before it was defined.
+  modules/conversations.js  'place' was used before it was defined.
+  modules/conversations.js  'renderMd' was used before it was defined.
+  modules/conversations.js  'sidePanel' was used before it was defined.
+  modules/conversations.js  'thoughtsVisible' was used before it was defined.
+  modules/core.js  'SandpieCommandView' was used before it was defined.
+  modules/core.js  'activeConvId' was used before it was defined.
+  modules/core.js  'convStreams' was used before it was defined.
+  modules/core.js  'messages' was used before it was defined.
+  modules/file-viewer.js  'filesUrl' was used before it was defined.
+  modules/file-viewer.js  'modeSel' was used before it was defined.
+  modules/fonts.js  'fileInput' was used before it was defined.
+  modules/html-editor.js  'cIn' was used before it was defined.
+  modules/html-editor.js  'eachPage' was used before it was defined.
+  modules/html-editor.js  'globalOf' was used before it was defined.
+  modules/html-editor.js  'pageSel' was used before it was defined.
+  modules/html-editor.js  'place' was used before it was defined.
+  modules/html-editor.js  'stSel' was used before it was defined.
+  modules/html-editor.js  'wIn' was used before it was defined.
+  modules/opfs.js  'api' was used before it was defined.
+  modules/opfs.js  'cleanup' was used before it was defined.
+  modules/pyodide-worker.js  '_CLOUD_FS_PY' was used before it was defined.
+  modules/pyodide-worker.js  '_HYDRATE_AUDIT_PY' was used before it was defined.
+  modules/pyodide-worker.js  '_cloudDeleted' was used before it was defined.
+  modules/pyodide-worker.js  '_lookupOrigRef' was used before it was defined.
+  modules/pyodide-worker.js  '_nativefs' was used before it was defined.
+  modules/pyodide-worker.js  'out' was used before it was defined.
+  modules/pyodide-worker.js  'py' was used before it was defined.
+  modules/sandpie-worker.js  '_askReqs' was used before it was defined.
+  modules/sandpie-worker.js  '_consoleReqs' was used before it was defined.
+  modules/sandpie-worker.js  '_emittedFileHashes' was used before it was defined.
+  modules/sandpie-worker.js  '_ftExcluded' was used before it was defined.
+  modules/sandpie-worker.js  '_officeReqs' was used before it was defined.
+  modules/sandpie-worker.js  '_pyBackend' was used before it was defined.
+  modules/sandpie-worker.js  '_seenTcIds' was used before it was defined.
+  modules/sandpie-worker.js  '_shareReqs' was used before it was defined.
+  modules/sandpie-worker.js  '_shotReqs' was used before it was defined.
+  modules/sandpie-worker.js  '_touchSinks' was used before it was defined.
+  modules/sandpie-worker.js  '_wpy' was used before it was defined.
+  modules/sandpie-worker.js  'kill' was used before it was defined.
+  modules/sandpie-worker.js  'onAbort' was used before it was defined.
+  modules/sandpie-worker.js  'resolved' was used before it was defined.
+  modules/sandpie-worker.js  'subId' was used before it was defined.
+  modules/sandpie-worker.js  'timer' was used before it was defined.
+  modules/sharing.js  '_forceNext' was used before it was defined.
+  modules/sharing.js  'hubRead' was used before it was defined.
+  modules/sharing.js  'markDirtyForWorkspace' was used before it was defined.
+  modules/speech-to-text.js  '_pending' was used before it was defined.
+  modules/speech-to-text.js  '_stopping' was used before it was defined.
+  modules/tools.js  'toolDefs' was used before it was defined.
