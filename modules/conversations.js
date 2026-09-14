@@ -419,6 +419,12 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   if (s && s._provDirty) { provId = s.providerId || null; s._provDirty = false; }
   else provId = (prevMeta && prevMeta.providerId) || (s && s.providerId) || null;
   if (provId) meta.providerId = provId;
+  // PER-CONVERSATION project: carried forward like providerId (meta is rebuilt
+  // from scratch on every save). null → projectless.
+  let projId;
+  if (s && s._projDirty) { projId = s.projectId || null; s._projDirty = false; }
+  else projId = (prevMeta && prevMeta.projectId) || (s && s.projectId) || null;
+  if (projId) meta.projectId = projId;
   // PER-CONVERSATION reasoning effort: carried forward like providerId (meta is
   // rebuilt from scratch on every save). null → the app default applies.
   let rsnLvl;
@@ -1318,20 +1324,41 @@ function renderFileBundle(target, bundleFiles) {
 // No colors, no search, no keyboard hints - plain names, dashed ghost when
 // the conversation has no project.
 // Registry-backed (sandpie/config/projects.json via SandpieProjects, the
-// projects.js module). Selection is still in-memory per convId — conversation
-// persistence (projectId on stream+meta) is the NEXT commit.
-const _convProjects = new Map();      // convId -> project root (in-memory until persistence lands)
+// projects.js module). Conversations bind by STABLE project id (meta.projectId /
+// stream.projectId, providerId pattern) — never by root or name, so renaming or
+// re-pointing a project never orphans them.
 let _projPanelEl = null;              // singleton picker panel
 let _projPanelFor = null;             // convId the panel was opened for
-const _projName = (root) => { try { const p = (window.SandpieProjects && SandpieProjects._cache || []).find(x => x.root === root); return p ? p.name : root; } catch { return root; } };
+const _projById = (id) => { try { return (window.SandpieProjects && SandpieProjects.byId(id)) || null; } catch { return null; } };
+const _projName = (id) => { const p = _projById(id); return p ? p.name : ''; };
 
 const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const escAttr = escHtml;
+// Bind/unbind a conversation's project (stable project id). Same contract as the
+// provider bridge: convId null → home-state default in localStorage, which new
+// chats inherit. touch() refreshes the registry MRU so the picker lists the
+// most recently used project first.
+function _setProjBinding(convId, projectId) {
+  const id = '' + (convId == null ? '' : convId);
+  if (!id) {
+    try {
+      if (projectId) localStorage.setItem('sandpie-default-project', projectId);
+      else localStorage.removeItem('sandpie-default-project');
+    } catch (_) {}
+    return;
+  }
+  const s = ensureStream(id);
+  s.projectId = projectId || null;
+  s._projDirty = true;   // stale-save guard: this tab's explicit pick wins the next _saveConv
+  saveConv(id, { touchUpdated: false }).catch(() => {});
+  if (projectId && window.SandpieProjects) SandpieProjects.touch(projectId).catch(() => {});
+}
+
 function _projChipHtml(convId) {
-  const root = _convProjects.get('' + (convId == null ? '' : convId)) || '';
-  const name = root ? _projName(root) : '';
+  const s = convStreams.get('' + (convId == null ? '' : convId));
+  const name = _projName(s && s.projectId);
   return name
-    ? '<span class="mt-proj" title="Project">' + name + '<span class="mt-proj-caret">▾</span></span>'
+    ? '<span class="mt-proj" title="Project">' + escHtml(name) + '<span class="mt-proj-caret">▾</span></span>'
     : '<span class="mt-proj none" title="File to project">no project<span class="mt-proj-caret">▾</span></span>';
 }
 // Append (or refresh) the project chip on a timer slot. The timer row is ONE
@@ -1366,13 +1393,14 @@ function _toggleProjPanel(chip, convId) {
   const panel = document.createElement('div');
   panel.className = 'proj-panel mp-panel visible';
   panel.innerHTML = '<div class="proj-item" style="opacity:.5"><span class="nm">Loading…</span></div>';
-  const current = _convProjects.get('' + (convId == null ? '' : convId)) || '';
+  const s = convStreams.get('' + (convId == null ? '' : convId));
+  const current = (s && s.projectId) || '';
   const fill = (reg) => {
     if (_projPanelEl !== panel) return;   // panel was closed/reopened while loading
     let html = '';
     for (const p of reg) {
-      html += '<div class="proj-item' + (p.root === current ? ' sel' : '') + '" data-proj="' + escAttr(p.root) + '">' +
-        '<span class="nm">' + escHtml(p.name) + '</span>' + (p.root === current ? '<span class="chk">✓</span>' : '') + '</div>';
+      html += '<div class="proj-item' + (p.id === current ? ' sel' : '') + '" data-proj="' + escAttr(p.id) + '">' +
+        '<span class="nm">' + escHtml(p.name) + '</span>' + (p.id === current ? '<span class="chk">✓</span>' : '') + '</div>';
     }
     html += '<div class="proj-item none' + (current === '' ? ' sel' : '') + '" data-proj=""><span class="nm">no project</span></div>';
     html += '<div class="proj-add" title="Pick a Dropbox folder"><span class="plus">＋</span> New project</div>';
@@ -1385,7 +1413,7 @@ function _toggleProjPanel(chip, convId) {
       if (!window.SandpieProjects) { console.warn('[projects] module not loaded'); return; }
       const created = await SandpieProjects.newProjectFlow();
       if (created) {
-        _convProjects.set('' + convId, created.root);
+        _setProjBinding(convId, created.id);
         _closeProjPanel();
         const slot = chip.closest('.msg-timer');
         if (slot) _paintProjChip(slot, convId);
@@ -1394,8 +1422,7 @@ function _toggleProjPanel(chip, convId) {
     }
     const item = e.target.closest('.proj-item');
     if (!item) return;
-    const v = item.dataset.proj || '';
-    if (v === '') _convProjects.delete('' + convId); else _convProjects.set('' + convId, v);
+    _setProjBinding(convId, item.dataset.proj || '');
     _closeProjPanel();
     const slot = chip.closest('.msg-timer');
     if (slot) _paintProjChip(slot, convId);
@@ -1419,8 +1446,7 @@ function _toggleProjPanel(chip, convId) {
   (async () => {
     try {
       if (!window.SandpieProjects) { fill([]); place(); return; }
-      const reg = await SandpieProjects.loadRegistry();
-      SandpieProjects._cache = reg;
+      const reg = await SandpieProjects.list();
       fill(reg); place();
     } catch (e) { console.warn('[projects] registry load failed:', e); fill([]); place(); }
   })();
@@ -2142,8 +2168,7 @@ async function loadConv(id) {
       s.filesTouched = meta.filesTouched || null;
       s.artifactThumbs = meta.artifactThumbs || null;
       s.lastTurn = meta.lastTurn || null;
-      s.projectRoot = meta.projectRoot || null;
-      s.projectNs = meta.projectNs || null;
+      s.projectId = meta.projectId || null;
       s.providerId = meta.providerId || null;
       s.reasoningLevel = meta.reasoningLevel || null;
 
@@ -4593,8 +4618,8 @@ function ensureStream(id) {
       // JSONL persistence: how many messages are already on disk, and a flag that
       // forces a full rewrite (rewind/edit) instead of an append on the next save.
       persistedCount: 0, _forceJsonlRewrite: false,
-      // The conversation's project folder (null until picked).
-      projectRoot: null, projectNs: null,
+      // The conversation's project (stable registry id, null until filed).
+      projectId: null,
       // PER-CONVERSATION provider: which catalog model this conversation uses
       // (composer model picker). null → providers.js defaultProvider() applies.
       providerId: null,
@@ -7794,6 +7819,20 @@ window.SandpieConv = {
     s._provDirty = true;
     saveConv(id, { touchUpdated: false }).catch(() => {});
   },
+  // PER-CONVERSATION project bridge — the timer-row chip reads/sets the project
+  // through this. Same contract as the provider bridge: convId null → home-state
+  // default in localStorage (sandpie-default-project).
+  getProjectId(convId) {
+    const id = convId || activeConvId;
+    if (!id) return null;
+    const s = convStreams.get(id);
+    return (s && s.projectId) || null;
+  },
+  setProjectId(convId, projectId) {
+    _setProjBinding(convId, projectId);
+    const slot = _timerSlotFor({ id: convId || activeConvId, host: document.getElementById('messages') });
+    if (slot) _paintProjChip(slot, convId || activeConvId);
+  },
   // PER-CONVERSATION reasoning effort bridge — providers.js reads/sets the level
   // through this (slider inside the composer model picker). Same contract as the
   // provider bridge: convId null → home-state default in localStorage.
@@ -8746,6 +8785,8 @@ function bootConversations() {
         if ((s.providerId || null) !== pid) s.providerId = pid;
         const rl = meta.reasoningLevel || null;
         if ((s.reasoningLevel || null) !== rl) s.reasoningLevel = rl;
+        const prj = meta.projectId || null;
+        if ((s.projectId || null) !== prj) s.projectId = prj;
         if (((s.providerId || null) !== pid || (s.reasoningLevel || null) !== rl)
             && window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
       } catch (_) {}
