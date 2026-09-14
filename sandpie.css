@@ -2193,13 +2193,6 @@ ul.conv-list li.active {
   .artifact-compact .ac-ic svg { width: 12px; height: 12px; }
   .artifact-compact .ac-sub { font-size: 11px; }
   .artifact-compact .ac-go { font-size: 15px; }
-  .ac-t-doc { background: rgba(88,166,255,0.14); color: #58a6ff; }
-  .ac-t-xls { background: rgba(63,185,80,0.15); color: #3fb950; }
-  .ac-t-ppt { background: rgba(219,109,64,0.15); color: #db6d40; }
-  .ac-t-pdf { background: rgba(248,81,73,0.15); color: #f85149; }
-  .ac-t-code { background: rgba(163,113,247,0.16); color: #a371f7; }
-  .ac-t-img { background: rgba(88,166,255,0.14); color: #58a6ff; }
-  .ac-t-generic { background: var(--sp-border); color: var(--sp-text-dim); }
   /* Real preview image (captured HTML thumbnail, or the image file itself) layered
      over the faux-page placeholder; fades in on load, leaving the placeholder as a
      fallback if capture fails. */
