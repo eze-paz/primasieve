@@ -393,9 +393,32 @@ var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
         <button class="ghost" onclick="saveThemeColors()" style="font-size:0.72rem;">Save colors</button>
       </div>
     </div>
+    <div style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--sp-border);">
+      <div style="font-size:0.7rem;color:var(--sp-text-dim);margin-bottom:0.35rem;">Background animation <span style="opacity:.7;">(home screen)</span></div>
+      <div id="bgModeBtns" style="display:flex;gap:0.35rem;flex-wrap:wrap;"></div>
+      <div style="font-size:0.65rem;color:var(--sp-text-dim);margin-top:0.3rem;">Shown behind the empty-chat home screen; follows the theme colors.</div>
+    </div>
     <div id="themeHint" style="font-size:0.65rem;color:var(--sp-text-dim);padding:0.5rem;margin-top:auto;text-align:center;transition:opacity 0.3s;opacity:0;">Pick a look.</div>` + _CHAT_WIDTH_HTML;
+function _setupBackgroundPicker() {
+  var host = document.getElementById('bgModeBtns');
+  if (!host) return;
+  var bg = window.SandpieBackground;
+  if (!bg) { host.textContent = 'Background module not loaded.'; return; }
+  host.innerHTML = '';
+  var active = bg.get();
+  bg.modes().forEach(function (m) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ghost theme-btn' + (m.id === active ? ' active' : '');
+    b.textContent = m.label;
+    b.title = 'Background: ' + m.label;
+    b.onclick = function () { bg.set(m.id); _setupBackgroundPicker(); };
+    host.appendChild(b);
+  });
+}
 function _setupAppearancePanel() {
   applyChatWidth();   // highlight the active width button
+  _setupBackgroundPicker();   // home-screen background animation picker
   var saved = getThemeName() || 'classic-dark';
   if (_themePalettes[saved]) {
     updateThemeButtons();
@@ -432,6 +455,7 @@ function _bootThemes() {
     // another device wins. Also re-apply on any later 'appearance' change.
     c.ready().then(function() { _importLegacyAppearance(); applySavedCustom(); _refreshAppearancePanel(); });
     c.subscribe('appearance', function() { applySavedCustom(); _refreshAppearancePanel(); });
+    c.subscribe('background', function() { if (document.getElementById('bgModeBtns')) _setupBackgroundPicker(); });
   }
 }
 if (document.readyState === 'loading') {
