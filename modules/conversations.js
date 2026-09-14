@@ -119,80 +119,6 @@ async function readConvJsonl(path) {
 }
 function _serializeJsonl(msgs) { return msgs.length ? msgs.map(m => JSON.stringify(m)).join('\n') + '\n' : ''; }
 
-// ── Incremental NDJSON reader: reads from END of file backwards in chunks ──
-// Yields batches of parsed messages, newest-first. Each yield is { messages, bytesRead, totalSize, done }.
-// The first chunk may start mid-line (the leading partial line is carried over
-// to the next chunk and completed there). The final yield (offset reaches 0)
-// flushes any remaining carried partial.
-const TAIL_CHUNK = 65536;          // 64KB per read
-async function* readConvJsonlTail(path, totalSize) {
-  if (!totalSize) return;
-  let offset = totalSize;
-  let carry = '';   // partial line carried from the previous (lower) chunk
-  while (offset > 0) {
-    const readStart = Math.max(0, offset - TAIL_CHUNK);
-    const len = offset - readStart;
-    let chunk;
-    try { chunk = await opfs.readTail(path, readStart, len); } catch { return; }
-    offset = readStart;
-    // Prepend carry from the previous chunk, then split into lines.
-    const text = chunk + carry;
-    carry = '';
-    const lines = text.split('\n');
-    // If this is NOT the start of the file, the first line may be partial.
-    if (offset > 0) {
-      carry = lines.shift();   // carry the partial head to the next (lower) chunk
-    }
-    // Parse lines from the END (newest) backwards. Filter empties.
-    const batch = [];
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const t = lines[i].trim();
-      if (!t) continue;
-      try { batch.push(JSON.parse(t)); } catch { /* tolerate torn line */ }
-    }
-    if (batch.length) {
-      yield { messages: batch, bytesRead: len, totalSize, done: offset <= 0 };
-    }
-  }
-  // Flush any remaining carry (shouldn't happen on well-formed files, but safe)
-  if (carry.trim()) {
-    try {
-      const msg = JSON.parse(carry.trim());
-      yield { messages: [msg], bytesRead: 0, totalSize, done: true };
-    } catch {}
-  }
-}
-
-// Render a batch of messages (in chronological order) PREPENDED before the
-// first existing child of host. Used by the incremental loader to fill in
-// older messages above the already-rendered recent batch.
-function renderMessagesBefore(msgs, host, scrollEl) {
-  if (!msgs.length || !host) return;
-  const prevHeight = scrollEl ? scrollEl.scrollHeight : 0;
-  const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
-  const frag = document.createDocumentFragment();
-  for (const m of msgs) renderHistoricalMessage(m, frag);
-  // Insert before the first .msg (or .compaction-block) — NOT before #homeCenter,
-  // which _placeHome() tucks in as the first child of the host. Inserting before
-  // host.firstChild would put older messages above #homeCenter, sandwiching it
-  // between old and new messages.
-  let anchor = null;
-  for (const child of host.children) {
-    if (child.classList && (child.classList.contains('msg') || child.classList.contains('compaction-block'))) {
-      anchor = child;
-      break;
-    }
-  }
-  if (anchor) host.insertBefore(frag, anchor);
-  else host.appendChild(frag);
-  // The conv-host anchors by default (overflow-anchor:auto), so the browser holds
-  // the viewport through this prepend AND later async reflow — no manual pinning
-  // needed, and doing it here would double-shift. Only compensate in the rare case
-  // anchoring is off (mid-stream, sp-streaming), where the app drives scroll itself.
-  if (scrollEl && scrollEl.classList.contains('sp-streaming')) {
-    scrollEl.scrollTop = prevScroll + (scrollEl.scrollHeight - prevHeight);
-  }
-}
 function _deriveTitle(msgs) {
   const firstUser = (msgs || []).find(m => m.role === 'user');
   if (firstUser && firstUser.content) return (_convText(firstUser.content).slice(0, 60)) || 'Untitled';
@@ -1122,7 +1048,7 @@ function reflectFileDeletes(paths) {
   const match = (p) => wants.has(norm(p));
   try { if (typeof window.removeArtifactByPath === 'function') window.removeArtifactByPath(paths); } catch (_) {}
   // A deletion changed grid membership — recompute the +N overflow on any grid.
-  try { for (const g of document.querySelectorAll('.artifact-grid')) applyGridOverflow(g); } catch (_) {}
+  try { for (const g of document.querySelectorAll('.artifact-grid')) applyGridFolding(g); } catch (_) {}
   try {
     for (const [cid, stream] of convStreams) {
       if (!stream) continue;
@@ -1156,11 +1082,12 @@ function _ftOpenGrid(target) {
 // transcript with cards. Show the first GRID_CAP and fold the rest behind a "+N"
 // tile in the next cell; clicking it expands (and offers "Show less"). State lives
 // on grid.dataset.expanded so re-renders/deletes preserve it. Re-run after any
-// change to a grid's membership.
+// change to a grid's membership (via applyGridFolding, which stacks images first;
+// cards folded into the image stack don't count toward the cap).
 const GRID_CAP = 7;
 function applyGridOverflow(grid) {
   if (!grid || !grid.isConnected) return;
-  const cards = [...grid.querySelectorAll(':scope > .artifact-wrap')];
+  const cards = [...grid.querySelectorAll(':scope > .artifact-wrap:not(.ac-stacked)')];
   let more = grid.querySelector(':scope > .ac-more');
   const expanded = grid.dataset.expanded === '1';
   const overflow = cards.length > GRID_CAP;
@@ -1183,6 +1110,84 @@ function applyGridOverflow(grid) {
     ? '<span class="ac-more-n">‹</span><span class="ac-more-lbl">Show less</span>'
     : '<span class="ac-more-n">+' + hidden + '</span><span class="ac-more-lbl">more</span>';
   more.title = expanded ? 'Show fewer' : hidden + ' more file' + (hidden !== 1 ? 's' : '');
+}
+// Image stack: a turn (or a replayed conversation) that wrote a pile of images —
+// screenshots, crops, probes — used to put one auto-expanded card per image in
+// the grid, so a conversation opened later was mostly visual noise. When a grid
+// holds more than two image cards they fold into ONE "N images" tile showing a
+// mosaic of the newest four; clicking it unfolds the individual cards (and offers
+// "Collapse"). The cards stay in the DOM (class ac-stacked hides them), so the
+// re-touch dedupe, delete reflection and side-panel open paths are unchanged.
+// State lives on grid.dataset.stackOpen, like the "+N" tile's dataset.expanded.
+const IMAGE_STACK_MIN = 3;
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
+const _isImageCard = w => IMAGE_EXTS.has(String(w.dataset.artifactPath || '').split('.').pop().toLowerCase());
+const IMG_STACK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+function applyImageStack(grid) {
+  if (!grid || !grid.isConnected) return;
+  const imgs = [...grid.querySelectorAll(':scope > .artifact-wrap')].filter(_isImageCard);
+  let tile = grid.querySelector(':scope > .ac-stack');
+  const open = grid.dataset.stackOpen === '1';
+  if (imgs.length < IMAGE_STACK_MIN) {
+    imgs.forEach(w => w.classList.remove('ac-stacked'));
+    if (tile) tile.remove();
+    return;
+  }
+  imgs.forEach(w => w.classList.toggle('ac-stacked', !open));
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.className = 'ac-stack';
+    tile.tabIndex = 0;
+    tile.setAttribute('role', 'button');
+    tile.innerHTML = '<div class="ac-stack-mosaic"></div>' +
+      '<div class="ac-ft"><div class="ac-ic ac-t-img">' + IMG_STACK_SVG + '</div><span class="ac-sub"></span><span class="ac-go">›</span></div>';
+    tile.addEventListener('click', () => {
+      grid.dataset.stackOpen = grid.dataset.stackOpen === '1' ? '' : '1';
+      applyGridFolding(grid);
+    });
+    tile.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tile.click(); } });
+  }
+  // The tile sits where the first image card is; the cards follow it when open.
+  if (imgs[0].previousElementSibling !== tile) grid.insertBefore(tile, imgs[0]);
+  tile.classList.toggle('ac-stack-open', open);
+  const n = imgs.length;
+  tile.querySelector('.ac-sub').textContent = open ? 'Collapse ' + n + ' images' : n + ' images';
+  tile.title = open ? 'Fold the images back into one tile' : 'Show all ' + n + ' images';
+  // Mosaic of the newest four — rebuilt only when membership changes.
+  const newest = imgs.slice(-4).map(w => w.dataset.artifactPath);
+  const mosaic = tile.querySelector('.ac-stack-mosaic');
+  const key = newest.join('|') + '#' + n;
+  if (mosaic.dataset.key !== key) {
+    mosaic.dataset.key = key;
+    mosaic.innerHTML = '';
+    for (const clean of newest) {
+      const cell = document.createElement('div');
+      cell.className = 'ac-stack-cell';
+      const img = document.createElement('img');
+      img.alt = ''; img.hidden = true;
+      cell.appendChild(img);
+      mosaic.appendChild(cell);
+      (async () => {
+        try {
+          const rp = await resolveArtifactPath(clean);
+          const url = (opfs.filesUrlReady && opfs.filesUrlReady()) ? opfs.filesUrl(rp) : await opfs.toUrl(rp);
+          if (window._applyArtifactShot) window._applyArtifactShot(img, url);
+        } catch (_) {}
+      })();
+    }
+    if (n > 4) {
+      const badge = document.createElement('span');
+      badge.className = 'ac-stack-n';
+      badge.textContent = '+' + (n - 4);
+      mosaic.lastElementChild.appendChild(badge);
+    }
+  }
+}
+// Every fold a grid needs, in order: images into their stack first, then the
+// "+N more" cap over whatever is still individually visible.
+function applyGridFolding(grid) {
+  applyImageStack(grid);
+  applyGridOverflow(grid);
 }
 function renderFilesTouched(host, files, opts) {
   if (!Array.isArray(files) || !files.length) return;
@@ -1232,7 +1237,7 @@ function renderFilesTouched(host, files, opts) {
   }
   if (!partial && grid) grid.removeAttribute('data-ft-open');
   if (grid && !grid.querySelector('.artifact-wrap')) grid.remove();
-  else if (grid) applyGridOverflow(grid);
+  else if (grid) applyGridFolding(grid);
   // Fold code + data + everything else into ONE shared bundle (from the 1st file).
   // Rebuilt only on the final (non-partial) emit so it doesn't churn mid-turn.
   if (bundleFiles.length) {
@@ -2109,6 +2114,24 @@ registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
 registerLiteButton();
+// Scroll a conversation's host to its end. The host is the scroll container, so
+// this targets the pane the conversation was actually mounted in (main OR side)
+// — loadConv used to scroll #messages unconditionally and left a conversation
+// mounted into the focused right pane sitting at the top. Images render with no
+// reserved height and fill in asynchronously, so re-pin when one loads if the
+// view is still at the bottom (within that image's own height — i.e. the growth
+// came from the image, not from the user scrolling up to read).
+function scrollConvToEnd(s) {
+  const host = s && s.host;
+  if (!host || !host.parentNode) return;
+  host.scrollTop = host.scrollHeight;
+  host.querySelectorAll('img').forEach(img => {
+    img.addEventListener('load', () => {
+      const gap = host.scrollHeight - host.scrollTop - host.clientHeight;
+      if (gap <= img.getBoundingClientRect().height + 2) host.scrollTop = host.scrollHeight;
+    }, { once: true });
+  });
+}
 async function loadConv(id) {
   if (id === activeConvId) return;
 
@@ -2128,8 +2151,7 @@ async function loadConv(id) {
   const s = ensureStream(id);
   if (convStreams.has(id) && s.messages.length) {
     // Warm — content already loaded; just scroll + refresh the sidebar.
-    const mEl = paneScrollEl($('messages'));
-    if (mEl) mEl.scrollTop = mEl.scrollHeight;
+    scrollConvToEnd(s);
     await refreshConversationList();
     return;
   }
@@ -2165,8 +2187,7 @@ async function loadConv(id) {
         if (activeConvId === id) messages = s.messages;
         renderConversation(s.messages, s.compaction, s.host);
         if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
-        const mEl = paneScrollEl($('messages'));
-        if (mEl) mEl.scrollTop = mEl.scrollHeight;
+        scrollConvToEnd(s);
         await refreshConversationList();
         return;
       }
@@ -2224,8 +2245,7 @@ async function loadConv(id) {
       if (activeConvId === id) messages = s.messages;
       renderConversation(allMsgs, s.compaction, s.host);
       if (s.readOnlyViewer) _notifyReadOnlyConv(s);   // render wiped the mount-time notice
-      const mEl = paneScrollEl($('messages'));
-      if (mEl) mEl.scrollTop = mEl.scrollHeight;
+      scrollConvToEnd(s);
       await refreshConversationList();
     } finally {
       s._loading = false;
@@ -2233,45 +2253,6 @@ async function loadConv(id) {
   })();
 }
 
-// Post-load finalization shared by the incremental path: compaction block,
-// pending asks, settled timer — the things renderConversation() normally does
-// but that the incremental path skips (it renders batches manually).
-function _finalizeIncrementalLoad(s, host) {
-  // Re-render with compaction support: if there's a compaction boundary, we
-  // need to wrap the older messages in a compaction block. The simplest correct
-  // approach: clear and re-render everything via renderConversation now that
-  // all messages are loaded. This is O(N) but only runs once at the end, and
-  // the user has already seen the bottom (the first batch rendered instantly).
-  if (s.compaction && s.compaction.boundary > 0 && s.compaction.boundary < s.messages.length) {
-    host.innerHTML = '';
-    renderConversation(s.messages, s.compaction, host);
-  } else {
-    // No compaction — just handle pending asks + settled timer
-    const target = host;
-    const pending = findPendingAsk(s.messages);
-    const targetConvId = s.id;
-    if (pending && pending.tcId && targetConvId) {
-      _askingConvs.add(targetConvId);
-      if (!target.querySelector('.ask-card[data-ask-tc-id="' + pending.tcId + '"]')) {
-        renderQuestions(pending.tcId, pending.questions, (result) => {
-          let answers = [];
-          try { answers = JSON.parse(String(result || '').replace(/^answers:/, '')); } catch (_) {}
-          resolveStoredAsk(targetConvId, pending.tcId, answers);
-        }, targetConvId);
-      }
-    } else {
-      markStaleAsks(target);
-    }
-    rebuildSettledTimer(target, s);
-  }
-  // Scroll to bottom only if the user is already near the bottom (hasn't
-  // scrolled up to read older messages). The incremental prepend path already
-  // pins scroll position per-batch, so this is just a final settle.
-  const mEl = paneScrollEl($('messages'));
-  if (mEl && (mEl.scrollHeight - mEl.scrollTop - mEl.clientHeight <= 50)) {
-    mEl.scrollTop = mEl.scrollHeight;
-  }
-}
 async function newConversation() {
   await saveActiveConv();
   // "+ New chat" always opens in the MAIN pane and leaves the side panel alone.
