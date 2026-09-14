@@ -1209,6 +1209,35 @@ ul.conv-list li.active {
      manual token-by-token scroll-to-bottom — auto anchoring would fight it. */
   .conv-host.sp-streaming { overflow-anchor: none; }
 
+  /* Rail scrollbar — conversation area ONLY (modules/scrollbar.js).
+     The native bar is hidden on .conv-host and replaced by a rail drawn in the
+     pane: hairline track, square thumb, one accent tick per user turn. Ghost
+     behaviour: invisible at rest, fades in on hover / focus-within / drag and
+     for 900ms after a scroll. Every other scrollable keeps the quiet native bar
+     above. Colours come from the scrollbar/accent tokens, never --sp-border
+     alone, so the clear theme's hard borders don't leak into the thumb. */
+  .conv-host.osb-host { scrollbar-width: none; scrollbar-gutter: auto; }
+  .conv-host.osb-host::-webkit-scrollbar { display: none; }
+  #messagesSide.osb-pane { position: relative; }   /* #messages already is */
+  .osb-rail {
+    position: absolute; right: 4px; width: 10px; z-index: 30;
+    opacity: 0; transition: opacity 0.35s ease; touch-action: none;
+  }
+  .osb-rail.osb-show, .osb-rail.osb-scrolling, .osb-rail.osb-dragging { opacity: 1; transition-duration: 0.12s; }
+  .osb-rail::before { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: var(--sp-scrollbar); }
+  .osb-thumb {
+    position: absolute; left: 1px; right: 1px; top: 0; min-height: 24px;
+    background: var(--sp-scrollbar-hover); cursor: grab; will-change: transform;
+    transition: background 0.2s;
+  }
+  .osb-rail:hover .osb-thumb, .osb-rail.osb-dragging .osb-thumb { background: var(--sp-accent); }
+  .osb-rail.osb-dragging .osb-thumb { cursor: grabbing; }
+  .osb-ticks { position: absolute; inset: 0; pointer-events: none; }
+  .osb-ticks i { position: absolute; left: 0; right: 0; height: 1px; background: var(--sp-accent); opacity: 0.8; }
+  @media (prefers-reduced-motion: reduce) {
+    .osb-rail, .osb-thumb { transition: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
   }
 
