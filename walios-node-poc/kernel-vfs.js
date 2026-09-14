@@ -88,6 +88,9 @@ class KernelVfs {
   }
 
   write(fd, bytes, pos) {
+    // Never issue a 0-length write. POSIX says it transfers nothing; walios used to
+    // push an empty chunk into a pipe, which the reader took for EOF.
+    if (!bytes || bytes.length === 0) return 0;
     if (pos !== null && pos !== undefined && pos >= 0) this._check(this.sys.lseek(fd, pos, 0), 'lseek');
     const ptr = this.mem.bytes(bytes);
     const n = this._check(this.sys.write(fd, ptr, bytes.length), 'write');

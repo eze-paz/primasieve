@@ -11,7 +11,7 @@ kernel. Two phases done so far.
 | `run3.js` | a multi-file user app via node's real CJS loader | runs |
 | `test-kernel-vfs.mjs` | **node's fs over the walios syscall protocol** | 19/19 |
 | `test-node-cli.mjs` | **`node -e` and `node script.js`, argv+stdio via syscalls** | 23/23 |
-| `test-browser.mjs` | **the real thing: real Chromium, real kernel, real ash** | 8/9 |
+| `test-browser.mjs` | **the real thing: real Chromium, real kernel, real ash** | 9/9 |
 
 ---
 
@@ -197,26 +197,41 @@ Nested workers created from a URL-based worker fail there -- including the kerne
 own `wali-proc-worker.js` and a one-line trivial worker. Blob-to-blob nesting works.
 Real Chromium is fine. That is why `test-browser.mjs` exists.
 
-## KNOWN BROKEN: node in a pipeline
+## The pipe bug: a zero-length write meant EOF
 
-`node -e '...' | grep x` produces nothing. Characterised, not yet fixed:
+`node -e '...' | grep x` produced nothing. Fixed, and the root cause was not in node.
 
-- fd 1 IS a proper FIFO in a pipeline (`fstat` -> `mode=0o10600 fifo=true`)
-- raw `SYS_write(1, ...)` at process start AND at +300ms both succeed and the bytes
-  reach the reader (`| wc -c` counts them)
-- node closes neither fd 0/1/2 nor any fd it did not open (both instrumented)
-- yet node's first `console.log` finds `_writableState.errored = EPIPE` already set,
-  so `write()` returns false and `_write` is never called
-- unpiped, redirected to a file, and a busybox-only pipe all work
+A **zero-length** write to a pipe pushed an *empty chunk* into the fifo and woke the
+reader. The reader read 0 bytes and took that for EOF, exited, `readers` went to 0,
+and the writer's next real write came back EPIPE + SIGPIPE (exit 141). POSIX is
+explicit that `write(fd, buf, 0)` on a pipe transfers nothing and has no effect.
 
-So the pipe is healthy when the process starts and the write end is gone by the time
-node has booted, without node having closed anything. The next step is kernel-side
-instrumentation of the fifo refcounts across the vfork/execve handoff.
+The kernel log that showed it:
 
-Two things made this hard to see and are worth keeping fixed:
-`SyncWriteStream._write` routes a failing `writeSync` into `cb(err)` -> an `'error'`
-event -> `process.nextTick`, which never drains here, so the failure was **totally
-silent**; and our own `out()` swallowed write errors. Both now report on fd 2.
+```
+[FIFO] blockread pipe#1 pid=103 chunks=0 w=1      grep waits, one writer alive
+[FIFO] blockread EXIT  pipe#1 pid=103 chunks=1 w=1  woken: a chunk arrived
+[FIFO] read      pipe#1 pid=103 got=0 w=1 r=1     the chunk is EMPTY -> EOF -> grep exits
+[FIFO] EPIPE     pipe#1 pid=101 w=1 r=0           node's next write, no readers left
+```
+
+Fixed in two places:
+
+- **the kernel** (`wali-worker.js`, both the pipe and socketpair write paths): a
+  0-length write returns 0 without pushing a chunk or waking the reader. This is a
+  latent walios bug that any guest could hit, not a walios-node one.
+- **`kernel-vfs.js`**: never issue a 0-length write at all. Regression-tested in
+  `test-kernel-vfs.mjs`.
+
+The zero-length writes were my own diagnostic probes, which is a lesson worth
+recording: **the probe caused the failure it was measuring.** It looked like a race
+for a long time because the early probe succeeded and killed the reader, so the next
+write failed -- consistent with "the pipe dies after ~200ms" and entirely misleading.
+
+What finally separated it was a control matrix: a builtin writer (`echo`) worked, a
+fast exec'd writer (`cat`) worked, a *slow* exec'd writer (`sh -c 'sleep 1; echo'`)
+also worked -- which ruled out latency and the exec path, leaving only something our
+process did. Kernel-side refcount logging then named it in one run.
 
 ## Previously NOT verified: the browser
 

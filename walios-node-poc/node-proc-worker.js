@@ -180,13 +180,6 @@ function runNode() {
   let vfs, rt;
   try {
     vfs = new KernelVfs(sys, arena);
-    raw('vfs built; probing SYS_write on fd 1');
-    // Does a bare write to stdout work at all, before node is involved?
-    const probe = new TextEncoder().encode('');
-    const pp = arena.bytes(probe);
-    const wrote = Number(sys.write(1, pp, 0));
-    arena.reset();
-    raw('bare SYS_write(1, "", 0) returned ' + wrote);
 
     rt = boot(null, { sources: libSources, vfs });
     raw('boot ok; lib modules=' + rt.trace.loaded.length);
@@ -197,7 +190,7 @@ function runNode() {
 
   let code;
   try {
-    code = main(rt, sys, arena, raw);
+    code = main(rt, sys, arena, trace);
     raw('main returned ' + code + '; syscalls=' + vfs.calls);
   } catch (e) {
     raw('MAIN THREW: ' + String((e && e.stack) || e).slice(0, 600));

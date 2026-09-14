@@ -28,22 +28,53 @@ const NODE_WORKER_URL = '/walios-node-poc/node-proc-worker.js';
 const SPAWN_FROM = "    const w = new Worker('wali-proc-worker.js');\n    this.procWorker = w;";
 const SPAWN_TO = "    const w = new Worker(NODE_STUB_RE.test(this.modKey) ? NODE_WORKER_URL : 'wali-proc-worker.js');\n    this.procWorker = w;";
 
+// A real walios bug, not a walios-node one. POSIX says write(fd, buf, 0) on a pipe
+// transfers nothing, but the kernel pushed an EMPTY chunk and woke the reader; the
+// reader then read 0 bytes and took it for EOF. Any guest that probed a pipe with a
+// zero-length write silently killed its own pipeline.
+const NL = String.fromCharCode(10);
+const PIPE_FROM = "          h.fifo.chunks.push(S.u8.slice(a[1], a[1] + a[2])); wakePipe(h.fifo); return BigInt(a[2]); }";
+const PIPE_TO = [
+  "          // POSIX: a 0-length write to a pipe transfers nothing and has no effect.",
+  "          // Pushing an empty chunk woke the reader, which read 0 bytes and took it",
+  "          // for EOF -- a writer that probed with write(fd, p, 0) silently killed its",
+  "          // own pipeline.",
+  "          if (a[2] === 0) return 0n;",
+  PIPE_FROM,
+].join(NL);
+const SPAIR_FROM = "          h.spair.wr.chunks.push(S.u8.slice(a[1], a[1] + a[2])); wakePipe(h.spair.wr); return BigInt(a[2]); }";
+const SPAIR_TO = [
+  "          if (a[2] === 0) return 0n;                                   // same rule as the pipe above",
+  SPAIR_FROM,
+].join(NL);
+
 let src = readFileSync(KERNEL, 'utf8');
 const hasConsts = src.includes('const NODE_STUB_RE');
 const hasSpawn = src.includes('NODE_STUB_RE.test(this.modKey)');
+const hasPipe = src.includes('a 0-length write to a pipe transfers nothing');
 
 if (mode === 'check') {
-  console.log('constants  :', hasConsts ? 'present' : 'MISSING');
-  console.log('spawn hook :', hasSpawn ? 'present' : 'MISSING');
-  process.exit(hasConsts && hasSpawn ? 0 : 1);
+  console.log('constants     :', hasConsts ? 'present' : 'MISSING');
+  console.log('spawn hook    :', hasSpawn ? 'present' : 'MISSING');
+  console.log('0-len pipe fix:', hasPipe ? 'present' : 'MISSING');
+  process.exit(hasConsts && hasSpawn && hasPipe ? 0 : 1);
 }
 
 if (mode === 'revert') {
   if (hasConsts) src = src.replace(CONSTS, '');
   if (hasSpawn) src = src.replace(SPAWN_TO, SPAWN_FROM);
+  if (hasPipe) { src = src.replace(PIPE_TO, PIPE_FROM).replace(SPAIR_TO, SPAIR_FROM); }
   writeFileSync(KERNEL, src);
-  console.log('reverted');
-  process.exit(0);
+  // Report what actually came out, not what we attempted: an anchor that has drifted
+  // leaves a hunk in place, and silently claiming success would hide that.
+  const after = readFileSync(KERNEL, 'utf8');
+  const left = [
+    after.includes('const NODE_STUB_RE') && 'constants',
+    after.includes('NODE_STUB_RE.test(this.modKey)') && 'spawn hook',
+    after.includes('a 0-length write to a pipe transfers nothing') && '0-len pipe fix',
+  ].filter(Boolean);
+  console.log(left.length ? 'reverted, but still present: ' + left.join(', ') : 'reverted');
+  process.exit(left.length ? 1 : 0);
 }
 
 let changed = 0;
@@ -56,6 +87,13 @@ if (!hasSpawn) {
   // The threadSpawn path has an identical line; only the FIRST (runInWorker) is patched.
   if (!src.includes(SPAWN_FROM)) { console.error('FAILED: spawn anchor not found'); process.exit(2); }
   src = src.replace(SPAWN_FROM, SPAWN_TO);
+  changed++;
+}
+
+if (!hasPipe) {
+  if (!src.includes(PIPE_FROM)) { console.error('FAILED: pipe anchor not found'); process.exit(2); }
+  src = src.replace(PIPE_FROM, PIPE_TO);
+  if (src.includes(SPAIR_FROM)) src = src.replace(SPAIR_FROM, SPAIR_TO);
   changed++;
 }
 

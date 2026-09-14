@@ -101,6 +101,13 @@ t('reads files the "shell" seeded', () => {
   const etc = fs.readdirSync('/etc').sort();
   return '/etc = ' + JSON.stringify(etc) + ' gitconfig=' + JSON.stringify(fs.readFileSync('/etc/gitconfig', 'utf8').slice(0, 12));
 });
+t('0-length write issues NO syscall  [pipe EOF regression]', () => {
+  const before = vfs.calls;
+  const n = vfs.write(1, new Uint8Array(0), null);
+  if (n !== 0) throw new Error('expected 0, got ' + n);
+  if (vfs.calls !== before) throw new Error('a syscall was issued for a 0-length write');
+  return 'returned 0, no syscall';
+});
 t('fs.readFileSync on a dir throws EISDIR', () => { try { fs.readFileSync('/etc'); return 'NO THROW (bad)'; } catch (e) { return e.code; } });
 
 console.log('PASS (' + ok.length + ')');

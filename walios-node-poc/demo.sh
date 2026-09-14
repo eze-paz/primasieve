@@ -28,7 +28,7 @@ cat /tmp/r.txt
 echo "--- control: busybox-only pipe ---"
 echo pipe-from-echo | grep pipe
 
-echo "--- KNOWN BROKEN: pipe node into grep ---"
+echo "--- pipe node into grep ---"
 node -e 'console.log("findme-123"); console.log("ignore-me")' | grep findme
 
 echo "--- exit codes ---"
