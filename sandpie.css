@@ -2200,7 +2200,7 @@ ul.conv-list li.active {
   .artifact-card-body .ac-shot.ready { opacity: 1; }
   /* Per-turn wrapping grid: several deliverable cards flow side by side; a single
      card fills the row (auto-fit collapses the empty tracks). */
-  .artifact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 0.5rem; align-self: stretch; }
+  .artifact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 400px)); gap: 12px; margin-top: 0.5rem; align-self: stretch; }
   .artifact-grid > .artifact-wrap { margin-top: 0 !important; min-width: 0; }
   .artifact-grid > .artifact-wrap.ac-hidden { display: none !important; }
   /* "+N more" overflow tile — folds a flood of cards behind one cell (GRID_CAP). */
