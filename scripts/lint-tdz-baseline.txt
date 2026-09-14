@@ -103,8 +103,6 @@ modules/pyodide-worker.js:322:25  'py' was used before it was defined.
 modules/pyodide-worker.js:322:31  'py' was used before it was defined.
 modules/pyodide-worker.js:322:45  'py' was used before it was defined.
 modules/pyodide-worker.js:322:66  'py' was used before it was defined.
-modules/pyodide-worker.js:331:5  '_betaProject' was used before it was defined.
-modules/pyodide-worker.js:334:15  '_betaProject' was used before it was defined.
 modules/pyodide-worker.js:437:27  '_HYDRATE_AUDIT_PY' was used before it was defined.
 modules/pyodide-worker.js:438:27  '_CLOUD_FS_PY' was used before it was defined.
 modules/pyodide-worker.js:461:3  '_lookupOrigRef' was used before it was defined.

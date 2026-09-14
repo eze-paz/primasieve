@@ -647,10 +647,7 @@ window.SandpieTools = SandpieTools;
 // image-already-attached, the plan-first gate). Everything else — repetition,
 // when/when-not trees, examples, schema restatement — is cut.
 //
-// SHORT_DESC is the /app (OPFS workspace) wording; BETA_DESC layers the Dropbox-
-// project overrides on top for the fork. run_python→pyodide and the inline-`code`
-// param graduated to BOTH modes (NAME / PARAMS); copy_to_workspace→copy stays
-// beta-only (BETA_NAME / BETA_PARAMS).
+// SHORT_DESC is the trimmed wording actually sent on the wire (see _effectiveTool).
 const SHORT_DESC = {
   run_python: 'Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script), or `path` to run a saved .py file under /files. Async: top-level `await` works — end with `await main()`, never asyncio.run() or time.sleep() (use `await asyncio.sleep`). No sockets — for HTTP use `pyodide.http.pyfetch` and check `r.ok`. ~100 packages prebuilt (numpy, pandas, matplotlib, bs4…); others via `await micropip.install(...)`. A relative save lands next to the script; inline `code` runs in /files.',
   write_file: 'Create or overwrite a text file under /files. Creates by default; if it already exists nothing is written unless you pass overwrite:true. For a small change to an existing file, use edit_file instead of rewriting it — never save a renamed copy (foo_v2).',
@@ -677,21 +674,7 @@ const SHORT_DESC = {
   ask: 'Ask the user to choose between options to resolve a genuine ambiguity that would waste real work if guessed wrong — ask early, before doing the work. Batch all questions in ONE call (≤4), each with 2-5 mutually exclusive options and a default. Author in English.',
   respond: 'Deliver your final, user-facing answer (rendered as Markdown). Put ONLY the finished reply here — never thinking, planning, or scratch narration.',
 };
-// Beta (Dropbox-project) overrides: only the tools whose path model differs from
-// /app. Everything else is inherited from SHORT_DESC.
-const BETA_DESC = { ...SHORT_DESC,
-  run_python: 'Run Python and get stdout/stderr. Pass `code` to run a snippet directly (preferred — no throwaway script), or `path` to run a saved .py script in the project. Async: top-level `await` works — end with `await main()`, never asyncio.run() or time.sleep() (use `await asyncio.sleep`). No sockets — for HTTP use `pyodide.http.pyfetch` and check `r.ok`. ~100 packages prebuilt (numpy, pandas, matplotlib, bs4…); others via `await micropip.install(...)`. Files resolve in the project folder.',
-  write_file: 'Create or overwrite a text file in the project. Creates by default; if it already exists nothing is written unless you pass overwrite:true. For a small change to an existing file, use edit_file instead of rewriting it — never save a renamed copy (foo_v2).',
-  read_file: 'Read a UTF-8 text file (use offset/limit for a line range). You can read ANY file in the user\'s Dropbox by absolute path, not just the project.',
-  delete_file: 'Delete a file or folder in the project.',
-  list_files: 'List files and folders (with size + modified time). Use it to see what exists and to verify a write. An absolute path lists anywhere in Dropbox.',
-  search: 'Find files by content or name (regex) in the project. scope:"dropbox" runs a keyword search over file names + contents across all of the user\'s Dropbox; an absolute `path` scopes it.',
-  load_image: 'Load an image so you can see its pixels — it\'s visible on your next step. Do NOT call it if the image is already attached to the user\'s message (you already see it). You can only see it during this turn; reload the same path in a later turn if you need it again. JPEG/PNG/GIF/WEBP; images over ~5 MB are refused — downscale first (pyodide + Pillow).',
-  copy_to_workspace: 'Copy a file or folder from anywhere in the user\'s Dropbox INTO this conversation\'s project folder so you can edit or run it. The source is never modified.',
-  shell: 'Run a command on the REMOTE relay host (stdout/stderr/exit code). The relay is a SEPARATE machine — NOT your project files: verify project files with list_files, never `ls`/`cat` here. Use it only for the relay itself (builds, ssh/scp to other hosts). Write a relay file by piping content through stdin. Long jobs (>~120s) are killed — launch detached (nohup … & echo $!) and poll a log.',
-};
-
-// The WIRE path is _effectiveTool(), and it prefers SHORT_DESC/BETA_DESC over
+// The WIRE path is _effectiveTool(), and it prefers SHORT_DESC over
 // SandpieTools.description() — so the backend-aware text on the accessor never reached
 // the model. Caught only by dumping the tools array the app actually POSTed: while
 // running WALIOS the model was being told "never asyncio.run()", "No sockets — use
@@ -714,31 +697,20 @@ const PARAMS = {
     timeout: { type: 'number', description: 'Seconds before the run is killed.' },
   }, required: [] },
 };
-// Beta-only: copy_to_workspace is exposed as copy() with a project-shaped schema.
-const BETA_NAME = { copy_to_workspace: 'copy' };
-const BETA_PARAMS = {
-  copy_to_workspace: { type: 'object', properties: {
-    src:  { type: 'string', description: 'Source path — absolute (anywhere in Dropbox) or relative to the project.' },
-    dest: { type: 'string', description: 'Optional destination inside the project (default: the source filename).' },
-  }, required: ['src'] },
-};
 
 // Resolve one tool to the EFFECTIVE {name, description, parameters} actually sent
 // to the model — applying the mode's rename, param, and trimmed-description maps.
 // Shared by toolDefs() (the wire schema) and SandpieTools.effectiveList() (the
 // Settings → Tools inspector), so the panel always shows exactly what's sent.
 function _effectiveTool(name) {
-  const beta = !!window.SANDPIE_BETA;
-  const descMap = beta ? BETA_DESC : SHORT_DESC;
-  let description = (descMap[name] != null) ? descMap[name] : SandpieTools.description(name);
+  let description = (SHORT_DESC[name] != null) ? SHORT_DESC[name] : SandpieTools.description(name);
   // run_python describes whichever backend is actually selected, on the wire path too.
   if (name === 'run_python' && _waliosPython()) description = SHORT_DESC_WALIOS;
-  const outName = (beta && BETA_NAME[name]) || NAME[name] || name;
-  const params = (beta && BETA_PARAMS[name]) || PARAMS[name] || tools[name].parameters;
+  const outName = NAME[name] || name;
+  const params = PARAMS[name] || tools[name].parameters;
   // /app search: append WHERE the workspace + team shared area sit in Dropbox, so
-  // a scope:"dropbox" search can target the shared folder precisely. (Beta carries
-  // its per-conversation project path in the system prompt instead.)
-  if (!beta && name === 'search') {
+  // a scope:"dropbox" search can target the shared folder precisely.
+  if (name === 'search') {
     try {
       const p = window.Sandpie && Sandpie.syncProvider && Sandpie.syncProvider();
       const wr = p && p.workingRoot && p.workingRoot();

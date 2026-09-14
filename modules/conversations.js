@@ -402,10 +402,8 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   // carried forward — otherwise every save would make the conversation eligible
   // for auto-titling again.
   if (prevMeta && prevMeta.titleLocked) meta.titleLocked = true;
-  // BETA projects fork: the conversation's project folder (absolute Dropbox path
-  // + namespace). Rebuilt-from-scratch meta means this must be carried forward,
-  // preferring a warm stream's value (set by the project picker at new-chat) over
-  // the prior meta. A conversation with no project (legacy / Unsorted) omits both.
+  // The conversation's project folder (absolute Dropbox path + namespace): meta is
+  // rebuilt from scratch here, so carry it forward, preferring a warm stream's value.
   const projRoot = (s && s.projectRoot) || (prevMeta && prevMeta.projectRoot);
   if (projRoot) {
     meta.projectRoot = projRoot;
@@ -460,71 +458,17 @@ function _lrNorm(p) {
   try { p = decodeURIComponent(p); } catch (_) {}
   return p.replace(/^\.\//, '').replace(/^\/?files\//, '').replace(/^opfs:\/\//, '').replace(/^\/+/, '');
 }
-// BETA: a file ref in a chat message is a Dropbox path, not an OPFS path. Resolve
-// it against the active conversation's project folder (absolute /path stays as-is;
-// otherwise it's project-relative) and fetch it into the OPFS render cache so the
-// viewer / <img> / SW /files/ URL can display it. `raw` is the ORIGINAL ref text
-// (before _lrNorm strips the leading slash — we need that to tell absolute apart).
-function _lrBetaResolve(raw) {
-  let p = String(raw || '').trim();
-  try { p = decodeURIComponent(p); } catch (_) {}
-  p = p.replace(/^\.\//, '').replace(/^opfs:\/\//, '');
-  const s = activeStream();
-  const proj = (s && s.projectRoot) ? String(s.projectRoot).replace(/\/+$/, '') : '';
-  const team = !!(s && s.projectNs === 'team');
-  let abs;
-  if (p.startsWith('/')) abs = p.replace(/\/+$/, '');
-  else { p = p.replace(/^files\//, ''); if (!proj) return null; abs = proj + '/' + p; }
-  // Cache rel: the project-relative subpath when the file is inside the project
-  // (clean + reused by the viewer), else a flattened name under _betaview/.
-  const cacheRel = (proj && abs.toLowerCase().startsWith(proj.toLowerCase() + '/'))
-    ? abs.slice(proj.length + 1)
-    : ('_betaview/' + abs.replace(/^\/+/, '').replace(/[^\w.\- ]+/g, '_'));
-  return { abs, team, cacheRel };
-}
-async function _betaHydrateForView(raw) {
-  const r = _lrBetaResolve(raw);
-  if (!r) return null;
-  const prov = (typeof Sandpie !== 'undefined' && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
-  if (!prov || !prov.cloudDownload) return null;
-  let bytes = null;
-  for (const team of [r.team, !r.team]) {   // reads work anywhere: try the project ns, then the other
-    try { bytes = await prov.cloudDownload(r.abs, { team }); if (bytes) break; } catch (_) {}
-  }
-  if (!bytes) return null;
-  try { await opfs.write(r.cacheRel, bytes); } catch (_) {}   // render cache (beta ignores it for sync)
-  return { cacheRel: r.cacheRel, bytes };
-}
 async function _lrBlobUrl(path, raw) {
   if (_lrBlobUrls.has(path)) return _lrBlobUrls.get(path);
   const mime = _LR_IMG_MIME[path.split('.').pop().toLowerCase()];
   if (!mime) return null;
   const cache = (bytes) => { const url = URL.createObjectURL(new Blob([bytes], { type: mime })); _lrBlobUrls.set(path, url); return url; };
   try { return cache(await opfs.readBytes(path)); } catch (_) {}
-  if (window.SANDPIE_BETA) {   // not in OPFS → fetch from the Dropbox project
-    try { const h = await _betaHydrateForView(raw != null ? raw : path); if (h && h.bytes) return cache(h.bytes); } catch (_) {}
-  }
   return null;
 }
 async function _lrOpen(path, raw) {
-  if (window.SANDPIE_BETA) {
-    try {
-      const h = await _betaHydrateForView(raw != null ? raw : path);
-      if (h && typeof SandpieFileViewer !== 'undefined') { SandpieFileViewer.open(h.cacheRel); return; }
-      console.warn('[beta] could not fetch for view:', raw || path);
-    } catch (e) { console.warn('[beta] view fetch failed:', (e && e.message) || e); }
-    return;
-  }
   try { if (typeof SandpieFileViewer !== 'undefined' && _LR_PATHISH.test(path)) SandpieFileViewer.open(path); } catch (_) {}
 }
-// BETA: expose the active conversation's project (for the Files sidebar) and the
-// Dropbox-fetch-into-render-cache helper (so the sidebar opens project files the
-// same way chat links do). opfs.js reads these; both are no-ops on /app.
-window.sandpieActiveProject = function () {
-  try { const s = activeStream(); return (s && s.projectRoot) ? { root: s.projectRoot, ns: s.projectNs || 'home' } : null; }
-  catch (_) { return null; }
-};
-window.__betaHydrateForView = _betaHydrateForView;
 function hydrateLocalRefs(root) {
   if (!root || !root.querySelectorAll) return;
   for (const img of root.querySelectorAll('img[src]')) {
@@ -1815,9 +1759,6 @@ function mountConv(convId, pane = null) {
     if (mpHost) mpHost.dataset.convId = convId || '';
     if (window.SandpieProviders && SandpieProviders.refreshPickers) SandpieProviders.refreshPickers();
   } catch (_) {}
-  // BETA: the Files sidebar shows the ACTIVE conversation's project — refresh it
-  // on every switch so it tracks the conversation now on screen.
-  if (window.SANDPIE_BETA && window.opfs && opfs.refreshFileList) { try { opfs.refreshFileList(); } catch (_) {} }
 }
 /* ---- harness-reminder note visibility (drift / no-plan / stop guard) ----- */
 // The agentic loop emits `reminder` events when its guards fire. They are never
@@ -2262,14 +2203,6 @@ async function newConversation() {
   parkPaneConv(main);
   const id = newConvId();
   const s = ensureStream(id);
-  // BETA: stamp the new conversation with the currently-selected project (the
-  // sidebar dropdown), so "+ New chat" and file writes go there.
-  if (window.SANDPIE_BETA && s && window.SandpieProjects) {
-    try {
-      const proj = await SandpieProjects.projectForNewChat();
-      if (proj && proj.root) { s.projectRoot = proj.root; s.projectNs = proj.ns || 'home'; try { SandpieProjects.touchProject(proj.root); } catch (_) {} }
-    } catch (_) {}
-  }
   mountConv(id, main);
   if (sidePanel?.isOpen && sidePanel.activeIsRight) sidePanel.focusPane(false);
   convLastViewed.set(id, new Date().toISOString());
@@ -2830,7 +2763,7 @@ const _MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUS
 
 // Panel head counter ("19 · 1 pinned"). The sidebar head is a label for the
 // list, so it has to move whenever the list does — every exit of
-// refreshConversationList calls this, including the empty and BETA paths.
+// refreshConversationList calls this, including the empty path.
 function _setConvCount(total, pinned) {
   const el = $('convCount');
   if (!el) return;
@@ -2859,15 +2792,6 @@ async function refreshConversationList() {
   const pinned   = list.filter(c => c.pinned);
   const regular  = list.filter(c => !c.pinned);
 
-
-  // BETA: group the sidebar by project. Each project is a header with a "+ chat"
-  // button; conversations without a project fall under "Unsorted". A "New project"
-  // button sits at the top. When there are no projects at all, prompt to create one.
-  if (window.SANDPIE_BETA && window.SandpieProjects) {
-    _setConvCount(pinned.length + regular.length, pinned.length);
-    await _renderBetaConvList(ul, [...pinned, ...regular]);
-    return;
-  }
 
   const frag = document.createDocumentFragment();
   if (!list.length) {
@@ -2931,61 +2855,6 @@ function _archiveSearchLink(query) {
     else if (window.SandpieSettings) SandpieSettings.open('archive');
   });
   return li;
-}
-// BETA sidebar: a project selector under "+ New chat", then the conversations of
-// the SELECTED project only. "Personal" (the user's own Dropbox folder) is a
-// built-in project that also holds legacy, projectless conversations. Selecting
-// "＋ Add new project…" opens the folder picker. `rows` = visible (pinned +
-// regular) conv rows, each carrying projectRoot.
-async function _renderBetaConvList(ul, rows) {
-  const frag = document.createDocumentFragment();
-  const projects = await SandpieProjects.allProjects();     // [Personal, ...registry]
-  const active = await SandpieProjects.activeProject();
-  const normP = (s) => String(s || '').replace(/\/+$/, '').toLowerCase();
-  const activeKey = active.personal ? '' : normP(active.root);
-
-  // --- the project dropdown (directly under the + New chat button) ---
-  const selLi = document.createElement('li');
-  selLi.className = 'proj-select-row';
-  selLi.style.cssText = 'list-style:none;margin:.1rem 0 .4rem';
-  const sel = document.createElement('select');
-  sel.className = 'proj-select';
-  sel.title = 'Project — new chats and file writes go here';
-  sel.style.cssText = 'width:100%;padding:.3rem .4rem;font-size:.8rem;border-radius:6px;background:var(--input-bg,#0002);color:inherit;border:1px solid var(--border,#3335)';
-  for (const p of projects) {
-    const o = document.createElement('option');
-    o.value = p.personal ? '' : normP(p.root);
-    o.textContent = (p.personal ? '👤 ' : '📁 ') + (p.name || p.root);
-    if (o.value === activeKey) o.selected = true;
-    sel.appendChild(o);
-  }
-  const addOpt = document.createElement('option');
-  addOpt.value = '__add__'; addOpt.textContent = '＋ Add new project…';
-  sel.appendChild(addOpt);
-  sel.onchange = async () => {
-    if (sel.value === '__add__') {
-      const created = await SandpieProjects.newProjectFlow();   // picks + names + selects + refreshes
-      if (!created) await refreshConversationList();            // cancelled → restore selection
-      return;
-    }
-    const chosen = projects.find(p => (p.personal ? '' : normP(p.root)) === sel.value) || SandpieProjects.personalProject();
-    SandpieProjects.setActiveProject(chosen);
-    await refreshConversationList();
-  };
-  selLi.appendChild(sel);
-  frag.appendChild(selLi);
-
-  // --- conversations of the active project only ---
-  const mine = rows.filter(c => SandpieProjects.convInProject(c, active));
-  if (!mine.length) {
-    const li = document.createElement('li');
-    li.className = 'empty';
-    li.textContent = Sandpie.initialSyncDone() ? 'No chats in this project yet — + New chat to start.' : 'Loading…';
-    frag.appendChild(li);
-  } else {
-    mine.forEach((c, i) => frag.appendChild(buildConvLi(c, i)));
-  }
-  ul.replaceChildren(frag);
 }
 function refreshSendButtonForActive() {
   refreshSendButtonFor('main');
@@ -3423,7 +3292,7 @@ function getSandpieWorker() {
   // Lives under modules/ (served wholesale by sandpie-server) rather than the
   // web root, where brand-new files have no route and 404. Path resolves against
   // the document base (root) → /modules/sandpie-worker.js.
-  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=228');
+  _sandpieWorker = new Worker('./modules/sandpie-worker.js?v=229');
   window._sandpieWorker = _sandpieWorker;
 
   /* ---- Suspension labeling: forward page visibility to the worker. The worker's
@@ -4241,26 +4110,8 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     } catch (_) { return null; }
   })();
   const _ep = effective ? String(effective.endpoint || '').replace(/\/$/, '') : '';
-  // BETA projects fork: resolve the conversation's project once (stream first, then
-  // persisted meta) — reused for both the system-prompt block and the worker config.
-  let _projRoot = null, _projNs = null;
-  if (window.SANDPIE_BETA) {
-    try {
-      const cid = convId || activeConvId;
-      const s = convStreams.get(cid);
-      if (s && s.projectRoot) { _projRoot = s.projectRoot; _projNs = s.projectNs || 'home'; }
-      else { const m = await readConvMeta(cid); if (m && m.projectRoot) { _projRoot = m.projectRoot; _projNs = m.projectNs || 'home'; } }
-    } catch (_) {}
-  }
-  // The project rule, appended to the system prompt so the model knows where it
-  // can write and that reads are unrestricted.
   const _liteCfg = _liteOn(convId || activeConvId);
   const _sysPrompt = await buildSystemPrompt(convMessages, null);
-  if (window.SANDPIE_BETA && _sysPrompt && typeof _sysPrompt.content === 'string') {
-    _sysPrompt.content += _projRoot
-      ? `\n\n## Project folder\nThis conversation's project folder is your working directory:\n  ${_projRoot}\nThat folder IS your workspace root. To write a file, use a BARE name or a path relative to that root — e.g. write_file("rand10.txt") creates ${_projRoot}/rand10.txt. Every tool result echoes the FULL absolute path it acted on; trust that echo, not your memory of earlier paths.\nHARD RULES:\n- Do NOT invent nested folders like "projects/<name>/…" — there is no such structure here; the project folder is the root, so put files directly in it (or in a subfolder only if the user asks). A path you saw in another conversation or in a "recent paths" list does NOT apply here.\n- Writes, edits and deletes are limited to this project folder. Reads work ANYWHERE in the user's Dropbox by absolute path (e.g. read_file("/R+D+I/spec.pdf")). To change a file outside the project, copy() it in first.\n- If you're unsure what already exists, list_files (no path) shows the project root — orient with that instead of guessing a path.`
-      : `\n\n## No project folder\nThis conversation has no project folder yet, so file writes will be refused. You can still read files anywhere in Dropbox by absolute path. Ask the user to start the conversation inside a project to enable writing.`;
-  }
   return {
     url: new URL(api(_ep + '/chat/completions', effective && effective.proxyUrl), location.href).href,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ((effective && effective.apiKey) || '') },
@@ -4371,12 +4222,6 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // Stable per-conversation cache key, persisted in meta (ensureSessionId).
     // Reused across turns/refreshes/devices so OpenRouter prompt-cache holds.
     session_id: await ensureSessionId(convId || activeConvId),
-    // BETA projects fork: the conversation's project folder (absolute Dropbox
-    // path + namespace), resolved above. The worker resolves relative tool paths
-    // against it and guards all writes/deletes to stay inside it. null on /app
-    // and for legacy/Unsorted conversations.
-    projectRoot: _projRoot,
-    projectNs: _projNs,
     // (volatileContext removed 2026-09-02: the Recent-paths block is no longer
     // injected anywhere. The worker still adds the minute-level clock.)
     // Current checklist (task tree) so the worker can apply write_todos ops to it
@@ -4748,7 +4593,7 @@ function ensureStream(id) {
       // JSONL persistence: how many messages are already on disk, and a flag that
       // forces a full rewrite (rewind/edit) instead of an append on the next save.
       persistedCount: 0, _forceJsonlRewrite: false,
-      // BETA projects fork: the conversation's project folder (null until picked).
+      // The conversation's project folder (null until picked).
       projectRoot: null, projectNs: null,
       // PER-CONVERSATION provider: which catalog model this conversation uses
       // (composer model picker). null → providers.js defaultProvider() applies.
@@ -5483,7 +5328,6 @@ const TC_LABELS = {
   pyodide:           { doing: 'Running code',        done: 'Ran code' },   // former wire name of run_python
   run_walios:        { doing: 'Running a script',    done: 'Ran script' },  // shell script in the in-browser Linux
   walios:            { doing: 'Running a script',    done: 'Ran script' },  // former name of run_walios
-  copy:              { doing: 'Importing file',      done: 'Imported file' },   // beta alias of copy_to_workspace
   write_file:        { doing: 'Creating',            done: 'Created',        target: 'path' },
   edit_file:         { doing: 'Editing',             done: 'Edited',         target: 'path' },
   read_file:         { doing: 'Reading',             done: 'Read',           target: 'path' },

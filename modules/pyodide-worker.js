@@ -227,7 +227,7 @@ self.addEventListener('message', async (event) => {
   if (!data) return;
 
   if (data.type === 'dbx-token') {
-    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, workingRoot: data.workingRoot || '', beta: !!data.beta };
+    _dbxCtx = { token: data.token, pathRoot: data.pathRoot || null, teamRoot: data.teamRoot || null, workingRoot: data.workingRoot || '' };
     _dehydrated = !!data.dehydrated;
     return;
   }
@@ -326,12 +326,10 @@ self.addEventListener('message', async (event) => {
   }
 
   if (data.type === 'run-python') {
-    const { id, path, code, args, betaProject } = data;
+    const { id, path, code, args } = data;
     let out;
-    _betaProject = betaProject || null;   // project context for THIS run (beta)
     try { out = await tool_run_python({ path, code, args }); }
     catch (e) { out = { result: 'Error: ' + (e && e.message || e) }; }
-    finally { _betaProject = null; }
     try { self.postMessage({ type: 'python-result', id, result: (out && out.result) || '' }); } catch (_) {}
     return;
   }
@@ -608,76 +606,6 @@ function _syncDownloadBytes(cloudPath) {
   for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
   return b;
 }
-// ---- BETA: project-folder-on-Dropbox for run_python ----------------------
-// Set for the duration of one run (from the run-python message). When set, the
-// runner reads the entry script, faults in reads, and writes outputs against
-// <root>/… on Dropbox instead of the OPFS mount. sandpie/ paths still go to OPFS.
-let _betaProject = null;   // { root, team }
-// The manager sends a per-run project context ONLY in beta, so its presence IS
-// the beta signal — don't also gate on _dbxCtx.beta, which can be stale if the
-// pool worker cached a dbx-token pushed before the beta flag was set.
-function _betaOn() { return !!(_betaProject && _betaProject.root && _dbxCtx && _dbxCtx.token); }
-function _betaMapped(rel) {
-  // A /files rel that maps to the project folder (i.e. NOT sandpie/ app metadata).
-  const r = String(rel).replace(/^\/+/, '');
-  return _betaOn() && r && !_relExempt(r) && !(r === 'sandpie' || r.startsWith('sandpie/'));
-}
-function _betaCloudPath(rel) { return _betaProject.root + '/' + String(rel).replace(/^\/+/, ''); }
-function _betaHeaders(json) {
-  const h = { Authorization: 'Bearer ' + (_dbxCtx && _dbxCtx.token) };
-  if (json) h['Content-Type'] = 'application/json';
-  const ns = _betaProject && _betaProject.team ? (_dbxCtx && _dbxCtx.teamRoot) : null;
-  if (ns) h['Dropbox-API-Path-Root'] = JSON.stringify({ '.tag': 'root', root: ns });
-  return h;
-}
-// Synchronous Dropbox read for a beta project path (get_temporary_link → GET),
-// with the project namespace. Returns bytes, or null if the file doesn't exist.
-function _betaSyncDownload(rel) {
-  const cloudPath = _betaCloudPath(rel);
-  const x1 = new XMLHttpRequest();
-  x1.open('POST', 'https://api.dropboxapi.com/2/files/get_temporary_link', false);
-  const h = _betaHeaders(true);
-  for (const k in h) x1.setRequestHeader(k, h[k]);
-  x1.send(JSON.stringify({ path: cloudPath }));
-  if (x1.status === 409) return null;   // not_found
-  if (x1.status !== 200) throw new Error('get_temporary_link ' + x1.status);
-  const link = JSON.parse(x1.responseText).link;
-  const x2 = new XMLHttpRequest();
-  x2.open('GET', link, false);
-  let ab = true;
-  try { x2.responseType = 'arraybuffer'; } catch (_) { ab = false; }
-  if (!ab) { try { x2.overrideMimeType('text/plain; charset=x-user-defined'); } catch (_) {} }
-  x2.send();
-  if (x2.status !== 200) throw new Error('download ' + x2.status);
-  if (ab && x2.response) return new Uint8Array(x2.response);
-  const s = x2.responseText, b = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
-  return b;
-}
-// Async Dropbox read for a beta project path (used to read the entry script).
-async function _betaDownload(rel) {
-  const tl = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: _betaHeaders(true), body: JSON.stringify({ path: _betaCloudPath(rel) }) });
-  if (tl.status === 409) return null;
-  if (!tl.ok) throw new Error('get_temporary_link ' + tl.status);
-  const dl = await fetch((await tl.json()).link, { method: 'GET' });
-  if (!dl.ok) throw new Error('download ' + dl.status);
-  return new Uint8Array(await dl.arrayBuffer());
-}
-// Async Dropbox upload for a beta project path (write-back after a run).
-async function _betaUpload(rel, bytes) {
-  const arg = JSON.stringify({ path: _betaCloudPath(rel), mode: 'overwrite', mute: true, autorename: false })
-    .replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
-  const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
-    method: 'POST',
-    headers: { ..._betaHeaders(false), 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': arg },
-    body: bytes,
-  });
-  if (!res.ok) throw new Error('upload ' + res.status + ': ' + (await res.text().catch(() => '')).slice(0, 150));
-}
-async function _betaDelete(rel) {
-  const res = await fetch('https://api.dropboxapi.com/2/files/delete_v2', { method: 'POST', headers: _betaHeaders(true), body: JSON.stringify({ path: _betaCloudPath(rel) }) });
-  if (!res.ok && res.status !== 409) throw new Error('delete_v2 ' + res.status);
-}
 
 // Run <fn> with the lookupNode fault-in wrapper temporarily removed, so FS
 // operations issued from hydration itself (analyzePath, mkdirTree, writeFile)
@@ -712,13 +640,6 @@ self._sandpie_hydrate_sync = function (pathStr) {
     if (!rel) return;
     _ensureCloudDirs(full);   // materialize cloud-folder ancestors (create-mode opens in cloud dirs)
     if (_memfsHas(full)) return;
-    // BETA — project files live on Dropbox at <projectRoot>/<rel>. Fetch directly
-    // (no OPFS, no index): a 409/not_found means the file genuinely doesn't exist,
-    // so a create-mode open proceeds to make it (write-back uploads it later).
-    if (_betaMapped(rel)) {
-      try { const b = _betaSyncDownload(rel); if (b) _writeMemfs(full, b); } catch (_) {}
-      return;
-    }
     // Tier 1 — local OPFS (lazy mode): bytes come through the SAB IO bridge.
     const le = _localEntry(rel);
     if (le) {
@@ -1453,9 +1374,7 @@ async function flushCaptureToOpfs() {
     let st; try { st = _noFault(() => py.FS.stat(full)); } catch (_) { return; }
     try {
       if (py.FS.isDir(st.mode)) {
-        // BETA: Dropbox has no empty folders — just recurse to flush child files
-        // (their full path creates the folders implicitly on upload).
-        if (!_betaMapped(rel)) await opfsResolveDir(rel.split('/').filter(Boolean), true);
+        await opfsResolveDir(rel.split('/').filter(Boolean), true);
         // A touched directory (mkdir or the target of a dir rename) must flush
         // its whole MEMFS subtree: a rename re-parents children in MEMFS
         // without firing per-child hooks, so the top entry is all we captured.
@@ -1467,18 +1386,14 @@ async function flushCaptureToOpfs() {
       }
       else {
         const bytes = _noFault(() => py.FS.readFile(full));
-        if (_betaMapped(rel)) { await _betaUpload(rel, bytes); written.push(rel); }   // upload to <projectRoot>/<rel>
-        else {
-          await opfsWriteBytes(rel, bytes);
-          written.push(rel);
-          _idxPut(rel, 'file', bytes.length, Date.now());
-        }
+        await opfsWriteBytes(rel, bytes);
+        written.push(rel);
+        _idxPut(rel, 'file', bytes.length, Date.now());
       }
     } catch (e) { failed.push(rel + ': ' + ((e && e.message) || e)); console.warn('[pyodide-worker] write-back failed:', rel, e); }
   };
   for (const rel of _capDeleted) {
-    if (_betaMapped(rel)) { try { await _betaDelete(rel); removed.push(rel); } catch (e) { console.warn('[pyodide-worker] beta delete failed:', rel, e); } }
-    else { if (await swOpfsDelete(rel, true)) removed.push(rel); _idxDrop(rel); }
+    if (await swOpfsDelete(rel, true)) removed.push(rel); _idxDrop(rel);
   }
   for (const rel of _capTouched) await flushOne(rel);
   return { removed, written, failed };
@@ -1525,7 +1440,7 @@ function sourceFromTraceback(tb, code) {
 
 async function tool_run_python({ path, code: inlineCode, args }) {
   const scriptArgs = Array.isArray(args) ? args.map(String) : [];
-  // BETA REPL: `code` runs directly — no file to read, cwd is the project root.
+  // REPL: `code` runs directly — no file to read.
   const repl = typeof inlineCode === 'string' && inlineCode.trim() !== '';
   const normPath = repl ? '' : String(path || '').replace(/^\/+/, '').replace(/^files\//, '');
   if (!repl && !normPath) return { result: 'Error: pass `code` to run Python directly, or `path` to run a saved script.' };
@@ -1536,14 +1451,6 @@ async function tool_run_python({ path, code: inlineCode, args }) {
   // The audit hook only hydrates files the script open()s at RUNTIME; the entry
   // script itself is read here before Python starts, so it needs the same
   // try-OPFS-then-hydrate-on-miss dance as read_file/load_image.
-  // BETA: the script lives on Dropbox at <projectRoot>/<path> — read it there.
-  if (_betaOn() && _betaMapped(normPath)) {
-    try {
-      const bytes = await _betaDownload(normPath);
-      if (!bytes) return { result: `Error: script not found in the project folder: ${normPath}. Write it with write_file first.` };
-      code = new TextDecoder().decode(bytes);
-    } catch (e) { return { result: `Error: could not read ${normPath} from the project folder: ${(e && e.message) || e}.` }; }
-  } else {
   try {
     let bytes;
     try { bytes = await opfsReadBytes(normPath); }
@@ -1554,7 +1461,6 @@ async function tool_run_python({ path, code: inlineCode, args }) {
     code = new TextDecoder().decode(bytes);
   }
   catch (e) { return { result: `Error: could not read /files/${normPath}: ${e.message}.` }; }
-  }
   }
   return withPy(async () => {
     let p;
