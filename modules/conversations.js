@@ -1368,13 +1368,19 @@ function renderFileBundle(target, bundleFiles) {
 // selection is kept in-memory (per conversation id) until the backend lands.
 // No colors, no search, no keyboard hints - plain names, dashed ghost when
 // the conversation has no project.
-const _PROJECTS_STUB = ['FPI Conectividad', 'Reixach GCO', 'Impagados', 'TECNEC proposals'];
-const _convProjects = new Map();      // convId -> project name (in-memory until persistence lands)
+// Registry-backed (sandpie/config/projects.json via SandpieProjects, the
+// projects.js module). Selection is still in-memory per convId — conversation
+// persistence (projectId on stream+meta) is the NEXT commit.
+const _convProjects = new Map();      // convId -> project root (in-memory until persistence lands)
 let _projPanelEl = null;              // singleton picker panel
 let _projPanelFor = null;             // convId the panel was opened for
+const _projName = (root) => { try { const p = (window.SandpieProjects && SandpieProjects._cache || []).find(x => x.root === root); return p ? p.name : root; } catch { return root; } };
 
+const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const escAttr = escHtml;
 function _projChipHtml(convId) {
-  const name = _convProjects.get('' + (convId == null ? '' : convId)) || '';
+  const root = _convProjects.get('' + (convId == null ? '' : convId)) || '';
+  const name = root ? _projName(root) : '';
   return name
     ? '<span class="mt-proj" title="Project">' + name + '<span class="mt-proj-caret">▾</span></span>'
     : '<span class="mt-proj none" title="File to project">no project<span class="mt-proj-caret">▾</span></span>';
@@ -1410,19 +1416,34 @@ function _toggleProjPanel(chip, convId) {
   const r = chip.getBoundingClientRect();
   const panel = document.createElement('div');
   panel.className = 'proj-panel mp-panel visible';
+  panel.innerHTML = '<div class="proj-item" style="opacity:.5"><span class="nm">Loading…</span></div>';
   const current = _convProjects.get('' + (convId == null ? '' : convId)) || '';
-  let html = '';
-  for (const p of _PROJECTS_STUB) {
-    html += '<div class="proj-item' + (p === current ? ' sel' : '') + '" data-proj="' + p + '">' +
-      '<span class="nm">' + p + '</span>' + (p === current ? '<span class="chk">✓</span>' : '') + '</div>';
-  }
-  html += '<div class="proj-item none' + (current === '' ? ' sel' : '') + '" data-proj=""><span class="nm">no project</span></div>';
-  html += '<div class="proj-add" title="Coming soon — project creation lands with the backend"><span class="plus">＋</span> New project</div>';
-  panel.innerHTML = html;
-  panel.addEventListener('click', (e) => {
+  const fill = (reg) => {
+    if (_projPanelEl !== panel) return;   // panel was closed/reopened while loading
+    let html = '';
+    for (const p of reg) {
+      html += '<div class="proj-item' + (p.root === current ? ' sel' : '') + '" data-proj="' + escAttr(p.root) + '">' +
+        '<span class="nm">' + escHtml(p.name) + '</span>' + (p.root === current ? '<span class="chk">✓</span>' : '') + '</div>';
+    }
+    html += '<div class="proj-item none' + (current === '' ? ' sel' : '') + '" data-proj=""><span class="nm">no project</span></div>';
+    html += '<div class="proj-add" title="Pick a Dropbox folder"><span class="plus">＋</span> New project</div>';
+    panel.innerHTML = html;
+  };
+  panel.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (e.target.closest('.proj-add')) {
+      // Real creation flow (projects.js): Dropbox folder picker → name → registry.
+      const created = await SandpieProjects.newProjectFlow();
+      if (created) {
+        _convProjects.set('' + convId, created.root);
+        _closeProjPanel();
+        const slot = chip.closest('.msg-timer');
+        if (slot) _paintProjChip(slot, convId);
+      }
+      return;
+    }
     const item = e.target.closest('.proj-item');
     if (!item) return;
-    e.stopPropagation();
     const v = item.dataset.proj || '';
     if (v === '') _convProjects.delete('' + convId); else _convProjects.set('' + convId, v);
     _closeProjPanel();
@@ -1431,15 +1452,27 @@ function _toggleProjPanel(chip, convId) {
   });
   document.body.appendChild(panel);
   // Fixed-position, right-aligned under the chip (escapes the timer row's overflow).
-  const pw = panel.offsetWidth, ph = panel.offsetHeight;
-  let left = r.right - pw;
-  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
-  let top = r.bottom + 4;
-  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 4);
-  panel.style.left = left + 'px';
-  panel.style.top = top + 'px';
+  const place = () => {
+    const pw = panel.offsetWidth, ph = panel.offsetHeight;
+    let left = r.right - pw;
+    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+    let top = r.bottom + 4;
+    if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 4);
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+  };
+  place();
   chip.classList.add('open');
   _projPanelEl = panel; _projPanelFor = '' + (convId == null ? '' : convId);
+  // Registry is async (OPFS read) — fill when it lands, re-place, and cache for
+  // the chip's name lookup.
+  (async () => {
+    try {
+      const reg = await SandpieProjects.loadRegistry();
+      SandpieProjects._cache = reg;
+      fill(reg); place();
+    } catch (e) { console.warn('[projects] registry load failed:', e); fill([]); place(); }
+  })();
 }
 document.addEventListener('click', (e) => {
   if (_projPanelEl && !_projPanelEl.contains(e.target) && !(e.target.closest && e.target.closest('.mt-proj'))) _closeProjPanel();
