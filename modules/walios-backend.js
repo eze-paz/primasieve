@@ -175,7 +175,11 @@ WORKER_V = 'sig30';
                // `cc`/`gcc` are the driver wrapper from walios/bin (the driver cannot spawn its
                // cc1/wasm-ld steps, the wrapper runs them as processes). It used to run on the
                // PAGE, terminal-only: `cc` in the tool hung to the timeout.
-               clang: CLANG, 'wasm-ld': CLANG, ar: CLANG, ranlib: CLANG, nm: CLANG, strip: CLANG, objdump: CLANG, 'llvm-ar': CLANG, 'llvm-ranlib': CLANG };
+               // NB `ar` and `ranlib` are deliberately NOT here: they are seeded as absolutising
+               // wrapper scripts by toolBlobs() (see walios/bin/ar) because clang.wasm resolves
+               // relative paths against "/". A manifest entry would materialise /bin/ar and
+               // shadow the wrapper, since PATH is /bin:/usr/bin.
+               clang: CLANG, 'wasm-ld': CLANG, nm: CLANG, strip: CLANG, objdump: CLANG, 'llvm-ar': CLANG, 'llvm-ranlib': CLANG };
     },
 
     // ONE mount strategy for every host. It used to fork: 'terminal' unpacked all six
@@ -264,8 +268,9 @@ WORKER_V = 'sig30';
     // bzip2/bunzip2, unzip, diff/cmp built in. The catalog's GNU tar was `rmt` and its
     // grep/diffutils/findutils were gnulib test helpers (the farm picked the wrong
     // executable); those catalog entries are gone and busybox provides the commands.
-    BUSYBOX: 'busybox.wasm?v=net9',   // net8: CONFIG_FEATURE_WGET_OPENSSL -- `wget https://` works (helper: /bin/openssl)
-    //                                net9: FEATURE_TAR_OLDGNU/OLDSUN -- tar reads v7-format archives (jq's)
+    BUSYBOX: 'busybox.wasm?v=net10',   // net8: CONFIG_FEATURE_WGET_OPENSSL -- `wget https://` works (helper: /bin/openssl)
+    //                                net9:  FEATURE_TAR_OLDGNU/OLDSUN -- tar reads v7-format archives (jq's)
+    //                                net10: ls -t / grep -A-B-C and the rest of the standard flag surface
     async runMessage(o) {
       const base = o.base || '/walios/';
       const bb = o.busybox || this.BUSYBOX;
@@ -306,10 +311,23 @@ WORKER_V = 'sig30';
     // in-guest). Source of truth: sandpie-server/walios/bin/*, served under /walios/bin/.
     async toolBlobs(base) {
       const b = {};
-      await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg'].map(async (n) => {
+      await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld'].map(async (n) => {
         try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=1'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
+      // Applet links. Real busybox is installed with `busybox --install -s`, one symlink per
+      // applet in /bin and /usr/bin. We never did that, so /bin/sed and friends did not EXIST
+      // as files. Running them was fine (resolveExecKey falls back to busybox by name), but
+      // `test -f` / `test -x` said no -- and that is precisely how autoconf hunts for tools,
+      // so configure died with "no acceptable sed could be found in $PATH" on a system whose
+      // sed works perfectly. The content is irrelevant (it is not wasm, so exec still falls
+      // through to busybox); only EXISTENCE is. busybox.links comes from the busybox build.
+      try {
+        const r = await fetch((base || '/walios/') + 'busybox.links');
+        if (r.ok) { const marker = new TextEncoder().encode('#!busybox applet\n').buffer;
+          for (const line of (await r.text()).split('\n')) { const q = line.trim();
+            if (q.startsWith('/') && !b[q]) b[q] = marker.slice(0); } }
+      } catch (_) { /* no links file: applets still RUN, they just cannot be stat'd */ }
       return b;
     },
 

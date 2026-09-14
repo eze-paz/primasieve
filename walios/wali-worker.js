@@ -2201,7 +2201,27 @@ class Process {
       if (name === '__init' || name === '__deinit') wali[name] = () => 0;
       else if (name === '__get_init_envfile') wali[name] = (buf, sz) => {
         if (!S.env.length) return 0;
-        addFile(`/.wali_env_${S.pid}`, te.encode(S.env.join('\n') + '\n'));
+        // The env reaches a new process as a NEWLINE-SEPARATED file that wali-musl's
+        // init_env() splits and putenv()s token by token. So a VALUE that itself contains a
+        // newline splits into a fragment with no '=', musl's putenv rejects it (EINVAL), and
+        // init_env aborts the process with WALI_ENV_READ_FAIL before main ever runs.
+        //
+        // That killed EVERY autotools build. Autoconf's preamble is literally
+        //     as_nl='<newline>' ; export as_nl
+        // so from that line on every command configure spawned died instantly with a silent
+        // exit 3 (259 & 0xff) -- no message, no stderr. Even `sh -c :` failed. It looked like
+        // a broken compiler; it was the environment.
+        //
+        // Properly this file should be NUL-separated like Linux's /proc/self/environ, but the
+        // reader is compiled into every wasm binary we ship, so that is a libc change plus a
+        // relink of everything. Until then drop what we cannot represent, LOUDLY, rather than
+        // let it kill the process: losing a variable beats losing the process, and configure
+        // re-derives as_nl at the top of every script anyway.
+        const safe = [], bad = [];
+        for (const e of S.env) { if (e.indexOf('\n') >= 0) bad.push(e.slice(0, e.indexOf('=')) || '?'); else safe.push(e); }
+        if (bad.length) WARN('env: dropped ' + bad.length + ' variable(s) whose value contains a newline (' + bad.join(', ') + '): the env file is newline-separated, so a child cannot receive them');
+        if (!safe.length) return 0;
+        addFile(`/.wali_env_${S.pid}`, te.encode(safe.join('\n') + '\n'));
         S.wstr(buf, `/.wali_env_${S.pid}`, sz); return 1;
       };
       else if (name === 'log_execution') { // wasm-opt --log-execution preemption hook
@@ -2797,6 +2817,15 @@ class Process {
       if (exited) break;
     }
     const code = st.exit !== null ? st.exit : (Atomics.load(i32, 3) | 0);
+    // wali-musl uses codes ABOVE 255 for startup failures precisely so they can be told apart
+    // from a real main() status (init_env.h: WALI_STARTUP_FAIL 257 .. WALI_ENV_MALLOC_FAIL 261).
+    // Masking to a byte threw that distinction away: ENV_READ_FAIL 259 became a baffling silent
+    // "exit 3". Say what actually happened.
+    if (code > 255) {
+      const WALI_FAIL = { 257: 'startup failed', 258: 'cleanup failed', 259: 'could not read its environment file',
+                          260: 'could not get its environment filename', 261: 'out of memory building its environment' };
+      post(`[host] pid ${this.pid} died before main: ${WALI_FAIL[code] || 'wali startup code ' + code}\n`, 2);
+    }
     w.terminate();
     return { code: code & 0xff };
   }
