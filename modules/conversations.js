@@ -1356,10 +1356,11 @@ function _setProjBinding(convId, projectId) {
 
 function _projChipHtml(convId) {
   const s = convStreams.get('' + (convId == null ? '' : convId));
-  const name = _projName(s && s.projectId);
-  return name
-    ? '<span class="mt-proj" title="Project">' + escHtml(name) + '<span class="mt-proj-caret">▾</span></span>'
-    : '<span class="mt-proj none" title="File to project">no project<span class="mt-proj-caret">▾</span></span>';
+  // No explicit project → the DEFAULT project (the sync workspace root, e.g.
+  // "sandpie"). There is no "no project" state anymore.
+  const p = (s && s.projectId && _projById(s.projectId)) || (window.SandpieProjects ? SandpieProjects.defaultProject() : null);
+  const name = p ? p.name : '';
+  return '<span class="mt-proj" title="Project">' + escHtml(name) + '<span class="mt-proj-caret">▾</span></span>';
 }
 // Append (or refresh) the project chip on a timer slot. The timer row is ONE
 // persistent element per pane, rebuilt wholesale by every paint path - so the
@@ -1399,10 +1400,12 @@ function _toggleProjPanel(chip, convId) {
     if (_projPanelEl !== panel) return;   // panel was closed/reopened while loading
     let html = '';
     for (const p of reg) {
-      html += '<div class="proj-item' + (p.id === current ? ' sel' : '') + '" data-proj="' + escAttr(p.id) + '">' +
-        '<span class="nm">' + escHtml(p.name) + '</span>' + (p.id === current ? '<span class="chk">✓</span>' : '') + '</div>';
+      const isDefault = p.id === 'default';
+      html += '<div class="proj-item' + (p.id === current ? ' sel' : '') + '" data-proj="' + escAttr(p.id) + '" title="' + escAttr(p.root || '') + '">' +
+        '<span class="nm">' + escHtml(p.name) + '</span>' +
+        (isDefault ? '' : '<button class="proj-del" data-del="' + escAttr(p.id) + '" title="Remove from list">✕</button>') +
+        '</div>';
     }
-    html += '<div class="proj-item none' + (current === '' ? ' sel' : '') + '" data-proj=""><span class="nm">no project</span></div>';
     html += '<div class="proj-add" title="Pick a Dropbox folder"><span class="plus">＋</span> New project</div>';
     panel.innerHTML = html;
   };
@@ -1417,6 +1420,16 @@ function _toggleProjPanel(chip, convId) {
         _closeProjPanel();
         const slot = chip.closest('.msg-timer');
         if (slot) _paintProjChip(slot, convId);
+      }
+      return;
+    }
+    const del = e.target.closest('.proj-del');
+    if (del) {
+      const id = del.dataset.del;
+      if (id && id !== 'default' && confirm('Remove this project from the list? (Conversations stay; they fall back to the default project.)')) {
+        await SandpieProjects.remove(id);
+        const reg = await SandpieProjects.list();
+        fill(reg); place();
       }
       return;
     }

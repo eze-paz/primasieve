@@ -803,7 +803,13 @@
   }
   .proj-panel .proj-item:hover, .proj-panel .proj-item.sel { background: var(--sp-panel); }
   .proj-panel .proj-item .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .proj-panel .proj-item .chk { margin-left: auto; color: var(--sp-accent); font-size: 0.7rem; }
+  .proj-panel .proj-item .proj-del {
+    margin-left: auto; display: none;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--sp-text-dim); font-size: 0.7rem; padding: 0 2px; line-height: 1;
+  }
+  .proj-panel .proj-item .proj-del:hover { color: var(--sp-danger); }
+  .proj-panel .proj-item:hover .proj-del { display: inline-block; }
   .proj-panel .proj-item.none { color: var(--sp-text-dim); }
   .msg-timer .mt-sep { color: var(--sp-text-dim); opacity: 0.55; margin: 0 0.3rem; }
   .msg-timer.done { color: #6e7681; }

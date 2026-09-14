@@ -9,6 +9,11 @@
    Registry entries: { id, name, root, ns, created, lastUsed }
      - id: stable short id — conversations bind to projectId, NOT to root/name,
        so renaming or re-pointing a project never orphans them.
+     - name: ALWAYS the folder's own name (no custom names). Colliding folder
+       names are disambiguated by appending parent-path segments until unique.
+     - root: the full absolute Dropbox path (authoritative; name is cosmetic).
+   A built-in DEFAULT project (the sync workspace root, e.g. /sandpie) always
+   exists, is listed first, and cannot be removed.
    No beta gating, no sidebar grouping, no per-project conversation folders.
    ========================================================================== */
 (function () {
@@ -24,6 +29,26 @@
   let _cache = null;            // last loaded registry (array)
 
   const newId = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  // ---- default project -------------------------------------------------------
+  // The sync workspace root (e.g. /sandpie) is the always-present default: the
+  // chip shows it when a conversation has no explicit project, so "unfiled" and
+  // "default" are the same thing. Not deletable.
+  function defaultProject() {
+    const root = (P() && P().workingRoot && P().workingRoot()) || '/sandpie';
+    return { id: 'default', name: root.split('/').filter(Boolean).pop() || 'sandpie', root, ns: 'home', personal: true };
+  }
+  // Display name = the folder's own name; on collision, append parent-path
+  // segments until unique ("test", "test — FPI_C_Conectividad", …).
+  function _deriveName(root, reg) {
+    const segs = String(root || '').split('/').filter(Boolean);
+    let depth = 1;
+    const cand = (d) => d === 1 ? segs[segs.length - 1] : segs[segs.length - d] + '/' + segs[segs.length - d + 1];
+    let name = cand(depth);
+    const taken = () => reg.some(x => String(x.name).toLowerCase() === name.toLowerCase());
+    while (taken() && depth < segs.length) { depth++; name = cand(depth); }
+    return name;
+  }
 
   // ---- registry ------------------------------------------------------------
   async function loadRegistry() {
@@ -45,19 +70,21 @@
       Sandpie.events.emit('file:changed', REG_PATH);
     } catch (e) { console.warn('[projects] registry save failed:', e); }
   }
-  // All projects, newest-used first (for the picker list).
+  // All projects for the picker: the default first, then the registry
+  // newest-used first.
   async function list() {
     const reg = await loadRegistry();
-    return reg.slice().sort((a, b) => String(b.lastUsed || b.created || '').localeCompare(String(a.lastUsed || a.created || '')));
+    const rest = reg.slice().sort((a, b) => String(b.lastUsed || b.created || '').localeCompare(String(a.lastUsed || a.created || '')));
+    return [defaultProject(), ...rest];
   }
   function cached() { return _cache ? _cache.slice() : null; }
   function byId(id) { return (_cache || []).find(x => x.id === id) || null; }
-  async function create(name, root, ns) {
+  async function create(root, ns) {
     const reg = await loadRegistry();
     const existing = reg.find(x => norm(x.root) === norm(root));
     if (existing) return existing;
     const now = new Date().toISOString();
-    const p = { id: newId(), name: String(name || root).trim() || root, root, ns: ns || 'home', created: now, lastUsed: now };
+    const p = { id: newId(), name: _deriveName(root, reg), root, ns: ns || 'home', created: now, lastUsed: now };
     reg.push(p);
     await saveRegistry(reg);
     return p;
@@ -69,6 +96,7 @@
     return p;
   }
   async function remove(id) {
+    if (id === 'default') return;   // the default project cannot be removed
     const reg = (await loadRegistry()).filter(x => x.id !== id);
     await saveRegistry(reg);
   }
@@ -124,7 +152,6 @@
         loc = null;
         crumbs.textContent = 'Dropbox';
         useBtn.style.visibility = 'hidden'; newBtn.style.visibility = 'hidden';
-        hideNameRow();
         browser.replaceChildren();
         browser.appendChild(rowEl('My Dropbox', () => navigate({ team: false, path: '' }), true));
         browser.appendChild(rowEl('Team folders', async () => {
@@ -146,7 +173,6 @@
         loc = next;
         crumbs.textContent = (next.team ? 'Team ' : '') + (next.path || '/');
         useBtn.style.visibility = 'visible'; newBtn.style.visibility = 'visible';
-        showNameRow('Project name', loc.path.split('/').filter(Boolean).pop() || '');
         msg.textContent = 'Loading…';
         let entries = [];
         try { entries = (await prov.cloudList(next.path || '', false, { team: next.team })) || []; }
@@ -163,47 +189,22 @@
         }
       }
 
-      // Inline name field (no browser prompt): a slim row above the buttons.
-      // Prefilled with the current folder's name; "Use this folder" submits it.
-      const btns = back.querySelector('.share-modal-btns');
-      const nameRow = document.createElement('div');
-      nameRow.style.cssText = 'display:none;gap:.4rem;align-items:center;margin-top:.6rem';
-      nameRow.innerHTML =
-        '<input class="proj-name-input" placeholder="Project name" style="flex:1;padding:.4rem .6rem;background:var(--bg,#111);border:1px solid var(--border,#333);border-radius:6px;color:inherit;font:inherit;font-size:.85rem" />' +
-        '<span class="proj-name-hint" style="font-size:.65rem;opacity:.6;white-space:nowrap">↵ or Use this folder</span>';
-      btns.parentNode.insertBefore(nameRow, btns);
-      const nameInput = nameRow.querySelector('.proj-name-input');
-      const showNameRow = (placeholder, value, onSubmit) => {
-        nameRow.style.display = 'flex';
-        nameInput.placeholder = placeholder;
-        nameInput.value = value || '';
-        nameRow._onSubmit = onSubmit;
-        setTimeout(() => nameInput.focus(), 0);
-      };
-      const hideNameRow = () => { nameRow.style.display = 'none'; nameRow._onSubmit = null; };
-      nameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && nameRow._onSubmit) { e.preventDefault(); nameRow._onSubmit(nameInput.value.trim()); }
-        if (e.key === 'Escape') { e.stopPropagation(); hideNameRow(); }
-      });
       useBtn.onclick = () => {
         if (!loc || !loc.path) { msg.textContent = 'Open a folder first (the Dropbox root itself can\'t be a project).'; return; }
-        const nm = nameInput.value.trim();
-        close({ name: nm || (loc.path.split('/').filter(Boolean).pop()), root: loc.path, ns: loc.team ? 'team' : 'home' });
+        close({ name: loc.path.split('/').filter(Boolean).pop(), root: loc.path, ns: loc.team ? 'team' : 'home' });
       };
       newBtn.onclick = async () => {
         if (!loc) { msg.textContent = 'Open a location first.'; return; }
         if (!prov.cloudMkdir) { msg.textContent = 'Folder creation not available on this provider.'; return; }
-        showNameRow('New folder name', '', async (nm) => {
-          if (!nm) return;
-          const full = (loc.path || '') + '/' + nm;
-          msg.textContent = 'Creating…';
-          try {
-            await prov.cloudMkdir(full, { team: loc.team });
-            msg.textContent = '';
-            hideNameRow();
-            navigate({ team: loc.team, path: full });
-          } catch (e) { msg.textContent = 'Create failed: ' + ((e && e.message) || e); }
-        });
+        const nm = (prompt('New folder name:') || '').trim();
+        if (!nm) return;
+        const full = (loc.path || '') + '/' + nm;
+        msg.textContent = 'Creating…';
+        try {
+          await prov.cloudMkdir(full, { team: loc.team });
+          msg.textContent = '';
+          navigate({ team: loc.team, path: full });
+        } catch (e) { msg.textContent = 'Create failed: ' + ((e && e.message) || e); }
       };
 
       navigate({ team: true, path: '' });   // start at the team root (most projects live there)
@@ -216,7 +217,7 @@
   async function newProjectFlow() {
     const picked = await pickFolder();
     if (!picked) return null;
-    return await create(picked.name, picked.root, picked.ns);
+    return await create(picked.root, picked.ns);
   }
 
   window.SandpieProjects = {
