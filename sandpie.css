@@ -3147,18 +3147,20 @@ body.sp-decoding *::after {
 }
 [data-theme="clear"] .user .bubble:hover { transform: translateY(-2px); }
 [data-theme="clear"] .assistant {
-  background: var(--sp-surface);
-  border: 1px solid var(--sp-border);
-  border-radius: 16px 16px 16px 4px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid var(--sp-accent-dim);
+  border-radius: 0;
   color: var(--sp-text);
-  padding: 0.9rem 1.2rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
-  transition: all 0.2s;
-  border-left: none;
+  padding: 0.75rem 1rem 0.75rem 1.25rem;
+  line-height: 1.6;
+  max-width: 90%;
+  box-shadow: none;
+  transition: none;
 }
 [data-theme="clear"] .assistant:hover {
-  border-color: var(--sp-border-bright);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  border-color: var(--sp-accent-dim);
+  box-shadow: none;
 }
 [data-theme="clear"] .assistant code {
   padding: 0.15em 0.35em;
