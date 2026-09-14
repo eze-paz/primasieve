@@ -1223,6 +1223,11 @@ ul.conv-list li.active {
      positioning it changes nothing for its other absolute children. */
   body.osb-pane { position: relative; }
   .osb-rail.osb-aside { z-index: 3; }              /* above aside (z 2), below the resize handle (z 10) and modals */
+  /* The aside has no right padding: the native bar's gutter used to keep the
+     chat titles off the edge. With the bar hidden, reserve the rail's lane
+     (4px gap + 10px rail) so titles ellipsize before it instead of under it. */
+  aside.osb-host { padding-right: 14px; }
+  .osb-rail.osb-aside .osb-thumb { left: 3px; right: 3px; }   /* 4px thumb: a list wants a quieter bar than the conversation */
   .osb-rail {
     position: absolute; width: 10px; z-index: 30;  /* top/left set by JS in mount coordinates */
     opacity: 0; transition: opacity 0.35s ease; touch-action: none;
@@ -1434,6 +1439,7 @@ ul.conv-list li.active {
   @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     .osb-rail.osb-aside { display: none; }   /* drawer is fixed + animated; touch gets the native indicator */
     aside.osb-host { scrollbar-width: auto; }
+    aside.osb-host { padding-right: 0; }
     aside.osb-host::-webkit-scrollbar { display: initial; }
     body {
       flex-direction: column;
