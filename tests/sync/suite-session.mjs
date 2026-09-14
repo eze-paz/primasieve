@@ -2,8 +2,11 @@
 // byte-for-byte, with no errors.
 //
 // These are CONTRACT tests: they describe what the user observes, not how the
-// sync engine achieves it. They must still pass after the full-Dropbox refactor
-// (where `settle()` becomes a no-op because uploads are immediate).
+// sync engine achieves it. They must still pass after the full-Dropbox refactor,
+// where settle() becomes a no-op because a write IS the upload.
+//
+// Assertions read through readBack()/readable() rather than OPFS directly: after
+// the refactor a project file has no local copy, and that is correct, not a bug.
 import { connectedWorld, settleDeletes } from './harness.mjs';
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
@@ -25,7 +28,7 @@ export async function run(t) {
 
     t.ok(/^Created:/.test(a.result), 'create reports Created', a.result);
     t.ok(!/Error|failed|Refused/i.test(b.result), 'edit after create raises no error', b.result);
-    t.ok(w.localText('artifacts/report.html') === '<h1>v2</h1>', 'local content is the edited version', w.localText('artifacts/report.html'));
+    t.ok(w.readBack('artifacts/report.html') === '<h1>v2</h1>', 'reading it back gives the edited version', w.readBack('artifacts/report.html'));
     t.ok(w.cloudHas('artifacts/report.html'), 'file exists in Dropbox');
     t.ok(w.cloudText('artifacts/report.html') === '<h1>v2</h1>', 'Dropbox content matches local after create+edit', w.cloudText('artifacts/report.html'));
   }
@@ -77,8 +80,8 @@ export async function run(t) {
     const bad = await w.tools.tool_edit_file({ path: 'artifacts/e.html', old_str: 'NOT-PRESENT', new_str: 'x' }, CTX);
     await settle(w);
     t.ok(/not found|no match|Error/i.test(bad.result), 'edit with non-matching old_str errors', bad.result);
-    t.ok(w.localText('artifacts/e.html') === 'hello' && w.cloudText('artifacts/e.html') === 'hello',
-      'failed edit leaves local and cloud content intact', [w.localText('artifacts/e.html'), w.cloudText('artifacts/e.html')]);
+    t.ok(w.readBack('artifacts/e.html') === 'hello' && w.cloudText('artifacts/e.html') === 'hello',
+      'a failed edit leaves the content intact everywhere', [w.readBack('artifacts/e.html'), w.cloudText('artifacts/e.html')]);
   }
 
   // ── delete removes it from both sides ──
@@ -90,7 +93,7 @@ export async function run(t) {
     const del = await w.tools.tool_delete_file({ path: 'artifacts/d.html' }, CTX);
     await settleDeletes(w);
     t.ok(/^Deleted:/.test(del.result), 'delete_file reports Deleted', del.result);
-    t.ok(!w.localHas('artifacts/d.html'), 'file gone locally');
+    t.ok(!w.readable('artifacts/d.html'), 'the file is no longer readable', w.where('artifacts/d.html'));
     t.ok(!w.cloudHas('artifacts/d.html'), 'file gone from Dropbox');
   }
 

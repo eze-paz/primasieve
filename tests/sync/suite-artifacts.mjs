@@ -15,8 +15,9 @@ import { connectedWorld, settleDeletes } from './harness.mjs';
 const tick = () => new Promise((r) => setTimeout(r, 5));
 const CTX = { agentId: 'agent-1' };
 
-// What a card click has to be able to do: read the bytes back.
-function resolvable(w, path) { return w.localHas(path) || w.cloudHas(path); }
+// What a card click has to be able to do: read the bytes back. Storage-neutral
+// on purpose — after the refactor an artifact lives only in Dropbox.
+function resolvable(w, path) { return w.readable(path); }
 
 // The meta a conversation carries across a reload.
 function metaFor(paths) { return { filesTouched: paths.map((p) => ({ path: p, ts: 1 })) }; }
@@ -57,7 +58,7 @@ export async function run(t) {
     await tick();
 
     t.ok(resolvable(w, 'artifacts/old.html'),
-      'a three-day-old artifact card still resolves (cloud copy)', { local: w.localHas('artifacts/old.html'), cloud: w.cloudHas('artifacts/old.html') });
+      'a three-day-old artifact card still resolves (cloud copy)', w.where('artifacts/old.html'));
     t.ok(w.cloudText('artifacts/old.html') === 'from last week',
       'the old artifact still has its content in Dropbox', w.cloudText('artifacts/old.html'));
   }
@@ -111,6 +112,6 @@ export async function run(t) {
     await settleDeletes(w);
     t.ok(!resolvable(w, 'artifacts/tmp.html'),
       'a deliberately deleted artifact is gone from both sides',
-      { local: w.localHas('artifacts/tmp.html'), cloud: w.cloudHas('artifacts/tmp.html') });
+      w.where('artifacts/tmp.html'));
   }
 }

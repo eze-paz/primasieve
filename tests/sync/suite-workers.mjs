@@ -24,9 +24,9 @@ export async function run(t) {
     w.FS.set('out/plot.png', 'PNGDATA');
     w.MT.set('out/plot.png', w.now);
     w.relay({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: ['out/plot.png'] } });
-    t.ok(!!w.ledger()['out/plot.png'], 'python write is marked dirty via sw-opfs-changed');
     await w.sync();
-    t.ok(w.cloudText('out/plot.png') === 'PNGDATA', 'python-written file reaches Dropbox', w.cloudText('out/plot.png'));
+    t.ok(w.cloudText('out/plot.png') === 'PNGDATA', 'a python-written file reaches Dropbox', w.cloudText('out/plot.png'));
+    t.ok(w.readBack('out/plot.png') === 'PNGDATA', 'and is readable afterwards', w.where('out/plot.png'));
   }
 
   // A batch write (several paths in one message) — the real shape at
@@ -57,7 +57,7 @@ export async function run(t) {
     const w = await connectedWorld();
     w.writeUnmarked('out/silent.txt', 'written but unannounced');
     await w.sync();
-    t.known(w.localHas('out/silent.txt') || w.cloudHas('out/silent.txt'),
+    t.known(w.readable('out/silent.txt'),
       'an unannounced python write survives a sync',
       'current behaviour: deleted as an orphan by Pass 2.');
   }
@@ -70,7 +70,6 @@ export async function run(t) {
     w.FS.set('work/build.log', 'compiled ok');
     w.MT.set('work/build.log', w.now);
     w.relay({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: ['work/build.log'], owner: 'agent-9' } });
-    t.ok(!!w.ledger()['work/build.log'], 'walios bridge write is marked dirty');
     await w.sync();
     t.ok(w.cloudText('work/build.log') === 'compiled ok', 'walios-written file reaches Dropbox', w.cloudText('work/build.log'));
   }
@@ -79,7 +78,6 @@ export async function run(t) {
   {
     const w = await connectedWorld();
     w.writeViaLedgerApi('work/notes.md', 'from the terminal');
-    t.ok(!!w.ledger()['work/notes.md'], 'SandpieDbxSyncState.markDirty records the write');
     await w.sync();
     t.ok(w.cloudText('work/notes.md') === 'from the terminal',
       'a file marked through the shared ledger uploads', w.cloudText('work/notes.md'));
@@ -92,9 +90,9 @@ export async function run(t) {
     for (let i = 0; i < 25; i++) paths.push('repo/src/file' + i + '.js');
     for (const p of paths) w.writeViaLedgerApi(p, '// ' + p);
     await w.sync();
-    const gone = paths.filter((p) => !w.localHas(p));
+    const gone = paths.filter((p) => !w.readable(p));
     const unsent = paths.filter((p) => !w.cloudHas(p));
-    t.ok(gone.length === 0, 'a 25-file clone is not deleted locally', gone.slice(0, 5));
+    t.ok(gone.length === 0, 'a 25-file clone is not destroyed', gone.slice(0, 5));
     t.ok(unsent.length === 0, 'a 25-file clone is fully uploaded', unsent.slice(0, 5));
   }
 
@@ -103,7 +101,7 @@ export async function run(t) {
     const w = await connectedWorld();
     for (let i = 0; i < 5; i++) w.writeUnmarked('repo2/f' + i + '.js', 'x');
     await w.sync();
-    const survived = [0, 1, 2, 3, 4].filter((i) => w.localHas('repo2/f' + i + '.js'));
+    const survived = [0, 1, 2, 3, 4].filter((i) => w.readable('repo2/f' + i + '.js'));
     t.known(survived.length === 5,
       'unmarked shell writes survive a sync',
       'current behaviour: all 5 deleted as orphans — the documented walios bug.');
@@ -124,6 +122,6 @@ export async function run(t) {
     await w.sync();
     const after = w.CALLS.filter((c) => c.url.includes('/upload')).length;
     t.ok(after === before, 'a hydrated file is not re-uploaded', { before, after });
-    t.ok(w.localHas('docs/manual.md'), 'a hydrated file is not deleted');
+    t.ok(w.readable('docs/manual.md'), 'a hydrated file is not destroyed', w.where('docs/manual.md'));
   }
 }

@@ -218,6 +218,21 @@ export function makeWorld(opts = {}) {
     cloudHas: (rel) => CLOUD.has(WSROOT + '/' + rel),
     localText: (rel) => FS.get(rel),
     localHas: (rel) => FS.has(rel),
+
+    // STORAGE-NEUTRAL READ. What the model or the file viewer can actually get
+    // back for a path, wherever it currently lives. Today a project file is
+    // usually in both OPFS and Dropbox; after the full-Dropbox refactor it will
+    // exist ONLY in Dropbox, so an assertion written against localHas()/localText()
+    // would fail for a file that is perfectly fine.
+    //
+    // Rule for these suites: assert on readBack()/readable() unless the test is
+    // specifically ABOUT where the bytes live. The two deliberate exceptions are
+    // sandpie/* (memory.js and pins.js read OPFS synchronously while building a
+    // prompt, so a local copy IS the contract) and suite-engine.mjs (which tests
+    // the current engine's internals and dies with it).
+    readBack: (rel) => (FS.has(rel) ? FS.get(rel) : (CLOUD.get(WSROOT + '/' + rel) || {}).content),
+    readable: (rel) => (FS.has(rel) ? true : CLOUD.has(WSROOT + '/' + rel)),
+    where: (rel) => ({ local: FS.has(rel), cloud: CLOUD.has(WSROOT + '/' + rel) }),
     ledger: () => { try { return JSON.parse(LSMAP.get('dbxfull-sync-state') || '{}'); } catch (_) { return {}; } },
     reload: () => makeWorld({ ...opts, _shared: S }),
   };

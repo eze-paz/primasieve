@@ -18,6 +18,7 @@ import * as reload from './suite-reload.mjs';
 import * as workers from './suite-workers.mjs';
 import * as artifacts from './suite-artifacts.mjs';
 import * as multidevice from './suite-multidevice.mjs';
+import * as engine from './suite-engine.mjs';
 
 const t = runner();
 await session.run(t);
@@ -25,4 +26,6 @@ await reload.run(t);
 await workers.run(t);
 await artifacts.run(t);
 await multidevice.run(t);
+// Internals of the CURRENT engine. Delete alongside the code they cover.
+await engine.run(t);
 t.done('sync pipeline');
