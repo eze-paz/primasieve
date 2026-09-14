@@ -155,9 +155,16 @@ function boot(libDir, opts = {}) {
     prototype: {},
   };
 
+  // Modules we REPLACE rather than serve from node's lib/. Each one is a front end
+  // for something the platform does natively and we cannot port: crypto is OpenSSL,
+  // https is OpenSSL over TCP, zlib is a native inflate. Everything else still comes
+  // from node's own source -- these three are the whole deviation.
+  const shims = opts.shims || {};
+
   function requireBuiltin(id) {
     if (typeof id !== 'string') throw new TypeError('require() id must be a string, got ' + typeof id);
     if (id.startsWith('node:')) id = id.slice(5);
+    if (shims[id]) return shims[id];
     if (id === 'internal/bootstrap/realm') return { BuiltinModule, require: requireBuiltin };
     if (cache.has(id)) return cache.get(id).exports;
 
@@ -201,6 +208,14 @@ function boot(libDir, opts = {}) {
   } catch (e) { trace.stderr.push('debuglog init: ' + e.message); }
 
   try { realm.Buffer = requireBuiltin('buffer').Buffer; realm.global.Buffer = realm.Buffer; } catch (_) {}
+
+  // http/https need the guest's own EventEmitter, so they are wired after boot.
+  if (opts.shimFactories) {
+    try {
+      const EE = requireBuiltin('events');
+      Object.assign(shims, opts.shimFactories(EE, requireBuiltin, pending));
+    } catch (e) { trace.stderr.push('shim wiring failed: ' + e.message); }
+  }
 
   return { require: requireBuiltin, process, primordials, internalBinding, vfs, trace, realm, pending };
 }

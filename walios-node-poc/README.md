@@ -10,8 +10,46 @@ kernel. Two phases done so far.
 | `run2.js` | encodings, stream data flow, CJS, perf | 22/22 |
 | `run3.js` | a multi-file user app via node's real CJS loader | runs |
 | `test-kernel-vfs.mjs` | node's fs over the walios syscall protocol | 20/20 |
-| `test-node-cli.mjs` | `node -e`, `node script.js`, stdin, REPL | 36/36 |
-| `test-browser.mjs` | **real Chromium, real kernel, real ash, real pty** | 17/17 |
+| `test-node-cli.mjs` | `node -e`, `node script.js`, stdin, REPL, async, crypto/zlib | 55/55 |
+| `test-browser.mjs` | **real Chromium, real kernel, real ash, real pty** | 20/20 |
+| `test-npm-lite.mjs` | **installs real packages from the real npm registry** | 8/8 |
+
+## Installing from the real npm registry
+
+```
+walios:/root$ node /usr/bin/npm-lite left-pad@1.3.0
+installed left-pad@1.3.0  (10 files, 9752 bytes, tarball 3619, integrity sha512 ok)
+  -> /node_modules/left-pad
+walios:/root$ node -e 'console.log("[" + require("/node_modules/left-pad")("42",8,"0") + "]")'
+[00000042]
+```
+
+Real registry, real tarball, sha512 verified against the registry's own integrity
+field, unpacked into the walios filesystem with real syscalls, then `require()`d.
+Runs in the browser, not just headless.
+
+`npm-lite` is not npm -- it is the install path reduced to its essentials, which is
+what proves the pieces work:
+
+| step | provided by |
+|---|---|
+| registry metadata, tarball | `shim-http.js` — `https` over `fetch()` |
+| integrity check | `shim-crypto.js` — sha1/256/512, NIST-verified |
+| decompress | `shim-zlib.js` — `DecompressionStream` |
+| unpack + write | tar reader + real `SYS_open`/`write` |
+
+### Three modules are REPLACED, not run from node's source
+
+Everything else in walios-node is node's own `lib/`. These three are front ends for
+things the platform does natively and we cannot port:
+
+- **crypto** is OpenSSL. npm needs a hash, not a cipher suite, so this implements
+  sha1/sha256/sha512 directly (SubtleCrypto is async; `createHash().digest()` is not).
+- **https** is OpenSSL over TCP. `fetch()` already does TLS with the platform trust
+  store. The cost is CORS: registry.npmjs.org sends `Access-Control-Allow-Origin: *`
+  for metadata *and* tarballs, which is why this works; an arbitrary host may not.
+- **zlib** is a native inflate. `DecompressionStream` is real and correct, but async,
+  so `gunzipSync` throws a directive rather than a wrong answer.
 
 ## `walios:/root$ node`
 

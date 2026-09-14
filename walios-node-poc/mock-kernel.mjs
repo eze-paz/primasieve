@@ -10,7 +10,28 @@
 // round trip end to end.
 import { parentPort, workerData } from 'node:worker_threads';
 
-const { ctl, mem, names, argv: ARGV = ['/bin/node'], stdin: STDIN = null, tty: TTY = false } = workerData;
+const { ctl, mem, names, argv: argv0 = ['/bin/node'], stdin: STDIN = null, tty: TTY = false } = workerData;
+// argv is mutable so one long-lived kernel can serve several `node ...` invocations
+// against a SHARED filesystem -- which is what an install-then-require test needs.
+// argv lives in SHARED MEMORY, not a postMessage: this kernel parks in Atomics.wait,
+// so its event loop never runs and a message handler would never fire. The harness
+// writes [i32 count][NUL-separated utf8] at ARGV_BASE before each run.
+const ARGV_BASE = 8192;
+let ARGV = argv0;
+function readArgvFromMemory() {
+  const d = dv();
+  const n = d.getInt32(ARGV_BASE, true);
+  if (n <= 0 || n > 64) return null;
+  const m = u8();
+  const out = [];
+  let p = ARGV_BASE + 4;
+  for (let i = 0; i < n; i++) {
+    let e = p; while (m[e]) e++;
+    out.push(td.decode(m.slice(p, e)));
+    p = e + 1;
+  }
+  return out;
+}
 const i32 = new Int32Array(ctl);
 const i64 = new BigInt64Array(ctl);
 const ARGS = 64, RET = 192;
@@ -200,7 +221,7 @@ for (;;) {
   let ret = 0n;
   try {
     if (full.startsWith('wali.SYS_')) ret = syscall(full.slice(9), a);
-    else if (full === 'wali.__cl_get_argc') ret = BigInt(ARGV.length);
+    else if (full === 'wali.__cl_get_argc') { const a2 = readArgvFromMemory(); if (a2) ARGV = a2; ret = BigInt(ARGV.length); }
     else if (full === 'wali.__cl_get_argv_len') ret = BigInt(te.encode(ARGV[a[0]] || '').length);
     else if (full === 'wali.__cl_copy_argv') {
       const b = te.encode(ARGV[a[1]] || '');

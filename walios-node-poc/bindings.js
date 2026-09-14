@@ -368,6 +368,13 @@ function makeBindings(vfs, trace, realm) {
         // it silently resolves to the HOST's. That is how console.log ended up on the
         // host terminal instead of going through SYS_write, and how process.platform
         // reported win32 before `process` joined this list.
+        // Strip a shebang the way node does -- `#!` is not valid JS and new Function
+        // rejects the whole file. Replaced with a blank line, not removed, so stack
+        // traces keep their line numbers.
+        if (content.charCodeAt(0) === 35 && content.charCodeAt(1) === 33) {
+          const nl = content.indexOf(String.fromCharCode(10));
+          content = nl < 0 ? '' : content.slice(nl);
+        }
         const inner = new Function(
           'process', 'Buffer', 'console', 'setTimeout', 'setInterval', 'setImmediate', 'clearTimeout', 'clearInterval',
           'globalThis', 'global', 'require', 'module', 'exports', '__filename', '__dirname',

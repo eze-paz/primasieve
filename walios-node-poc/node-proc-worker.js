@@ -167,6 +167,7 @@ function runNode() {
   const { makeArena, makeSyscalls } = require('./syscall-bridge.js');
   const { KernelVfs } = require('./kernel-vfs.js');
   const { boot } = require('./boot.js');
+  const { shimFactories } = require('./shims.js');
   const { main } = require('./node-main.js');
 
   const sys = makeSyscalls(names, hostCall);
@@ -192,7 +193,7 @@ function runNode() {
   try {
     vfs = new KernelVfs(sys, arena);
 
-    rt = boot(null, { sources: libSources, vfs });
+    rt = boot(null, { sources: libSources, vfs, shimFactories });
     raw('boot ok; lib modules=' + rt.trace.loaded.length);
   } catch (e) {
     raw('BOOT FAILED: ' + ((e && e.stack) || e));

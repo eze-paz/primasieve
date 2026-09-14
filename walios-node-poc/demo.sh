@@ -43,4 +43,11 @@ node -e 'console.log("ok")' && echo "&& worked"
 node -e 'process.exitCode = 3'
 echo "exit code was $?"
 
+echo "--- npm-lite: install left-pad from the real registry ---"
+node /usr/bin/npm-lite left-pad@1.3.0
+
+echo "--- require the installed package ---"
+echo 'console.log("[" + require("/node_modules/left-pad")("42", 8, "0") + "]")' > /tmp/use.js
+node /tmp/use.js
+
 echo "--- done ---"

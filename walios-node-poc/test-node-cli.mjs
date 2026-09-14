@@ -16,6 +16,7 @@ const LIB = process.argv[2] || join(here, 'lib');
 const { makeHostCall, makeArena, makeSyscalls } = require('./syscall-bridge.js');
 const { KernelVfs } = require('./kernel-vfs.js');
 const { boot } = require('./boot.js');
+const { shimFactories } = require('./shims.js');
 const { main } = require('./node-main.js');
 
 const SYSCALLS = ['open', 'openat', 'close', 'read', 'write', 'lseek', 'fstat', 'stat',
@@ -50,7 +51,7 @@ async function runNode(argv, seed, opts) {
   const sys = makeSyscalls(names, makeHostCall(ctl));
   const arena = makeArena(memory, 1 << 16);
   const vfs = new KernelVfs(sys, arena);
-  const rt = boot(null, { sources, vfs });
+  const rt = boot(null, { sources, vfs, shimFactories });
   if (seed) seed(rt.require('fs'));
 
   let code, thrown = null;
@@ -183,6 +184,27 @@ await t('async exitCode is honoured', ['/bin/node', '-e', 'setTimeout(()=>{proce
 await t('rejected promise surfaces', ['/bin/node', '-e',
   '(async()=>{try{await require("fs").promises.readFile("/nope/x")}catch(e){console.log("caught "+e.code)}})()'],
   'caught ENOENT');
+
+// ---- crypto / zlib / https (the npm prerequisites) ---------------------------
+await t('crypto sha256 NIST vector', ['/bin/node', '-e',
+  'console.log(require("crypto").createHash("sha256").update("abc").digest("hex"))'],
+  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+await t('crypto sha512 NIST vector', ['/bin/node', '-e',
+  'console.log(require("crypto").createHash("sha512").update("abc").digest("hex").slice(0,32))'],
+  'ddaf35a193617abacc417349ae204131');
+await t('crypto sha512 base64 (npm integrity form)', ['/bin/node', '-e',
+  'console.log("sha512-" + require("crypto").createHash("sha512").update("abc").digest("base64").slice(0,16))'],
+  'sha512-3a81oZNherrMQXNJ');
+await t('crypto randomBytes', ['/bin/node', '-e',
+  'console.log(require("crypto").randomBytes(16).length)'], '16');
+await t('zlib gunzip round trip', ['/bin/node', '-e',
+  '(async()=>{const z=require("zlib");' +
+  'const gz=new Uint8Array(await new Response(new Blob([new TextEncoder().encode("hello gzip")]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());' +
+  'const out=await z.promises.gunzip(gz);console.log(new TextDecoder().decode(out))})()'],
+  'hello gzip');
+await t('zlib gunzipSync says use the async form', ['/bin/node', '-e',
+  'try{require("zlib").gunzipSync(new Uint8Array(0))}catch(e){console.log(e.code)}'],
+  'ERR_METHOD_NOT_IMPLEMENTED');
 
 console.log('PASS (' + ok.length + ')');
 for (const s of ok) console.log('  + ' + s);

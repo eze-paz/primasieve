@@ -19,7 +19,7 @@ const { chromium } = require(GLOBAL_ROOT + '/playwright');
 const PORT = Number(process.env.PORT || 8791);
 const HEADED = process.argv.includes('--headed');
 const URL_ = `http://localhost:${PORT}/walios-node-poc/`;
-const WAIT_MS = Number(process.env.WAIT_MS || 25000);
+const WAIT_MS = Number(process.env.WAIT_MS || 60000);
 
 // ---- server -----------------------------------------------------------------
 const server = spawn(process.execPath, [new URL('./serve.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')], {
@@ -127,6 +127,9 @@ const checks = [
   ['exit code propagated', /exit code was 3/.test(outText)],
   ['echo | node ran stdin as a script', /from-stdin-777/.test(outText)],
   ['node < file ran the redirect', /from-redirect-888/.test(outText)],
+  ['npm-lite installed from the real registry', /installed left-pad@1\.3\.0/.test(outText)],
+  ['tarball sha512 was verified', /integrity sha512 ok/.test(outText)],
+  ['the installed package runs', /\[00000042\]/.test(outText)],
 ];
 console.log('\n================ verdict ================');
 let pass = 0;

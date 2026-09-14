@@ -78,9 +78,13 @@ async function boot() {
   } else {
     const CR = String.fromCharCode(13);
     const demo = (await (await fetch('./demo.sh')).text()).split(CR).join('');
+    const npmLite = await (await fetch('./npm-lite.js')).text();
     msg = await WB.runMessage(Object.assign({}, common, {
       argv: ['sh', '/demo.sh'],
-      blobs: { '/demo.sh': new TextEncoder().encode(demo).buffer },
+      blobs: {
+        '/demo.sh': new TextEncoder().encode(demo).buffer,
+        '/usr/bin/npm-lite': new TextEncoder().encode(npmLite).buffer,
+      },
     }));
   }
   kernel.postMessage(msg);

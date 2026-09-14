@@ -17,6 +17,7 @@ const LIB = process.argv[2] || join(here, 'lib');
 const { makeHostCall, makeArena, makeSyscalls } = require('./syscall-bridge.js');
 const { KernelVfs } = require('./kernel-vfs.js');
 const { boot } = require('./boot.js');
+const { shimFactories } = require('./shims.js');
 
 // The import list the kernel would build from node-stub.wasm, in the same order.
 const SYSCALLS = ['open', 'openat', 'close', 'read', 'write', 'lseek', 'fstat', 'stat',
@@ -54,7 +55,7 @@ const hostCall = makeHostCall(ctl);
 const sys = makeSyscalls(names, hostCall);
 const arena = makeArena(memory, 1 << 16);
 const vfs = new KernelVfs(sys, arena);
-const rt = boot(null, { sources, vfs });
+const rt = boot(null, { sources, vfs, shimFactories });
 const R = rt.require;
 
 const ok = [], bad = [];
