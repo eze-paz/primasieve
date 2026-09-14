@@ -18,7 +18,7 @@ if("serviceWorker"in navigator){
 <title>sandpie</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
-<link rel="stylesheet" href="sandpie.css?v=230">
+<link rel="stylesheet" href="sandpie.css?v=231">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <!-- KaTeX: LaTeX math rendering. conversations.js renderMd extracts $…$ / $$…$$ /
@@ -217,7 +217,7 @@ if("serviceWorker"in navigator){
           <div class="input-bar">
             <button type="button" id="attachBtn" class="attach-btn" onclick="$('imageInput').click()" title="Attach file">+</button>
             <div id="modelPicker" class="model-picker"></div>
-            <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick('main')" title="Send">▶</button>
+            <button type="button" id="sendBtn" class="send-btn" onclick="handleButtonClick('main')" title="Send"><span class="ic-play"></span></button>
           </div>
         </div>
       </form>
@@ -245,7 +245,7 @@ if("serviceWorker"in navigator){
           <div class="input-bar">
             <button type="button" id="attachBtnSide" class="attach-btn" onclick="$('imageInputSide').click()" title="Attach file">+</button>
             <div id="modelPickerSide" class="model-picker"></div>
-            <button type="button" id="sendBtnSide" class="send-btn" onclick="handleButtonClick('side')" title="Send">▶</button>
+            <button type="button" id="sendBtnSide" class="send-btn" onclick="handleButtonClick('side')" title="Send"><span class="ic-play"></span></button>
           </div>
         </div>
       </form>

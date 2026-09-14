@@ -3022,12 +3022,12 @@ function refreshSendButtonFor(which) {
   // (▶); its composer starts/sends into that pane.
   const s = convId ? convStreams.get(convId) : null;
   if (s && s.generating) {
-    btn.textContent = '■';
+    btn.innerHTML = '<span class="ic-stop"></span>';
     btn.title = 'Stop';
     btn.classList.add('sending');
     btn.disabled = false;
   } else {
-    btn.textContent = '▶';
+    btn.innerHTML = '<span class="ic-play"></span>';
     btn.title = 'Send';
     btn.classList.remove('sending');
     btn.disabled = false;

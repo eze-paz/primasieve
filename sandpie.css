@@ -686,6 +686,22 @@
     box-shadow: 0 2px 8px rgba(88,166,255,0.35);
     text-shadow: none;
   }
+  .send-btn .ic-play {
+    display: block;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0.42em 0 0.42em 0.68em;
+    border-color: transparent transparent transparent currentColor;
+    margin-left: 0.11em;
+  }
+  .send-btn .ic-stop {
+    display: block;
+    width: 0.62em;
+    height: 0.62em;
+    background: currentColor;
+    border-radius: 1px;
+  }
   .send-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 14px rgba(88,166,255,0.45);
