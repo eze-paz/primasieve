@@ -14,6 +14,7 @@ const SYSCALLS = [
   ['open', 3], ['openat', 4], ['close', 1], ['read', 3], ['write', 3],
   ['lseek', 3], ['fstat', 2], ['stat', 2], ['lstat', 2], ['newfstatat', 4],
   ['mkdir', 2], ['rmdir', 1], ['unlink', 1], ['getdents64', 3], ['access', 2],
+  ['ioctl', 3], ['dup', 1], ['fcntl', 3],
   ['rename', 2], ['ftruncate', 2], ['fsync', 1], ['readlink', 3], ['chdir', 1],
   ['getcwd', 2], ['exit_group', 1], ['exit', 1],
 ];

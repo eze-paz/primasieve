@@ -10,7 +10,7 @@
 // round trip end to end.
 import { parentPort, workerData } from 'node:worker_threads';
 
-const { ctl, mem, names, argv: ARGV = ['/bin/node'] } = workerData;
+const { ctl, mem, names, argv: ARGV = ['/bin/node'], stdin: STDIN = null, tty: TTY = false } = workerData;
 const i32 = new Int32Array(ctl);
 const i64 = new BigInt64Array(ctl);
 const ARGS = 64, RET = 192;
@@ -86,6 +86,8 @@ function statInto(path, sp) {
 }
 
 const dirState = new Map();
+const stdinBytes = STDIN == null ? new Uint8Array(0) : te.encode(STDIN);
+let stdinPos = 0;
 
 function syscall(name, a) {
   switch (name) {
@@ -103,8 +105,20 @@ function syscall(name, a) {
       fds.set(fd, { path: p, pos: (flags & O_APPEND) ? files.get(p).data.length : 0 });
       return BigInt(fd);
     }
+    case 'ioctl': {
+      // TCGETS (0x5401) succeeds only on a terminal -- this IS isatty().
+      if ((a[1] >>> 0) === 0x5401) return TTY && a[0] <= 2 ? 0n : BigInt(-25);   // ENOTTY
+      return 0n;
+    }
     case 'close': { if (!fds.delete(a[0])) return BigInt(-E.EBADF); dirState.delete(a[0]); return 0n; }
     case 'read': {
+      if (a[0] === 0) {                                   // stdin
+        if (stdinPos >= stdinBytes.length) return 0n;     // EOF
+        const n = Math.min(a[2], stdinBytes.length - stdinPos);
+        u8().set(stdinBytes.subarray(stdinPos, stdinPos + n), a[1]);
+        stdinPos += n;
+        return BigInt(n);
+      }
       const h = fds.get(a[0]); if (!h || h.dir) return BigInt(-E.EBADF);
       const f = files.get(h.path);
       const n = Math.max(0, Math.min(a[2], f.data.length - h.pos));

@@ -31,6 +31,13 @@ echo pipe-from-echo | grep pipe
 echo "--- pipe node into grep ---"
 node -e 'console.log("findme-123"); console.log("ignore-me")' | grep findme
 
+echo "--- echo | node  (script from stdin) ---"
+echo 'console.log("from-stdin-777")' | node
+
+echo "--- node < file ---"
+echo 'console.log("from-redirect-888")' > /tmp/in.js
+node < /tmp/in.js
+
 echo "--- exit codes ---"
 node -e 'console.log("ok")' && echo "&& worked"
 node -e 'process.exitCode = 3'

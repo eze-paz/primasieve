@@ -19,7 +19,8 @@ const { boot } = require('./boot.js');
 const { main } = require('./node-main.js');
 
 const SYSCALLS = ['open', 'openat', 'close', 'read', 'write', 'lseek', 'fstat', 'stat',
-  'lstat', 'newfstatat', 'mkdir', 'rmdir', 'unlink', 'getdents64', 'access', 'rename',
+  'lstat', 'newfstatat', 'mkdir', 'rmdir', 'unlink', 'getdents64', 'access',
+  'ioctl', 'dup', 'fcntl', 'rename',
   'ftruncate', 'fsync', 'readlink', 'chdir', 'getcwd', 'exit_group', 'exit'];
 const names = [...SYSCALLS.map((n) => 'wali.SYS_' + n),
   'wali.__cl_get_argc', 'wali.__cl_get_argv_len', 'wali.__cl_copy_argv', 'wali.__proc_exit'];
@@ -35,11 +36,12 @@ const sources = {};
 })(LIB);
 
 // Run one `node ...` invocation against a fresh kernel. `seed` writes files first.
-async function runNode(argv, seed) {
+async function runNode(argv, seed, opts) {
+  opts = opts || {};
   const ctl = new SharedArrayBuffer(256);
   const memory = new WebAssembly.Memory({ initial: 256, maximum: 4096, shared: true });
   const kernel = new Worker(new URL('./mock-kernel.mjs', import.meta.url), {
-    workerData: { ctl, mem: memory.buffer, names, argv },
+    workerData: { ctl, mem: memory.buffer, names, argv, stdin: opts.stdin || null, tty: !!opts.tty },
   });
   let out = '', err = '';
   kernel.on('message', (m) => { if (m.t === 'out') { if (m.fd === 2) err += m.s; else out += m.s; } });
@@ -60,9 +62,9 @@ async function runNode(argv, seed) {
 }
 
 const ok = [], bad = [];
-async function t(name, argv, expect, seed) {
+async function t(name, argv, expect, seed, opts) {
   try {
-    const r = await runNode(argv, seed);
+    const r = await runNode(argv, seed, opts);
     if (r.thrown) throw r.thrown;
     const got = (r.out + (r.err ? '[stderr] ' + r.err : '')).trim();
     const pass = typeof expect === 'function' ? expect(r) : got === expect;
@@ -111,8 +113,44 @@ await t('node script.js does fs work', ['/bin/node', '/app/w.js'], 'wrote 11',
     fs.writeFileSync('/app/w.js', 'const fs=require("fs");fs.writeFileSync("/tmp/o","hello world");console.log("wrote "+fs.statSync("/tmp/o").size)');
   });
 await t('node missing.js -> exit 1', ['/bin/node', '/app/nope.js'], (r) => r.code === 1 && /cannot find module/i.test(r.err));
-await t('bare node -> helpful message', ['/bin/node'], (r) => r.code === 1 && /no interactive REPL/.test(r.err));
+
 await t('node --bogus -> exit 9', ['/bin/node', '--bogus'], (r) => r.code === 9 && /bad option/.test(r.err));
+
+// ---- stdin + REPL ----------------------------------------------------------
+// N avoids backslash escapes entirely: this file has been mangled twice by them.
+const N = String.fromCharCode(10);
+await t('echo "..." | node  (script from stdin)', ['/bin/node'], 'from stdin', null,
+  { stdin: 'console.log("from stdin")' + N });
+await t('node < file  (multi-line stdin script)', ['/bin/node'], 'a' + N + 'b', null,
+  { stdin: 'console.log("a");' + N + 'console.log("b");' + N });
+await t('stdin script can require()', ['/bin/node'], '/x/y', null,
+  { stdin: 'console.log(require("path").join("/x","y"))' + N });
+await t('stdin script sees process.argv0', ['/bin/node'], 'node', null,
+  { stdin: 'console.log(process.argv0)' + N });
+await t('bare node, no stdin -> usage, exit 1', ['/bin/node'],
+  (r) => r.code === 1 && /nothing on stdin/.test(r.err));
+await t('REPL: 2+2', ['/bin/node'], (r) => /(^|\s)4(\s|$)/m.test(r.out) && r.code === 0,
+  null, { tty: true, stdin: '2+2' + N + '.exit' + N });
+await t('REPL: const persists across lines', ['/bin/node'],
+  (r) => /walios-repl/.test(r.out) && r.code === 0,
+  null, { tty: true, stdin: 'const who = "walios-repl"' + N + 'who' + N + '.exit' + N });
+await t('REPL: require works', ['/bin/node'], (r) => /\/a\/b/.test(r.out),
+  null, { tty: true, stdin: 'require("path").join("/a","b")' + N + '.exit' + N });
+await t('REPL: multi-line continuation', ['/bin/node'], (r) => /(^|\s)3(\s|$)/m.test(r.out),
+  null, { tty: true, stdin: 'function f() {' + N + 'return 3' + N + '}' + N + 'f()' + N + '.exit' + N });
+await t('REPL: an error does not kill the session', ['/bin/node'],
+  (r) => /ReferenceError/.test(r.err) && /(^|\s)7(\s|$)/m.test(r.out) && r.code === 0,
+  null, { tty: true, stdin: 'nope_not_defined' + N + '7' + N + '.exit' + N });
+await t('REPL: Ctrl-D (EOF) exits 0', ['/bin/node'], (r) => r.code === 0,
+  null, { tty: true, stdin: '1+1' + N });
+await t('REPL: .clear forgets the scope', ['/bin/node'],
+  (r) => /scope cleared/.test(r.out) && /ReferenceError/.test(r.err),
+  null, { tty: true, stdin: 'const z = 1' + N + '.clear' + N + 'z' + N + '.exit' + N });
+await t('REPL: console.log inside the REPL', ['/bin/node'], (r) => /repl-log/.test(r.out),
+  null, { tty: true, stdin: 'console.log("repl-log")' + N + '.exit' + N });
+await t('REPL: fs works (real syscalls)', ['/bin/node'], (r) => /etc-ok/.test(r.out),
+  null, { tty: true, stdin: 'require("fs").readFileSync("/etc/hosts","utf8") ? "etc-ok" : "no"' + N + '.exit' + N });
+
 
 console.log('PASS (' + ok.length + ')');
 for (const s of ok) console.log('  + ' + s);

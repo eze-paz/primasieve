@@ -58,7 +58,7 @@ function makeArena(mem, base) {
 const SYSCALL_NAMES = [
   'open', 'close', 'read', 'write', 'lseek', 'fstat', 'stat', 'lstat',
   'mkdir', 'rmdir', 'unlink', 'getdents64', 'access', 'rename',
-  'ftruncate', 'fsync', 'chdir', 'getcwd', 'exit_group',
+  'ftruncate', 'fsync', 'chdir', 'getcwd', 'exit_group', 'ioctl', 'dup', 'fcntl',
 ];
 
 // names[] is the kernel-supplied import list; syscalls are addressed by index into it.

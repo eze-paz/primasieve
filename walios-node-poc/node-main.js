@@ -5,6 +5,8 @@
 //
 // Rung one of "make `node` work at the walios shell". NOT the REPL.
 
+const REPL = require('./repl.js');
+
 const USAGE = [
   'Usage: node [options] [script.js] [arguments]',
   '',
@@ -73,6 +75,7 @@ function makeConsole(R, stdout, stderr) {
 // arena: marshalling arena
 function main(rt, sys, arena, trace) {
   trace = trace || (() => {});
+  const vfs = rt.vfs;
   const R = rt.require;
   const process = rt.process;
 
@@ -145,6 +148,53 @@ function main(rt, sys, arena, trace) {
   };
   const errOut = (s) => { try { stderr.write(s); } catch (e) { rawFd(2, s); } };
 
+  // ---- stdin ---------------------------------------------------------------
+  // Reads park in Atomics.wait and the kernel serves them asynchronously, so
+  // blocking here costs nothing and needs no event loop.
+  let stdinBuf = '';
+  let stdinEof = false;
+  const readLine = () => {
+    for (;;) {
+      const nl = stdinBuf.indexOf(NL);
+      if (nl >= 0) { const line = stdinBuf.slice(0, nl); stdinBuf = stdinBuf.slice(nl + 1); return line; }
+      if (stdinEof) { if (!stdinBuf) return null; const rest = stdinBuf; stdinBuf = ''; return rest; }
+      let chunk;
+      try { chunk = vfs.readFd(0, 4096); } catch (_) { stdinEof = true; continue; }
+      if (!chunk.length) { stdinEof = true; continue; }
+      stdinBuf += new TextDecoder().decode(chunk);
+    }
+  };
+  const readAllStdin = () => {
+    let rest = '';
+    try { rest = new TextDecoder().decode(vfs.readAll(0)); } catch (_) {}
+    const all = stdinBuf + rest;
+    stdinBuf = ''; stdinEof = true;
+    return all;
+  };
+  const stdinIsTty = (() => { try { return vfs.isatty(0); } catch (_) { return false; } })();
+
+  // Minimal process.stdin. Node's real one is a stream over libuv; this covers the
+  // synchronous shapes scripts actually reach for here.
+  Object.defineProperty(process, 'stdin', {
+    configurable: true,
+    get() {
+      const EE = R('events');
+      const s2 = new EE();
+      s2.fd = 0;
+      s2.isTTY = stdinIsTty;
+      s2.setEncoding = () => s2;
+      s2.read = () => { const l = readLine(); return l === null ? null : l + NL; };
+      s2.resume = () => { const all = readAllStdin(); if (all) s2.emit('data', all); s2.emit('end'); return s2; };
+      const on = s2.on.bind(s2);
+      s2.on = function (ev, fn) {
+        on(ev, fn);
+        if (ev === 'data') { const all = readAllStdin(); if (all) fn(all); s2.emit('end'); }
+        return s2;
+      };
+      return s2;
+    },
+  });
+
   // argv[0] is the interpreter; walios passes the program name there.
   const args = argv.slice(1);
   let evalCode = null, printResult = false, script = null;
@@ -209,9 +259,33 @@ function main(rt, sys, arena, trace) {
   }
 
   // ---- bare `node` ----------------------------------------------------------
-  errOut('walios-node ' + process.version + ': no interactive REPL yet.\n');
-  errOut('Try:  node -e "console.log(2+2)"   or   node script.js\n');
-  return 1;
+  // A terminal gets the REPL; anything else (a pipe, a redirected file) is read to
+  // EOF and run as a script -- what real node does.
+  if (stdinIsTty) {
+    trace('branch: REPL');
+    return REPL.start(rt, vfs, { out, err: errOut, readLine });
+  }
+
+  trace('branch: script from stdin');
+  const src = readAllStdin();
+  if (!src.trim()) {
+    errOut('walios-node ' + process.version + ': nothing on stdin and no script given.' + NL);
+    errOut('Try:  node -e "..."   |   node script.js   |   echo "..." | node' + NL);
+    return 1;
+  }
+  try {
+    const Module = R('module');
+    const M = Module.Module || Module;
+    const m = new M('[stdin]', null);
+    m.filename = '/[stdin]';
+    m.paths = [];
+    const compiled = rt.internalBinding('contextify').compileFunctionForCJSLoader(src, '[stdin]');
+    compiled.function.call(m.exports, m.exports, m.require.bind(m), m, '/[stdin]', '/');
+    return typeof process.exitCode === 'number' ? process.exitCode : 0;
+  } catch (e) {
+    errOut(formatErr(e) + NL);
+    return 1;
+  }
 }
 
 function absolute(p, process) {

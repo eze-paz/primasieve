@@ -185,6 +185,42 @@ class KernelVfs {
     return out;
   }
 
+  // POSIX isatty: TCGETS succeeds only on a terminal. walios serves 0x5401 for pty
+  // fds and answers ENOTTY for anything else, so this is the real test -- not a
+  // guess from st_mode, which reports a char device for plain std fds too.
+  isatty(fd) {
+    const buf = this.mem.alloc(64);
+    let ok = false;
+    try { ok = Number(this.sys.ioctl(fd, 0x5401, buf)) === 0; } catch (_) { ok = false; }
+    this.mem.reset();
+    return ok;
+  }
+
+  // Blocking read of up to `max` bytes. The kernel serves reads asynchronously, so
+  // the guest simply parks in Atomics.wait -- no event loop needed.
+  readFd(fd, max) {
+    const scratch = this.mem.alloc(max);
+    const n = this._check(this.sys.read(fd, scratch, max), 'read');
+    const out = n > 0 ? this.mem.u8().slice(scratch, scratch + n) : new Uint8Array(0);
+    this.mem.reset();
+    return out;
+  }
+
+  // Everything until EOF -- what `node < file` and `echo x | node` need.
+  readAll(fd) {
+    const parts = [];
+    let total = 0;
+    for (;;) {
+      const b = this.readFd(fd, 65536);
+      if (!b.length) break;
+      parts.push(b); total += b.length;
+    }
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const p of parts) { out.set(p, off); off += p.length; }
+    return out;
+  }
+
   // 1 = file, 0 = dir, -1 = missing. Matches vfs.js so bindings.js is unchanged.
   exists(path) {
     try { const st = this.statPath(path); return st.isDir ? 0 : 1; }

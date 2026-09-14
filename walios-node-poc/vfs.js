@@ -76,6 +76,9 @@ class Vfs {
   rename(from, to) { const a = this._norm(from), b = this._norm(to);
     const f = this.files.get(a); if (!f) throw new VfsError('ENOENT', 'rename', a);
     this.files.delete(a); this.files.set(b, f); }
+  isatty() { return false; }
+  readFd() { return new Uint8Array(0); }
+  readAll() { return new Uint8Array(0); }
   exists(path) { const p = this._norm(path); return this.files.has(p) ? 1 : this.dirs.has(p) ? 0 : -1; }
 }
 module.exports = { Vfs, VfsError, E };

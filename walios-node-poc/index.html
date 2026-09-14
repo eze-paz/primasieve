@@ -20,6 +20,15 @@ const out = document.getElementById('out');
 const err = document.getElementById('err');
 const write = (el, s) => { el.textContent += s; };
 
+// ?mode=repl boots an INTERACTIVE pty shell and lets the driver type into it, which
+// is the only way to exercise `walios:/root$ node` -> the REPL. Default runs demo.sh.
+const MODE = new URLSearchParams(location.search).get('mode') || 'demo';
+let kernel = null;
+
+// Driven by test-browser.mjs
+window.__send = (s) => { if (kernel) kernel.postMessage({ t: 'stdin', data: s }); };
+window.__text = () => out.textContent;
+
 if (!crossOriginIsolated) {
   write(err, 'NOT cross-origin isolated — SharedArrayBuffer is unavailable.\nServe with COOP/COEP (use serve.mjs).\n');
 } else {
@@ -30,7 +39,7 @@ async function boot() {
   const WB = self.WALIOS_BACKEND;
   if (!WB) throw new Error('walios-backend.js did not load (serve the repo root)');
 
-  const kernel = new Worker('/walios/wali-worker.js');
+  kernel = new Worker('/walios/wali-worker.js');
   kernel.onerror = (e) => write(err, 'kernel worker error: ' + (e.message || e) + '\n');
   kernel.onmessage = (ev) => {
     const m = ev.data;
@@ -52,15 +61,28 @@ async function boot() {
   const CR = String.fromCharCode(13);
   const demo = (await (await fetch('./demo.sh')).text()).split(CR).join('');
 
-  const msg = await WB.runMessage({
+  const common = {
     kind: 'tool',
     base: '/walios/',
-    argv: ['sh', '/demo.sh'],
     cwd: '/root',
     rpc: false,
     manifest: { node: '/walios-node-poc/node-stub.wasm' },
-    blobs: { '/demo.sh': new TextEncoder().encode(demo).buffer },
-  });
+  };
+
+  let msg;
+  if (MODE === 'repl') {
+    // pty: true gives a real terminal -- canonical mode, so the kernel does echo and
+    // line editing and a read on fd 0 returns a finished line. That is what lets the
+    // REPL work with no readline and no raw mode.
+    msg = await WB.runMessage(Object.assign({}, common, { argv: ['sh'], pty: true, cols: 100, rows: 30 }));
+  } else {
+    const CR = String.fromCharCode(13);
+    const demo = (await (await fetch('./demo.sh')).text()).split(CR).join('');
+    msg = await WB.runMessage(Object.assign({}, common, {
+      argv: ['sh', '/demo.sh'],
+      blobs: { '/demo.sh': new TextEncoder().encode(demo).buffer },
+    }));
+  }
   kernel.postMessage(msg);
 }
 </script>

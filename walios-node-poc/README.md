@@ -9,6 +9,68 @@ kernel. Two phases done so far.
 | `run.js` | node's builtins boot on synthetic bindings | 28/28 |
 | `run2.js` | encodings, stream data flow, CJS, perf | 22/22 |
 | `run3.js` | a multi-file user app via node's real CJS loader | runs |
+| `test-kernel-vfs.mjs` | node's fs over the walios syscall protocol | 20/20 |
+| `test-node-cli.mjs` | `node -e`, `node script.js`, stdin, REPL | 36/36 |
+| `test-browser.mjs` | **real Chromium, real kernel, real ash, real pty** | 17/17 |
+
+## `walios:/root$ node`
+
+The whole point, captured from an actual pty session in `test-browser.mjs`:
+
+```
+BusyBox v1.36.1 (2026-09-14) built-in shell (ash)
+
+walios:/root$ node
+Welcome to walios-node v22.23.2.
+Type .exit to leave, .help for commands.
+> 2+2
+4
+> const who = "walios-repl"
+> who
+'walios-repl'
+> require("path").join("/a","b")
+'/a/b'
+> require("fs").readFileSync("/etc/hosts","utf8").trim()
+'127.0.0.1 localhost'
+> .exit
+walios:/root$ echo BACK-IN-ASH
+BACK-IN-ASH
+```
+
+Everything a shell command should do:
+
+```
+node -v                            node script.js one two
+node -e '...'   node -p '...'      node < file
+echo '...' | node                  node -e '...' | grep x
+node -e '...' > out.txt            node build.js && echo ok   ($? propagates)
+```
+
+One filesystem with the rest of walios: node reads what ash wrote, ash reads what
+node wrote, git and python see the same files.
+
+### How the REPL works
+
+Not node's `lib/repl.js`: that drives `vm.createScript`/`runInContext`, and a worker
+has no way to make a real realm. `repl.js` here evaluates with `new Function` — the
+same V8 either way; what it gives up is vm's isolation, not speed.
+
+There is no readline and no raw mode, because there does not need to be: walios runs
+the pty in **canonical mode**, so the kernel already does echo, backspace and line
+assembly, and a read on fd 0 returns a finished line.
+
+`isatty` is the real POSIX test — `ioctl(0, TCGETS)`, which walios answers only for a
+pty. A tty gets the REPL; a pipe or redirect is read to EOF and run as a script,
+exactly as node does.
+
+Known limits: `var`/`let`/`const` at the top level are rewritten to properties of a
+persistent scope object, so simple declarations survive across lines but destructuring
+ones do not. No tab completion, no history.
+
+---|---|---|
+| `run.js` | node's builtins boot on synthetic bindings | 28/28 |
+| `run2.js` | encodings, stream data flow, CJS, perf | 22/22 |
+| `run3.js` | a multi-file user app via node's real CJS loader | runs |
 | `test-kernel-vfs.mjs` | **node's fs over the walios syscall protocol** | 19/19 |
 | `test-node-cli.mjs` | **`node -e` and `node script.js`, argv+stdio via syscalls** | 23/23 |
 | `test-browser.mjs` | **the real thing: real Chromium, real kernel, real ash** | 9/9 |
