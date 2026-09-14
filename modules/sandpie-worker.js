@@ -499,7 +499,7 @@ async function _dbxUploadRel(rel, bytes) {
       console.warn('[dbxpush] network error for ' + rel + ':', (e && e.message) || e);
       return false;
     }
-    if (res.ok) { console.info('[dbxpush] uploaded ' + rel); return true; }
+    if (res.ok) { console.info('[dbxpush] uploaded ' + rel); _lsCacheClear(); return true; }
     // 429 carries Retry-After and 5xx is worth another try. Anything else is a
     // real rejection (bad path, no permission) that retrying cannot fix.
     if (res.status !== 429 && res.status < 500) {
@@ -593,7 +593,7 @@ function _pyKillSlot(slot, reason) {
 }
 
 function _spawnPyWorker() {
-  const worker = new Worker('./pyodide-worker.js?v=16', { name: 'py' + (_pySpawnSeq++) });
+  const worker = new Worker('./pyodide-worker.js?v=17', { name: 'py' + (_pySpawnSeq++) });
   const slot = { worker, busy: false, job: null };
   worker.addEventListener('message', (event) => {
     const msg = event.data; if (!msg) return;
@@ -803,13 +803,6 @@ function _relExempt(rel) {
       return false;
     });
 }
-function _indexEntry(rel) {
-  if (!_dehydrated || !_dbxIndex) return null;
-  const r = String(rel).replace(/^\/+/, '');
-  if (!r || _relExempt(r)) return null;
-  const e = _dbxIndex[r];
-  return (e && e.kind === 'file') ? e : null;
-}
 async function _opfsGetFile(rel) {
   const { parts, name } = splitPath(rel);
   const dir = await opfsResolveDir(parts);
@@ -832,46 +825,71 @@ function _dbxHeaders(json, team) {
 // Async hydration (file tools): get_temporary_link RPC → GET the link → OPFS.
 // Mirrors dropbox.js download() — the documented CORS-enabled browser path.
 async function hydrateAsync(rel) {
-  const entry = _indexEntry(rel);
-  if (!entry) return false;
-  if (_hydrating.has(rel)) return _hydrating.get(rel);
+  const r = String(rel || '').replace(/^\/+/, '');
+  // sandpie/* is eagerly synced by the page, so it is already in OPFS; a miss
+  // there is a genuine miss, not something to fetch.
+  if (!r || _relExempt(r)) return false;
+  if (_hydrating.has(r)) return _hydrating.get(r);
   const job = (async () => {
-    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: _dbxHeaders(true), body: JSON.stringify({ path: _cloudPathFor(rel, entry) }) });
+    if (!(await _ensureDbxCtx(2000))) return false;
+    // Same guard as the upload path: without a workingRoot the path resolves to
+    // the Dropbox ROOT, and we would fetch (or miss) the wrong file entirely.
+    if (!(_dbxCtx && _dbxCtx.workingRoot)) return false;
+    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: _dbxHeaders(true), body: JSON.stringify({ path: _cloudPathFor(r) }) });
+    // 409 is Dropbox's "path/not_found": the file genuinely is not there. Any
+    // other failure is a transport problem and must not be read as absence.
+    if (tlRes.status === 409) return false;
     if (!tlRes.ok) throw new Error('get_temporary_link ' + tlRes.status);
     const dl = await fetch((await tlRes.json()).link, { method: 'GET' });
     if (!dl.ok) throw new Error('download ' + dl.status);
-    await opfsWriteBytes(rel, new Uint8Array(await dl.arrayBuffer()));
-    _hydratedSet.add(rel); _reportHydrated(rel);
+    await opfsWriteBytes(r, new Uint8Array(await dl.arrayBuffer()));
+    _hydratedSet.add(r); _reportHydrated(r);
     return true;
   })();
-  _hydrating.set(rel, job);
-  try { return await job; } finally { _hydrating.delete(rel); }
+  _hydrating.set(r, job);
+  try { return await job; } finally { _hydrating.delete(r); }
 }
 // The synchronous run_python fault-in (blocking XHR + open() audit hook) now
 // lives in pyodide-worker.js, which owns the interpreter. This worker keeps only
 // the ASYNC hydration above, used by the file tools (read_file/load_image/etc).
 
 // Build a directory listing from the cloud index (no download) for list_files.
-function _indexEntriesUnder(norm, recursive) {
-  if (!_dehydrated || !_dbxIndex) return [];
-  const base = norm ? String(norm).replace(/^\/+|\/+$/g, '') : '';
-  const basePrefix = base ? base + '/' : '';
-  const bpl = basePrefix.toLowerCase();
-  const out = [], dirs = new Set();
-  for (const rel0 of Object.keys(_dbxIndex)) {
-    const rel = rel0.replace(/^\/+/, '');
-    if (_relExempt(rel)) continue;
-    if (basePrefix && !rel.toLowerCase().startsWith(bpl)) continue;
-    const sub = basePrefix ? rel.slice(basePrefix.length) : rel;
-    if (!sub) continue;
-    const slash = sub.indexOf('/');
-    if (!recursive && slash >= 0) { dirs.add(basePrefix + sub.slice(0, slash)); continue; }
-    const e = _dbxIndex[rel0];
-    out.push({ path: rel, kind: e.kind === 'folder' ? 'directory' : 'file', size: e.size, cloudMtime: e.cloudMtime });
+// -- Live Dropbox reads (full-Dropbox, step 2) -- DBXREAD-BEGIN ------------
+// Listings come from Dropbox, not from the cloud index. The index was a
+// snapshot: empty on a cold boot, stale after another device wrote, and missing
+// anything added outside the app. A miss in it read as "the file does not
+// exist", which is how a file that Dropbox holds could look gone. Asking
+// Dropbox costs one round trip and is never wrong.
+//
+// Cached for a few seconds only, so that listing a folder and then reading its
+// entries does not re-list per entry. Any upload clears it (see _dbxUploadRel).
+const _lsCache = new Map();
+const _LS_TTL_MS = 15000;
+function _lsCacheClear() { _lsCache.clear(); }
+async function _cloudEntriesUnder(norm, recursive) {
+  if (!(await _ensureDbxCtx(2000))) return [];
+  const root = _dbxCtx && _dbxCtx.workingRoot;
+  if (!root) return [];
+  const base = String(norm || '').replace(/^\/+|\/+$/g, '');
+  const key = base + '|' + (recursive ? 'r' : 'f');
+  const hit = _lsCache.get(key);
+  if (hit && Date.now() - hit.t < _LS_TTL_MS) return hit.rows;
+  let raw;
+  try { raw = await _dropboxListFolder(root + (base ? '/' + base : ''), recursive, false); }
+  catch (e) { console.warn('[dbxread] list failed for /' + base + ':', (e && e.message) || e); return []; }
+  const prefix = (root + '/').toLowerCase();
+  const out = [];
+  for (const r of raw) {
+    const full = String(r.path || '');
+    if (!full.toLowerCase().startsWith(prefix)) continue;
+    const rel = full.slice(root.length + 1);
+    if (!rel || _relExempt(rel)) continue;
+    out.push({ path: rel, kind: r.kind, size: r.size, cloudMtime: r.cloudMtime });
   }
-  for (const d of dirs) out.push({ path: d, kind: 'directory' });
+  _lsCache.set(key, { t: Date.now(), rows: out });
   return out;
 }
+// -- DBXREAD-END ------------------------------------------------------------
 // Flushing last session's hydrated copies is now PAGE-side (dropbox
 // dehydratePurge() on boot) — it knows sync state, so it can skip files with
 // unsynced edits. The worker no longer persists a manifest or wipes on boot.
@@ -1822,7 +1840,7 @@ async function tool_show_artifact({ path, language }, ctx) {
   for (const p of candidates) {
     let found = false;
     try { await opfsReadBytes(p); found = true; } catch (_) {}
-    if (!found && _indexEntry(p)) { try { await hydrateAsync(p); found = true; } catch (_) {} }
+    if (!found) { try { found = await hydrateAsync(p); } catch (_) {} }
     if (found) {
       // TRANSITIONAL SHIM — show_artifact is no longer offered to the model
       // (files it touches surface automatically at turn end; see the
@@ -1896,7 +1914,7 @@ async function tool_load_image({ path }, ctx) {
     let bytes;
     try { bytes = await opfsReadBytes(clean); }
     catch (miss) {
-      if (_indexEntry(clean)) { await hydrateAsync(clean); bytes = await opfsReadBytes(clean); }
+      if (await hydrateAsync(clean)) bytes = await opfsReadBytes(clean);
       else throw miss;
     }
     const ext = (clean.split('.').pop() || '').toLowerCase();
@@ -2452,10 +2470,12 @@ async function tool_read_file({ path, offset, limit, force, _conv }, ctx) {
     if (!norm) return { result: 'Error: path is required.' };
     try { file = await _opfsGetFile(norm); }
     catch {
-      if (_indexEntry(norm)) {
-        try { await hydrateAsync(norm); file = await _opfsGetFile(norm); }
-        catch (e) { return { result: `Error: ${norm} is in Dropbox but could not be fetched: ${(e && e.message) || e}` }; }
-      } else { return { result: 'Error: file not found: ' + norm }; }
+      let got = false;
+      try { got = await hydrateAsync(norm); }
+      catch (e) { return { result: `Error: ${norm} is in Dropbox but could not be fetched: ${(e && e.message) || e}` }; }
+      if (!got) return { result: 'Error: file not found: ' + norm };
+      try { file = await _opfsGetFile(norm); }
+      catch (e) { return { result: `Error: ${norm} was fetched but could not be opened: ${(e && e.message) || e}` }; }
     }
   }
   if (file.size > FILE_TEXT_MAX) return { result: `Error: ${norm} is ${file.size} bytes — too large to read as text. Process it with run_python instead.` };
@@ -2542,7 +2562,7 @@ async function tool_list_files({ path, pattern, recursive, scope }, ctx) {
 
   // ---- INSIDE working root (or relative) → OPFS + cloud index merge ----
   let entries = await opfsCollect(norm, { recursive: !!recursive, includeDirs: !recursive, max: 4000 });
-  const idxEntries = _indexEntriesUnder(norm, !!recursive);   // [] unless dehydrated mode is on
+  const idxEntries = await _cloudEntriesUnder(norm, !!recursive);   // live listing (step 2)
   if (entries === null && !idxEntries.length) return { result: 'Error: not a directory: ' + (norm || '/files/') };
   entries = entries || [];
   if (idxEntries.length) {
@@ -2641,8 +2661,10 @@ function _formatCloudPage(r, query, scope, offset) {
   hints.push('or narrow the path/term for fewer, more relevant matches');
   return `${totalStr} files match "${query}" in ${scope} — showing ${off + 1}-${end}${note}:\n` + page.join('\n') + `\n(${hints.join('; ')}.)`;
 }
-async function _dropboxListFolder(folderPath, recursive) {
-  const headers = _dbxHeaders(true, true);   // team namespace — cloud browse
+async function _dropboxListFolder(folderPath, recursive, team) {
+  // team defaults TRUE for the existing cloud-browse callers; the workspace
+  // listing added in step 2 passes false (home namespace).
+  const headers = _dbxHeaders(true, team === undefined ? true : !!team);
   const body = JSON.stringify({ path: folderPath || '', recursive: !!recursive, include_mounted_folders: false, include_deleted: false, include_has_explicit_shared_members: false, limit: 999 });
   let res = await fetch('https://api.dropboxapi.com/2/files/list_folder', { method: 'POST', headers, body });
   if (!res.ok) { const txt = await res.text().catch(() => ''); throw new Error('Dropbox list failed (' + res.status + '): ' + txt.slice(0, 300)); }
@@ -6083,10 +6105,10 @@ async function tool_edit_file({ path, old_str, new_str = '' }, ctx) {
   try { current = new TextDecoder().decode(await opfsReadBytes(norm)); }
   catch {
     // Dehydrated: edit a not-yet-downloaded cloud file by hydrating it first.
-    if (_indexEntry(norm)) {
-      try { await hydrateAsync(norm); current = new TextDecoder().decode(await opfsReadBytes(norm)); }
-      catch { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
-    } else { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
+    try {
+      if (!(await hydrateAsync(norm))) return { result: `File not found: ${norm}. Use write_file to create it.` };
+      current = new TextDecoder().decode(await opfsReadBytes(norm));
+    } catch { return { result: `File not found: ${norm}. Use write_file to create it.` }; }
   }
   const res = applyEdit(current, old_str, new_str);
   if (res.error) return { result: res.error };

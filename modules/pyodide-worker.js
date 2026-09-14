@@ -548,13 +548,6 @@ function _relExempt(rel) {
       return false;
     });
 }
-function _indexEntry(rel) {
-  if (!_dehydrated || !_dbxIndex) return null;
-  const r = String(rel).replace(/^\/+/, '');
-  if (!r || _relExempt(r)) return null;
-  const e = _dbxIndex[r];
-  return (e && e.kind === 'file') ? e : null;
-}
 function _cloudPathFor(rel, entry) {
   if (entry && entry.path) return entry.path;
   const root = (_dbxCtx && _dbxCtx.workingRoot) || '';
@@ -568,20 +561,22 @@ function _dbxHeaders(json) {
 }
 // Async hydration (used to fault in the entry script itself before Python starts).
 async function hydrateAsync(rel) {
-  const entry = _indexEntry(rel);
-  if (!entry) return false;
-  if (_hydrating.has(rel)) return _hydrating.get(rel);
+  const r = String(rel || '').replace(/^\/+/, '');
+  if (!r || _relExempt(r)) return false;
+  if (!(_dbxCtx && _dbxCtx.token && _dbxCtx.workingRoot)) return false;
+  if (_hydrating.has(r)) return _hydrating.get(r);
   const job = (async () => {
-    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: _dbxHeaders(true), body: JSON.stringify({ path: _cloudPathFor(rel, entry) }) });
+    const tlRes = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', { method: 'POST', headers: _dbxHeaders(true), body: JSON.stringify({ path: _cloudPathFor(r) }) });
+    if (tlRes.status === 409) return false;   // path/not_found: genuinely absent
     if (!tlRes.ok) throw new Error('get_temporary_link ' + tlRes.status);
     const dl = await fetch((await tlRes.json()).link, { method: 'GET' });
     if (!dl.ok) throw new Error('download ' + dl.status);
-    await opfsWriteBytes(rel, new Uint8Array(await dl.arrayBuffer()));
-    _hydratedSet.add(rel); _reportHydrated(rel);
+    await opfsWriteBytes(r, new Uint8Array(await dl.arrayBuffer()));
+    _hydratedSet.add(r); _reportHydrated(r);
     return true;
   })();
-  _hydrating.set(rel, job);
-  try { return await job; } finally { _hydrating.delete(rel); }
+  _hydrating.set(r, job);
+  try { return await job; } finally { _hydrating.delete(r); }
 }
 // Synchronous hydration for Pyodide open(): two blocking XHRs, writing THROUGH
 // Pyodide's FS so the just-opened file is visible inline. Only possible in a
@@ -1455,7 +1450,7 @@ async function tool_run_python({ path, code: inlineCode, args }) {
     let bytes;
     try { bytes = await opfsReadBytes(normPath); }
     catch (miss) {
-      if (_indexEntry(normPath)) { await hydrateAsync(normPath); bytes = await opfsReadBytes(normPath); }
+      if (await hydrateAsync(normPath)) bytes = await opfsReadBytes(normPath);
       else throw miss;
     }
     code = new TextDecoder().decode(bytes);

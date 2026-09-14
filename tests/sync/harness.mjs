@@ -59,10 +59,19 @@ const srcDelete = extractFrom(workerSrc, 'async function tool_delete_file(');
 // Direct-upload path (refactor step 1), plus the two helpers it builds the
 // request from. Real code: a change to the upload contract shows up here.
 const srcDbxPush = sliceMarkers(workerSrc, 'DBXPUSH-BEGIN', 'DBXPUSH-END');
+// Live read path (refactor step 2): hydration and listings ask Dropbox instead
+// of consulting the cloud index.
+const srcDbxRead = sliceMarkers(workerSrc, 'DBXREAD-BEGIN', 'DBXREAD-END');
+const srcRelExempt = extractFrom(workerSrc, 'function _relExempt(');
+const srcNormPath = extractFrom(workerSrc, 'function normFilesPath(');
+const srcHydrate = extractFrom(workerSrc, 'async function hydrateAsync(');
+const srcListFolder = extractFrom(workerSrc, 'async function _dropboxListFolder(');
+const srcReadFile = extractFrom(workerSrc, 'async function tool_read_file(');
 const srcCloudPath = extractFrom(workerSrc, 'function _cloudPathFor(');
 const srcDbxHeaders = extractFrom(workerSrc, 'function _dbxHeaders(');
 const TOOL_SRC = srcFnv + srcEditHelpers + srcCloudPath + srcDbxHeaders + srcDbxPush
-  + srcWrite + srcEdit + srcDelete;
+  + srcRelExempt + srcNormPath + srcListFolder + srcDbxRead + srcHydrate
+  + srcWrite + srcEdit + srcDelete + srcReadFile;
 
 export const WSROOT = '/sandpie';
 const enc = (s) => new TextEncoder().encode(s);
@@ -399,6 +408,18 @@ export function makeWorld(opts = {}) {
     const _invalidateFileCache = () => {};
     const _betaOn = () => false;
     const _ensureDbxCtx = async () => true;
+    const _dbxExempt = ['sandpie/conversations', 'sandpie/skills', 'sandpie/memory', 'sandpie/config', 'sandpie/shared-installed', 'sandpie/shared-incoming'];
+    const _hydrating = new Map();
+    const _hydratedSet = new Set();
+    const _reportHydrated = (rel) => {
+      try { self.postMessage({ type: 'forward-to-page', payload: { type: 'worker-hydrated', paths: [rel] } }); } catch (_) {}
+    };
+    const splitPath = (rel) => { const parts = String(rel).split('/'); return { name: parts.pop(), parts }; };
+    const opfsResolveDir = async (parts) => {
+      let dir = await opfsRoot();
+      for (const x of parts) dir = await dir.getDirectoryHandle(x);
+      return dir;
+    };
     const _dbxCtx = DBXCTX;
     const _toOpfsRel = (x) => {
       let r = String(x || '');
@@ -408,7 +429,6 @@ export function makeWorld(opts = {}) {
       return r;
     };
     const _indexEntry = () => null;
-    const hydrateAsync = async () => false;
     const _nf = () => { const e = new Error('not found'); e.name = 'NotFoundError'; return e; };
     const opfsRoot = async () => {
       const dirHandle = (prefix) => ({
@@ -425,7 +445,10 @@ export function makeWorld(opts = {}) {
       });
       return dirHandle('');
     };
-    const opfsReadBytes = async (rel) => new TextEncoder().encode(FS.get(rel) ?? '');
+    const opfsReadBytes = async (rel) => {
+      if (!FS.has(rel)) throw _nf();          // real OPFS throws NotFoundError
+      return new TextEncoder().encode(FS.get(rel));
+    };
     const opfsWriteBytes = async (rel, bytes) => { FS.set(rel, new TextDecoder().decode(bytes)); MT.set(rel, NOW()); };
     const _opfsGetFile = async (rel) => {
       if (!FS.has(rel)) throw _nf();
@@ -453,7 +476,7 @@ export function makeWorld(opts = {}) {
   world.dbxCtx = { token: 'tok', pathRoot: null, teamRoot: null, homeNs: '', workingRoot: WSROOT };
   world.tools = new Function('FS', 'MT', 'POSTED', 'relay', 'NOW', 'fetch', 'console', 'DBXCTX',
     toolGlobals + TOOL_SRC +
-    '\nreturn { tool_write_file, tool_edit_file, tool_delete_file, _dbxUploadRel, _dbxPushable };')(
+    '\nreturn { tool_write_file, tool_edit_file, tool_delete_file, tool_read_file, hydrateAsync, _cloudEntriesUnder, _dbxUploadRel, _dbxPushable };')(
     FS, MT, POSTED, relayDispatch, nowMs, fakeFetch,
     opts.verbose ? console : { log() {}, info() {}, warn() {}, error() {}, debug() {} },
     world.dbxCtx);
