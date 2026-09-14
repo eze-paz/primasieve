@@ -66,6 +66,15 @@
     --sp-rail-hot-bg: rgba(255,255,255,0.16);
     --sp-rail-hot-bg: color-mix(in srgb, var(--sp-bg, #fff) 18%, transparent);
   }
+  /* Classic light: user bubbles borrow the aurora look (gradient + soft glow) */
+  [data-theme="light"] .user .bubble {
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    color: #fff;
+    border-radius: 18px 18px 6px 18px;
+    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(56,189,248,0.2);
+  }
+  [data-theme="light"] .user::before { background: rgba(56,189,248,0.1); transform: translate(3px, 3px); }
   body {
     font: 14px -apple-system, system-ui, 'Segoe UI', sans-serif;
     background: var(--sp-bg);
