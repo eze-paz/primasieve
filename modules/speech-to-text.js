@@ -21,7 +21,7 @@ const SandpieSpeech = (function () {
 
   const NS = 'speech';
   const LS_KEY = 'sandpie-speech';
-  const DEFAULTS = { model: 'onnx-community/whisper-small', lang: 'auto', engine: 'webspeech' };
+  const DEFAULTS = { model: 'onnx-community/whisper-base', lang: 'auto', engine: 'webspeech' };
 
   const MODELS = [
     { id: 'onnx-community/whisper-tiny',  label: 'Whisper Tiny — fastest (~80 MB)' },
@@ -61,7 +61,7 @@ const SandpieSpeech = (function () {
       else localStorage.setItem(LS_KEY, JSON.stringify(next));
     } catch (_) { try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch (_) {} }
   }
-  const cfgModel = () => 'onnx-community/whisper-small'; // model picker removed — always the most accurate (small)
+  const cfgModel = () => 'onnx-community/whisper-base'; // model picker removed — always whisper-base (privacy: on-device, faster than small)
   const cfgLang  = () => cfgAll().lang;
   // 'moonshine' was removed — migrate any saved pref to whisper
   const cfgEngine = () => { const e = cfgAll().engine; return e === 'moonshine' ? 'whisper' : e; };
