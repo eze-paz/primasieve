@@ -1768,20 +1768,6 @@ function liteBtnPlace(btn, bar) {
 setInterval(() => { liteBtnRefresh(); const b = document.getElementById("liteBtn"); const bar = b && b.closest(".input-bar"); if (b && bar) liteBtnPlace(b, bar); }, 700);
 try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.on('file:changed', liteBtnRefresh); } catch (_) {}
 
-function registerLiteAliasCommand() {
-  // Backwards-compat alias: >>> lite still works after the rename to FAST.
-  if (typeof SandpieCommands === 'undefined') return;
-  const fast = SandpieCommands.get('fast');
-  if (!fast) return;
-  SandpieCommands.register({
-    name: 'lite',
-    module: 'core',
-    help: 'Alias of >>> fast (FAST mode toggle)',
-    usage: '>>> lite [on|off]',
-    run: fast.run
-  });
-}
-
 function registerLiteCommand() {
   if (typeof SandpieCommands === 'undefined') return;
   SandpieCommands.register({
@@ -1891,7 +1877,6 @@ registerDriftCommand();
 registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
-registerLiteAliasCommand();
 registerLiteButton();
 async function loadConv(id) {
   if (id === activeConvId) return;
