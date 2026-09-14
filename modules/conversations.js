@@ -708,6 +708,26 @@ document.addEventListener('selectionchange', () => {
   if (acts) acts.classList.add('show');
 });
 
+// Click-to-open: a plain click (no text selection) on a user bubble toggles
+// its toolbar, so the actions are reachable without selecting text. Only one
+// toolbar is open at a time; clicking anywhere else closes it. A click that
+// ends a drag-selection is ignored — selectionchange already handled it.
+document.addEventListener('click', (e) => {
+  const msg = e.target.closest?.('.msg.user');
+  const openActs = document.querySelectorAll('.msg.user > .msg-actions.show');
+  if (!msg) {
+    openActs.forEach(a => a.classList.remove('show'));
+    return;
+  }
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.isCollapsed && msg.contains(sel.getRangeAt(0).commonAncestorContainer)) return;
+  const acts = msg.querySelector(':scope > .msg-actions');
+  if (!acts) return;
+  const wasOpen = acts.classList.contains('show');
+  openActs.forEach(a => a.classList.remove('show'));
+  if (!wasOpen) acts.classList.add('show');
+});
+
 function renderHistoricalMessage(m, host = null) {
   // STRICT parentage (2026-09-13 follow-up): every caller passes a real host
   // (a conv-host or a detached fragment). A null host used to fall back to the
