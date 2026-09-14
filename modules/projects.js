@@ -124,6 +124,7 @@
         loc = null;
         crumbs.textContent = 'Dropbox';
         useBtn.style.visibility = 'hidden'; newBtn.style.visibility = 'hidden';
+        hideNameRow();
         browser.replaceChildren();
         browser.appendChild(rowEl('My Dropbox', () => navigate({ team: false, path: '' }), true));
         browser.appendChild(rowEl('Team folders', async () => {
@@ -145,6 +146,7 @@
         loc = next;
         crumbs.textContent = (next.team ? 'Team ' : '') + (next.path || '/');
         useBtn.style.visibility = 'visible'; newBtn.style.visibility = 'visible';
+        showNameRow('Project name', loc.path.split('/').filter(Boolean).pop() || '');
         msg.textContent = 'Loading…';
         let entries = [];
         try { entries = (await prov.cloudList(next.path || '', false, { team: next.team })) || []; }
@@ -161,37 +163,60 @@
         }
       }
 
+      // Inline name field (no browser prompt): a slim row above the buttons.
+      // Prefilled with the current folder's name; "Use this folder" submits it.
+      const btns = back.querySelector('.share-modal-btns');
+      const nameRow = document.createElement('div');
+      nameRow.style.cssText = 'display:none;gap:.4rem;align-items:center;margin-top:.6rem';
+      nameRow.innerHTML =
+        '<input class="proj-name-input" placeholder="Project name" style="flex:1;padding:.4rem .6rem;background:var(--bg,#111);border:1px solid var(--border,#333);border-radius:6px;color:inherit;font:inherit;font-size:.85rem" />' +
+        '<span class="proj-name-hint" style="font-size:.65rem;opacity:.6;white-space:nowrap">↵ or Use this folder</span>';
+      btns.parentNode.insertBefore(nameRow, btns);
+      const nameInput = nameRow.querySelector('.proj-name-input');
+      const showNameRow = (placeholder, value, onSubmit) => {
+        nameRow.style.display = 'flex';
+        nameInput.placeholder = placeholder;
+        nameInput.value = value || '';
+        nameRow._onSubmit = onSubmit;
+        setTimeout(() => nameInput.focus(), 0);
+      };
+      const hideNameRow = () => { nameRow.style.display = 'none'; nameRow._onSubmit = null; };
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && nameRow._onSubmit) { e.preventDefault(); nameRow._onSubmit(nameInput.value.trim()); }
+        if (e.key === 'Escape') { e.stopPropagation(); hideNameRow(); }
+      });
       useBtn.onclick = () => {
         if (!loc || !loc.path) { msg.textContent = 'Open a folder first (the Dropbox root itself can\'t be a project).'; return; }
-        close({ name: loc.path.split('/').filter(Boolean).pop(), root: loc.path, ns: loc.team ? 'team' : 'home' });
+        const nm = nameInput.value.trim();
+        close({ name: nm || (loc.path.split('/').filter(Boolean).pop()), root: loc.path, ns: loc.team ? 'team' : 'home' });
       };
       newBtn.onclick = async () => {
         if (!loc) { msg.textContent = 'Open a location first.'; return; }
         if (!prov.cloudMkdir) { msg.textContent = 'Folder creation not available on this provider.'; return; }
-        const name = (prompt('New folder name:') || '').trim();
-        if (!name) return;
-        const full = (loc.path || '') + '/' + name;
-        msg.textContent = 'Creating…';
-        try {
-          await prov.cloudMkdir(full, { team: loc.team });
-          msg.textContent = '';
-          navigate({ team: loc.team, path: full });
-        } catch (e) { msg.textContent = 'Create failed: ' + ((e && e.message) || e); }
+        showNameRow('New folder name', '', async (nm) => {
+          if (!nm) return;
+          const full = (loc.path || '') + '/' + nm;
+          msg.textContent = 'Creating…';
+          try {
+            await prov.cloudMkdir(full, { team: loc.team });
+            msg.textContent = '';
+            hideNameRow();
+            navigate({ team: loc.team, path: full });
+          } catch (e) { msg.textContent = 'Create failed: ' + ((e && e.message) || e); }
+        });
       };
 
       navigate({ team: true, path: '' });   // start at the team root (most projects live there)
     });
   }
 
-  // New-project flow: pick a folder, name it, register it. Returns the created
-  // project (or null if cancelled). Binding to the current conversation is the
-  // caller's job (conversations.js).
+  // New-project flow: pick a folder (naming it inline in the same modal),
+  // register it. Returns the created project (or null if cancelled). Binding to
+  // the current conversation is the caller's job (conversations.js).
   async function newProjectFlow() {
     const picked = await pickFolder();
     if (!picked) return null;
-    let name = (prompt('Project name:', picked.name) || '').trim();
-    if (!name) name = picked.name;
-    return await create(name, picked.root, picked.ns);
+    return await create(picked.name, picked.root, picked.ns);
   }
 
   window.SandpieProjects = {
