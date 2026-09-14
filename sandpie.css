@@ -497,6 +497,9 @@
   .msg { position: relative; }
   .msg-actions {
     position: absolute; z-index: 6; bottom: -34px; right: 8px;
+  }
+  .msg.assistant > .msg-actions { right: auto; left: 8px; }
+  .msg-actions {
     display: flex; align-items: center; gap: 2px;
     background: var(--sp-panel); border: 1px solid var(--sp-border-bright);
     border-radius: 8px; padding: 2px;
@@ -2746,10 +2749,6 @@ ul.conv-list li.active {
   box-shadow: 0 1px 2px rgba(0,0,0,0.4);
   transition: all 0.2s;
   border-left: none;
-}
-[data-theme="electric"] .assistant:hover {
-  border-color: var(--sp-border-bright);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 [data-theme="electric"] .assistant code {
   padding: 0.15em 0.35em;
