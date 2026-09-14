@@ -550,6 +550,15 @@ const RUN_PYTHON_WALIOS = (() => {
 // COOP/COEP headers) -- and nothing else, so it is not Chromium-only. Without
 // isolation there is no SharedArrayBuffer and the OS cannot start; fall back to Pyodide.
 //
+// Since 2026-09-14 run_python is walios, full stop -- there is no preference and no
+// opt-in any more. It is a real CPython 3.14 kept WARM between calls (imports and
+// globals persist: a reused import measured ~3ms against ~650ms for a fresh
+// interpreter), with real sockets/TLS and the heavy packages built in.
+//
+// Pyodide is deliberately still here, as the one thing it is now for: the fallback for
+// a page that is NOT cross-origin isolated, where SharedArrayBuffer does not exist and
+// the OS genuinely cannot start. That is the only way to land on it.
+//
 // THE SAME predicate must decide the tool DESCRIPTION and the tool's actual BACKEND, or
 // the model is told walios's rules while running on Pyodide — that exact mismatch was a
 // real bug once already. conversations.js calls SandpieTools.waliosPython() for the
@@ -559,15 +568,11 @@ function _waliosCapable() {
 }
 let _waliosWarned = false;
 function _waliosPython() {
-  let want = false;
-  try { want = (localStorage.getItem('sandpie-python-backend') || '').trim() === 'walios'; }
-  catch (_) { return false; }
-  if (!want) return false;
   if (_waliosCapable()) return true;
   if (!_waliosWarned) {
     _waliosWarned = true;
-    console.warn('[sandpie] python backend "walios" requested but this page has no SharedArrayBuffer '
-                 + '(not cross-origin isolated) — falling back to Pyodide.');
+    console.warn('[sandpie] this page has no SharedArrayBuffer (not cross-origin isolated), '
+                 + 'so the walios python backend cannot start — falling back to Pyodide.');
   }
   return false;
 }

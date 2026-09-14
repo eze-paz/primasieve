@@ -4244,19 +4244,20 @@ async function buildAgentConfig(convMessages, compaction, curTodos, convId) {
     // The user attached an image to a text-only model: the worker's vision pre-step
     // describes it via vision.fallback (below) before the loop. Marks the user bubble.
     routedViaVision: !!routedViaVision,
-    // Python backend for run_python. Default (unset/anything else) = Pyodide.
-    // localStorage 'sandpie-python-backend' = 'walios' routes run_python at the
-    // WARM walios interpreter instead: native-wasm numpy/pandas/matplotlib with
-    // imports paid once per session rather than once per call. Staged as a shadow
-    // backend so the default path is untouched.
-    // Asks SandpieTools rather than reading the preference directly: walios needs
-    // cross-origin isolation (SharedArrayBuffer) and cannot start without it, so the
-    // answer is preference AND capability — and it must be the SAME answer that picked
-    // the tool description. Not Chromium-only: see _waliosCapable in tools.js, which
-    // tests WebAssembly + SharedArrayBuffer and nothing else.
+    // Python backend for run_python: walios, the WARM interpreter -- native-wasm
+    // numpy/pandas/matplotlib with imports paid once per session rather than once per
+    // call, and globals that survive between calls. There is no preference to set.
+    // Pyodide remains only as the fallback for a page that is not cross-origin isolated,
+    // where SharedArrayBuffer does not exist and walios cannot start.
+    // Asks SandpieTools rather than testing capability here, because it must be the SAME
+    // answer that picked the tool description -- telling the model walios's rules while
+    // running on Pyodide was a real bug once. Not Chromium-only: see _waliosCapable in
+    // tools.js, which tests WebAssembly + SharedArrayBuffer and nothing else.
     pythonBackend: (() => {
       try { if (window.SandpieTools && window.SandpieTools.waliosPython) return window.SandpieTools.waliosPython() ? 'walios' : ''; } catch (_) {}
-      try { return (localStorage.getItem('sandpie-python-backend') || '').trim(); } catch (_) { return ''; }
+      // SandpieTools missing (load failure): mirror its rule rather than silently
+      // disagreeing with whatever description the model was handed.
+      try { return (typeof SharedArrayBuffer === 'function') ? 'walios' : ''; } catch (_) { return ''; }
     })(),
     // web_search primary backend: the first configured OpenRouter provider's
     // endpoint+key (active provider preferred), so the tool gets real Exa-backed

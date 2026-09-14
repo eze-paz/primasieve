@@ -915,7 +915,10 @@ function truncateToolResult(result) {
 // keep streaming — and lets several scripts run in parallel. The pool worker
 // owns file-read/hydration, capture write-back, and error formatting; it also
 // posts opfs-deleted-by-python / sw-opfs-changed back through the manager relay.
-let _pyBackend = 'pyodide';
+// walios unless this context cannot run it (no cross-origin isolation -> no
+// SharedArrayBuffer). An 'agent' run overwrites this from its config; the default has to
+// agree with that rule on its own, or a direct tool call silently runs the other engine.
+let _pyBackend = (typeof SharedArrayBuffer === 'function') ? 'walios' : 'pyodide';
 
 // The run_python description shipped in tools.js describes PYODIDE: ~100 prebuilt wheels,
 // micropip, and "no sockets, use pyfetch". On the walios backend three of those are wrong,

@@ -149,12 +149,10 @@ try {
 
   // ── 2. run_python on walios: import soffice ───────────────────────────────
   console.log('\nrun_python (walios backend): import soffice');
-  // The worker picks the python backend from the config of an 'agent' run, and sets it
-  // as the very first thing it does. There is no other selector, so the test starts an
-  // agent run purely to flip that flag and aborts it immediately -- after which a direct
-  // run_python tool call routes to the warm walios interpreter instead of Pyodide.
+  // walios is the default now, so this no longer SELECTS anything -- it drives the same
+  // config path production uses (an 'agent' run, whose first act is to set the backend)
+  // so the test still fails if that path ever stops saying walios. Aborted immediately.
   await page.evaluate(async () => {
-    localStorage.setItem('sandpie-python-backend', 'walios');
     window._sandpieWorker.postMessage({ type: 'agent', id: 'backend-select', config: { pythonBackend: 'walios', tools: [] } });
     await new Promise(r => setTimeout(r, 300));
     window._sandpieWorker.postMessage({ type: 'abort', id: 'backend-select' });
