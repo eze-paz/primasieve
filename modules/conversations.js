@@ -1910,8 +1910,23 @@ function registerLiteButton() {
     btn.innerHTML = LITE_BOLT_SVG;
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); e.preventDefault();
+      // Home screen (fresh boot / hard refresh): no conversation is mounted
+      // (boot no longer restores the last chat). Instead of dying silently,
+      // materialize a new conversation and toggle FAST on it.
+      if (!activeConvId) {
+        newConversation().then(() => {
+          const cid = activeConvId;
+          if (!cid) return;
+          _setLite(cid, true).then(() => {
+            liteBtnRefresh();
+            try { if (SandpieCommandView) SandpieCommandView.show(
+              'FAST mode is now ON for this conversation.', 'fast');
+            } catch (_) {}
+          }).catch(() => {});
+        }).catch(() => {});
+        return;
+      }
       const cid = activeConvId;
-      if (!cid) return;
       const on = !_liteOn(cid);
       _setLite(cid, on).then(() => {
         liteBtnRefresh();
