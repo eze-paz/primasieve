@@ -264,7 +264,8 @@ WORKER_V = 'sig30';
     // bzip2/bunzip2, unzip, diff/cmp built in. The catalog's GNU tar was `rmt` and its
     // grep/diffutils/findutils were gnulib test helpers (the farm picked the wrong
     // executable); those catalog entries are gone and busybox provides the commands.
-    BUSYBOX: 'busybox.wasm?v=net8',   // net8: CONFIG_FEATURE_WGET_OPENSSL -- `wget https://` works (helper: /bin/openssl)
+    BUSYBOX: 'busybox.wasm?v=net9',   // net8: CONFIG_FEATURE_WGET_OPENSSL -- `wget https://` works (helper: /bin/openssl)
+    //                                net9: FEATURE_TAR_OLDGNU/OLDSUN -- tar reads v7-format archives (jq's)
     async runMessage(o) {
       const base = o.base || '/walios/';
       const bb = o.busybox || this.BUSYBOX;
