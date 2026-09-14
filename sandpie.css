@@ -766,7 +766,6 @@
     margin-left: auto;
     display: inline-flex; align-items: center; gap: 5px;
     font: inherit; font-size: 0.68rem;
-    color: var(--sp-text-dim);
     padding: 1px 8px; border-radius: 999px; cursor: pointer;
     border: 1px solid transparent; white-space: nowrap;
   }
@@ -793,7 +792,6 @@
   .msg-timer.done .mt-ctx { color: inherit; }   /* ctx was left out: it kept --sp-text-dim while siblings dimmed to the settled grey */
 
   .msg-timer .mt-todos {
-    color: var(--sp-text-dim);   /* matches mt-tok / mt-rate / mt-ctx */
     cursor: pointer;
   }
 
