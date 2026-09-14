@@ -1346,7 +1346,7 @@ ul.conv-list li.active {
     color: var(--sp-rail-ink-hot);
     transform: translateY(-1px);
   }
-  .sb-avatar-svg { width: 20px; height: 20px; margin-left: 6px; }
+  .sb-avatar-svg { width: 20px; height: 20px; }
   /* ── Unseen-completion badge ───────────────────────────────────────────────
      Rides the sidebar toggle. Hidden by default; JS sets [hidden] when the count
      is zero, and the :not([hidden]) rules below opt it back in for exactly the
