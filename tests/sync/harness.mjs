@@ -192,7 +192,14 @@ export function makeWorld(opts = {}) {
     list: async () => [...FS.keys()],
     read: async (rel) => { if (!FS.has(rel)) throw new Error('ENOENT ' + rel); return FS.get(rel); },
     readBytes: async (rel) => enc(FS.get(rel) ?? ''),
-    write: async (rel, text) => { FS.set(rel, String(text)); MT.set(rel, nowMs()); },
+    // bulkDownload writes the downloaded bytes straight through, so accept both
+    // a string and a Uint8Array/ArrayBuffer (String(bytes) would store "111,114,…").
+    write: async (rel, data) => {
+      const text = (data instanceof Uint8Array) ? dec(data)
+        : (data instanceof ArrayBuffer) ? dec(new Uint8Array(data))
+        : String(data);
+      FS.set(rel, text); MT.set(rel, nowMs());
+    },
     remove: async (rel) => {
       FS.delete(rel); MT.delete(rel);
       for (const k of [...FS.keys()]) if (k.startsWith(rel + '/')) { FS.delete(k); MT.delete(k); }
@@ -254,7 +261,49 @@ export function makeWorld(opts = {}) {
     body: elStub(),
     head: elStub(),
   };
-  const indexedDB = { open: () => { const req = {}; setTimeout(() => { if (req.onerror) req.onerror({}); }, 0); return req; } };
+  // Minimal in-memory IndexedDB. Not optional: since commit 3c12314 the cloud
+  // cursor is only advanced once the index has been COMMITTED to IDB, so a stub
+  // that always errors silently degrades every sync to a full re-list and
+  // changes what the cleanup passes see. Backed by shared state so the store
+  // survives world.reload(), like the real thing.
+  if (!S.idb) S.idb = new Map();
+  const fire = (obj, name, arg) => setTimeout(() => { const fn = obj[name]; if (fn) fn(arg || {}); }, 0);
+  const indexedDB = {
+    open(name) {
+      const req = { result: null, error: null };
+      const db = {
+        _stores: S.idb,
+        createObjectStore(store) { if (!S.idb.has(store)) S.idb.set(store, new Map()); return {}; },
+        close() {},
+        transaction(store) {
+          const map = S.idb.get(store) || (S.idb.set(store, new Map()), S.idb.get(store));
+          const tx = { error: null };
+          let pending = 0;
+          const settle = () => { if (--pending === 0) fire(tx, 'oncomplete'); };
+          tx.objectStore = () => ({
+            put(value, key) { pending++; setTimeout(() => { map.set(key, value); settle(); }, 0); return {}; },
+            clear() { pending++; setTimeout(() => { map.clear(); settle(); }, 0); return {}; },
+            get(key) {
+              const r = { result: undefined };
+              pending++;
+              setTimeout(() => { r.result = map.get(key); fire(r, 'onsuccess'); settle(); }, 0);
+              return r;
+            },
+          });
+          // A transaction with no requests still completes.
+          setTimeout(() => { if (pending === 0) fire(tx, 'oncomplete'); }, 0);
+          return tx;
+        },
+      };
+      req.result = db;
+      const fresh = S.idb.size === 0;
+      setTimeout(() => {
+        if (fresh && req.onupgradeneeded) req.onupgradeneeded({});
+        fire(req, 'onsuccess');
+      }, 0);
+      return req;
+    },
+  };
   const crypto = {
     getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = i & 255; return a; },
     subtle: { digest: async () => new ArrayBuffer(32) },
