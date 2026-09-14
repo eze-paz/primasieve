@@ -91,8 +91,20 @@ function main(rt, sys, arena) {
     rt.realm.global.process = process;
   }
 
-  const out = (s) => { try { stdout.write(s); } catch (_) { /* fd gone */ } };
-  const errOut = (s) => { try { stderr.write(s); } catch (_) {} };
+  // Do NOT swallow write failures. Swallowing them is why a broken stdout showed up
+  // as a blank screen and exit 0 instead of an error: `node -v` "succeeded" silently.
+  // If stdout is unusable, say so on fd 2 by the rawest means available.
+  const rawFd = (fd, s) => {
+    try {
+      const b = new TextEncoder().encode(s);
+      const p = arena.bytes(b);
+      sys.write(fd, p, b.length);
+      arena.reset();
+    } catch (_) { /* truly nothing left */ }
+  };
+  const out = (s) => { try { stdout.write(s); } catch (e) { rawFd(2, 'node: stdout write failed: ' + (e && e.message) + '
+'); } };
+  const errOut = (s) => { try { stderr.write(s); } catch (e) { rawFd(2, s); } };
 
   // argv[0] is the interpreter; walios passes the program name there.
   const args = argv.slice(1);

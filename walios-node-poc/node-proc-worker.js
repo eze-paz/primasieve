@@ -143,12 +143,50 @@ function runNode() {
   const { main } = require('./node-main.js');
 
   const sys = makeSyscalls(names, hostCall);
-  // Arena starts above 0 so a stray null-pointer write is not silently legal.
   const arena = makeArena(memory, 1 << 16);
-  const vfs = new KernelVfs(sys, arena);
-  const rt = boot(null, { sources: libSources, vfs });
 
-  const code = main(rt, sys, arena);
+  // Unbuffered diagnostic straight to fd 2 -- no node streams, no buffering, no
+  // event loop. If node's own stdout is broken this still gets through.
+  const DEBUG = true;
+  const raw = (s2) => {
+    if (!DEBUG) return;
+    try {
+      const b = new TextEncoder().encode('[node-dbg] ' + s2 + String.fromCharCode(10));
+      const p2 = arena.bytes(b);
+      sys.write(2, p2, b.length);
+      arena.reset();
+    } catch (_) { /* nothing we can do */ }
+  };
+
+  raw('runNode entered; names=' + names.length + ' libSources=' + (libSources ? Object.keys(libSources).length : 'NULL'));
+
+  let vfs, rt;
+  try {
+    vfs = new KernelVfs(sys, arena);
+    raw('vfs built; probing SYS_write on fd 1');
+    // Does a bare write to stdout work at all, before node is involved?
+    const probe = new TextEncoder().encode('');
+    const pp = arena.bytes(probe);
+    const wrote = Number(sys.write(1, pp, 0));
+    arena.reset();
+    raw('bare SYS_write(1, "", 0) returned ' + wrote);
+
+    rt = boot(null, { sources: libSources, vfs });
+    raw('boot ok; lib modules=' + rt.trace.loaded.length);
+  } catch (e) {
+    raw('BOOT FAILED: ' + ((e && e.stack) || e));
+    return 70;
+  }
+
+  let code;
+  try {
+    code = main(rt, sys, arena);
+    raw('main returned ' + code + '; syscalls=' + vfs.calls);
+  } catch (e) {
+    raw('MAIN THREW: ' + String((e && e.stack) || e).slice(0, 600));
+    return 70;
+  }
+
   self.postMessage({ t: 'result', code, calls: vfs.calls,
                      loaded: rt.trace.loaded.length, bindings: rt.trace.bindings.size });
   return code;
