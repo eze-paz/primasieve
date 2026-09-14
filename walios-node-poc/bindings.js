@@ -5,6 +5,7 @@
 const { VfsError } = require('./vfs.js');
 const CONST = require('./constants.json');
 const { makeBufferBinding } = require('./buffer-binding.js');
+const { makeTcpWrap } = require('./tcp-wrap.js');
 
 // privateSymbols is read off internalBinding('util') (lib/internal/errors.js:939),
 // and must be STABLE across reads -- a fresh Symbol per access silently breaks
@@ -13,6 +14,9 @@ const PRIVATE_SYMBOLS = new Proxy({}, (() => {
   const made = new Map();
   return { get: (t, k) => { const s = String(k); if (!made.has(s)) made.set(s, Symbol(s)); return made.get(s); } };
 })());
+
+// One array, shared by internalBinding('stream_wrap') and tcp_wrap.
+const STREAM_BASE_STATE = new Int32Array(8);
 
 const HRTIME_AB = new ArrayBuffer(16);
 const HRTIME_BUF = new Uint32Array(HRTIME_AB);
@@ -389,6 +393,26 @@ function makeBindings(vfs, trace, realm) {
       },
       compileFunction: (content, filename, ...rest) => new Function(content),
     },
+    // stream_base's shared scratch: node reads read/write results out of this array
+    // rather than returning them, so tcp_wrap and the binding must share one copy.
+    // Real sockets. node's own lib/net.js and lib/_http_*.js run on top of this, so
+    // `net` and `http` stop being modules we own and become modules walios serves.
+    tcp_wrap: (() => {
+      if (!realm.sys || !realm.mem) return null;       // headless callers without a kernel
+      return makeTcpWrap(realm.sys, realm.mem, {
+        streamBaseState: STREAM_BASE_STATE,
+        kReadBytesOrError: 0, kArrayBufferOffset: 1, kBytesWritten: 2, kLastWriteWasAsync: 3,
+        getBuffer: () => realm.Buffer,
+        pending: realm.pending,
+        uvErrno: { UV_EOF: -4095 },
+      });
+    })(),
+    stream_wrap: {
+      streamBaseState: STREAM_BASE_STATE,
+      kReadBytesOrError: 0, kArrayBufferOffset: 1, kBytesWritten: 2,
+      kLastWriteWasAsync: 3, kNumStreamBaseStateFields: 4,
+      WriteWrap: function WriteWrap() {}, ShutdownWrap: function ShutdownWrap() {},
+    },
     os: { getHostname: () => 'walios', getOSInformation: () => ['Linux', 'walios', '6.0.0-wasm'], getCPUs: () => [], getFreeMem: () => 2 ** 30, getTotalMem: () => 2 ** 31, getUptime: () => performance.now() / 1000, getLoadAvg: (a) => { a[0] = a[1] = a[2] = 0; }, getInterfaceAddresses: () => [], getHomeDirectory: () => '/root', getUserInfo: () => ({ uid: 0, gid: 0, username: 'root', homedir: '/root', shell: '/bin/sh' }), setPriority: () => 0, getPriority: () => 0, getAvailableParallelism: () => 4, isBigEndian: false },
   };
 
@@ -410,7 +434,7 @@ function makeBindings(vfs, trace, realm) {
     trace.bindings.add(name);
     if (seen.has(name)) return seen.get(name);
     let b = table[name];
-    if (!b) { trace.stubbed.add(name); b = stub(name); }
+    if (!b) { trace.stubbed.add(name); b = stub(name); }   // includes tcp_wrap when no kernel
     else {
       b = new Proxy(b, {
         get(t, k) {

@@ -19,7 +19,10 @@ function boot(libDir, opts = {}) {
   const trace = { bindings: new Set(), stubbed: new Set(), used: new Set(), missing: new Set(), loaded: [], stderr: [] };
   const vfs = opts.vfs || new Vfs();
   // Filled in below; the bindings close over it so user code sees OUR realm globals.
-  const realm = {};
+  // Outstanding async work, so the process can wait for it instead of exiting the
+  // instant main() returns. Declared here because tcp_wrap captures it at construction.
+  const pending = { n: 0, onError: (e) => { throw e; } };
+  const realm = { sys: opts.sys || null, mem: opts.mem || null, pending };
   const internalBinding = makeBindings(vfs, trace, realm);
 
   // ---- primordials: node's own file, run as node runs it --------------------
@@ -34,9 +37,7 @@ function boot(libDir, opts = {}) {
   // ---- a minimal process object (Phase 1 replaces this with the real bootstrap)
   const listeners = new Map();
   const tickQueue = [];
-  // Outstanding async work, so the process can wait for it instead of exiting the
-  // instant main() returns. Timers and nextTick both register here.
-  const pending = { n: 0, onError: (e) => { throw e; } };
+
   const process = {
     platform: 'linux', arch: 'wasm32',
     version: 'v22.23.2',
@@ -213,7 +214,7 @@ function boot(libDir, opts = {}) {
   if (opts.shimFactories) {
     try {
       const EE = requireBuiltin('events');
-      Object.assign(shims, opts.shimFactories(EE, requireBuiltin, pending));
+      Object.assign(shims, opts.shimFactories({ EventEmitter: EE, require: requireBuiltin, pending, sys: opts.sys, mem: opts.mem }));
     } catch (e) { trace.stderr.push('shim wiring failed: ' + e.message); }
   }
 

@@ -122,8 +122,9 @@ function makeModule(defaultProtocol, EventEmitter, pending) {
 
 // node's EventEmitter comes from the guest's own lib/, so it is injected rather than
 // imported -- this file has no access to the builtin loader.
+// Only https. Plain http goes through node's own lib/http.js on real sockets now.
 function install(EventEmitter, pending) {
-  return { http: makeModule('http:', EventEmitter, pending), https: makeModule('https:', EventEmitter, pending) };
+  return { https: makeModule('https:', EventEmitter, pending) };
 }
 
 module.exports = { install };

@@ -50,4 +50,20 @@ echo "--- require the installed package ---"
 echo 'console.log("[" + require("/node_modules/left-pad")("42", 8, "0") + "]")' > /tmp/use.js
 node /tmp/use.js
 
+echo "--- net.connect over REAL walios sockets ---"
+cat > /tmp/net.js <<'NETEOF'
+// node's own lib/net.js on walios socket syscalls -- no fetch, no shim.
+const net = require('net');
+const CRLF = String.fromCharCode(13, 10);
+const s = net.connect(80, 'example.com', () => {
+  s.write('HEAD / HTTP/1.0' + CRLF + 'Host: example.com' + CRLF + CRLF);
+});
+let got = '';
+s.setEncoding('utf8');
+s.on('data', (d) => { got += d; });
+s.on('end', () => console.log('NET-CONNECT-OK ' + got.split(CRLF)[0]));
+s.on('error', (e) => console.log('net failed: ' + e.message));
+NETEOF
+node /tmp/net.js
+
 echo "--- done ---"

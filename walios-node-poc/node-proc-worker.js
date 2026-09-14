@@ -98,6 +98,21 @@ function __unused_makeOut(sys, arena) {
   };
 }
 
+// node's lib/ assumes a current V8. Chromium in CI can be a few versions behind, and
+// lib/http.js calls methods.toSorted() at module scope -- so `require("http")` threw
+// "methods.toSorted is not a function" and took the whole module with it. Polyfill the
+// small, well-defined change-array-by-copy methods rather than pin a browser.
+for (const [name, impl] of [
+  ['toSorted', function (cmp) { return Array.prototype.slice.call(this).sort(cmp); }],
+  ['toReversed', function () { return Array.prototype.slice.call(this).reverse(); }],
+  ['toSpliced', function (...a) { const c = Array.prototype.slice.call(this); c.splice(...a); return c; }],
+  ['with', function (i, v) { const c = Array.prototype.slice.call(this); c[i < 0 ? c.length + i : i] = v; return c; }],
+]) {
+  if (typeof Array.prototype[name] !== 'function') {
+    Object.defineProperty(Array.prototype, name, { value: impl, writable: true, configurable: true });
+  }
+}
+
 self.onmessage = async (ev) => {
   const m = ev.data;
 
@@ -200,7 +215,7 @@ function runNode() {
   try {
     vfs = new KernelVfs(sys, arena);
 
-    rt = boot(null, { sources: libSources, vfs, shimFactories });
+    rt = boot(null, { sources: libSources, vfs, shimFactories, sys, mem: arena });
     raw('boot ok; lib modules=' + rt.trace.loaded.length);
   } catch (e) {
     raw('BOOT FAILED: ' + ((e && e.stack) || e));

@@ -2,12 +2,14 @@
 // SharedArrayBuffer -- and therefore the whole walios kernel -- requires COOP/COEP.
 //   node walios-node-poc/serve.mjs   ->  http://localhost:8788/walios-node-poc/
 import { createServer } from 'node:http';
+import { connect as tcpConnect } from 'node:net';
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8788);
+const WISP_PORT = Number(process.env.WISP_PORT || 6970);
 
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
@@ -38,6 +40,23 @@ createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('404 ' + url + '\n');
   }
+}).on('upgrade', (req, sock, head) => {
+  // Transparent TCP proxy for the WISP relay. The kernel's wisp-worker defaults to
+  // ws://<origin>/wisp, so real sockets only work if this origin answers there.
+  // Start the relay with:
+  //   WISP_ENABLED=1 node ../sandpie-server/scripts/wisp-standalone.mjs 6970
+  if (!req.url.startsWith('/wisp')) { sock.destroy(); return; }
+  const up = tcpConnect(WISP_PORT, '127.0.0.1', () => {
+    // CRLF built from char codes: this file has been mangled twice by escapes.
+    const CRLF = String.fromCharCode(13, 10);
+    const head0 = req.method + ' ' + req.url + ' HTTP/1.1' + CRLF
+      + Object.entries(req.headers).map(([k, v]) => k + ': ' + v).join(CRLF) + CRLF + CRLF;
+    up.write(head0);
+    if (head && head.length) up.write(head);
+    sock.pipe(up); up.pipe(sock);
+  });
+  up.on('error', () => sock.destroy());
+  sock.on('error', () => up.destroy());
 }).listen(PORT, () => {
   console.log('serving ' + ROOT);
   console.log('  http://localhost:' + PORT + '/walios-node-poc/');

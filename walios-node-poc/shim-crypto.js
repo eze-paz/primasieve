@@ -198,12 +198,18 @@ class Hash {
   }
 }
 
+// getrandom(2) when the runtime wires it -- the Linux path, same source of entropy
+// every other walios guest gets. Falls back to the engine's CSPRNG when absent (the
+// headless tests construct this module directly).
+let SYS_RANDOM = null;
+
 module.exports = {
+  useSyscalls: (fn) => { SYS_RANDOM = fn; },
   createHash: (algo) => new Hash(algo),
   getHashes: () => ['sha1', 'sha256', 'sha512'],
   randomBytes: (n, cb) => {
     const b = new Uint8Array(n);
-    crypto.getRandomValues(b);
+    if (SYS_RANDOM) SYS_RANDOM(b); else crypto.getRandomValues(b);
     if (cb) { cb(null, b); return undefined; }
     return b;
   },

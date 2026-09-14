@@ -38,20 +38,41 @@ what proves the pieces work:
 | decompress | `shim-zlib.js` — `DecompressionStream` |
 | unpack + write | tar reader + real `SYS_open`/`write` |
 
-### Three modules are REPLACED, not run from node's source
+### What goes through syscalls, and what cannot
 
-Everything else in walios-node is node's own `lib/`. These three are front ends for
-things the platform does natively and we cannot port:
+The rule: anything walios already serves as a Linux syscall should be a *binding*, not
+a module we own. A binding is ~50 lines and inherits everything the kernel does; a
+shim is a module we maintain forever.
 
-- **crypto** is OpenSSL. npm needs a hash, not a cipher suite, so this implements
-  sha1/sha256/sha512 directly (SubtleCrypto is async; `createHash().digest()` is not).
-- **https** is OpenSSL over TCP. `fetch()` already does TLS with the platform trust
-  store. The cost is CORS: registry.npmjs.org sends `Access-Control-Allow-Origin: *`
-  for metadata *and* tarballs, which is why this works; an arbitrary host may not.
-- **zlib** is a native inflate. `DecompressionStream` is real and correct, but async,
-  so `gunzipSync` throws a directive rather than a wrong answer.
+| area | how | why |
+|---|---|---|
+| fs | **syscalls** | open/read/write/stat/getdents64 |
+| sockets | **syscalls** | `tcp-wrap.js` on socket/connect/sendto/recvfrom — node's own `net.js` runs on it |
+| randomBytes | **syscall** | `getrandom(2)`, same entropy every other guest gets |
+| hashing | JS | not I/O. There is no hash syscall; sha1/256/512 are computation, NIST-verified |
+| TLS (`https`) | `fetch()` | see below |
+| inflate (`zlib`) | `DecompressionStream` | native, correct, but async |
 
-## `walios:/root$ node`
+**Why TLS cannot be a syscall.** walios *does* have OpenSSL compiled to wasm — python's
+`_ssl.cpython-314-x86_64-linux-gnu.so` is right there in `walios-extras.tar.gz`. But
+`dlopen` links a side module against the **main module's** memory, function table,
+`__stack_pointer` and libc (see `wali-proc-worker.js`), and a JS process has no main
+module. So a JS guest cannot load `_ssl.so` the way python does, and `https` stays on
+`fetch()` — which brings TLS with the platform trust store, and CORS as the price.
+
+### `net` works; `http` needs one more binding
+
+`net.connect` goes through real socket syscalls and reaches DNS, where it stops:
+node's `dns` uses `cares_wrap` (c-ares) and the kernel has no `getaddrinfo` — its
+`sockaddr` carries only an address, and `connect` hands `"<ip>|<port>"` to wisp. So
+name resolution is the next piece, not a wall.
+
+`http` additionally needs `http_parser` (llhttp). Until then `require('http')` fails on
+`methods.toSorted` — because `http_parser` is stubbed, so `methods` is a stub function
+rather than an array. `shim-http.js` now provides **only** `https`; the `http` shim is
+deleted, because node's own `_http_*.js` should ride on `net`.
+
+## `walios:/root$ node`## `walios:/root$ node`
 
 The whole point, captured from an actual pty session in `test-browser.mjs`:
 

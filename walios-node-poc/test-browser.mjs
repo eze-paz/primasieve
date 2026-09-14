@@ -32,7 +32,20 @@ server.stderr.on('data', (d) => { serverLog += d; });
 const stop = () => { try { server.kill(); } catch (_) {} };
 process.on('exit', stop);
 
-await new Promise((r) => setTimeout(r, 600));
+// The WISP relay: without it the kernel has no egress and `net`/`http` cannot work.
+// serve.mjs proxies /wisp to it. Permissive allow-list because this is a local test.
+const wisp = spawn(process.execPath, ['../sandpie-server/scripts/wisp-standalone.mjs', '6970'], {
+  cwd: new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+  env: { ...process.env, WISP_ENABLED: '1', WISP_ALLOW_HOSTS: '*', WISP_ALLOW_PORTS: '80,443', WISP_ALLOW_ORIGINS: '*' },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let wispLog = '';
+wisp.stdout.on('data', (d) => { wispLog += d; });
+wisp.stderr.on('data', (d) => { wispLog += d; });
+const stopWisp = () => { try { wisp.kill(); } catch (_) {} };
+process.on('exit', stopWisp);
+
+await new Promise((r) => setTimeout(r, 900));
 
 // ---- browser ----------------------------------------------------------------
 const browser = await chromium.launch({ headless: !HEADED });
@@ -106,6 +119,7 @@ await page2.close();
 
 await browser.close();
 stop();
+stopWisp();
 
 // ---- verdict ----------------------------------------------------------------
 const all = outText + errText;
@@ -130,6 +144,7 @@ const checks = [
   ['npm-lite installed from the real registry', /installed left-pad@1\.3\.0/.test(outText)],
   ['tarball sha512 was verified', /integrity sha512 ok/.test(outText)],
   ['the installed package runs', /\[00000042\]/.test(outText)],
+  ['net.connect over REAL sockets', /NET-CONNECT-OK/.test(outText)],
 ];
 console.log('\n================ verdict ================');
 let pass = 0;

@@ -55,11 +55,31 @@ function makeArena(mem, base) {
   return api;
 }
 
+// THE canonical syscall list. mkstub.mjs builds node-stub.wasm from it and every
+// harness derives its `names` from it, so the stub's imports and the tests cannot
+// drift apart -- which they did: sockets and getrandom were in the stub but missing
+// from the test harnesses, and crypto.randomBytes failed only under test.
 const SYSCALL_NAMES = [
-  'open', 'close', 'read', 'write', 'lseek', 'fstat', 'stat', 'lstat',
-  'mkdir', 'rmdir', 'unlink', 'getdents64', 'access', 'rename',
-  'ftruncate', 'fsync', 'chdir', 'getcwd', 'exit_group', 'ioctl', 'dup', 'fcntl',
+  // files
+  'open', 'openat', 'close', 'read', 'write', 'lseek', 'fstat', 'stat', 'lstat',
+  'newfstatat', 'mkdir', 'rmdir', 'unlink', 'getdents64', 'access', 'rename',
+  'ftruncate', 'fsync', 'readlink', 'chdir', 'getcwd',
+  // descriptors / terminals
+  'ioctl', 'dup', 'fcntl',
+  // sockets -- net and http ride on these
+  'socket', 'connect', 'bind', 'listen', 'accept4', 'sendto', 'recvfrom',
+  'setsockopt', 'getsockopt', 'shutdown',
+  // misc
+  'getrandom', 'exit_group', 'exit',
 ];
+
+// The non-SYS_ imports WALI uses for argv and exit.
+const WALI_NAMES = ['__cl_get_argc', '__cl_get_argv_len', '__cl_copy_argv', '__proc_exit'];
+
+// The full `names` array the kernel would hand a process, in stub-import order.
+function importNames() {
+  return [...SYSCALL_NAMES.map((n) => 'wali.SYS_' + n), ...WALI_NAMES.map((n) => 'wali.' + n)];
+}
 
 // names[] is the kernel-supplied import list; syscalls are addressed by index into it.
 function makeSyscalls(names, hostCall) {
@@ -82,4 +102,4 @@ function makeSyscalls(names, hostCall) {
   return sys;
 }
 
-module.exports = { makeHostCall, makeArena, makeSyscalls, ProcExit, SYSCALL_NAMES, ARGS, RET, ST_IDLE, ST_REQ, ST_REPLY, ST_DONE, ST_DIE };
+module.exports = { makeHostCall, makeArena, makeSyscalls, ProcExit, SYSCALL_NAMES, WALI_NAMES, importNames, ARGS, RET, ST_IDLE, ST_REQ, ST_REPLY, ST_DONE, ST_DIE };

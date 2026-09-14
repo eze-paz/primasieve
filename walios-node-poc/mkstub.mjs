@@ -7,6 +7,8 @@
 // the signature plumbing. node-proc-worker.js never instantiates it -- it only reads
 // the `names` array the kernel builds from it and calls hostCall() by index.
 import { writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+const { SYSCALL_NAMES } = createRequire(import.meta.url)('./syscall-bridge.js');
 
 // WALI: pointers/fds/flags are i32, syscalls return i64.
 const I32 = 0x7f, I64 = 0x7e;
@@ -15,6 +17,10 @@ const SYSCALLS = [
   ['lseek', 3], ['fstat', 2], ['stat', 2], ['lstat', 2], ['newfstatat', 4],
   ['mkdir', 2], ['rmdir', 1], ['unlink', 1], ['getdents64', 3], ['access', 2],
   ['ioctl', 3], ['dup', 1], ['fcntl', 3],
+  // sockets: net/http go through these, exactly as python and git do
+  ['socket', 3], ['connect', 3], ['bind', 3], ['listen', 2], ['accept4', 4],
+  ['sendto', 6], ['recvfrom', 6], ['setsockopt', 5], ['getsockopt', 5], ['shutdown', 2],
+  ['getrandom', 3],
   ['rename', 2], ['ftruncate', 2], ['fsync', 1], ['readlink', 3], ['chdir', 1],
   ['getcwd', 2], ['exit_group', 1], ['exit', 1],
 ];
@@ -65,6 +71,19 @@ const funcs = [...uleb(1), ...uleb(startType)];
 const exports_ = vec([[...str('_start'), 0x00, ...uleb(SYSCALLS.length + WALI_MISC.length)]]);
 const body = [...uleb(0), 0x0b];                         // no locals, end
 const code = vec([[...uleb(body.length), ...body]]);
+
+// Guard: the stub must declare exactly the canonical list, or a harness will build a
+// `names` array that does not match the stub's imports and syscalls silently vanish.
+{
+  const declared = SYSCALLS.map(([n]) => n).sort().join(',');
+  const canonical = [...SYSCALL_NAMES].sort().join(',');
+  if (declared !== canonical) {
+    console.error('MISMATCH with syscall-bridge.js SYSCALL_NAMES');
+    console.error('  only in stub  :', SYSCALLS.map(([n]) => n).filter((n) => !SYSCALL_NAMES.includes(n)).join(' ') || '(none)');
+    console.error('  only in bridge:', SYSCALL_NAMES.filter((n) => !SYSCALLS.some(([m]) => m === n)).join(' ') || '(none)');
+    process.exit(1);
+  }
+}
 
 const wasm = Uint8Array.from([
   0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,        // magic + version
