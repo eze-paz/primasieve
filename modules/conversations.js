@@ -6627,7 +6627,7 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
     // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
     // The reply-language directive below still applies (it is appended after this).
     content = 'You are sandpie, a fast assistant in FAST mode. Answer directly, concisely and completely. '
-      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> fast off. '
+      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and tell the user to press the FAST-mode bolt icon (next to the composer) to turn it off. '
       + 'Do not invent tool results.';
   } else {
     content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
