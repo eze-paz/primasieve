@@ -237,6 +237,7 @@
 
   /* ── wiring ── */
   function boot() {
+    if (window.__spOff && window.__spOff('sky')) return;   // ?off=sky bisect switch
     retheme(); sync();
     // theme switch (data-theme) and custom palettes (#themeOverride <style>) both
     // land in <head>/<html>; re-derive the ramp on either.

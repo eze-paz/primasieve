@@ -447,6 +447,7 @@ const SandpieSpeech = (function () {
   // ── Init — idempotent + self-retrying (mirrors notifications.js) ──
   let _btnDone = false, _panelDone = false;
   function init() {
+    if (window.__spOff && window.__spOff('stt')) return;   // ?off=stt bisect switch
     if (!supported()) return;   // no button, no panel — clean no-op
     if (!_btnDone) _btnDone = injectButton();
     if (!_panelDone && window.SandpieSettings) {

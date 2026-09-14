@@ -2564,9 +2564,17 @@ function _endConvDrag() {
   const w = $('messagesWrap'); if (w) w.classList.remove('drop-target');
   if (_convRefreshPending) { _convRefreshPending = false; refreshConversationList(); }
 }
-// Net for a dragend that reaches a node other than the one carrying the
-// once-listener below (re-render races, drags that leave the window).
-if (typeof document !== 'undefined') document.addEventListener('dragend', _endConvDrag, true);
+// Nets for a drag that never delivers `dragend` to the row that started it
+// (re-render races, drags that leave the window, an OS drag loop that ends
+// without notifying the page). `mouseup`, `pointerdown` and `keydown` cannot
+// fire while a drag is in flight, so any one of them arriving proves the drag is
+// over — without them a missed dragend would freeze the sidebar permanently.
+if (typeof document !== 'undefined') {
+  for (const t of ['dragend', 'mouseup', 'pointerdown', 'keydown']) {
+    document.addEventListener(t, _endConvDrag, true);
+  }
+  window.addEventListener('blur', _endConvDrag);
+}
 function buildConvLi(c, idx) {
 
   const li = document.createElement('li');
