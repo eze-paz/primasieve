@@ -638,6 +638,76 @@ function hydrateLocalRefs(root) {
     });
   }
 }
+/* ---- selection-triggered toolbar on user bubbles ------------------------ */
+function getSelectionTextIn(el) {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return '';
+  const r = sel.getRangeAt(0);
+  if (el.contains(r.commonAncestorContainer)) return sel.toString();
+  return '';
+}
+function hideUserSelToolbar(acts) {
+  acts.classList.remove('show');
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && acts.parentNode && acts.parentNode.contains(sel.getRangeAt(0).commonAncestorContainer)) sel.removeAllRanges();
+}
+function rewindToUserMessage(div) {
+  // Rewind so THIS user message is the last one kept: drop everything after
+  // it (its own assistant reply included) and restore its text in the
+  // composer — the same end state as ">>> rewind N" from the bottom.
+  const s = activeStream();
+  if (!s || !messages.length) return;
+  const host = div.closest('.conv-host') || s.host;
+  if (!host || !host.contains(div)) return;
+  let idx = -1, seen = 0;
+  const hostDivs = [...host.querySelectorAll(':scope > .msg.user')];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'user') continue;
+    if (hostDivs[hostDivs.length - 1 - seen] === div) { idx = i; break; }
+    seen++;
+  }
+  if (idx < 0) return;
+  const m = messages[idx];
+  let txt = '';
+  if (typeof m.content === 'string') txt = m.content;
+  else if (Array.isArray(m.content)) txt = m.content
+    .filter(p => p && p.type === 'text' && p.text).map(p => p.text).join('\n');
+  const removed = messages.length - idx;
+  if (!confirm(`Remove the last ${removed} message(s)?`)) return;
+  if (s.abort) s.abort.abort();
+  messages.length = idx;
+  if (s.compaction && idx <= s.compaction.boundary) s.compaction = null;
+  clearActiveConvUI();
+  renderConversation(messages, s.compaction);
+  const messagesEl = paneScrollEl($('messages'));
+  if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
+  saveActiveConv().catch(() => {});
+  if (txt.trim()) {
+    const ta = (s.host && s.host.parentNode === $('messagesSide')) ? $('inputSide') : $('input');
+    if (ta) {
+      ta.value = txt.trim();
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+      ta.focus();
+    }
+  }
+}
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  document.querySelectorAll('.msg.user > .msg-actions.show').forEach(acts => {
+    const bubble = acts.parentNode.querySelector(':scope > .bubble');
+    if (!bubble) { acts.classList.remove('show'); return; }
+    const inBubble = sel && sel.rangeCount && !sel.isCollapsed && bubble.contains(sel.getRangeAt(0).commonAncestorContainer);
+    if (!inBubble) acts.classList.remove('show');
+  });
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+  const node = sel.getRangeAt(0).commonAncestorContainer;
+  const bubble = (node.nodeType === 1 ? node : node.parentNode)?.closest?.('.msg.user > .bubble');
+  if (!bubble) return;
+  const acts = bubble.parentNode.querySelector(':scope > .msg-actions');
+  if (acts) acts.classList.add('show');
+});
+
 function renderHistoricalMessage(m, host = null) {
   // STRICT parentage (2026-09-13 follow-up): every caller passes a real host
   // (a conv-host or a detached fragment). A null host used to fall back to the
@@ -4628,6 +4698,41 @@ function addMsg(role, text = '', host = null, animate = false) {
       bubble.textContent = text;
     }
     div.appendChild(bubble);
+    if (role === 'user') {
+      // Selection-triggered toolbar (copy / rewind): hidden until the user
+      // selects text inside this bubble. Same .msg-actions/.act-copy material
+      // and icons as the assistant strip; positioned above the bubble.
+      const acts = document.createElement('div');
+      acts.className = 'msg-actions';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'act-copy';
+      copy.title = 'Copy selection';
+      copy.setAttribute('aria-label', 'Copy selection');
+      copy.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/></svg>';
+      copy.addEventListener('click', () => {
+        const sel = getSelectionTextIn(bubble);
+        navigator.clipboard.writeText(sel || bubble.innerText.trim()).then(() => {
+          copy.classList.add('done');
+          const prev = copy.innerHTML;
+          copy.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+          setTimeout(() => { copy.innerHTML = prev; copy.classList.remove('done'); hideUserSelToolbar(acts); }, 1300);
+        }).catch(() => {});
+      });
+      acts.appendChild(copy);
+      const rewind = document.createElement('button');
+      rewind.type = 'button';
+      rewind.className = 'act-copy act-rewind';
+      rewind.title = 'Rewind to this message';
+      rewind.setAttribute('aria-label', 'Rewind to this message');
+      rewind.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>';
+      rewind.addEventListener('click', () => {
+        hideUserSelToolbar(acts);
+        rewindToUserMessage(div);
+      });
+      acts.appendChild(rewind);
+      div.appendChild(acts);
+    }
     if (role === 'assistant') {
       // Hover-reveal copy action: copy this reply as plain text.
       const acts = document.createElement('div');
