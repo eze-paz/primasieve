@@ -65,6 +65,18 @@ export async function run(t) {
     t.ok(!!w.ledger()['work/sh.txt'], 'a walios write is marked dirty via SandpieDbxSyncState.markDirty');
   }
 
+  t.group('engine internals: sync suppression');
+
+  // sync() refuses to run mid-turn so a PULL cannot delete or overwrite files a
+  // turn is still writing. This is a property of the sync pass, not of writing:
+  // with upload-on-write the bytes reach Dropbox during the turn regardless.
+  {
+    const w = await connectedWorld();
+    w.generating = true;
+    const r = await w.sync();
+    t.ok(r && r.ok === false, 'sync refuses to run while a turn is generating', r);
+  }
+
   t.group('engine internals: pre-reload flush');
 
   {

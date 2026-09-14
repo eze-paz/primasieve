@@ -97,19 +97,40 @@ export async function run(t) {
     t.ok(!w.cloudHas('artifacts/d.html'), 'file gone from Dropbox');
   }
 
-  // ── sync is suppressed while a turn generates (current design) ──
+  // ── a write is durable the moment the tool returns ──
+  // The headline of the full-Dropbox refactor: no sync pass in between. Before
+  // step 1 this file sat in OPFS until a sync ran, which could be minutes (sync
+  // is suppressed mid-turn and while the tab is hidden) or never.
+  {
+    const w = await connectedWorld();
+    await w.tools.tool_write_file({ path: 'artifacts/immediate.html', content: 'now' }, CTX);
+    await tick();
+    t.ok(w.cloudText('artifacts/immediate.html') === 'now',
+      'a tool write reaches Dropbox without waiting for a sync', w.where('artifacts/immediate.html'));
+  }
+
+  // ── an edit is durable immediately too ──
+  {
+    const w = await connectedWorld();
+    await w.tools.tool_write_file({ path: 'artifacts/imm-edit.html', content: 'v1' }, CTX);
+    await w.tools.tool_edit_file({ path: 'artifacts/imm-edit.html', old_str: 'v1', new_str: 'v2' }, CTX);
+    await tick();
+    t.ok(w.cloudText('artifacts/imm-edit.html') === 'v2',
+      'an edit reaches Dropbox without waiting for a sync', w.cloudText('artifacts/imm-edit.html'));
+  }
+
+  // ── work written during a turn is durable by the end of it ──
+  // Sync is suppressed while a turn generates, because it must not PULL while
+  // files are being written. Whether the bytes land during the turn (step 1) or
+  // at the end of it (the old engine), the contract is the same.
   {
     const w = await connectedWorld();
     w.generating = true;
     await w.tools.tool_write_file({ path: 'artifacts/g.html', content: 'mid-turn' }, CTX);
-    const r = await w.sync();
-    t.ok(r && r.ok === false, 'sync refuses to run mid-generation', r);
-    t.ok(!w.cloudHas('artifacts/g.html'), 'nothing uploaded while generating');
-
     w.generating = false;
     await settle(w);
     t.ok(w.cloudText('artifacts/g.html') === 'mid-turn',
-      'work written during a turn is uploaded once the turn ends', w.cloudText('artifacts/g.html'));
+      'work written during a turn is in Dropbox by the time it ends', w.cloudText('artifacts/g.html'));
   }
 
   // ── a long turn writing many files still lands everything ──

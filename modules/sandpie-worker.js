@@ -434,6 +434,85 @@ let _pySpawnSeq = 0;
 
 function _pyBroadcast(msg) { for (const s of _pyPool) { try { s.worker.postMessage(msg); } catch (_) {} } }
 
+// -- Direct Dropbox writes (full-Dropbox, step 1) -- DBXPUSH-BEGIN ----------
+// A workspace write IS an upload.
+//
+// Until now a write only marked the file dirty and waited for the page's sync
+// pass. That pass is suppressed while a turn is generating and while the tab is
+// hidden, so the gap between "the tool said Created" and "the bytes are in
+// Dropbox" was routinely minutes. And if the dirty mark never reached
+// dropbox.js (it travels worker -> relay -> a synthetic MessageEvent on
+// navigator.serviceWorker), cleanup Pass 2 deleted the file as an orphan with
+// no error anywhere. Uploading at write time closes the gap and removes the
+// premise of that deletion.
+//
+// Scope: NOT sandpie/*. That subtree stays with the sync engine, which keeps it
+// in OPFS because memory.js and pins.js read it synchronously while building a
+// prompt.
+//
+// Fail-OPEN. A failed upload is logged and swallowed: the file is in OPFS and
+// still marked dirty, so the existing engine remains the retry path. This step
+// only ever ADDS durability.
+function _dbxPushable(rel) {
+  const r = String(rel || '').replace(/^\/+/, '');
+  if (!r) return false;
+  if (r === 'sandpie' || r.startsWith('sandpie/')) return false;   // engine-owned
+  if (r.startsWith('.tokens')) return false;
+  return true;
+}
+// Dropbox-API-Arg must be ASCII: a Catalan folder such as 3_DOCUMENTACIO with
+// an accent is rejected outright unless the non-ASCII is escaped in the header.
+function _dbxArg(obj) {
+  return JSON.stringify(obj).replace(/[\u007f-\uffff]/g, function (c) {
+    return '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0');
+  });
+}
+// One upload. Resolves true when Dropbox has the bytes.
+async function _dbxUploadRel(rel, bytes) {
+  if (!_dbxPushable(rel)) return false;
+  if (!(await _ensureDbxCtx(2000))) return false;
+  const body = bytes || await opfsReadBytes(rel);
+  const arg = { path: _cloudPathFor(rel), mode: 'overwrite', mute: true, autorename: false };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let res;
+    try {
+      res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: Object.assign(_dbxHeaders(false), {
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': _dbxArg(arg),
+        }),
+        body,
+      });
+    } catch (e) {
+      console.warn('[dbxpush] network error for ' + rel + ':', (e && e.message) || e);
+      return false;
+    }
+    if (res.ok) return true;
+    // 429 carries Retry-After and 5xx is worth another try. Anything else is a
+    // real rejection (bad path, no permission) that retrying cannot fix.
+    if (res.status !== 429 && res.status < 500) {
+      console.warn('[dbxpush] upload refused for ' + rel + ': ' + res.status);
+      return false;
+    }
+    const ra = (res.headers && res.headers.get) ? Number(res.headers.get('Retry-After')) : 0;
+    await new Promise(function (r) { setTimeout(r, Math.min(ra || (attempt + 1), 5) * 1000); });
+  }
+  console.warn('[dbxpush] upload gave up after retries: ' + rel);
+  return false;
+}
+// Best-effort push for the postMessage interceptor, so writers this step does
+// not call directly (run_python batches, the walios bridge, office conversion)
+// also land in Dropbox immediately. Fire-and-forget by necessity: the
+// interceptor is synchronous.
+function _dbxPushBestEffort(rels) {
+  for (const rel of rels) {
+    if (!_dbxPushable(rel)) continue;
+    Promise.resolve().then(function () { return _dbxUploadRel(rel); }).catch(function () {});
+  }
+}
+// -- DBXPUSH-END ------------------------------------------------------------
+
 // ── Touched-file tracking (replaces show_artifact) ─────────────────────────
 // Every OPFS write in this worker — direct file tools, copy, python writes
 // relayed from the pool — announces itself to the page as a
@@ -470,6 +549,12 @@ self.postMessage = function (msg, ...rest) {
         if (p.type === 'sw-opfs-changed') { const t = Date.now(); for (const x of p.paths) sink.set(_toOpfsRel(x), t); }
         else if (p.type === 'opfs-deleted-by-python') { for (const x of p.paths) sink.delete(_toOpfsRel(x)); }
       }
+    }
+    // A write IS an upload (see DBXPUSH above). Outside the owner-routing block
+    // on purpose: it must run for EVERY announced write, owner-stamped or not,
+    // so the python, walios and office writers are covered too.
+    if (p && p.type === 'sw-opfs-changed' && Array.isArray(p.paths)) {
+      _dbxPushBestEffort(p.paths.map(_toOpfsRel));
     }
   } catch (_) {}
   return _postRaw(msg, ...rest);

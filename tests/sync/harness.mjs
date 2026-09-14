@@ -45,12 +45,24 @@ function sliceBetween(src, startMarker, endMarker) {
   const end = src.indexOf('\n}\n', j);
   return src.slice(i, end + 3);
 }
+// A block fenced by BEGIN/END markers in the worker source.
+function sliceMarkers(src, begin, end) {
+  const b = src.indexOf(begin), e = src.indexOf(end);
+  if (b < 0 || e < 0) throw new Error('sliceMarkers: ' + begin + ' / ' + end + ' not found');
+  return src.slice(src.lastIndexOf('\n', b) + 1, src.indexOf('\n', e) + 1);
+}
 const srcFnv = extractFrom(workerSrc, 'function _fnv1a(');
 const srcEditHelpers = sliceBetween(workerSrc, 'function _matchEol(', 'function _editReport(');
 const srcWrite = extractFrom(workerSrc, 'async function tool_write_file(');
 const srcEdit = extractFrom(workerSrc, 'async function tool_edit_file(');
 const srcDelete = extractFrom(workerSrc, 'async function tool_delete_file(');
-const TOOL_SRC = srcFnv + srcEditHelpers + srcWrite + srcEdit + srcDelete;
+// Direct-upload path (refactor step 1), plus the two helpers it builds the
+// request from. Real code: a change to the upload contract shows up here.
+const srcDbxPush = sliceMarkers(workerSrc, 'DBXPUSH-BEGIN', 'DBXPUSH-END');
+const srcCloudPath = extractFrom(workerSrc, 'function _cloudPathFor(');
+const srcDbxHeaders = extractFrom(workerSrc, 'function _dbxHeaders(');
+const TOOL_SRC = srcFnv + srcEditHelpers + srcCloudPath + srcDbxHeaders + srcDbxPush
+  + srcWrite + srcEdit + srcDelete;
 
 export const WSROOT = '/sandpie';
 const enc = (s) => new TextEncoder().encode(s);
@@ -386,7 +398,15 @@ export function makeWorld(opts = {}) {
     const _pyBroadcast = () => {};
     const _invalidateFileCache = () => {};
     const _betaOn = () => false;
-    const _ensureDbxCtx = async () => {};
+    const _ensureDbxCtx = async () => true;
+    const _dbxCtx = { token: 'tok', pathRoot: null, teamRoot: null, homeNs: '', workingRoot: '/sandpie' };
+    const _toOpfsRel = (x) => {
+      let r = String(x || '');
+      while (r.startsWith('/')) r = r.slice(1);
+      if (r.startsWith('files/')) r = r.slice(6);
+      else if (r.startsWith('root/')) r = r.slice(5);
+      return r;
+    };
     const _indexEntry = () => null;
     const hydrateAsync = async () => false;
     const _nf = () => { const e = new Error('not found'); e.name = 'NotFoundError'; return e; };
@@ -412,13 +432,27 @@ export function makeWorld(opts = {}) {
       const s = FS.get(rel);
       return { size: new TextEncoder().encode(s).length, text: async () => s };
     };
-    const self = { postMessage: (m) => { POSTED.push(m); relay(m); } };
+    // Mirrors the worker's real postMessage interceptor: every announced write
+    // is also pushed straight to Dropbox (see DBXPUSH in sandpie-worker.js).
+    const self = {
+      postMessage: (m) => {
+        POSTED.push(m);
+        try {
+          const pl = m && m.type === 'forward-to-page' ? m.payload : null;
+          if (pl && pl.type === 'sw-opfs-changed' && Array.isArray(pl.paths)) {
+            _dbxPushBestEffort(pl.paths.map(_toOpfsRel));
+          }
+        } catch (_) {}
+        relay(m);
+      },
+    };
   `;
   world.POSTED = POSTED;
-  world.tools = new Function('FS', 'MT', 'POSTED', 'relay', 'NOW',
+  world.tools = new Function('FS', 'MT', 'POSTED', 'relay', 'NOW', 'fetch', 'console',
     toolGlobals + TOOL_SRC +
-    '\nreturn { tool_write_file, tool_edit_file, tool_delete_file };')(
-    FS, MT, POSTED, relayDispatch, nowMs);
+    '\nreturn { tool_write_file, tool_edit_file, tool_delete_file, _dbxUploadRel, _dbxPushable };')(
+    FS, MT, POSTED, relayDispatch, nowMs, fakeFetch,
+    opts.verbose ? console : { log() {}, info() {}, warn() {}, error() {}, debug() {} });
 
   // A non-tool OPFS writer (pyodide / walios bridge) that marks via the shared
   // ledger module instead of the sw-opfs-changed relay.
