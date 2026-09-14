@@ -227,7 +227,6 @@
   }
 
   function boot() {
-    if (window.__spOff && window.__spOff('rail')) return;   // ?off=rail bisect switch
     // Sidebar: the <aside> is its own scroll container; mount in <body> (made
     // position:relative in sandpie.css) so the rail sits outside the scroller.
     // No ticks — a list of chats has no "turns". Hidden on mobile by CSS: the
