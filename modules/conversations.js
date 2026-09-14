@@ -1357,6 +1357,89 @@ function renderFileBundle(target, bundleFiles) {
   appendContent(target, wrap);
 }
 
+// ===================== Project selector (UI only) =====================
+// A quiet chip at the far right of the msg-timer row, aligned with the
+// composer's right edge. UI-only for now: the list is a static stub and the
+// selection is kept in-memory (per conversation id) until the backend lands.
+// No colors, no search, no keyboard hints - plain names, dashed ghost when
+// the conversation has no project.
+const _PROJECTS_STUB = ['FPI Conectividad', 'Reixach GCO', 'Impagados', 'TECNEC proposals'];
+const _convProjects = new Map();      // convId -> project name (in-memory until persistence lands)
+let _projPanelEl = null;              // singleton picker panel
+let _projPanelFor = null;             // convId the panel was opened for
+
+function _projChipHtml(convId) {
+  const name = _convProjects.get('' + (convId == null ? '' : convId)) || '';
+  return name
+    ? '<span class="mt-proj" title="Project">' + name + '<span class="mt-proj-caret">▾</span></span>'
+    : '<span class="mt-proj none" title="File to project">no project<span class="mt-proj-caret">▾</span></span>';
+}
+// Append (or refresh) the project chip on a timer slot. The timer row is ONE
+// persistent element per pane, rebuilt wholesale by every paint path - so the
+// chip is re-stamped after each rebuild instead of being a separate node.
+function _paintProjChip(slot, convId) {
+  if (!slot) return;
+  let chip = slot.querySelector('.mt-proj');
+  const html = _projChipHtml(convId);
+  if (!chip) {
+    slot.insertAdjacentHTML('beforeend', html);
+    chip = slot.querySelector('.mt-proj');
+    if (chip) chip.addEventListener('click', (e) => { e.stopPropagation(); _toggleProjPanel(chip, convId); });
+  } else {
+    const open = chip.classList.contains('open');
+    chip.outerHTML = open ? html.replace('"mt-proj', '"mt-proj open') : html;
+    const fresh = slot.querySelector('.mt-proj');
+    if (fresh && !fresh._wired) {
+      fresh._wired = true;
+      fresh.addEventListener('click', (e) => { e.stopPropagation(); _toggleProjPanel(fresh, convId); });
+    }
+  }
+}
+function _closeProjPanel() {
+  if (_projPanelEl) { _projPanelEl.remove(); _projPanelEl = null; _projPanelFor = null; }
+  document.querySelectorAll('.mt-proj.open').forEach(el => el.classList.remove('open'));
+}
+function _toggleProjPanel(chip, convId) {
+  if (_projPanelFor === '' + (convId == null ? '' : convId)) { _closeProjPanel(); return; }
+  _closeProjPanel();
+  const r = chip.getBoundingClientRect();
+  const panel = document.createElement('div');
+  panel.className = 'proj-panel mp-panel visible';
+  const current = _convProjects.get('' + (convId == null ? '' : convId)) || '';
+  let html = '';
+  for (const p of _PROJECTS_STUB) {
+    html += '<div class="proj-item' + (p === current ? ' sel' : '') + '" data-proj="' + p + '">' +
+      '<span class="nm">' + p + '</span>' + (p === current ? '<span class="chk">✓</span>' : '') + '</div>';
+  }
+  html += '<div class="proj-item none' + (current === '' ? ' sel' : '') + '" data-proj=""><span class="nm">no project</span></div>';
+  panel.innerHTML = html;
+  panel.addEventListener('click', (e) => {
+    const item = e.target.closest('.proj-item');
+    if (!item) return;
+    e.stopPropagation();
+    const v = item.dataset.proj || '';
+    if (v === '') _convProjects.delete('' + convId); else _convProjects.set('' + convId, v);
+    _closeProjPanel();
+    const slot = chip.closest('.msg-timer');
+    if (slot) _paintProjChip(slot, convId);
+  });
+  document.body.appendChild(panel);
+  // Fixed-position, right-aligned under the chip (escapes the timer row's overflow).
+  const pw = panel.offsetWidth, ph = panel.offsetHeight;
+  let left = r.right - pw;
+  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+  let top = r.bottom + 4;
+  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 4);
+  panel.style.left = left + 'px';
+  panel.style.top = top + 'px';
+  chip.classList.add('open');
+  _projPanelEl = panel; _projPanelFor = '' + (convId == null ? '' : convId);
+}
+document.addEventListener('click', (e) => {
+  if (_projPanelEl && !_projPanelEl.contains(e.target) && !(e.target.closest && e.target.closest('.mt-proj'))) _closeProjPanel();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') _closeProjPanel(); });
+// =================== end project selector (UI only) ===================
 // Rebuild a settled (.done) msg-timer line into `target` from the stream's
 // surviving post-turn data. Mirrors the label/elapsed/[tok/s]/ctx/todos layout
 // endTotalTimer builds, minus the "stopped" variant (the label is not persisted
@@ -1385,6 +1468,7 @@ function _fillPlaceholderTimer(slot, convId) {
     '<span class="mt-sep">·</span><span class="mt-rate">0 tok/s</span>' +
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
   _wireCtxCounter(slot, convId);
+  _paintProjChip(slot, convId);
 }
 // Seed both pane timer slots with the resting placeholder when empty, so the bar
 // is present in the DOM from first paint — not only once a conversation mounts.
@@ -1440,6 +1524,7 @@ function rebuildSettledTimer(target, s) {
   slot.dataset.convId = '' + s.id;
   slot.innerHTML = parts.join('');
   _wireCtxCounter(slot, s.id);
+  _paintProjChip(slot, s.id);
   _wireRateClick(slot, s.id);
   if (s.todos && s.todos.length) {
     const badge = slot.querySelector('.mt-todos');
@@ -8067,6 +8152,7 @@ function startTotalTimer(stream) {
       slot.dataset.convId = '' + (stream.id || '');
       slot.innerHTML = _LIVE_TIMER_HTML();
       _wireCtxCounter(slot, stream.id);
+      _paintProjChip(slot, stream.id);
     }
     // Ripple while a completion is actively streaming (respond()/plain content),
     // not only while a thought box is open. `generating` is the single source of
@@ -8156,6 +8242,7 @@ function endTotalTimer(stream, label) {
   slot.classList.add('done');
   slot.dataset.convId = '' + (stream.id || '');
   _wireCtxCounter(slot, stream.id);
+  _paintProjChip(slot, stream.id);
   _wireRateClick(slot, stream.id);
   if (stream.todos && stream.todos.length) {
     const badge = slot.querySelector('.mt-todos');

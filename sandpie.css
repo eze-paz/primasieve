@@ -757,6 +757,29 @@
   .msg-timer .mt-ctx:hover .ctx-fill { stroke: var(--sp-accent); }
   .msg-timer .mt-rate { cursor: pointer; }
   .msg-timer .mt-rate:hover { color: var(--sp-accent); }
+  /* Project chip - far right of the msg-timer row, composer-aligned (UI only). */
+  .msg-timer .mt-proj {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 5px;
+    font: inherit; font-size: 0.68rem;
+    color: var(--sp-text-dim);
+    padding: 1px 8px; border-radius: 999px; cursor: pointer;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .msg-timer .mt-proj:hover { border-color: var(--sp-border-bright); color: var(--sp-text); }
+  .msg-timer .mt-proj.open { border-color: var(--sp-accent); color: var(--sp-text); }
+  .msg-timer .mt-proj.none { border-style: dashed; }
+  .msg-timer .mt-proj .mt-proj-caret { font-size: 0.55rem; opacity: 0.7; }
+  .proj-panel { min-width: 180px; max-width: 260px; }
+  .proj-panel .proj-item {
+    display: flex; align-items: center; gap: 0.45rem;
+    padding: 0.35rem 0.5rem; border-radius: 5px;
+    font-size: 0.8rem; cursor: pointer; color: var(--sp-text);
+  }
+  .proj-panel .proj-item:hover, .proj-panel .proj-item.sel { background: var(--sp-panel); }
+  .proj-panel .proj-item .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj-panel .proj-item .chk { margin-left: auto; color: var(--sp-accent); font-size: 0.7rem; }
+  .proj-panel .proj-item.none { color: var(--sp-text-dim); }
   .msg-timer .mt-sep { color: var(--sp-text-dim); opacity: 0.55; margin: 0 0.3rem; }
   .msg-timer.done { color: #6e7681; }
   /* once settled, the whole line dims to one tone */
