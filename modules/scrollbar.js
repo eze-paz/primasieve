@@ -1,13 +1,21 @@
-/* sandpie — rail scrollbar for the conversation area (v=1)
-   Hides the browser's scrollbar on every mounted .conv-host and draws a
-   custom "rail": a hairline track, a square thumb, and one accent tick where
-   each of the user's turns begins, so the bar doubles as a turn index.
-   Scope is deliberately narrow — ONLY .conv-host. Sidebar, settings, home,
-   file viewer, and artifact iframes keep the native bar (see sandpie.css
-   "Scrollbars — quiet native style").
+/* sandpie — rail scrollbar (v=2)
+   Hides the browser's scrollbar on a host and draws a custom "rail": a
+   hairline track, a square thumb, and (optionally) one accent tick where each
+   of the user's turns begins, so the bar doubles as a turn index.
+   Scope is deliberately narrow — two hosts:
+     • every mounted .conv-host (main + side pane), WITH ticks;
+     • the <aside> sidebar, WITHOUT ticks, desktop only.
+   Settings, home, file viewer, and artifact iframes keep the native bar (see
+   sandpie.css "Scrollbars — quiet native style").
 
    Ghost behaviour: the rail is invisible while the conversation is at rest and
    fades in on hover, focus-within, drag, or for 900ms after any scroll.
+
+   The rail is appended to a MOUNT element (an ancestor with position:relative)
+   and placed with getBoundingClientRect deltas, so it never lives inside the
+   scroller: a child of the scroller would scroll away, or lag a frame behind
+   compositor-thread scrolling. Conversation rails mount in their pane
+   (#messages / #messagesSide); the sidebar rail mounts in <body>.
 
    Attachment is by observation, not by id: .conv-host elements are created in
    ensureStream() and mounted / unmounted / moved between #messages and
@@ -30,18 +38,21 @@
   const IDLE_MS = 900;    // fade-out delay after the last scroll
   const HOST_SEL = '.conv-host';
   const TICK_SEL = ':scope > .msg.user';
+  const RAIL_W = 10;      // px, matches .osb-rail width in sandpie.css
+  const RIGHT_GAP = 4;    // px between the rail and the host's right edge
   const rails = new WeakMap();   // host → Rail
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   class Rail {
-    constructor(host) {
+    constructor(host, opts) {
       this.host = host;
-      const pane = this.pane = host.parentElement;
+      this.opts = Object.assign({ mount: host.parentElement, ticks: true, cls: '' }, opts);
+      const pane = this.pane = this.opts.mount;
       pane.classList.add('osb-pane');
       host.classList.add('osb-host');
 
       const rail = this.rail = document.createElement('div');
-      rail.className = 'osb-rail';
+      rail.className = 'osb-rail' + (this.opts.cls ? ' ' + this.opts.cls : '');
       rail.setAttribute('aria-hidden', 'true');   // keyboard + wheel scrolling of the host is untouched
       const thumb = this.thumb = document.createElement('div');
       thumb.className = 'osb-thumb';
@@ -115,10 +126,10 @@
       const h = this.host, g = this.geom();
       this.rail.hidden = !g;
       if (!g) return;
-      // Rail geometry in pane coordinates. The pane is position:relative
-      // (#messages / #messagesSide), the host is an unpositioned flex item, so
-      // offsetTop/offsetHeight are exactly the host box within the pane.
-      this.rail.style.top = (h.offsetTop + INSET) + 'px';
+      // Rail geometry in mount coordinates (mount is position:relative).
+      const hr = h.getBoundingClientRect(), mr = this.pane.getBoundingClientRect();
+      this.rail.style.top = Math.round(hr.top - mr.top + this.pane.scrollTop + INSET) + 'px';
+      this.rail.style.left = Math.round(hr.right - mr.left + this.pane.scrollLeft - RIGHT_GAP - RAIL_W) + 'px';
       this.rail.style.height = g.trackH + 'px';
       const frac = h.scrollTop / g.max;
       const y = Math.round(frac * (g.trackH - g.thumbH));
@@ -128,6 +139,7 @@
       // the host resizes, or at most every 500ms while content is changing;
       // otherwise just re-place the cached content offsets against the new
       // scrollHeight, which is what moves them as a reply streams in.
+      if (!this.opts.ticks) return;
       const userTurns = h.querySelectorAll(TICK_SEL);
       const now = performance.now();
       if (userTurns.length !== this._tickCount || now - this._tickMeasured > 500) this.measureTicks(userTurns, now);
@@ -168,9 +180,9 @@
     }
   }
 
-  function attach(host) {
+  function attach(host, opts) {
     if (rails.has(host) || !host.parentElement) return;
-    rails.set(host, new Rail(host));
+    rails.set(host, new Rail(host, opts));
   }
   function detach(host) {
     const r = rails.get(host); if (!r) return;
@@ -178,9 +190,17 @@
   }
 
   function boot() {
+    // Sidebar: the <aside> is its own scroll container; mount in <body> (made
+    // position:relative in sandpie.css) so the rail sits outside the scroller.
+    // No ticks — a list of chats has no "turns". Hidden on mobile by CSS: the
+    // drawer there is position:fixed with an animated left, and the phone's own
+    // overlay indicator is the right behaviour under touch anyway.
+    const aside = document.querySelector('body > aside');
+    if (aside) attach(aside, { mount: document.body, ticks: false, cls: 'osb-aside' });
+
     const wrap = document.getElementById('messagesWrap');
     if (!wrap) return;
-    wrap.querySelectorAll(HOST_SEL).forEach(attach);
+    wrap.querySelectorAll(HOST_SEL).forEach(h => attach(h));
     // Hosts mount/unmount as conversations open, close, and move between panes.
     // A host moved from one pane to the other is a removal + an addition in the
     // same batch, so process removals first and let the addition re-attach it
@@ -192,7 +212,7 @@
         rec.addedNodes.forEach(n => { if (n.nodeType !== 1) return; if (n.matches(HOST_SEL)) added.add(n); n.querySelectorAll && n.querySelectorAll(HOST_SEL).forEach(h => added.add(h)); });
       }
       removed.forEach(detach);
-      added.forEach(h => { if (h.isConnected) attach(h); });
+      added.forEach(h => { if (h.isConnected) attach(h); });   // default opts: mount = pane, ticks on
     }).observe(wrap, { childList: true, subtree: true });
   }
 

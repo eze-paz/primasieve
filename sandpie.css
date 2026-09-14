@@ -1216,11 +1216,15 @@ ul.conv-list li.active {
      for 900ms after a scroll. Every other scrollable keeps the quiet native bar
      above. Colours come from the scrollbar/accent tokens, never --sp-border
      alone, so the clear theme's hard borders don't leak into the thumb. */
-  .conv-host.osb-host { scrollbar-width: none; scrollbar-gutter: auto; }
-  .conv-host.osb-host::-webkit-scrollbar { display: none; }
+  .osb-host { scrollbar-width: none; scrollbar-gutter: auto; }
+  .osb-host::-webkit-scrollbar { display: none; }
   #messagesSide.osb-pane { position: relative; }   /* #messages already is */
+  /* Sidebar rail mounts in <body>. body is 100vh at 0,0 with margin reset, so
+     positioning it changes nothing for its other absolute children. */
+  body.osb-pane { position: relative; }
+  .osb-rail.osb-aside { z-index: 3; }              /* above aside (z 2), below the resize handle (z 10) and modals */
   .osb-rail {
-    position: absolute; right: 4px; width: 10px; z-index: 30;
+    position: absolute; width: 10px; z-index: 30;  /* top/left set by JS in mount coordinates */
     opacity: 0; transition: opacity 0.35s ease; touch-action: none;
   }
   .osb-rail.osb-show, .osb-rail.osb-scrolling, .osb-rail.osb-dragging { opacity: 1; transition-duration: 0.12s; }
@@ -1428,6 +1432,9 @@ ul.conv-list li.active {
 
 
   @media (max-width: 768px), (hover: none) and (pointer: coarse) {
+    .osb-rail.osb-aside { display: none; }   /* drawer is fixed + animated; touch gets the native indicator */
+    aside.osb-host { scrollbar-width: auto; }
+    aside.osb-host::-webkit-scrollbar { display: initial; }
     body {
       flex-direction: column;
 
