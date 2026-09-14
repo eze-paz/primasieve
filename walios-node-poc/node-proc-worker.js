@@ -119,8 +119,15 @@ self.onmessage = async (ev) => {
     // write to fd 1 came back EPIPE + SIGPIPE (exit 141). A wasm guest instantiates
     // synchronously and never opens that window.
     libPromise = (async () => {
+      // The gzipped bundle is what ships (883KB vs 3967KB). DecompressionStream is
+      // already a dependency, so inflating it costs nothing we were not paying.
+      const gz = await fetch(new URL('./node-lib.json.gz', self.location.href));
+      if (gz.ok) {
+        const stream = gz.body.pipeThrough(new DecompressionStream('gzip'));
+        return JSON.parse(await new Response(stream).text());
+      }
       const r = await fetch(new URL('./node-lib.json', self.location.href));
-      if (!r.ok) throw new Error('node-lib.json ' + r.status);
+      if (!r.ok) throw new Error('node-lib.json ' + r.status + ' (and .gz ' + gz.status + ')');
       return r.json();
     })();
     self.postMessage({ t: 'ready', ok: true, memory });

@@ -3,6 +3,7 @@
 //   node-lib.json  -- node's lib/*.js as { id: source }
 // The .js files stay plain CommonJS so `node run.js ./lib` keeps working unchanged.
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { join, relative } from 'node:path';
 
 const here = new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
@@ -50,7 +51,11 @@ const out = {};
   }
 })(LIB);
 writeFileSync(join(here, 'node-lib.json'), JSON.stringify(out));
+// The .gz is what SHIPS: 3967KB -> 883KB, which matters both in git and on the wire.
+// The worker inflates it with DecompressionStream, which we already depend on.
+writeFileSync(join(here, 'node-lib.json.gz'), gzipSync(JSON.stringify(out), { level: 9 }));
 
 const kb = (f) => Math.round(statSync(join(here, f)).size / 1024);
 console.log('poc-bundle.js :', kb('poc-bundle.js'), 'KB');
 console.log('node-lib.json :', kb('node-lib.json'), 'KB  (' + n + ' modules)');
+console.log('node-lib.json.gz:', kb('node-lib.json.gz'), 'KB  <- shipped');

@@ -66,7 +66,9 @@ async function boot() {
     base: '/walios/',
     cwd: '/root',
     rpc: false,
-    manifest: { node: '/walios-node-poc/node-stub.wasm' },
+    // NO manifest override: `node` now comes from WALIOS_BACKEND.manifest(), which is
+    // what terminal.html and the walios() tool both use. If it works here, it works
+    // there -- that is the point of not overriding it.
   };
 
   let msg;

@@ -102,7 +102,11 @@
   const   // sig30: the child window's cwd/umask/signal table are the forking thread's view too (a
   // sibling thread saw the child's SIG_DFL table during the window); exit_group from any
   // thread ends the process; a thread may fork+exec.
-WORKER_V = 'sig30';
+// sig31: the 0-length pipe-write fix (POSIX says write(fd, buf, 0) transfers nothing;
+  // the kernel pushed an empty chunk, the reader took it for EOF and exited, and the
+  // writer's next real write got EPIPE), plus the walios-node hook that starts a JS
+  // process worker for node-stub.wasm.
+WORKER_V = 'sig31';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -167,6 +171,14 @@ WORKER_V = 'sig30';
                // serving it after the rebuild -- the kernel refused it and qjs exited 127 in
                // one session while working in a fresh one.
                qjs: 'qjs.wasm?v=threads', js: 'qjs.wasm?v=threads', qjsc: 'qjsc.wasm?v=threads',
+               // node: NOT a wasm guest. node-stub.wasm is a 652-byte WALI module that
+               // declares the syscall imports and a shared env.memory, purely so the
+               // kernel's _workerPlan() can derive names/sigs/memory the way it does for
+               // any guest; wali-worker.js then starts walios-node-poc/node-proc-worker.js
+               // instead of wali-proc-worker.js, and node's own lib/*.js runs on the page's
+               // V8 over our syscalls. Absolute path because it does not live under
+               // /walios/. See walios-node-poc/README.md.
+               node: '/walios-node-poc/node-stub.wasm',
                ssh: 'ssh.wasm?v=ssl2', slogin: 'ssh.wasm?v=ssl2',
                make: 'make.wasm', gmake: 'make.wasm',
                rustc: 'rustc-threads.wasm',                         // 126MB, fetched on first `rustc` only
