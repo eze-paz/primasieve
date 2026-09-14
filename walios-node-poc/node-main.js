@@ -71,7 +71,8 @@ function makeConsole(R, stdout, stderr) {
 // rt   : the object boot() returned
 // sys  : syscall bag (needs argc/argvLen/copyArgv wired)
 // arena: marshalling arena
-function main(rt, sys, arena) {
+function main(rt, sys, arena, trace) {
+  trace = trace || (() => {});
   const R = rt.require;
   const process = rt.process;
 
@@ -80,8 +81,41 @@ function main(rt, sys, arena) {
   process.argv0 = 'node';
   process.execPath = argv[0] || '/bin/node';
 
+  trace('argv=' + JSON.stringify(argv));
   const { stdout, stderr } = makeStdio(R, process);
+  // SyncWriteStream._write swallows a failing writeSync into cb(err) -> an 'error'
+  // event. With no listener that goes through process.nextTick, which we never drain,
+  // so a broken stdout is completely silent. Listen, and probe writeSync directly.
+  // Is _write even reached?
+  for (const [nm, st] of [['stdout', stdout], ['stderr', stderr]]) {
+    const orig = st._write;
+    st._write = function (chunk, enc, cb) {
+      // Call writeSync ourselves so a throw is visible SYNCHRONOUSLY. SyncWriteStream
+      // routes it to cb(err) -> 'error' -> process.nextTick, which never drains here.
+      try {
+        R('fs').writeSync(this.fd, chunk, 0, chunk.length);
+        cb();
+      } catch (e) {
+        // A failing stdout must never be silent. SyncWriteStream routes this to
+        // cb(err) -> 'error' -> process.nextTick, which never drains here, so the
+        // failure would vanish entirely. Report it on fd 2 by the rawest means.
+        trace(nm + '._write fd=' + this.fd + ' THREW ' + (e && e.code) + ' ' + (e && e.message));
+        try {
+          const msg = 'node: write to fd ' + this.fd + ' failed: ' + ((e && e.code) || '') + ' ' + ((e && e.message) || e) + String.fromCharCode(10);
+          const bb = new TextEncoder().encode(msg);
+          const pp = arena.bytes(bb);
+          sys.write(2, pp, bb.length);
+          arena.reset();
+        } catch (_) { /* nothing left */ }
+        cb(e);
+      }
+    };
+  }
+  stdout.on('error', (e) => trace('STDOUT STREAM ERROR: ' + (e && e.code) + ' ' + (e && e.message)));
+  stderr.on('error', (e) => trace('STDERR STREAM ERROR: ' + (e && e.code) + ' ' + (e && e.message)));
+  trace('stdio built; stdout.fd=' + stdout.fd + ' writable=' + stdout.writable + ' constructed=' + (stdout._writableState && stdout._writableState.constructed));
   const console = makeConsole(R, stdout, stderr);
+  trace('console built');
 
   // The realm user code sees. In the worker this IS the global scope; here we
   // hand it to compileFunctionForCJSLoader as shadowed parameters.
@@ -103,7 +137,12 @@ function main(rt, sys, arena) {
     } catch (_) { /* truly nothing left */ }
   };
   const NL = String.fromCharCode(10);
-  const out = (s) => { try { stdout.write(s); } catch (e) { rawFd(2, 'node: stdout write failed: ' + (e && e.message) + NL); } };
+  const out = (s) => {
+    try {
+      const r = stdout.write(s);
+      if (r !== true) trace('stdout.write backpressured');
+    } catch (e) { trace('stdout.write THREW ' + (e && e.message)); rawFd(2, 'node: stdout write failed: ' + (e && e.message) + NL); }
+  };
   const errOut = (s) => { try { stderr.write(s); } catch (e) { rawFd(2, s); } };
 
   // argv[0] is the interpreter; walios passes the program name there.
@@ -124,7 +163,7 @@ function main(rt, sys, arena) {
   }
 
   // ---- node -e / -p ---------------------------------------------------------
-  if (evalCode !== null) {
+  if (evalCode !== null) { trace('branch: -e/-p code=' + JSON.stringify(String(evalCode).slice(0, 40)));
     if (evalCode === undefined) { errOut('node: -e requires an argument\n'); return 9; }
     try {
       const Module = R('module');
@@ -152,6 +191,7 @@ function main(rt, sys, arena) {
 
   // ---- node script.js -------------------------------------------------------
   if (script !== null) {
+    trace('branch: script ' + script);
     process.argv = [process.execPath, absolute(script, process), ...scriptArgs];
     try {
       const Module = R('module');

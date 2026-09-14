@@ -11,6 +11,7 @@ kernel. Two phases done so far.
 | `run3.js` | a multi-file user app via node's real CJS loader | runs |
 | `test-kernel-vfs.mjs` | **node's fs over the walios syscall protocol** | 19/19 |
 | `test-node-cli.mjs` | **`node -e` and `node script.js`, argv+stdio via syscalls** | 23/23 |
+| `test-browser.mjs` | **the real thing: real Chromium, real kernel, real ash** | 8/9 |
 
 ---
 
@@ -164,7 +165,60 @@ force-ORing `O_TRUNC`, truncating on every append — `stringToFlags()` already 
 right flags per mode. Present in Phase 0 too; only surfaced once real open flags were
 involved. Fixed in `bindings.js`.
 
-## NOT yet verified: the browser
+## VERIFIED in a real browser
+
+`test-browser.mjs` starts the COOP/COEP server, drives headless Chromium via
+Playwright, and asserts on what ash prints. No human in the loop:
+
+```bash
+node walios-node-poc/apply-kernel-patch.mjs   # /walios/ is gitignored; see below
+node walios-node-poc/mkstub.mjs
+node walios-node-poc/build.mjs ./walios-node-poc/lib
+node walios-node-poc/test-browser.mjs         # --headed to watch
+```
+
+busybox ash execs `node`, which runs as an ordinary walios process:
+
+```
+--- node -v ---                        v22.23.2
+--- node -e ---                        hello from node v22.23.2 on walios
+--- node writes, busybox reads ---     written by node
+--- node reads what the shell made --- hello-from-ash
+--- node script.js with args ---       script says: one,two
+--- redirect to a file ---             redir-456
+--- exit codes ---                     ok / && worked / exit code was 3
+```
+
+One filesystem: node reads files ash created and ash reads files node wrote.
+
+### The in-app browser cannot run walios at all
+
+Nested workers created from a URL-based worker fail there -- including the kernel's
+own `wali-proc-worker.js` and a one-line trivial worker. Blob-to-blob nesting works.
+Real Chromium is fine. That is why `test-browser.mjs` exists.
+
+## KNOWN BROKEN: node in a pipeline
+
+`node -e '...' | grep x` produces nothing. Characterised, not yet fixed:
+
+- fd 1 IS a proper FIFO in a pipeline (`fstat` -> `mode=0o10600 fifo=true`)
+- raw `SYS_write(1, ...)` at process start AND at +300ms both succeed and the bytes
+  reach the reader (`| wc -c` counts them)
+- node closes neither fd 0/1/2 nor any fd it did not open (both instrumented)
+- yet node's first `console.log` finds `_writableState.errored = EPIPE` already set,
+  so `write()` returns false and `_write` is never called
+- unpiped, redirected to a file, and a busybox-only pipe all work
+
+So the pipe is healthy when the process starts and the write end is gone by the time
+node has booted, without node having closed anything. The next step is kernel-side
+instrumentation of the fifo refcounts across the vfork/execve handoff.
+
+Two things made this hard to see and are worth keeping fixed:
+`SyncWriteStream._write` routes a failing `writeSync` into `cb(err)` -> an `'error'`
+event -> `process.nextTick`, which never drains here, so the failure was **totally
+silent**; and our own `out()` swallowed write errors. Both now report on fd 2.
+
+## Previously NOT verified: the browser
 
 **The browser run did not happen.** The kernel boots, resolves `node`, and starts pid
 100 with the node worker — then the worker fails to load. Diagnosed: *nested workers

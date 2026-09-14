@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>walios-node — Phase 1</title>
+<title>walios-node</title>
 <style>
   body { font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; background: #111; color: #ddd; margin: 0; padding: 16px; }
   h1 { font-size: 14px; color: #8fd; margin: 0 0 4px; font-weight: 600; }
@@ -8,10 +8,9 @@
   pre { white-space: pre-wrap; margin: 0; }
   #out { border-left: 2px solid #2a4; padding-left: 10px; }
   #err { border-left: 2px solid #a33; padding-left: 10px; color: #e99; margin-top: 10px; }
-  .ok { color: #6d6; } .bad { color: #e66; }
 </style>
-<h1>walios-node — node's lib/ on the real walios kernel</h1>
-<div class="sub">node-proc-worker.js runs as an ordinary walios process; every fs call is a syscall into wali-worker.js.</div>
+<h1>walios-node — node as a command in the walios shell</h1>
+<div class="sub">busybox ash execs <code>node</code>; node-proc-worker.js is an ordinary walios process and every fs call is a syscall into wali-worker.js.</div>
 <pre id="out"></pre>
 <pre id="err"></pre>
 
@@ -24,7 +23,7 @@ const write = (el, s) => { el.textContent += s; };
 if (!crossOriginIsolated) {
   write(err, 'NOT cross-origin isolated — SharedArrayBuffer is unavailable.\nServe with COOP/COEP (use serve.mjs).\n');
 } else {
-  boot().catch((e) => write(err, 'boot failed: ' + (e && e.stack || e) + '\n'));
+  boot().catch((e) => write(err, 'boot failed: ' + ((e && e.stack) || e) + '\n'));
 }
 
 async function boot() {
@@ -37,34 +36,21 @@ async function boot() {
     const m = ev.data;
     if (m.t === 'out') write(m.fd === 2 ? err : out, m.s);
     else if (m.t === 'exit') write(out, '\n[process exited ' + m.code + ']\n');
-    else if (m.t === 'result') write(out, '\n[' + (m.fail ? 'FAILURES' : 'ALL PASS') + ' pass=' + m.pass + ' fail=' + m.fail + ' syscalls=' + m.calls + ']\n');
   };
 
-  // The root process is ALWAYS busybox (runMessage sets wasm: busybox and argv is
-  // what busybox dispatches on) -- the manifest is only consulted on execve. So boot
-  // a SHELL and let it exec `node`, which is both the correct wiring and the real
-  // test: node as an ordinary command spawned by ash.
-  const demo = [
-    'echo "--- node -v ---"',
-    'node -v',
-    'echo "--- node -e ---"',
-    'node -e \'console.log("hello from node " + process.version + " on " + require("os").hostname())\'',
-    'echo "--- node writes, busybox reads ---"',
-    'node -e \'require("fs").writeFileSync("/tmp/from-node", "written by node\n")\'',
-    'cat /tmp/from-node',
-    'echo "--- node reads what the shell made ---"',
-    'echo hello-from-ash > /tmp/from-ash',
-    'node -e \'console.log(require("fs").readFileSync("/tmp/from-ash","utf8").trim())\'',
-    'echo "--- node script.js with args ---"',
-    'echo \'console.log("script says: " + process.argv.slice(2).join(","))\' > /tmp/s.js',
-    'node /tmp/s.js one two',
-    'echo "--- pipe node into grep ---"',
-    'node -e \'console.log("findme-123"); console.log("ignore-me")\' | grep findme',
-    'echo "--- exit codes ---"',
-    'node -e \'console.log("ok")\' && echo "&& worked"',
-    'node -e \'process.exitCode = 3\'; echo "exit code was $?"',
-    'echo "--- done ---"',
-  ].join('\n') + '\n';
+  // The root process is ALWAYS busybox: runMessage() sets {wasm: busybox, argv} and
+  // argv[0] is what busybox dispatches on. The manifest is only consulted on execve.
+  // So boot a SHELL and let it exec `node` -- correct wiring, and the real test.
+  //
+  // demo.sh is fetched as a FILE rather than embedded here. Embedding it meant
+  // escaping through JS and then through ash, and a single backslash-n collapsed
+  // into a raw newline inside a JS string literal, which node -e rejected.
+  // Strip CR. On a Windows checkout demo.sh has CRLF endings, and ash then runs
+  // `node -v<CR>` ("node: bad option") and tries to execute a bare CR on every
+  // blank line (": not found"). Written without a regex literal on purpose:
+  // the escape kept getting mangled on the way into this file.
+  const CR = String.fromCharCode(13);
+  const demo = (await (await fetch('./demo.sh')).text()).split(CR).join('');
 
   const msg = await WB.runMessage({
     kind: 'tool',

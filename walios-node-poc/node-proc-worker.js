@@ -18,9 +18,13 @@ const ARGS = 64, RET = 192, MAXARGS = 16;
 const ST_IDLE = 0, ST_REQ = 1, ST_REPLY = 2, ST_DONE = 3, ST_DIE = 4;
 
 let ctl = null, i32 = null, i64 = null, names = null, sigv = null, memory = null;
-let libSources = null;
+let libSources = null, libPromise = null;
 
 class ProcExit { constructor(code) { this.code = code; } }
+
+// Diagnostic that cannot fail: postMessage reaches the kernel, which prints it as
+// "[host] <msg>". Independent of syscalls, the arena, and node's streams.
+function trace(msg) { if (!self.WALIOS_NODE_DEBUG) return; try { self.postMessage({ t: 'warn', s: 'node-dbg: ' + msg }); } catch (_) {} }
 
 function hostCall(idx, args) {
   const n = Math.min(args.length, MAXARGS);
@@ -98,6 +102,7 @@ self.onmessage = async (ev) => {
   const m = ev.data;
 
   if (m.t === 'init') {
+    trace('init received; names=' + (m.names ? m.names.length : 'none') + ' memory=' + (m.memory ? 'yes' : 'NO'));
     ctl = m.ctl; names = m.names; sigv = m.sigs;
     i32 = new Int32Array(ctl);
     i64 = new BigInt64Array(ctl);
@@ -106,27 +111,38 @@ self.onmessage = async (ev) => {
       self.postMessage({ t: 'ready', ok: false, error: 'node-proc-worker needs an imported shared memory (node-stub.wasm must import env.memory)' });
       return;
     }
-    // node's lib/ -- fetched once, cached across processes by the HTTP cache.
-    try {
-      if (!libSources) {
-        const r = await fetch(new URL('./node-lib.json', self.location.href));
-        if (!r.ok) throw new Error('node-lib.json ' + r.status);
-        libSources = await r.json();
-      }
-    } catch (e) {
-      self.postMessage({ t: 'ready', ok: false, error: 'lib fetch failed: ' + e.message });
-      return;
-    }
+    // Post ready IMMEDIATELY, then fetch node's lib/ in the background.
+    //
+    // Fetching before ready left a long async window in which this process was not
+    // yet registered with the kernel. In a pipeline that is fatal: the reader (cat)
+    // saw no writers, took EOF and exited, readers dropped to 0, and node's first
+    // write to fd 1 came back EPIPE + SIGPIPE (exit 141). A wasm guest instantiates
+    // synchronously and never opens that window.
+    libPromise = (async () => {
+      const r = await fetch(new URL('./node-lib.json', self.location.href));
+      if (!r.ok) throw new Error('node-lib.json ' + r.status);
+      return r.json();
+    })();
     self.postMessage({ t: 'ready', ok: true, memory });
     return;
   }
 
   if (m.t === 'run') {
+    trace('run received');
     let code = 0;
+    if (!libSources) {
+      try { libSources = await libPromise; }
+      catch (e) {
+        self.postMessage({ t: 'trap', error: 'lib fetch failed: ' + e.message });
+        Atomics.store(i32, 3, 70); Atomics.store(i32, 0, ST_DONE); Atomics.notify(i32, 0);
+        self.postMessage({ t: 'exit', code: 70 });
+        return;
+      }
+    }
     try { code = runNode(); }
     catch (e) {
       if (e instanceof ProcExit) code = e.code;
-      else { code = 139; self.postMessage({ t: 'trap', error: String((e && e.stack) || e).slice(0, 800) }); }
+      else { trace('RUN THREW: ' + String((e && e.stack) || e).slice(0, 500)); code = 139; self.postMessage({ t: 'trap', error: String((e && e.stack) || e).slice(0, 800) }); }
     }
     Atomics.store(i32, 3, code | 0);
     Atomics.store(i32, 0, ST_DONE);
@@ -147,9 +163,10 @@ function runNode() {
 
   // Unbuffered diagnostic straight to fd 2 -- no node streams, no buffering, no
   // event loop. If node's own stdout is broken this still gets through.
-  const DEBUG = true;
+  const DEBUG = (typeof self !== 'undefined' && self.WALIOS_NODE_DEBUG) || false;
   const raw = (s2) => {
     if (!DEBUG) return;
+    trace(s2);
     try {
       const b = new TextEncoder().encode('[node-dbg] ' + s2 + String.fromCharCode(10));
       const p2 = arena.bytes(b);
@@ -180,7 +197,7 @@ function runNode() {
 
   let code;
   try {
-    code = main(rt, sys, arena);
+    code = main(rt, sys, arena, raw);
     raw('main returned ' + code + '; syscalls=' + vfs.calls);
   } catch (e) {
     raw('MAIN THREW: ' + String((e && e.stack) || e).slice(0, 600));

@@ -51,11 +51,25 @@ class KernelVfs {
     const ptr = this.mem.cstr(p);
     const fd = this._check(this.sys.open(ptr, flags | 0, mode === undefined ? 0o666 : mode), 'open', p);
     this.mem.reset();
+    (this._opened || (this._opened = new Set())).add(fd);
     if (flags & 0o100) this.files.set(p, true);
     return fd;
   }
 
-  close(fd) { this._check(this.sys.close(fd), 'close'); }
+  close(fd) {
+    // Closing fd 0/1/2 by accident detaches this process from the shell's pipeline:
+    // writers drops to 0, the reader takes EOF and exits, and every later write to
+    // fd 1 comes back EPIPE. Loud on purpose.
+    // Closing an fd we never opened would drop a handle the shell still owns --
+    // e.g. the pipe's write end -- making the reader take EOF and exit.
+    if (!this._opened || !this._opened.has(fd)) {
+      try {
+        const b = new TextEncoder().encode('[vfs] CLOSE OF UNOWNED FD ' + fd + String.fromCharCode(10));
+        const p = this.mem.bytes(b); this.sys.write(2, p, b.length); this.mem.reset();
+      } catch (_) {}
+    } else { this._opened.delete(fd); }
+    this._check(this.sys.close(fd), 'close');
+  }
 
   read(fd, buf, off, len, pos) {
     if (len <= 0) return 0;
@@ -143,6 +157,7 @@ class KernelVfs {
     const ptr = this.mem.cstr(p);
     const fd = this._check(this.sys.open(ptr, 0o200000, 0), 'scandir', p);   // O_DIRECTORY
     this.mem.reset();
+    (this._opened || (this._opened = new Set())).add(fd);
     const out = [];
     try {
       const BUF = 8192;
