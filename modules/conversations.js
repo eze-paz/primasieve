@@ -2585,6 +2585,11 @@ function buildConvLi(c, idx) {
 // signal. Moving a conv to the archive is reversible (Settings → Archive →
 // Unarchive) and never deletes data.
 const AUTO_ARCHIVE_DAYS = 14; // 2 weeks: auto-archive conversations untouched for >14 days
+// Eviction MINIMUM: even past the cutoff, the newest N unpinned conversations
+// always stay in the active list. With only a handful of chats, archiving them
+// all reads as "my stuff was deleted" — the archive must never look like data
+// loss, so a small list is never touched at all.
+const AUTO_ARCHIVE_MIN_KEEP = 25;
 let _autoArchiveDone = false;
 async function autoArchiveStale() {
   if (_autoArchiveDone) return;
@@ -2597,6 +2602,11 @@ async function autoArchiveStale() {
     new Date(c.updated).getTime() < cutoff
   );
   if (!stale.length) return;
+  // Apply the eviction minimum: keep the newest N stale conversations active
+  // regardless of age; only the older surplus is archived.
+  stale.sort((a, b2) => new Date(b2.updated).getTime() - new Date(a.updated).getTime());
+  if (stale.length <= AUTO_ARCHIVE_MIN_KEEP) return;
+  stale = stale.slice(AUTO_ARCHIVE_MIN_KEEP);
   for (const c of stale) {
     try { await toggleArchiveConv(c.id, false); }
     catch (e) { console.warn('autoArchiveStale failed for', c.id, e); }
@@ -2666,8 +2676,15 @@ function _convGroupLabel(iso, b) {
   if (t >= b.yesterday) return 'Yesterday';
   if (t >= b.thisWeek)  return 'This week';
   if (t >= b.lastWeek)  return 'Last week';
-  return 'Older';
+  // Older than last week: label by calendar month (SEPTEMBER), or by year
+  // once the month is not the current one (2025, 2024). The list is walked
+  // newest-first, so same-month rows collapse under one header naturally.
+  const d = new Date(t);
+  const now = new Date();
+  if (d.getFullYear() !== now.getFullYear()) return String(d.getFullYear());
+  return _MONTHS[d.getMonth()];
 }
+const _MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 
 // Panel head counter ("19 · 1 pinned"). The sidebar head is a label for the
 // list, so it has to move whenever the list does — every exit of
