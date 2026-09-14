@@ -21,7 +21,7 @@ const SandpieSpeech = (function () {
 
   const NS = 'speech';
   const LS_KEY = 'sandpie-speech';
-  const DEFAULTS = { model: 'onnx-community/whisper-base', lang: 'auto', engine: 'webspeech' };
+  const DEFAULTS = { model: 'onnx-community/whisper-small', lang: 'auto', engine: 'webspeech' };
 
   const MODELS = [
     { id: 'onnx-community/whisper-tiny',  label: 'Whisper Tiny — fastest (~80 MB)' },
@@ -61,7 +61,7 @@ const SandpieSpeech = (function () {
       else localStorage.setItem(LS_KEY, JSON.stringify(next));
     } catch (_) { try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch (_) {} }
   }
-  const cfgModel = () => cfgAll().model;
+  const cfgModel = () => 'onnx-community/whisper-small'; // model picker removed — always the most accurate (small)
   const cfgLang  = () => cfgAll().lang;
   // 'moonshine' was removed — migrate any saved pref to whisper
   const cfgEngine = () => { const e = cfgAll().engine; return e === 'moonshine' ? 'whisper' : e; };
@@ -393,8 +393,6 @@ const SandpieSpeech = (function () {
       <option value="whisper">Whisper on-device — private, audio never leaves the tab</option>
       </select>
     <p id="sttEngineNote" style="font-size:0.68rem; color:var(--sp-text-dim); margin:0 0 0.6rem;"></p>
-    <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Model</label>
-    <select id="sttModel" style="width:100%; padding:0.4rem; margin-bottom:0.6rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;"></select>
     <label style="display:block; font-size:0.72rem; color:var(--sp-text-dim); margin:0 0 0.2rem;">Spoken language</label>
     <select id="sttLang" style="width:100%; padding:0.4rem; margin-bottom:0.7rem; background:var(--sp-panel); border:1px solid var(--sp-border); border-radius:6px; color:var(--sp-text); font-size:0.82rem;"></select>
     <button type="button" class="ghost" id="sttPreload">Download model now</button>
@@ -403,17 +401,14 @@ const SandpieSpeech = (function () {
 
   function renderPanel(panel) {
     panel.innerHTML = PANEL_HTML;
-    const modelSel = panel.querySelector('#sttModel');
     const langSel  = panel.querySelector('#sttLang');
     const status   = panel.querySelector('#sttStatus');
     const preload  = panel.querySelector('#sttPreload');
 
-    for (const m of MODELS) { const o = document.createElement('option'); o.value = m.id; o.textContent = m.label; modelSel.appendChild(o); }
     for (const pair of LANGS) { const o = document.createElement('option'); o.value = pair[0]; o.textContent = pair[1]; langSel.appendChild(o); }
     const engineSel = panel.querySelector('#sttEngine');
     const engineNote = panel.querySelector('#sttEngineNote');
     engineSel.value = cfgEngine();
-    modelSel.value = cfgModel();
     langSel.value  = cfgLang();
     function noteFor() {
       if (cfgEngine() === 'webspeech') {
@@ -427,7 +422,6 @@ const SandpieSpeech = (function () {
 
     engineSel.addEventListener('change', () => { setCfg({ engine: engineSel.value }); engineNote.textContent = noteFor(); });
 
-    modelSel.addEventListener('change', () => { setCfg({ model: modelSel.value }); _workerReady = false; status.textContent = ''; });
     langSel.addEventListener('change', () => setCfg({ lang: langSel.value }));
 
     if (!supported()) {
