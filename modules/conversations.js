@@ -1417,6 +1417,7 @@ function _toggleProjPanel(chip, convId) {
       '<span class="nm">' + p + '</span>' + (p === current ? '<span class="chk">✓</span>' : '') + '</div>';
   }
   html += '<div class="proj-item none' + (current === '' ? ' sel' : '') + '" data-proj=""><span class="nm">no project</span></div>';
+  html += '<div class="proj-add" title="Coming soon — project creation lands with the backend"><span class="plus">＋</span> New project</div>';
   panel.innerHTML = html;
   panel.addEventListener('click', (e) => {
     const item = e.target.closest('.proj-item');

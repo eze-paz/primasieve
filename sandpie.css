@@ -733,6 +733,7 @@
   .msg-timer {
     font: 0.7rem 'JetBrains Mono', Consolas, monospace;
     color: var(--sp-accent);
+    display: flex; align-items: center;
     padding: 0.25rem 1.75rem 0.25rem;
     /* Follow the chat width cap: composer padding + the usual 0.25rem inset. */
     padding-inline: calc(max(1.5rem, (100% - var(--sp-chat-max-w)) / 2) + 0.25rem);
@@ -3505,3 +3506,10 @@ body.sp-decoding *::after {
   @media (prefers-reduced-motion: reduce) {
     .assistant.ll-play > .ll-block { animation: none; opacity: 1; transform: none; }
   }
+  .proj-panel .proj-add {
+    display: flex; align-items: center; gap: 0.45rem; margin: 0.25rem 0.15rem 0.15rem;
+    padding: 0.4rem 0.5rem; border-radius: 5px; border: 1px dashed var(--sp-border-bright);
+    font-size: 0.75rem; color: var(--sp-text-dim); cursor: pointer;
+  }
+  .proj-panel .proj-add:hover { color: var(--sp-text); border-color: var(--sp-accent); }
+  .proj-panel .proj-add .plus { color: var(--sp-accent); font-weight: 700; }
