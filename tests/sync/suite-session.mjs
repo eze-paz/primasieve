@@ -119,6 +119,25 @@ export async function run(t) {
       'an edit reaches Dropbox without waiting for a sync', w.cloudText('artifacts/imm-edit.html'));
   }
 
+  // ── the boot race: no workingRoot yet ──
+  // pushDbxTokenToSW fires as soon as the worker exists, which can be before
+  // ensureWorkingRoot() has resolved the workspace path. Uploading then would
+  // resolve to '/<rel>' — the Dropbox ROOT — scattering files outside the
+  // workspace. The direct push must stand down and leave it to the engine.
+  {
+    const w = await connectedWorld();
+    w.dbxCtx.workingRoot = '';
+    await w.tools.tool_write_file({ path: 'artifacts/race.html', content: 'early' }, CTX);
+    await tick();
+    const stray = [...w.CLOUD.keys()].filter((k) => !k.startsWith('/sandpie/'));
+    t.ok(stray.length === 0, 'no upload lands outside the workspace before the root is known', stray);
+
+    w.dbxCtx.workingRoot = '/sandpie';
+    await settle(w);
+    t.ok(w.cloudText('artifacts/race.html') === 'early',
+      'and the sync engine still delivers it to the right place', w.cloudText('artifacts/race.html'));
+  }
+
   // ── work written during a turn is durable by the end of it ──
   // Sync is suppressed while a turn generates, because it must not PULL while
   // files are being written. Whether the bytes land during the turn (step 1) or

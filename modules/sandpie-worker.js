@@ -471,6 +471,17 @@ function _dbxArg(obj) {
 async function _dbxUploadRel(rel, bytes) {
   if (!_dbxPushable(rel)) return false;
   if (!(await _ensureDbxCtx(2000))) return false;
+  // The page sends workingRoot as localStorage ROOT_KEY || '', and it pushes the
+  // token as soon as the worker exists — which can be BEFORE ensureWorkingRoot()
+  // has written that key. With an empty root _cloudPathFor() resolves to
+  // '/<rel>', i.e. the Dropbox ROOT, so a write would land outside the workspace
+  // entirely. Reading with a bad path merely 404s; writing with one scatters
+  // files. Skip instead of guessing: the file stays dirty and the sync engine
+  // uploads it to the right place moments later.
+  if (!(_dbxCtx && _dbxCtx.workingRoot)) {
+    console.warn('[dbxpush] no workingRoot yet — leaving ' + rel + ' to the sync engine');
+    return false;
+  }
   const body = bytes || await opfsReadBytes(rel);
   const arg = { path: _cloudPathFor(rel), mode: 'overwrite', mute: true, autorename: false };
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -488,7 +499,7 @@ async function _dbxUploadRel(rel, bytes) {
       console.warn('[dbxpush] network error for ' + rel + ':', (e && e.message) || e);
       return false;
     }
-    if (res.ok) return true;
+    if (res.ok) { console.info('[dbxpush] uploaded ' + rel); return true; }
     // 429 carries Retry-After and 5xx is worth another try. Anything else is a
     // real rejection (bad path, no permission) that retrying cannot fix.
     if (res.status !== 429 && res.status < 500) {

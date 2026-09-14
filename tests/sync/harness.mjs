@@ -399,7 +399,7 @@ export function makeWorld(opts = {}) {
     const _invalidateFileCache = () => {};
     const _betaOn = () => false;
     const _ensureDbxCtx = async () => true;
-    const _dbxCtx = { token: 'tok', pathRoot: null, teamRoot: null, homeNs: '', workingRoot: '/sandpie' };
+    const _dbxCtx = DBXCTX;
     const _toOpfsRel = (x) => {
       let r = String(x || '');
       while (r.startsWith('/')) r = r.slice(1);
@@ -448,11 +448,15 @@ export function makeWorld(opts = {}) {
     };
   `;
   world.POSTED = POSTED;
-  world.tools = new Function('FS', 'MT', 'POSTED', 'relay', 'NOW', 'fetch', 'console',
+  // Mirrors what the page posts to the worker as 'dbx-token'. Mutable so a test
+  // can reproduce the boot race where workingRoot has not been resolved yet.
+  world.dbxCtx = { token: 'tok', pathRoot: null, teamRoot: null, homeNs: '', workingRoot: WSROOT };
+  world.tools = new Function('FS', 'MT', 'POSTED', 'relay', 'NOW', 'fetch', 'console', 'DBXCTX',
     toolGlobals + TOOL_SRC +
     '\nreturn { tool_write_file, tool_edit_file, tool_delete_file, _dbxUploadRel, _dbxPushable };')(
     FS, MT, POSTED, relayDispatch, nowMs, fakeFetch,
-    opts.verbose ? console : { log() {}, info() {}, warn() {}, error() {}, debug() {} });
+    opts.verbose ? console : { log() {}, info() {}, warn() {}, error() {}, debug() {} },
+    world.dbxCtx);
 
   // A non-tool OPFS writer (pyodide / walios bridge) that marks via the shared
   // ledger module instead of the sw-opfs-changed relay.
