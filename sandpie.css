@@ -506,11 +506,11 @@
   /* Selection-triggered toolbar on user bubbles (copy / rewind) */
   .msg.user { position: relative; }
   .msg.user .msg-actions {
-    position: absolute; z-index: 6; top: -34px; right: 8px;
+    position: absolute; z-index: 6; bottom: -34px; right: 8px;
     background: var(--sp-panel); border: 1px solid var(--sp-border-bright);
     border-radius: 8px; padding: 2px; gap: 2px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    opacity: 0; pointer-events: none; transform: translateY(3px);
+    opacity: 0; pointer-events: none; transform: translateY(-3px);
     transition: opacity 0.12s ease, transform 0.12s ease;
   }
   .msg.user .msg-actions.show { opacity: 1; pointer-events: auto; transform: none; }
