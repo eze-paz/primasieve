@@ -428,7 +428,7 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
     },
 
     run_walios: {
-      description: `Run a shell script (busybox ash) in walios, the sandboxed in-browser Linux. Headless: you get stdout, stderr and the exit code. Real TCP/TLS (wget, curl, nc, ssh, ping, git). NOT the user's machine — that is the \`shell\` tool.
+      description: `Run a shell script (busybox ash) in walios, the sandboxed in-browser Linux. Headless: you get stdout, stderr and the exit code. Real TCP/TLS (wget, curl, ssh, git). nc/telnet are PLAINTEXT TCP only -- for TLS on a raw socket run \`tlswrap -L LOCALPORT HOST 443\` and talk to 127.0.0.1:LOCALPORT. NOT the user's machine — that is the \`shell\` tool.
 SCRIPT: pass it in "script" (multi-line is fine). For long or heavily-quoted scripts you may instead omit "script" and put the raw text in your reply between <|walios|> and <|end_walios|> (no escaping; <|walios:90|> sets the timeout in seconds). Default timeout 120s, max 300.
 FILES: cwd and $HOME are /root, which IS the workspace the file tools and run_python see (/files is the same directory). Files written there persist; rm there deletes REAL files.
 COMMANDS: the busybox set — awk base64 basename bunzip2 bzip2 cat chmod chown cksum cmp comm cp cut date df diff dirname du echo env expand expr find flock fold getopt grep gunzip gzip head hexdump hostname id install kill less ln ls md5sum mkdir mkfifo mktemp mv nc nl nslookup od paste ping printf pwd readlink realpath rev rm rmdir sed seq sh sha1sum sha256sum sleep sort split stat tac tail tar telnet test timeout touch tr tree uname uniq unzip vi wc wget which xargs zcat yes — plus curl, git, python3, qjs, soffice. tar takes -z/-j/-J. NO zip (create) or jq (do that in run_python).
