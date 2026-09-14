@@ -2547,6 +2547,26 @@ function _selRangeTo(i, j, add) {
   _selAnchor = hi;
   _selHighlight();
 }
+// ---- conversation-row drag state -------------------------------------------
+// A native HTML5 drag belongs to its SOURCE element: the browser dispatches
+// `dragend` to the very <li> the drag started on. refreshConversationList()
+// rebuilds the sidebar with replaceChildren(), so any refresh that lands while a
+// drag is in flight destroys that node — `dragend` is then never dispatched, the
+// drag session is never torn down, and the page stops responding to the mouse
+// with nothing in the console (the dashed drop outline just stays up). The drop
+// handler itself ends in refreshConversationList(), so this fired on EVERY drop.
+// Refreshes requested during a drag are therefore deferred to dragend.
+let _convDragging = false;
+let _convRefreshPending = false;
+function _endConvDrag() {
+  if (!_convDragging) return;
+  _convDragging = false;
+  const w = $('messagesWrap'); if (w) w.classList.remove('drop-target');
+  if (_convRefreshPending) { _convRefreshPending = false; refreshConversationList(); }
+}
+// Net for a dragend that reaches a node other than the one carrying the
+// once-listener below (re-render races, drags that leave the window).
+if (typeof document !== 'undefined') document.addEventListener('dragend', _endConvDrag, true);
 function buildConvLi(c, idx) {
 
   const li = document.createElement('li');
@@ -2667,14 +2687,15 @@ function buildConvLi(c, idx) {
     if (ev.shiftKey) { ev.preventDefault(); return; }
     ev.dataTransfer.setData('text/sandpie-conv-id', c.id);
     ev.dataTransfer.effectAllowed = 'copy';
+    // Freeze sidebar rebuilds for the duration of the drag — see _endConvDrag.
+    _convDragging = true;
     // Show the dashed drop zone immediately, before the pointer even reaches the
     // messages area — so the user can see where they're allowed to drop.
     const w0 = $('messagesWrap'); if (w0) w0.classList.add('drop-target');
     // dragend always fires when the drag concludes (dropped, cancelled, or
     // released outside the drop zone) — guaranteed cleanup for the drop-target
     // dashed line so it can never get stuck on screen.
-    const clearDrop = () => { const w = $('messagesWrap'); if (w) w.classList.remove('drop-target'); };
-    li.addEventListener('dragend', clearDrop, { once: true });
+    li.addEventListener('dragend', _endConvDrag, { once: true });
   });
   return li;
 }
@@ -2799,6 +2820,10 @@ function _setConvCount(total, pinned) {
 async function refreshConversationList() {
   const ul = $('convList');
   if (!ul) return;
+  // Never replace the rows while a row is being dragged: the dragged <li> is the
+  // drag's source node, and destroying it kills `dragend` and hangs the whole
+  // drag session. Replay once the drag finishes (_endConvDrag).
+  if (_convDragging) { _convRefreshPending = true; return; }
   let list = await listConversations();
   updateConvAlerts(new Set(list.map(c => c.id)));   // before the search filter narrows it
 
