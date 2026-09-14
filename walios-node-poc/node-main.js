@@ -102,8 +102,8 @@ function main(rt, sys, arena) {
       arena.reset();
     } catch (_) { /* truly nothing left */ }
   };
-  const out = (s) => { try { stdout.write(s); } catch (e) { rawFd(2, 'node: stdout write failed: ' + (e && e.message) + '
-'); } };
+  const NL = String.fromCharCode(10);
+  const out = (s) => { try { stdout.write(s); } catch (e) { rawFd(2, 'node: stdout write failed: ' + (e && e.message) + NL); } };
   const errOut = (s) => { try { stderr.write(s); } catch (e) { rawFd(2, s); } };
 
   // argv[0] is the interpreter; walios passes the program name there.
