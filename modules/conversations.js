@@ -1741,7 +1741,7 @@ function registerLiteButton() {
       _setLite(cid, on).then(() => {
         liteBtnRefresh();
         try { if (SandpieCommandView) SandpieCommandView.show(
-          'FAST mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'lite');
+          'FAST mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'fast');
         } catch (_) {}
       }).catch(() => {});
     });
