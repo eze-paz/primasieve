@@ -592,6 +592,7 @@
     min-height: 28px;
   }
   .attach-btn {
+    cursor: pointer;
     background: transparent !important;
     border: none !important;
     color: var(--sp-text-dim) !important;
