@@ -35,6 +35,7 @@
 
   const INSET = 6;        // px the rail stops short of the host's top/bottom edges
   const MIN_THUMB = 24;   // px
+  const MAX_THUMB = 0.30; // of the track — a proportional thumb on a barely-scrolling host is a full-height slab; cap it
   const IDLE_MS = 900;    // fade-out delay after the last scroll
   const HOST_SEL = '.conv-host';
   const TICK_SEL = ':scope > .msg.user';
@@ -116,7 +117,10 @@
       const h = this.host, sh = h.scrollHeight, ch = h.clientHeight, max = sh - ch;
       if (ch === 0 || max <= 1) return null;   // hidden host (side pane in artifact mode) or nothing to scroll
       const trackH = Math.max(0, ch - INSET * 2);
-      const thumbH = Math.min(trackH, Math.max(MIN_THUMB, Math.round(ch / sh * trackH)));
+      // Proportional thumb, floored at MIN_THUMB and capped at MAX_THUMB of the
+      // track. Position is still frac * (trackH - thumbH), so a capped thumb just
+      // travels a longer path — top and bottom of the content stay reachable.
+      const thumbH = Math.min(Math.max(MIN_THUMB, Math.round(trackH * MAX_THUMB)), Math.max(MIN_THUMB, Math.round(ch / sh * trackH)));
       return { sh, ch, max, trackH, thumbH };
     }
 
