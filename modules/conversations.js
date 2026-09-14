@@ -1717,8 +1717,8 @@ function liteBtnRefresh() {
   if (!b) return;
   const on = _liteOn();
   b.classList.toggle('active', on);
-  b.title = on ? 'LITE mode is ON for this conversation - click to turn it off'
-               : 'Enable LITE mode for this conversation (no tools/skills/memories)';
+  b.title = on ? 'FAST mode is ON for this conversation - click to turn it off'
+               : 'Enable FAST mode for this conversation (no tools/skills/memories)';
 }
 function registerLiteButton() {
   const bar = document.querySelector('form.composer:not(.composer-side) .input-bar');
@@ -1730,8 +1730,8 @@ function registerLiteButton() {
     btn.type = 'button';
     btn.id = 'liteBtn';
     btn.className = 'attach-btn lite-btn';
-    btn.title = 'Enable LITE mode for this conversation (no tools/skills/memories)';
-    btn.setAttribute('aria-label', 'Toggle LITE mode');
+    btn.title = 'Enable FAST mode for this conversation (no tools/skills/memories)';
+    btn.setAttribute('aria-label', 'Toggle FAST mode');
     btn.innerHTML = LITE_BOLT_SVG;
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); e.preventDefault();
@@ -1741,7 +1741,7 @@ function registerLiteButton() {
       _setLite(cid, on).then(() => {
         liteBtnRefresh();
         try { if (SandpieCommandView) SandpieCommandView.show(
-          'LITE mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'lite');
+          'FAST mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.', 'lite');
         } catch (_) {}
       }).catch(() => {});
     });
@@ -1768,23 +1768,37 @@ function liteBtnPlace(btn, bar) {
 setInterval(() => { liteBtnRefresh(); const b = document.getElementById("liteBtn"); const bar = b && b.closest(".input-bar"); if (b && bar) liteBtnPlace(b, bar); }, 700);
 try { if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.on('file:changed', liteBtnRefresh); } catch (_) {}
 
-function registerLiteCommand() {
+function registerLiteAliasCommand() {
+  // Backwards-compat alias: >>> lite still works after the rename to FAST.
   if (typeof SandpieCommands === 'undefined') return;
+  const fast = SandpieCommands.get('fast');
+  if (!fast) return;
   SandpieCommands.register({
     name: 'lite',
     module: 'core',
-    help: 'Toggle LITE mode for this conversation (no tools/skills/memories - fast answers)',
+    help: 'Alias of >>> fast (FAST mode toggle)',
     usage: '>>> lite [on|off]',
+    run: fast.run
+  });
+}
+
+function registerLiteCommand() {
+  if (typeof SandpieCommands === 'undefined') return;
+  SandpieCommands.register({
+    name: 'fast',
+    module: 'core',
+    help: 'Toggle FAST mode for this conversation (no tools/skills/memories - fast answers)',
+    usage: '>>> fast [on|off]',
     run(text, parts) {
       const cid = activeConvId;
-      if (!cid) return 'LITE mode applies per conversation - open (or start) a conversation first, then run >>> lite.';
+      if (!cid) return 'FAST mode applies per conversation - open (or start) a conversation first, then run >>> fast.';
       let on;
       if (parts.length > 1) on = /^(on|1|true|yes)$/i.test(parts[1]);
       else on = !_liteOn(cid);   // no arg -> toggle
       const apply = () => _setLite(cid, on).then(() =>
-        'LITE mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.'
+        'FAST mode is now ' + (on ? 'ON' : 'OFF') + ' for this conversation.'
         + '\n(' + (on
-          ? 'No tools, skills or memories are sent - simple queries answer in seconds. Turn it off with >>> lite off when you need files, Python or search.'
+          ? 'No tools, skills or memories are sent - simple queries answer in seconds. Turn it off with >>> fast off when you need files, Python or search.'
           : 'Full power restored: tools, skills and memories are back on the next turn.') + ')');
       // New conversation (no meta yet): flush the pending conv creation first if needed.
       return _loadLiteFlag(cid).then(() => apply());
@@ -1877,6 +1891,7 @@ registerDriftCommand();
 registerHiddenCommand();
 registerMetacogCommand();
 registerLiteCommand();
+registerLiteAliasCommand();
 registerLiteButton();
 async function loadConv(id) {
   if (id === activeConvId) return;
@@ -6521,8 +6536,8 @@ async function buildSystemPrompt(convMessages, localizeTarget) {
   if (_liteCid && _liteOn(_liteCid)) {
     // LITE MODE: minimal system prompt (no skills, no memories, no base prompt).
     // The reply-language directive below still applies (it is appended after this).
-    content = 'You are sandpie, a fast assistant in LITE mode. Answer directly, concisely and completely. '
-      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> lite off. '
+    content = 'You are sandpie, a fast assistant in FAST mode. Answer directly, concisely and completely. '
+      + 'You have NO tools in this mode: if the request needs files, code execution, web/search or any tool, say so in one short line and ask the user to run >>> fast off. '
       + 'Do not invent tool results.';
   } else {
     content = (typeof SandpieSystemPrompt !== 'undefined' && SandpieSystemPrompt.get)
@@ -6950,7 +6965,7 @@ function registerInspectPromptCommand() {
       if (activeConvId) await _loadLiteFlag(activeConvId).catch(() => {});
       const prompt = await buildSystemPrompt(messages);
       const lite = activeConvId && _liteOn(activeConvId);
-      return '=== System prompt ' + (lite ? '(LITE MODE ON - minimal)' : '') + ' ===\n\n' + prompt.content;
+      return '=== System prompt ' + (lite ? '(FAST MODE ON - minimal)' : '') + ' ===\n\n' + prompt.content;
     },
   });
 }
