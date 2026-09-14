@@ -619,9 +619,11 @@
     animation: micPulse 1.2s ease-in-out infinite;
   }
   .mic-btn.busy {
-    color: var(--sp-text-dim) !important;
-    opacity: 0.55;
+    color: var(--sp-accent) !important;
+    opacity: 1;
   }
+  .mic-btn .stt-spinner { animation: sttSpin 0.8s linear infinite; }
+  @keyframes sttSpin { to { transform: rotate(360deg); } }
   @keyframes micPulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.45; }

@@ -37,6 +37,7 @@ const SandpieSpeech = (function () {
   // Inline SVG glyphs, inherit currentColor.
   const MIC_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>';
   const STOP_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>';
+  const SPINNER_SVG = '<svg class="stt-spinner" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9"/></svg>';
 
   // ── VAD / capture tuning ──
   const TARGET_SR   = 16000;  // Whisper expects 16 kHz mono
@@ -81,7 +82,7 @@ const SandpieSpeech = (function () {
     if (!_btn) return;
     _btn.classList.toggle('recording', next === 'recording');
     _btn.classList.toggle('busy', next === 'busy');
-    _btn.innerHTML = next === 'recording' ? STOP_SVG : MIC_SVG;
+    _btn.innerHTML = next === 'recording' ? STOP_SVG : next === 'busy' ? SPINNER_SVG : MIC_SVG;
     _btn.title = next === 'recording' ? 'Stop dictation'
       : next === 'busy' ? 'Transcribing…'
       : 'Dictate by voice (on-device)';
