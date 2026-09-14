@@ -1433,6 +1433,7 @@ function _toggleProjPanel(chip, convId) {
     e.stopPropagation();
     if (e.target.closest('.proj-add')) {
       // Real creation flow (projects.js): Dropbox folder picker → name → registry.
+      if (!window.SandpieProjects) { console.warn('[projects] module not loaded'); return; }
       const created = await SandpieProjects.newProjectFlow();
       if (created) {
         _convProjects.set('' + convId, created.root);
@@ -1468,6 +1469,7 @@ function _toggleProjPanel(chip, convId) {
   // the chip's name lookup.
   (async () => {
     try {
+      if (!window.SandpieProjects) { fill([]); place(); return; }
       const reg = await SandpieProjects.loadRegistry();
       SandpieProjects._cache = reg;
       fill(reg); place();
