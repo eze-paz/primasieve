@@ -94,7 +94,14 @@ const SCRIPT = [
   '# 6. nothing may land at / ',
   'echo "leaked=$(ls /a.out /conftest /conftest.o /uses 2>/dev/null | wc -l)"',
   '',
-  '# 7. FAILURE must be non-zero. A compile error and a link error, both.',
+  '# 7. -print-prog-name must answer with an ABSOLUTE path (libtool AC_PROG_LD takes an',
+  '#    absolute answer as final; a bare name sends it hunting $PATH and then judging the',
+  '#    result against with_gnu_ld, which our LLD is not -- "no acceptable ld found").',
+  'echo "ppn_ld=$(cc -print-prog-name=ld)"',
+  'echo "ppn_ar=$(cc -print-prog-name=ar)"',
+  'echo "ppn_unknown=$(cc -print-prog-name=nosuchtool)"',
+  '',
+  '# 8. FAILURE must be non-zero. A compile error and a link error, both.',
   'cc bad.c -o bad 2>/dev/null; echo "badc_rc=$?"',
   'printf "extern void nosuchsym(void);\\nint main(void){nosuchsym();return 0;}\\n" > /tmp/cclab/ln.c',
   'cc ln.c -o ln 2>/dev/null; echo "badlink_rc=$?"',
@@ -131,6 +138,11 @@ try {
   // non-zero" would also pass on a cc that failed at everything.
   check('a compile ERROR is reported as non-zero', /badc_rc=[1-9]/.test(out), out);
   check('a link ERROR is reported as non-zero', /badlink_rc=[1-9]/.test(out), out);
+  check('-print-prog-name=ld gives an absolute path libtool accepts', /ppn_ld=\/usr\/bin\/ld/.test(out), out);
+  check('-print-prog-name=ar gives an absolute path', /ppn_ar=\/usr\/bin\/ar/.test(out), out);
+  // CONTROL: a tool we do NOT ship must still echo the bare name back, or the check above
+  // would pass on a wrapper that blindly prefixes /usr/bin/ onto anything.
+  check('CONTROL: an unknown tool is echoed back unchanged', /ppn_unknown=nosuchtool$/m.test(out), out);
 
 } finally {
   if (browser) await browser.close();
