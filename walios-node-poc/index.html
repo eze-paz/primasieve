@@ -1,0 +1,56 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>walios-node — Phase 1</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; background: #111; color: #ddd; margin: 0; padding: 16px; }
+  h1 { font-size: 14px; color: #8fd; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: #777; margin-bottom: 12px; }
+  pre { white-space: pre-wrap; margin: 0; }
+  #out { border-left: 2px solid #2a4; padding-left: 10px; }
+  #err { border-left: 2px solid #a33; padding-left: 10px; color: #e99; margin-top: 10px; }
+  .ok { color: #6d6; } .bad { color: #e66; }
+</style>
+<h1>walios-node — node's lib/ on the real walios kernel</h1>
+<div class="sub">node-proc-worker.js runs as an ordinary walios process; every fs call is a syscall into wali-worker.js.</div>
+<pre id="out"></pre>
+<pre id="err"></pre>
+
+<script src="/modules/walios-backend.js"></script>
+<script>
+const out = document.getElementById('out');
+const err = document.getElementById('err');
+const write = (el, s) => { el.textContent += s; };
+
+if (!crossOriginIsolated) {
+  write(err, 'NOT cross-origin isolated — SharedArrayBuffer is unavailable.\nServe with COOP/COEP (use serve.mjs).\n');
+} else {
+  boot().catch((e) => write(err, 'boot failed: ' + (e && e.stack || e) + '\n'));
+}
+
+async function boot() {
+  const WB = self.WALIOS_BACKEND;
+  if (!WB) throw new Error('walios-backend.js did not load (serve the repo root)');
+
+  const kernel = new Worker('/walios/wali-worker.js');
+  kernel.onerror = (e) => write(err, 'kernel worker error: ' + (e.message || e) + '\n');
+  kernel.onmessage = (ev) => {
+    const m = ev.data;
+    if (m.t === 'out') write(m.fd === 2 ? err : out, m.s);
+    else if (m.t === 'exit') write(out, '\n[process exited ' + m.code + ']\n');
+    else if (m.t === 'result') write(out, '\n[' + (m.fail ? 'FAILURES' : 'ALL PASS') + ' pass=' + m.pass + ' fail=' + m.fail + ' syscalls=' + m.calls + ']\n');
+  };
+
+  // The standard walios boot, plus one manifest entry: `node` -> our stub module.
+  // Everything else (busybox root, /etc seeding, env) is the same as any host, which
+  // is the point — the node process lands on the SAME filesystem as the shell.
+  const msg = await WB.runMessage({
+    kind: 'tool',
+    base: '/walios/',
+    argv: ['node'],
+    cwd: '/root',
+    rpc: false,
+    manifest: { node: '/walios-node-poc/node-stub.wasm' },
+  });
+  kernel.postMessage(msg);
+}
+</script>
