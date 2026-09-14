@@ -3143,9 +3143,7 @@ body.sp-decoding *::after {
   border-radius: 16px 16px 4px 16px;
   font-weight: 600;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  transition: transform 0.2s;
 }
-[data-theme="clear"] .user .bubble:hover { transform: translateY(-2px); }
 [data-theme="clear"] .assistant {
   background: transparent;
   border: none;
