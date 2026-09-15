@@ -3858,7 +3858,7 @@ html[data-theme="aurora"] #messagesSide > .msg.user {
      rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
+  padding: 2rem 10px 2rem var(--sprail-gut);
   margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 0; }
@@ -3913,7 +3913,7 @@ html[data-theme="aurora"] #messagesSide > .msg.assistant {
   border-left-color: var(--sp-accent);
   background: var(--sprail-ground);
   padding-right: 12px;   /* the tint needs air on the far side of the prose */
-  padding-top: 7px; padding-bottom: 4px;
+  padding-top: 2rem; padding-bottom: 2rem;
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="aurora"] .msg.assistant p { margin: 0 0 0.68em; }
@@ -4015,7 +4015,7 @@ html[data-theme="olive"] #messages > .msg.user,
 html[data-theme="olive"] #messagesSide > .msg.user {
   border-left-color: var(--sprail-ops);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
+  padding: 2rem 10px 2rem var(--sprail-gut);
   margin-top: 40px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="olive"] .conv-host > .msg.user:first-child { margin-top: 0; }
@@ -4069,7 +4069,7 @@ html[data-theme="olive"] #messages > .msg.assistant,
 html[data-theme="olive"] #messagesSide > .msg.assistant {
   border-left-color: var(--sp-accent);
   background: var(--sprail-ground);
-  padding-top: 7px; padding-bottom: 10px;
+  padding-top: 2rem; padding-bottom: 2rem;
   margin-bottom: 14px;         /* separation after the reply */
   font-size: 13.5px; line-height: 1.6;
 }
@@ -4206,7 +4206,7 @@ html[data-theme="light"] #messagesSide > .msg.user {
      rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
+  padding: 2rem 10px 2rem var(--sprail-gut);
   margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="light"] .conv-host > .msg.user:first-child { margin-top: 0; }
@@ -4261,7 +4261,7 @@ html[data-theme="light"] #messagesSide > .msg.assistant {
   border-left-color: var(--sprail-key);
   background: var(--sprail-ground);
   padding-right: 12px;   /* the tint needs air on the far side of the prose */
-  padding-top: 7px; padding-bottom: 4px;
+  padding-top: 2rem; padding-bottom: 2rem;
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="light"] .msg.assistant p { margin: 0 0 0.68em; }
@@ -4367,7 +4367,7 @@ html[data-theme="clear"] #messagesSide > .msg.user {
      rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
+  padding: 2rem 10px 2rem var(--sprail-gut);
   margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="clear"] .conv-host > .msg.user:first-child { margin-top: 0; }
@@ -4422,7 +4422,7 @@ html[data-theme="clear"] #messagesSide > .msg.assistant {
   border-left-color: var(--sprail-key);
   background: var(--sprail-ground);
   padding-right: 12px;   /* the tint needs air on the far side of the prose */
-  padding-top: 7px; padding-bottom: 4px;
+  padding-top: 2rem; padding-bottom: 2rem;
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="clear"] .msg.assistant p { margin: 0 0 0.68em; }
