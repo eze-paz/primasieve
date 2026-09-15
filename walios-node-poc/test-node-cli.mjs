@@ -115,6 +115,26 @@ await t('node script.js does fs work', ['/bin/node', '/app/w.js'], 'wrote 11',
   });
 await t('node missing.js -> exit 1', ['/bin/node', '/app/nope.js'], (r) => r.code === 1 && /cannot find module/i.test(r.err));
 
+// --check parses without running: a script that would print must stay silent.
+await t('node --check on good source', ['/bin/node', '--check', '/app/ok.js'],
+  (r) => r.code === 0 && r.out === '' && r.err === '',
+  (fs) => { fs.mkdirSync('/app'); fs.writeFileSync('/app/ok.js', 'console.log("SHOULD NOT RUN")'); });
+await t('node -c is the same flag', ['/bin/node', '-c', '/app/ok.js'],
+  (r) => r.code === 0 && r.out === '',
+  (fs) => { fs.mkdirSync('/app'); fs.writeFileSync('/app/ok.js', 'const x = 1;'); });
+await t('node --check reports a syntax error', ['/bin/node', '--check', '/app/bad.js'],
+  (r) => r.code === 1 && /SyntaxError/.test(r.err) && /bad\.js/.test(r.err),
+  (fs) => { fs.mkdirSync('/app'); fs.writeFileSync('/app/bad.js', 'function ( {'); });
+// A top-level `const process` is legal source, not a redeclaration -- the seam
+// that broke commander must not resurface as a false --check failure.
+await t('node --check accepts a top-level const process', ['/bin/node', '--check', '/app/shadow.js'],
+  (r) => r.code === 0 && r.err === '',
+  (fs) => { fs.mkdirSync('/app'); fs.writeFileSync('/app/shadow.js', 'const process = {};'); });
+await t('node --check on a missing file -> exit 1', ['/bin/node', '--check', '/app/nope.js'],
+  (r) => r.code === 1 && /cannot open/.test(r.err));
+await t('node --check with no script -> exit 9', ['/bin/node', '--check'],
+  (r) => r.code === 9);
+
 await t('node --bogus -> exit 9', ['/bin/node', '--bogus'], (r) => r.code === 9 && /bad option/.test(r.err));
 
 // ---- stdin + REPL ----------------------------------------------------------

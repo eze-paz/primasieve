@@ -3047,6 +3047,7 @@ const USAGE = [
   '',
   '  -e, --eval <code>     evaluate code',
   '  -p, --print <code>    evaluate and print the result',
+  '  -c, --check           check the script for syntax errors, do not run it',
   '  -v, --version         print the version',
   '  -h, --help            print this',
   '',
@@ -3232,7 +3233,7 @@ function main(rt, sys, arena, trace) {
 
   // argv[0] is the interpreter; walios passes the program name there.
   const args = argv.slice(1);
-  let evalCode = null, printResult = false, script = null;
+  let evalCode = null, printResult = false, script = null, checkOnly = false;
   const scriptArgs = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -3240,6 +3241,7 @@ function main(rt, sys, arena, trace) {
     if (script !== null) { scriptArgs.push(a); continue; }
     if (a === '-e' || a === '--eval') { evalCode = args[++i]; continue; }
     if (a === '-p' || a === '--print') { evalCode = args[++i]; printResult = true; continue; }
+    if (a === '-c' || a === '--check') { checkOnly = true; continue; }
     if (a === '-v' || a === '--version') { out(process.version + '\n'); return 0; }
     if (a === '-h' || a === '--help') { out(USAGE + '\n'); return 0; }
     if (a === '--') { continue; }
@@ -3272,6 +3274,30 @@ function main(rt, sys, arena, trace) {
       errOut(formatErr(e) + '\n');
       return 1;
     }
+  }
+
+  // ---- node --check script.js ----------------------------------------------
+  // Parse and do not run. Deliberately compiled WITHOUT the realm globals as
+  // shadowed parameters: a module-level `const process` is legal source, and
+  // reporting it as a redeclaration is exactly the bug that broke commander.
+  if (checkOnly) {
+    if (script === null) { errOut('node: --check requires a script' + NL); return 9; }
+    const path = absolute(script, process);
+    let src;
+    try { src = R('fs').readFileSync(path, 'utf8'); }
+    catch (e) { errOut('node: cannot open ' + path + ': ' + ((e && e.code) || (e && e.message)) + NL); return 1; }
+    if (src.charCodeAt(0) === 35 && src.charCodeAt(1) === 33) {          // shebang
+      const nl = src.indexOf(NL);
+      src = nl < 0 ? '' : src.slice(nl);
+    }
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function('exports', 'require', 'module', '__filename', '__dirname', src);
+    } catch (e) {
+      errOut(path + NL + ((e && e.message) ? 'SyntaxError: ' + e.message : String(e)) + NL);
+      return 1;
+    }
+    return 0;                                     // node prints nothing on success
   }
 
   // ---- node script.js -------------------------------------------------------
