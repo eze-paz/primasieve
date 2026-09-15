@@ -280,11 +280,12 @@ WORKER_V = 'sig31';
     // bzip2/bunzip2, unzip, diff/cmp built in. The catalog's GNU tar was `rmt` and its
     // grep/diffutils/findutils were gnulib test helpers (the farm picked the wrong
     // executable); those catalog entries are gone and busybox provides the commands.
-    BUSYBOX: 'busybox.wasm?v=net11',   // net8: CONFIG_FEATURE_WGET_OPENSSL -- `wget https://` works (helper: /bin/openssl)
+    BUSYBOX: 'busybox.wasm?v=net12',   // net8: CONFIG_FEATURE_WGET_OPENSSL -- `wget https://` works (helper: /bin/openssl)
     //                                net9:  FEATURE_TAR_OLDGNU/OLDSUN -- tar reads v7-format archives (jq's)
     //                                net10: ls -t / grep -A-B-C and the rest of the standard flag surface
     //                                net11: --import-memory -- the KERNEL owns the linear memory, so a
     //                                       terminated process no longer leaks it (see e2e-process-ceiling)
+    //                                net12: CONFIG_DESKTOP -- the non-essential applet flags (od -A, ...)
     async runMessage(o) {
       const base = o.base || '/walios/';
       const bb = o.busybox || this.BUSYBOX;
