@@ -3228,7 +3228,7 @@ ul.conv-list li.active {
   outline: 1px solid #93a332;
 }
 
-[data-theme="olive-bold"] main { background: linear-gradient(180deg, #1D1D1B 0%, #232320 100%); }
+[data-theme="olive-bold"] main { background: #1D1D1B; }
 
 
 [data-theme="olive-bold"] .user .bubble { background: linear-gradient(135deg, #93a332, #C9A25A); color: #fff; border-radius: 18px 18px 6px 18px; font-weight: 500; box-shadow: 0 4px 16px rgba(147,163,50,0.2); }
