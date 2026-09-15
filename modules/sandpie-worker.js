@@ -3008,7 +3008,7 @@ const WALIOS_BASE = '/walios/';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=17');
+importScripts('/modules/walios-backend.js?v=18');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_BB = WB.BUSYBOX;   // one busybox for every host; the version (and what changed) lives in walios-backend.js
 const WALIOS_WORKER_V = WB.WORKER_V;

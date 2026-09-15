@@ -364,7 +364,7 @@ WORKER_V = 'devexec36';
       const b = {};
       await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld',
                          'nm', 'strip', 'objdump', 'pkg-config'].map(async (n) => {
-        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=2'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
+        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=3'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
       // config.site -- so a PLAIN `./configure` works, on every autotools package.
