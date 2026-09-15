@@ -133,13 +133,13 @@
     gw = Math.ceil(W / cell); gh = Math.ceil(H / cell);
     off.width = gw; off.height = gh; img = octx.createImageData(gw, gh);
     ctx.imageSmoothingEnabled = false;
-    moon = null;                     // every redraw (resize/remount) respawns the moon
     dirty = true;
   }
   /* ── water fields (round-3 mockups W1/W3, monochrome via the shared ramp) ── */
   /* ── open water: tuned field (mockup round 4) + moon with reflection ──
-     The moon spawns at a RANDOM position on every redraw (resize / remount),
-     constrained to the sky band and never overlapping the greeting message. */
+     The moon position is drawn ONCE per page load (boot) and kept for the
+     whole session — resizes, pane remounts and focus changes never move it.
+     It is constrained to the sky band and never overlaps the greeting. */
   const MOON = { x: .7, y: .06, r: .04, soft: .4, glintW: .11, glintAmp: 1 };
   let moon = null;                       // { x, y } in pane fractions, spawned per redraw
   function greetingRect() {
@@ -172,7 +172,7 @@
   }
   function paintWaterOpen() {
     if (!img || !pal) return;
-    if (!moon) spawnMoon();
+    if (!moon) spawnMoon();          // lazily on first paint; position fixed for the session
     const d = img.data, T = tick / 60, horizon = gh * .5;
     const mx = moon.x * gw, my = moon.y * gh, mr = Math.min(gw, gh) * MOON.r;
     const gx = moon.x * gw, halfw = gw * MOON.glintW;
@@ -398,6 +398,7 @@
   function boot() {
     mode = loadMode();
     retheme(); sync();
+    spawnMoon();                     // one random moon per page load
     // Settings → Appearance → Background (another device/tab or this module's
     // own save) — re-apply live.
     try { if (window.SandpieConfig && SandpieConfig.subscribe) SandpieConfig.subscribe('background', () => { const m = loadMode(); if (m !== mode) applyMode(m); }); } catch (_) {}
