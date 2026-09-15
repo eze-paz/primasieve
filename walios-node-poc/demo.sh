@@ -107,4 +107,24 @@ console.log('CP-BIN-APPLET:' + s6.status);   // busybox: applet not found
 CPEOF
 node /tmp/cp.js
 
+echo "--- async child_process.spawn ---"
+cat > /tmp/cpa.js <<'CPAEOF'
+const cp = require('child_process');
+const c = cp.spawn('/bin/busybox', ['sh', '-c', 'echo async-out; echo async-err 1>&2; exit 3']);
+let out = '', err = '';
+c.stdout.on('data', (d) => { out += d; });
+c.stderr.on('data', (d) => { err += d; });
+c.on('close', (code) => {
+  console.log('SPAWN-CLOSE:' + code + ' OUT:' + out.trim() + ' ERR:' + err.trim());
+  // stdin, then a second child, to prove the handle wiring both ways
+  const c2 = cp.spawn('/bin/busybox', ['cat']);
+  let got = '';
+  c2.stdout.on('data', (d) => { got += d; });
+  c2.on('close', () => console.log('SPAWN-STDIN:' + got.trim()));
+  c2.stdin.write('async-piped');
+  c2.stdin.end();
+});
+CPAEOF
+node /tmp/cpa.js
+
 echo "--- done ---"
