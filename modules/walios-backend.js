@@ -194,11 +194,16 @@ WORKER_V = 'killall33';
                // `cc`/`gcc` are the driver wrapper from walios/bin (the driver cannot spawn its
                // cc1/wasm-ld steps, the wrapper runs them as processes). It used to run on the
                // PAGE, terminal-only: `cc` in the tool hung to the timeout.
-               // NB `ar` and `ranlib` are deliberately NOT here: they are seeded as absolutising
-               // wrapper scripts by toolBlobs() (see walios/bin/ar) because clang.wasm resolves
-               // relative paths against "/". A manifest entry would materialise /bin/ar and
-               // shadow the wrapper, since PATH is /bin:/usr/bin.
-               clang: CLANG, 'wasm-ld': CLANG, nm: CLANG, strip: CLANG, objdump: CLANG, 'llvm-ar': CLANG, 'llvm-ranlib': CLANG };
+               // NB `ar`, `ranlib`, `ld`, `nm`, `strip` and `objdump` are deliberately NOT here:
+               // they are seeded as absolutising wrapper scripts by toolBlobs() (see walios/bin/ar)
+               // because clang.wasm resolves relative paths against "/". A manifest entry would
+               // materialise /bin/ar and shadow the wrapper, since PATH is /bin:/usr/bin.
+               // nm/strip/objdump WERE here, under their plain names, and that is exactly how
+               // they stayed broken: `nm foo.o` looked for /foo.o. libtool builds its symbol
+               // pipe from a relative-path nm probe, so the pipe came out empty and every
+               // libtool link died with `eval: syntax error: unexpected "|"`. See walios/bin/nm.
+               clang: CLANG, 'wasm-ld': CLANG, 'llvm-ar': CLANG, 'llvm-ranlib': CLANG,
+               'llvm-nm': CLANG, 'llvm-strip': CLANG, 'llvm-objdump': CLANG };
     },
 
     // ONE mount strategy for every host. It used to fork: 'terminal' unpacked all six
@@ -333,8 +338,9 @@ WORKER_V = 'killall33';
     // in-guest). Source of truth: sandpie-server/walios/bin/*, served under /walios/bin/.
     async toolBlobs(base) {
       const b = {};
-      await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld'].map(async (n) => {
-        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=1'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
+      await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld',
+                         'nm', 'strip', 'objdump'].map(async (n) => {
+        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=2'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
       // Applet links. Real busybox is installed with `busybox --install -s`, one symlink per

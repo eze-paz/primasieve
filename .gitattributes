@@ -1,0 +1,8 @@
+# walios assets are deployed byte-for-byte and served to the guest; keep LF on checkout
+# so a Windows working copy does not silently rewrite every line. The bin/ wrappers have
+# no .sh extension, so the *.sh rule below would not have covered them.
+/walios/** text eol=lf
+
+# Shell scripts must stay LF wherever they live: CRLF makes bash treat a "\" line
+# continuation as escaping the CR, not the newline, and the script dies mid-parse.
+*.sh text eol=lf

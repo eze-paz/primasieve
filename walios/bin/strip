@@ -1,0 +1,19 @@
+#!/bin/sh
+# strip -- absolutising wrapper around llvm-strip. See bin/nm for why this exists.
+#
+# Unlike nm/objdump, strip WRITES: -o names an output path, so it has to be absolutised
+# too, or the stripped copy lands at / instead of the cwd (the same trap bin/cc hit with
+# its own -o, where `make install` quietly wrote binaries into the root).
+here=$(pwd)
+abs() { case "$1" in /*|'') printf %s "$1" ;; *) printf %s "$here/$1" ;; esac; }
+n=$#; i=0; want=0
+while [ $i -lt $n ]; do
+  a=$1; shift; i=$((i+1))
+  if [ $want = 1 ]; then set -- "$@" "$(abs "$a")"; want=0; continue; fi
+  case "$a" in
+    -o) set -- "$@" "$a"; want=1 ;;
+    -*) set -- "$@" "$a" ;;
+    *)  set -- "$@" "$(abs "$a")" ;;
+  esac
+done
+exec llvm-strip "$@"
