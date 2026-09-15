@@ -1830,16 +1830,6 @@ ul.conv-list li.active {
     color: var(--sp-accent);
     font-weight: 700;
   }
-  .tc-chevron {
-    margin-left: auto;
-    flex-shrink: 0;
-    color: var(--sp-text-dim);
-    opacity: 0.35;
-    font-size: 10px;
-    transition: transform 0.2s ease, opacity 0.15s ease;
-  }
-  .tool-call .tc-collapsed:hover .tc-chevron { opacity: 0.7; }
-  .tool-call.expanded .tc-collapsed .tc-chevron { transform: rotate(90deg); opacity: 0.7; }
 
   /* ---- Task Register: consecutive tool calls grouped in one block titled by
      the active checklist item (tgLogFor in conversations.js). Collapsed, only

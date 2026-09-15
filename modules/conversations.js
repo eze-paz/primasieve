@@ -5659,7 +5659,7 @@ function renderTcPreparing(div, fname, args) {
       REPL_LOADER('tc-dim') +
       `<span class="tc-title tc-dim" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'doing', args)}…</span>` +
       '<span class="tc-meta"></span>' +
-      '<span class="tc-chevron">▸</span>';
+      ';
   }
   const meta = el.querySelector('.tc-meta');
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
@@ -5673,7 +5673,7 @@ function renderTcRunning(div, fname, args) {
     el.innerHTML =
       REPL_LOADER() +
       `<span class="tc-title" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'doing', args)}…</span>` +
-      '<span class="tc-chevron">▸</span>';
+      ';
   }
 }
 
@@ -5684,7 +5684,7 @@ function renderTcDone(div, fname, args) {
   el.innerHTML =
     '<span class="tc-prompt">&gt;&gt;&gt;</span>' +
     `<span class="tc-title tc-dim" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'done', args)}</span>` +
-    '<span class="tc-chevron">▸</span>';
+    ';
   // Tools whose result IS the point of the call render it inside the expanded box,
   // so show it by default (other tools stay collapsed behind the header toggle).
   // The user can still collapse it by clicking the header.
