@@ -226,4 +226,7 @@ req.setTimeout(8000, () => { console.log('TLS-TIMEOUT'); req.destroy(); });
 TLSEOF
 node /tmp/tls.js
 
+echo "--- worker_threads (present, honest) ---"
+node -e 'const w=require("worker_threads"); console.log("WT:"+w.isMainThread+":"+w.threadId+":"+(typeof w.MessageChannel)); try { new w.Worker("/x.js"); } catch (e) { console.log("WT-WORKER:"+e.code); }'
+
 echo "--- done ---"

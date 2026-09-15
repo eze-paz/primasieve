@@ -178,6 +178,8 @@ const checks = [
   ['vm.Script runs in a context', /VM-SCRIPT:42/.test(outText)],
   ['new vm.Script throws on bad syntax', /VM-SYNTAX:SyntaxError/.test(outText)],
   ['fork() IPC sends both ways', /FORK-IPC:2,4 exit=0/.test(outText)],
+  ['worker_threads loads and reports the truth', /WT:true:0:function/.test(outText)],
+  ['new Worker() fails by name, not silently', /WT-WORKER:ERR_WORKER_UNSUPPORTED_OPERATION/.test(outText)],
   ['&& chaining worked', /&& worked/.test(outText)],
   ['exit code propagated', /exit code was 3/.test(outText)],
   ['echo | node ran stdin as a script', /from-stdin-777/.test(outText)],

@@ -18,6 +18,7 @@ const cryptoShim = require('./shim-crypto.js');
 const zlibShim = require('./shim-zlib.js');
 const httpsShim = require('./shim-http.js');
 const { makeTls } = require('./shim-tls.js');
+const { makeWorkerThreads } = require('./shim-worker-threads.js');
 
 function shimFactories(deps) {
   const { EventEmitter, pending, sys, mem } = deps;
@@ -50,6 +51,12 @@ function shimFactories(deps) {
   // a host that actually has tlswrap, not at boot on one that may not.
   out.https = https;
   if (deps.require) out.tls = makeTls({ require: deps.require, pending, trace: deps.trace });
+
+  // worker_threads: node's own lib/ cannot load here (it needs the messaging binding),
+  // and it threw on REQUIRE -- so a package that only wanted to read isMainThread died
+  // at import. This one loads, tells the truth, and throws a named error if anything
+  // actually asks for a second thread.
+  out.worker_threads = makeWorkerThreads({ require: deps.require });
   return out;
 }
 
