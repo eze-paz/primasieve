@@ -3008,7 +3008,7 @@ const WALIOS_BASE = '/walios/';
 // The backend definition is SHARED with /walios/terminal.html so the interactive terminal
 // always runs the same CPython, package bundles and env as run_python does. Classic script,
 // assigns self.WALIOS_BACKEND — this is a classic Worker and cannot use `import`.
-importScripts('/modules/walios-backend.js?v=11');
+importScripts('/modules/walios-backend.js?v=14');
 const WB = self.WALIOS_BACKEND;
 const WALIOS_BB = WB.BUSYBOX;   // one busybox for every host; the version (and what changed) lives in walios-backend.js
 const WALIOS_WORKER_V = WB.WORKER_V;
@@ -3174,8 +3174,11 @@ async function _waliosBlobs() {
   }
   return b;
 }
-async function tool_walios({ script, timeout }, ctx) {
-  if (!script || !String(script).trim())
+async function tool_walios({ script, timeout, resume }, ctx) {
+  // resume:true continues the run the last deadline SUSPENDED, instead of starting a new
+  // one. It is the only call shape that takes no script.
+  const wantResume = resume === true || resume === 'true';
+  if (!wantResume && (!script || !String(script).trim()))
     return { result: 'Error: "script" is required — pass it as the "script" argument, or via the <|walios|>…<|end_walios|> blob form in your reply.' };
   let t = Number(timeout); if (!isFinite(t) || t <= 0) t = 120; t = Math.min(300, Math.round(t));
   // Unlike run_python there is no second implementation to fall back to, so say why.
@@ -3194,8 +3197,19 @@ async function tool_walios({ script, timeout }, ctx) {
   const pkgs = await _waliosPkgIndex();
   // ONE boot, shared with the terminal and the REPL (WB.runMessage). Only argv and the
   // soffice bridge are this host's own.
-  const runMsg = await WB.runMessage({ kind: 'tool', base: WALIOS_BASE, busybox: WALIOS_BB, pkgs, manifest: WALIOS_MANIFEST,
-    blobs: await _waliosBlobs(), argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], pty: false, cols: 120, rows: 40 });
+  // A suspended run and a NEW script cannot coexist: the parked processes would sit there
+  // for the life of the kernel with nothing able to reach them. A script means "abandon it".
+  if (k.suspended && !wantResume) {
+    try { w.postMessage({ t: 'killall' }); } catch (_) {}
+    k.suspended = false;
+  }
+  if (wantResume && !k.suspended)
+    return { result: 'Error: there is no suspended run to resume. Pass a "script" to start one.' };
+  // On resume the kernel already has the root process parked mid-run; we re-attach to it
+  // and send SIGCONT instead of booting a second one.
+  const runMsg = wantResume ? null
+    : await WB.runMessage({ kind: 'tool', base: WALIOS_BASE, busybox: WALIOS_BB, pkgs, manifest: WALIOS_MANIFEST,
+        blobs: await _waliosBlobs(), argv: ['busybox', 'sh', '-c', WALIOS_PRELUDE + String(script)], pty: false, cols: 120, rows: 40 });
   return await new Promise((resolve) => {
     const chunks = []; let outLen = 0, truncated = false, done = false;
     const push = (s) => { if (!truncated) { chunks.push(s); outLen += s.length; if (outLen > 65536) truncated = true; } };
@@ -3207,7 +3221,7 @@ async function tool_walios({ script, timeout }, ctx) {
       if (done) return;
       const left = deadline - Date.now();
       if (left > 0) { timer = setTimeout(tick, left); return; }
-      detach('Error: walios run exceeded ' + t + 's and was stopped.');
+      suspend('Error: walios run exceeded ' + t + 's.');
     };
     const finish = (result) => { if (done) return; done = true; clearTimeout(timer); k.busy = false; k.last = Date.now(); resolve({ result }); };
     // DEADLINE: stop the processes, KEEP the session. The kernel, /tmp, the compiled
@@ -3216,14 +3230,55 @@ async function tool_walios({ script, timeout }, ctx) {
     // the whole kernel -- a build that ran out of budget threw away everything it had
     // already done, which is exactly the trap a long ./configure falls into.
     // ABORT still uses kill(): a stopped turn must leave nothing running.
-    const detach = (why) => {
+    // DEADLINE: SUSPEND the run. The processes are parked with SIGSTOP and kept, so the
+    // work IN FLIGHT survives, not just the filesystem -- the next call resumes the very
+    // same ./configure at the instruction it reached. It used to killall(), which kept
+    // /tmp but destroyed the run, and configure is not resumable, so a build that ran out
+    // of budget started over every time. That is what forced the "background it yourself"
+    // workaround, which is the wrong tool to hand a model on a phone: a backgrounded
+    // runaway keeps burning CPU with nobody watching it.
+    //
+    // A process that will not park is KILLED. Parking is honoured at the next blocking
+    // syscall, so a pure-compute runaway would otherwise be left running behind a reply
+    // that claimed it was suspended -- exactly the leak suspending is meant to avoid.
+    const suspend = (why) => {
       if (done) return; done = true; clearTimeout(timer);
-      try { w.postMessage({ t: 'killall' }); } catch (_) {}
       let partial = chunks.join(''); if (partial.length > 65536) partial = partial.slice(0, 65536) + '\n…[truncated]';
-      k.busy = false; k.last = Date.now();
-      resolve({ result: why + ' The session is intact -- /tmp, the workspace and anything already built are still there,'
-        + ' so the next walios call continues from here (run the remaining steps, or re-run a resumable command like `make`).'
-        + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : '') });
+      const tail = partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : '';
+      let settled = false;
+      const land = (msg) => {
+        if (settled) return; settled = true;
+        k.busy = false; k.last = Date.now();
+        resolve({ result: why + msg + tail });
+      };
+      const onStopped = (ev) => {
+        const m = ev && ev.data;
+        if (!m || m.t !== 'stopped-all') return;
+        w.removeEventListener('message', onStopped);
+        if (m.parked >= m.live && m.live > 0) {
+          k.suspended = true;
+          land(' The run is SUSPENDED, not lost: ' + m.parked + ' process(es) are parked exactly where they were.'
+            + ' Call walios again with resume:true (no script) to continue it -- a long ./configure or make picks up'
+            + ' mid-work rather than starting over. Sending a script instead abandons the suspended run.');
+        } else {
+          // Could not park everything: do not pretend. Kill, and say so.
+          try { w.postMessage({ t: 'killall' }); } catch (_) {}
+          k.suspended = false;
+          land(' It could not be suspended (' + m.parked + ' of ' + m.live + ' processes parked -- something is spinning'
+            + ' without making syscalls), so it was stopped instead. /tmp and anything already written are still there.');
+        }
+      };
+      w.addEventListener('message', onStopped);
+      try { w.postMessage({ t: 'stopall' }); } catch (_) { }
+      // The kernel must answer; if it cannot, fall back to the old behaviour rather than hang.
+      setTimeout(() => {
+        if (settled) return;
+        w.removeEventListener('message', onStopped);
+        try { w.postMessage({ t: 'killall' }); } catch (_) {}
+        k.suspended = false;
+        land(' The session is intact -- /tmp, the workspace and anything already built are still there,'
+          + ' so the next walios call continues from here.');
+      }, 3000);
     };
     const kill = (why) => {
       if (done) return; done = true; clearTimeout(timer);
@@ -3283,7 +3338,11 @@ async function tool_walios({ script, timeout }, ctx) {
       }
     };
     w.onerror = (e) => kill('Error: walios worker crashed: ' + ((e && e.message) || e));
-    w.postMessage(runMsg);
+    // Resume: the parked root process is still there and its stdout still lands on this
+    // worker's 'out' messages, which the handler above is already collecting -- so the only
+    // thing needed is the SIGCONT. The run then ends the way any run does, with 'exit'.
+    if (wantResume) { k.suspended = false; try { w.postMessage({ t: 'contall' }); } catch (_) {} }
+    else w.postMessage(runMsg);
   });
 }
 

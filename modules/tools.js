@@ -431,10 +431,7 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
       description: `Run a shell script (busybox ash) in walios, a sandboxed Linux in the browser. You get stdout, stderr and the exit code. NOT the user's machine — that is the \`shell\` tool.
 FILES: cwd and $HOME are /root, the same workspace the file tools and run_python see (/files is the same directory). Writes persist; rm deletes REAL files.
 STATE: one kernel across calls, so /tmp and anything you built survive. A timeout stops the run but keeps the session. Default 120s, max 300.
-LONGER THAN 300s: background it and poll. A process keeps running between calls, so this is how you run something that cannot finish in one call:
-  call 1:  ( ./configure > /tmp/c.log 2>&1; echo $? > /tmp/c.done ) &
-  call 2+: [ -f /tmp/c.done ] || sleep 120; cat /tmp/c.done 2>/dev/null; tail -3 /tmp/c.log
-Do NOT just re-run a long command in the next call hoping it resumes. \`make\` does resume (it keeps its .o files), but \`./configure\`, \`tar\`, and downloads all restart from zero, so re-running them forever is the one way to never finish. jq's configure takes ~700s: background it, poll, then \`make\`.
+LONGER THAN 300s: just run it. On the deadline the run is SUSPENDED, not lost — every process is parked exactly where it was — and calling again with resume:true (and NO script) continues the same command mid-work. Repeat until it finishes. A 700s ./configure takes three calls and never restarts. Sending a script instead of resume:true abandons the suspended run, so finish it first. Do NOT background long work with \`&\` to dodge the deadline: a backgrounded job nobody is watching keeps burning CPU on a phone, and resume:true already does the job safely.
 SCRIPT: pass it in "script", or omit it and put the raw text in your reply between <|walios|> and <|end_walios|> (no escaping; <|walios:90|> sets the timeout).
 BEYOND BUSYBOX: node, python3, git, curl, ssh, cc (clang 22), make, qjs, lua, rustc, soffice. "apk add NAME" earlier in the SAME script adds bc/cpio/m4/patch and more (instant); "build-pkg NAME" compiles from Alpine source (minutes, best effort, needs a 300s timeout).
 ABSENT: jq, zip, and xz — so -z/-j work but \`tar cJf\` fails ("xz: applet not found"); -J still extracts. Do jq work in run_python.
@@ -445,9 +442,9 @@ GOTCHAS: qjs's std/os are MODULES, not globals (\`qjs --std -e CODE\`, or import
         type: 'object',
         properties: {
           script: { type: 'string', description: 'The shell script to run (busybox ash -c). Multi-line is fine. Omit ONLY when supplying the script in the <|walios|>…<|end_walios|> blob form in your reply.' },
-          timeout: { type: 'number', description: 'Max seconds before the run is terminated (default 120, max 300). Also settable via the <|walios:90|> blob opener.' },
+          timeout: { type: 'number', description: 'Max seconds before the run is suspended (default 120, max 300). Also settable via the <|walios:90|> blob opener.' },
+          resume: { type: 'boolean', description: 'Continue the run a previous deadline suspended, instead of starting a new one. Pass it ALONE, with no "script" — the parked processes carry on from where they stopped. Repeat until the command finishes.' },
         },
-        required: ['script'],
       },
     },
 

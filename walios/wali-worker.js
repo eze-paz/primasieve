@@ -885,7 +885,26 @@ class Process {
           post(`[host] pid ${this.pid} (${(this.argv||[]).slice(0,2).join(' ')}): handler set for signal ${sig} but binary lacks --export-table; default action\n`, 2); }
       }
       if (SIG_DFL_IGNORE.has(sig)) continue;
-      if (SIG_STOPPERS.has(sig)) { if (!this.inChild()) { this.stopped = sig; this.stopReported = false; notifyStopped(this); } continue; }
+      // Job control was COSMETIC: a stopper set P.stopped and told the parent (so ^Z made
+      // the shell print "Stopped" and hand back the prompt) but the child NEVER stopped
+      // running. contWaiters was initialised and drained by SIGCONT, yet nothing ever
+      // pushed to it, so no code path waited for one. Measured: a `kill -STOP` on a busy
+      // job kept writing straight through it -- 9652 bytes before the stop, 20944 after,
+      // 32532 later still.
+      // Now it really parks: this is the ASYNC delivery path, so the syscall simply does
+      // not return until SIGCONT drains contWaiters (line ~579). The kernel is an async
+      // syscall server, so a parked process costs nothing while it waits.
+      // NB the SYNC twin (predeliver) cannot await and still only sets the flag; a process
+      // spinning in pure computation therefore parks at its next BLOCKING syscall, not
+      // instantly. That is fine for builds, which are syscall-bound, but it is why the
+      // caller must keep a kill fallback for a genuine runaway.
+      if (SIG_STOPPERS.has(sig)) {
+        if (!this.inChild()) {
+          this.stopped = sig; this.stopReported = false; notifyStopped(this);
+          await new Promise((res) => { this.contWaiters.push(res); });
+        }
+        continue;
+      }
       if (this.inChild()) return this.parkChild({ exited: 128 + sig });
       throw new ExitError(128 + sig);
     }
@@ -3031,6 +3050,29 @@ self.onmessage = async (ev) => {
     // 137 = 128 + SIGKILL, what a shell reports for a killed job.
     for (const P of [...procs.values()]) { try { P.groupExit(137); } catch (_) {} }
     self.postMessage({ t: 'killed-all' });
+    return; }
+  // SUSPEND / RESUME. killall preserves the FILESYSTEM but destroys the RUN: a ./configure
+  // that ran out of budget still had to start over, because configure is not resumable.
+  // These park the processes instead, so the work in flight survives and the next call
+  // carries on from the same instruction.
+  //
+  // The reply says how many are CONFIRMED parked, not how many were signalled, because the
+  // two differ: a stopper is honoured in the async delivery path, so a process parks at its
+  // next BLOCKING syscall. Builds are syscall-bound and park within milliseconds, but a
+  // process spinning in pure computation would not -- and the caller must be able to tell,
+  // so it can fall back to killing rather than silently leave something burning CPU.
+  if (m.t === 'stopall' || m.t === 'contall') {
+    const sig = m.t === 'stopall' ? SIG.STOP : SIG.CONT;
+    const all = [...procs.values()];
+    for (const P of all) { try { postSignal(P, sig); } catch (_) {} }
+    const settle = () => {
+      const parked = all.filter((P) => procs.has(P.pid) && P.stopped).length;
+      const live = all.filter((P) => procs.has(P.pid)).length;
+      self.postMessage({ t: m.t === 'stopall' ? 'stopped-all' : 'contd-all', parked, live });
+    };
+    // One turn of the loop is enough for anything already blocked in a syscall; the grace
+    // gives a running process time to reach its next one.
+    if (m.t === 'stopall') setTimeout(settle, 250); else settle();
     return; }
   if (m.t === 'sigint') { // page-level Ctrl-C -> guest foreground group (pty pgrp if set, else the root)
     let fg = 0; for (const p of ptys.values()) if (p.pgrp) fg = p.pgrp;
