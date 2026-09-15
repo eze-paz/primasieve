@@ -17,6 +17,7 @@
 const cryptoShim = require('./shim-crypto.js');
 const zlibShim = require('./shim-zlib.js');
 const httpsShim = require('./shim-http.js');
+const { makeTls } = require('./shim-tls.js');
 
 function shimFactories(deps) {
   const { EventEmitter, pending, sys, mem } = deps;
@@ -34,7 +35,22 @@ function shimFactories(deps) {
   }
 
   const { https } = httpsShim.install(EventEmitter, pending);
-  return { crypto: cryptoShim, zlib: zlibShim.install(pending), https };
+  const out = { crypto: cryptoShim, zlib: zlibShim.install(pending) };
+
+  // `tls` is REAL TLS where the host has it: shim-tls.js puts walios' own tlswrap
+  // (OpenSSL, in its own process -- no dlopen, which is what made this look impossible)
+  // in front of an ordinary socket.
+  //
+  // https still routes through the fetch-backed shim. Two reasons, both learned the
+  // hard way just now: probing for tlswrap at SHIM-WIRING time spawns a process on
+  // every node start, before the shim table is even installed; and handing https to
+  // node's own lib/https.js on a host WITHOUT tlswrap loads lib/tls.js, which calls
+  // assertCrypto() and dies with "not compiled with OpenSSL crypto support" -- a worse
+  // failure than the shim it replaced. The switch belongs behind a first-use check on
+  // a host that actually has tlswrap, not at boot on one that may not.
+  out.https = https;
+  if (deps.require) out.tls = makeTls({ require: deps.require, pending, trace: deps.trace });
+  return out;
 }
 
 module.exports = { shimFactories };

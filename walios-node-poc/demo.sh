@@ -210,4 +210,20 @@ k.on('exit', (code) => { plog('parent saw exit ' + code); console.log('FORK-IPC:
 PAREOF
 node /tmp/parent.js
 
+echo "--- TLS ---"
+command -v tlswrap >/dev/null 2>&1 && echo "TLSWRAP:present" || echo "TLSWRAP:absent"
+cat > /tmp/tls.js <<'TLSEOF'
+const https = require('https');
+const req = https.get({ host: 'example.com', path: '/', port: 443 }, (res) => {
+  let n = 0;
+  res.on('data', (d) => { n += d.length; });
+  res.on('end', () => console.log('TLS-GET:' + res.statusCode + ' bytes=' + (n > 100 ? 'many' : n)));
+});
+req.on('error', (e) => console.log('TLS-ERR:' + e.message));
+// 8s, not 30: without tlswrap this request cannot succeed, and a long doomed
+// wait pushes the whole demo toward the harness window for no information.
+req.setTimeout(8000, () => { console.log('TLS-TIMEOUT'); req.destroy(); });
+TLSEOF
+node /tmp/tls.js
+
 echo "--- done ---"
