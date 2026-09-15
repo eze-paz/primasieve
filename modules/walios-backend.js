@@ -106,7 +106,12 @@
   // the kernel pushed an empty chunk, the reader took it for EOF and exited, and the
   // writer's next real write got EPIPE), plus the walios-node hook that starts a JS
   // process worker for node-stub.wasm.
-WORKER_V = 'sig31';
+// mkdir32: mkdir in the workspace reported EPERM while SUCCEEDING -- opfsLoaded is a Map
+// and the handler called .add(), which threw after the OPFS mkdir had already worked;
+// the dispatcher turns any handler exception into -1. Broke `tar x` into /root,
+// `mkdir ~/.ssh`, git clone into a new dir, and multi-call builds. mkdir(2) on an
+// existing path is now EEXIST too, instead of silently succeeding (mkdir -p semantics).
+WORKER_V = 'mkdir32';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise

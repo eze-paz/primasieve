@@ -1401,8 +1401,21 @@ class Process {
         if (dirs.get(p).size) return err(E.NOTEMPTY);
         if (inOpfs(p) && p !== opfsMount) { const r = opfsPathOp(OFS.RMDIR, opfsRel(p)); if (r < 0 && r !== -E.NOENT) return BigInt(r); }
         rmEntry(p); return 0n; }
-      case 'mkdir': { const p = S.atPath(-100, S.cstr(a[0])); opfsFault(p); mkdirp(p);
-        if (inOpfs(p) && p !== opfsMount) { const r = opfsPathOp(OFS.MKDIR, opfsRel(p)); if (r < 0) return BigInt(r); opfsLoaded.add(p); }
+      case 'mkdir': { const p = S.atPath(-100, S.cstr(a[0])); opfsFault(p);
+        // POSIX: mkdir(2) on an existing path is EEXIST. This used to call mkdirp()
+        // straight away, which is idempotent, so the syscall had `mkdir -p` semantics and
+        // silently succeeded on a directory that was already there. `mkdir -p` still works:
+        // busybox tolerates EEXIST itself, which is exactly how it is meant to be built.
+        if (dirs.has(p) || files.has(p)) return err(E.EXIST);
+        mkdirp(p);
+        // opfsLoaded is a MAP (path -> when we last listed it), not a Set. This said
+        // .add(p), which threw TypeError -- and the dispatcher turns ANY handler exception
+        // into -1, so every mkdir in the workspace reported EPERM "Operation not permitted"
+        // while having actually SUCCEEDED (the directory was there afterwards, which is what
+        // made it so confusing). It broke `tar x` into /root, `mkdir -p`, git clone into a new
+        // directory, and `mkdir ~/.ssh`. We just created it and it is empty, so record it as
+        // freshly listed rather than force a re-listing.
+        if (inOpfs(p) && p !== opfsMount) { const r = opfsPathOp(OFS.MKDIR, opfsRel(p)); if (r < 0) return BigInt(r); opfsLoaded.set(p, Date.now()); }
         return 0n; }
       case 'rename': case 'renameat': case 'renameat2': {
         const pa = name === 'rename' ? S.atPath(-100, S.cstr(a[0])) : S.atPath(a[0], S.cstr(a[1]));
