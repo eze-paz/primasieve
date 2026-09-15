@@ -2563,6 +2563,45 @@ function fmtElapsed(totalSec, tenths = false) {
 // ---- Multi-conversation selection (shift/ctrl click + shift-drag rubber band) ----
 // PC-first: shift+click = range (anchor to row), ctrl/cmd+click = toggle, 
 
+
+// ---- Artifact cards: one per path, at turn end -------------------------
+// Live `artifact:` results are collected on the renderer instead of rendering
+// immediately (see the sentinel branch). At turn end -- which covers respond(),
+// an abort and a worker death alike, so nothing is ever stranded -- the list is
+// deduped by path and filtered to what still exists, then rendered at the
+// bottom of the host. A file written three times is one card; a temp file that
+// was deleted before the turn ended is none.
+function flushTurnArtifacts(renderer) {
+  const list = renderer && renderer.pendingArtifacts;
+  if (!list || !list.length) return;
+  renderer.pendingArtifacts = [];
+  const host = renderer.host;
+  (async () => {
+    const seen = new Set();
+    for (const raw of list) {
+      const clean = String(raw || '').replace(/^\/+/, '');
+      if (!clean || seen.has(clean)) continue;
+      seen.add(clean);
+      let resolved = clean;
+      try {
+        resolved = await resolveArtifactPath(clean);
+        if (!(await opfs.exists(resolved))) continue;   // gone by now -> no card
+      } catch (_) { continue; }
+      // Already on screen (a replay, or an earlier flush)? data-artifact-path
+      // holds the RESOLVED path and can carry a sandpie/ prefix the sentinel
+      // never had, so compare both sides normalised rather than by string.
+      const norm = (x) => String(x || '').replace(/^\/+/, '').replace(/^files\//, '')
+        .replace(/^sandpie\//, '').replace(/\/+$/, '');
+      const want = norm(resolved);
+      const already = host && host.querySelectorAll &&
+        [...host.querySelectorAll('.artifact-wrap[data-artifact-path]')]
+          .some((w) => norm(w.dataset.artifactPath) === want);
+      if (already) continue;
+      try { renderArtifact(host, clean); } catch (_) {}
+    }
+  })();
+}
+
 // ---- Message actions: a kebab in the top-right, menu on click ----------
 // The per-message toolbar used to sit permanently under every reply -- three
 // icons on every turn, which in a long thread is pure chrome. The buttons and
@@ -4074,6 +4113,7 @@ async function sendSingle(text, stream, opts = {}) {
     // still counting — even though the worker had aborted correctly.
     try {
       renderer.finalize();
+      flushTurnArtifacts(renderer);
       // A surviving ask card (turn aborted mid-question): keep it ANSWERABLE.
       // Answering appends the tool result and resumes the turn via resolveStoredAsk.
       for (const card of (stream.host ? stream.host.querySelectorAll('.ask-card') : [])) {
@@ -6272,7 +6312,11 @@ class RoundRenderer {
 
     if (sent.startsWith('artifact:')) {
       const path = sent.slice('artifact:'.length);
-      if (path) renderArtifact(this.host, path);
+      // DEFERRED to turn end (flushTurnArtifacts). A long run writes scratch
+      // files, a rewrite, then the real thing -- rendering each one on arrival
+      // buried the deliverable under its own dead ends, and dropped a card into
+      // the middle of the reply. Collected here, deduped and filtered later.
+      if (path) (this.pendingArtifacts = this.pendingArtifacts || []).push(path);
       return;
     }
 
