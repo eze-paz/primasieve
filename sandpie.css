@@ -3931,9 +3931,29 @@ html[data-theme="aurora"] #messagesSide > .msg.assistant {
   padding-top: 7px; padding-bottom: 4px;
   font-size: 13.5px; line-height: 1.6;
 }
-html[data-theme="aurora"] .msg.assistant p { margin: 0 0 0.58em; }
+html[data-theme="aurora"] .msg.assistant p { margin: 0 0 0.68em; }
 html[data-theme="aurora"] .msg.assistant ul { margin: 0.3em 0 0.62em; padding-left: 1.12em; }
-html[data-theme="aurora"] .msg.assistant li { margin: 0.22em 0; }
+html[data-theme="aurora"] .msg.assistant li { margin: 0.3em 0; }
+/* Type pass. A reply here is dense with bold lead-ins ("Headline numbers:",
+   "Major workstreams:"); at the browser default 700 they speckle the
+   paragraph into static. Dropping to 500 and paying for the lost emphasis
+   in BRIGHTNESS keeps the lead-in scannable without the texture. */
+html[data-theme="aurora"] .msg.assistant strong,
+html[data-theme="aurora"] .msg.assistant b {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--sp-text) 78%, #fff);
+}
+/* Headings were sitting tight against the paragraph above them. */
+html[data-theme="aurora"] .msg.assistant h2,
+html[data-theme="aurora"] .msg.assistant h3 {
+  margin: 1.65em 0 0.5em; line-height: 1.25;
+  font-weight: 600; letter-spacing: -0.02em;
+  color: color-mix(in srgb, var(--sp-text) 70%, #fff);
+}
+html[data-theme="aurora"] .msg.assistant h2 { font-size: 1.16rem; }
+html[data-theme="aurora"] .msg.assistant h3 { font-size: 1.02rem; }
+html[data-theme="aurora"] .msg.assistant > .bubble > h2:first-child,
+html[data-theme="aurora"] .msg.assistant > .bubble > h3:first-child { margin-top: 0.25em; }
 html[data-theme="aurora"] .msg.assistant li::marker { color: var(--sprail-out); }
 html[data-theme="aurora"] .msg.assistant > .bubble > :last-child { margin-bottom: 0; }
 html[data-theme="aurora"] .msg.assistant code {
