@@ -1053,6 +1053,7 @@ ul.conv-list li.active {
      on .name would beat that inheritance and kill the accent. These rules
      must also stay AFTER the :hover rule -- they tie on specificity. */
   ul.conv-list li .name { color: var(--sp-text-dim); transition: color 0.1s; }
+  [data-theme="olive"] ul.conv-list li .name { color: var(--sp-text-mid); }
   ul.conv-list li:hover .name { color: var(--sp-text); }
   ul.conv-list li.active .name,
   ul.conv-list li.in-panel .name,
@@ -2686,6 +2687,7 @@ ul.conv-list li.active {
   --sp-accent-dim: rgba(147,163,50,0.15);
   --sp-text: #FAF9F2;
   --sp-text-dim: #BEBDB2;
+  --sp-text-mid: #D8D7CD;
   --sp-success: #6C9E2C;
   --sp-danger: #D8504A;
   --sp-warn: #C9A25A;
