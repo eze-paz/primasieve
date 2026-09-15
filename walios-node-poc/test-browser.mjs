@@ -24,7 +24,7 @@ const HEADED = process.argv.includes('--headed');
 const PROD = process.env.PROD || '';
 const URL_ = PROD ? PROD.replace(/\/$/, '') + '/walios-node-poc/index.html'
                   : `http://localhost:${PORT}/walios-node-poc/`;
-const WAIT_MS = Number(process.env.WAIT_MS || 60000);
+const WAIT_MS = Number(process.env.WAIT_MS || 180000);
 
 // ---- server -----------------------------------------------------------------
 const server = PROD ? { kill() {}, stdout: { on() {} }, stderr: { on() {} } } : spawn(process.execPath, [new URL('./serve.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')], {
@@ -167,6 +167,12 @@ const checks = [
   ['an unknown /bin name is busybox exiting 127', /CP-BIN-APPLET:127/.test(outText)],
   ['async spawn streamed stdout and stderr', /SPAWN-CLOSE:3 OUT:async-out ERR:async-err/.test(outText)],
   ['async spawn wrote to child stdin', /SPAWN-STDIN:async-piped/.test(outText)],
+  ['ESM imported a relative module', /ESM-BASIC:hello esm/.test(outText)],
+  ['ESM bindings are LIVE, not copies', /ESM-LIVE:2/.test(outText)],
+  ['ESM imported a node: builtin', /ESM-BUILTIN:function/.test(outText)],
+  ['ESM interoperated with CJS', /ESM-CJS:cjs-value/.test(outText)],
+  ['dynamic import() from ESM', /ESM-DYNAMIC:hello dyn/.test(outText)],
+  ['a real ESM-only npm package imported', /ESM-PKG:21:function/.test(outText)],
   ['&& chaining worked', /&& worked/.test(outText)],
   ['exit code propagated', /exit code was 3/.test(outText)],
   ['echo | node ran stdin as a script', /from-stdin-777/.test(outText)],

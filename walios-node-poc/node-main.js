@@ -74,6 +74,21 @@ function makeConsole(R, stdout, stderr) {
 // rt   : the object boot() returned
 // sys  : syscall bag (needs argc/argvLen/copyArgv wired)
 // arena: marshalling arena
+// Built once per process and only if something actually imports: constructing it
+// pulls in the resolver and touches package.json, which a plain CJS run need not pay.
+let __esmHost = null;
+function makeEsmHostOnce(rt, trace) {
+  if (__esmHost !== null) return __esmHost;
+  try {
+    const { makeEsmHost } = require('./esm-host.js');
+    __esmHost = makeEsmHost(rt, { trace: (m) => trace && trace('[esm] ' + m) });
+  } catch (e) {
+    trace && trace('[esm] host unavailable: ' + ((e && e.message) || e));
+    __esmHost = false;
+  }
+  return __esmHost;
+}
+
 function main(rt, sys, arena, trace) {
   trace = trace || (() => {});
   const vfs = rt.vfs;
@@ -127,6 +142,22 @@ function main(rt, sys, arena, trace) {
   if (rt.realm.global) {
     rt.realm.global.console = console;
     rt.realm.global.process = process;
+  }
+  // An ESM module is handed to V8 as a blob and evaluates in the WORKER's global
+  // scope, not in our realm -- so `console.log` inside it binds to the WORKER's
+  // console and the output goes to devtools instead of fd 1. It looked like ESM
+  // worked; the writes were just landing somewhere nobody was reading.
+  //
+  // Installing the realm's globals ON the worker global is what node itself does
+  // (they ARE globals there), and it keeps legal shadowing working: a module with its
+  // own `const process` shadows it at module scope rather than colliding.
+  //
+  // Worker-only: in the headless harness globalThis is the TEST RUNNER's global, and
+  // overwriting its console would silence the suite reporting on us.
+  if (typeof importScripts === 'function' && typeof self !== 'undefined') {
+    self.console = console;
+    self.process = process;
+    if (rt.realm.Buffer) self.Buffer = rt.realm.Buffer;
   }
 
   // Do NOT swallow write failures. Swallowing them is why a broken stdout showed up
@@ -272,7 +303,25 @@ function main(rt, sys, arena, trace) {
     try {
       const Module = R('module');
       const M = Module.Module || Module;
-      M._load(absolute(script, process), null, true);
+      const abs = absolute(script, process);
+      // An ESM entry cannot go through M._load: it is handed to V8 as a module, not
+      // wrapped as CJS. The import is async, so it is registered with `pending` --
+      // without that the process exits before the graph has evaluated.
+      const esmHost = makeEsmHostOnce(rt, trace);
+      if (esmHost && esmHost.isEsmPath(abs)) {
+        trace('branch: ESM entry ' + abs);
+        // RETURN THE PROMISE. The first version started the import and returned the
+        // exit code immediately, leaning on the `pending` counter to keep the process
+        // alive -- and that raced: the module's output landed after the process had
+        // been retired in roughly half of runs, so ESM looked intermittently broken
+        // when it was only intermittently WAITED for. main() may now return a promise
+        // of the exit code, and every caller awaits it (awaiting a plain number is
+        // free, so the CJS paths are unchanged).
+        return esmHost.importModule(abs).then(
+          () => (typeof process.exitCode === 'number' ? process.exitCode : 0),
+          (e) => { errOut(formatErr(e) + NL); return 1; });
+      }
+      M._load(abs, null, true);
       return typeof process.exitCode === 'number' ? process.exitCode : 0;
     } catch (e) {
       if (e && e.code === 'MODULE_NOT_FOUND') {
@@ -331,4 +380,4 @@ function formatErr(e) {
   return (e.name || 'Error') + ': ' + (e.message || String(e));
 }
 
-module.exports = { main, readArgv, makeStdio, makeConsole, USAGE };
+module.exports = { main, readArgv, makeStdio, makeConsole, makeEsmHostOnce, USAGE };

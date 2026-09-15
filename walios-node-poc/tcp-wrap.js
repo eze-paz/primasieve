@@ -56,9 +56,17 @@ function makeTcpWrap(sys, mem, deps) {
   // The read/accept pumps must keep the process ALIVE. The worker's raw setTimeout
   // does not register with `pending`, so the process exited the moment main() returned
   // and every response arrived after nobody was listening.
+  // The decrement must happen AFTER fn(), not before. A pump re-schedules itself from
+  // inside fn(), so dropping the count first leaves a window where pending.n is 0 while
+  // work is still outstanding -- and the worker's drain loop, which exits the process
+  // the moment the count reaches zero, could sample exactly there. That is why async
+  // child_process output vanished in some runs and came back when two console.log calls
+  // shifted the timing: the process was being retired mid-pump.
   const later = (fn, ms) => {
     if (pending) pending.n++;
-    return setTimeout(() => { if (pending) pending.n--; fn(); }, ms);
+    return setTimeout(() => {
+      try { fn(); } finally { if (pending) pending.n--; }
+    }, ms);
   };
   const cancel = (t) => { if (t) { clearTimeout(t); if (pending && pending.n > 0) pending.n--; } };
 

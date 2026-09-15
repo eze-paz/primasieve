@@ -20,9 +20,17 @@ function makeProcessWrap(sys, mem, deps) {
     try { return Number(sys[n](...a)); }
     catch (e) { T('sys.' + n + ' THREW ' + ((e && e.message) || e)); return UV_EINVAL; }
   };
+  // The decrement must happen AFTER fn(), not before. A pump re-schedules itself from
+  // inside fn(), so dropping the count first leaves a window where pending.n is 0 while
+  // work is still outstanding -- and the worker's drain loop, which exits the process
+  // the moment the count reaches zero, could sample exactly there. That is why async
+  // child_process output vanished in some runs and came back when two console.log calls
+  // shifted the timing: the process was being retired mid-pump.
   const later = (fn, ms) => {
     if (pending) pending.n++;
-    return setTimeout(() => { if (pending) pending.n--; fn(); }, ms);
+    return setTimeout(() => {
+      try { fn(); } finally { if (pending) pending.n--; }
+    }, ms);
   };
   const cancel = (t) => { if (t) { clearTimeout(t); if (pending && pending.n > 0) pending.n--; } };
 
@@ -116,6 +124,12 @@ function makeProcessWrap(sys, mem, deps) {
       }
 
       this.pid = pid;
+      // Hold the process open for the CHILD'S WHOLE LIFETIME, not just while a poll
+      // timer happens to be scheduled. node emits 'exit'/'close' asynchronously, so a
+      // handler that starts more work (the common `spawn another one when this closes`
+      // shape) runs after the last timer has already dropped its count -- and the
+      // worker's drain loop exits the moment the count reaches zero.
+      if (pending) { pending.n++; this._alive = true; }
       for (const [handle, parentFd] of attach) handle.open(parentFd);
       this._watch();
       return 0;
@@ -136,16 +150,29 @@ function makeProcessWrap(sys, mem, deps) {
           const code = termSig ? 0 : ((w >> 8) & 0xff);
           T('exit pid=' + this.pid + ' code=' + code + ' sig=' + termSig);
           if (this.onexit) this.onexit(code, termSig || 0);
+          this._release();
           return;
         }
         if (r < 0) {                       // ECHILD: already reaped, or never ours
           this._exited = true;
           if (this.onexit) this.onexit(0, 0);
+          this._release();
           return;
         }
         this._poll = later(tick, 4);
       };
       this._poll = later(tick, 1);
+    }
+
+    // Released a MACROTASK after onexit, so anything the 'exit'/'close' handlers queue
+    // on nextTick or as a microtask has registered its own work before we let go.
+    _release() {
+      if (!this._alive) return;
+      setTimeout(() => {
+        if (!this._alive) return;
+        this._alive = false;
+        if (pending && pending.n > 0) pending.n--;
+      }, 0);
     }
 
     kill(signal) {
@@ -157,6 +184,7 @@ function makeProcessWrap(sys, mem, deps) {
       if (this._closed) { if (cb) queueMicrotask(cb); return; }
       this._closed = true;
       cancel(this._poll); this._poll = null;
+      this._release();
       if (cb) {
         if (pending) pending.n++;
         queueMicrotask(() => { if (pending) pending.n--; cb(); });

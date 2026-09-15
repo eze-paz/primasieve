@@ -94,7 +94,7 @@ async function run(argv) {
   const M = Module.Module || Module;
   delete M._cache[argv[1]];
   if (M._pathCache) for (const k of Object.keys(M._pathCache)) delete M._pathCache[k];
-  try { main(rt, sys, arena); } catch (e) { err += String((e && e.message) || e); }
+  try { await main(rt, sys, arena); } catch (e) { err += String((e && e.message) || e); }
   const deadline = Date.now() + 120000;
   let last = '', stable = 0;
   while (Date.now() < deadline) {

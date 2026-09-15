@@ -24,9 +24,17 @@ function makePipeWrap(sys, mem, deps) {
   };
   // A pump must keep the process ALIVE: the worker's raw setTimeout does not register
   // with `pending`, so the process would exit the moment main() returned.
+  // The decrement must happen AFTER fn(), not before. A pump re-schedules itself from
+  // inside fn(), so dropping the count first leaves a window where pending.n is 0 while
+  // work is still outstanding -- and the worker's drain loop, which exits the process
+  // the moment the count reaches zero, could sample exactly there. That is why async
+  // child_process output vanished in some runs and came back when two console.log calls
+  // shifted the timing: the process was being retired mid-pump.
   const later = (fn, ms) => {
     if (pending) pending.n++;
-    return setTimeout(() => { if (pending) pending.n--; fn(); }, ms);
+    return setTimeout(() => {
+      try { fn(); } finally { if (pending) pending.n--; }
+    }, ms);
   };
   const cancel = (t) => { if (t) { clearTimeout(t); if (pending && pending.n > 0) pending.n--; } };
 
