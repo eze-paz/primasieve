@@ -3834,7 +3834,6 @@ html[data-theme="aurora"] {
   --sprail-ground: color-mix(in srgb, var(--sp-text) 4%, transparent);
   --sprail-ops:    color-mix(in srgb, var(--sp-text) 14%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 26%, transparent);
-  --sprail-hot:    color-mix(in srgb, var(--sp-text) 42%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 55%, transparent);
   --sprail-chip:   color-mix(in srgb, var(--sp-text) 7%, transparent);
   /* same stack the tool-group header already uses */
@@ -3941,15 +3940,6 @@ html[data-theme="aurora"] #messagesSide > .msg.think {
   border-left-color: var(--sprail-ops);
   padding-top: 2px; padding-bottom: 2px;
   font-size: 11.5px;
-}
-
-/* --- the rail answers the cursor --- */
-/* The reply is deliberately NOT here: its rail is the accent now, and the
-   hover tone is a grey -- lifting it would read as the answer dimming. */
-html[data-theme="aurora"] .conv-host > .msg.tool-group:hover,
-html[data-theme="aurora"] #messages > .msg.tool-group:hover,
-html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover {
-  border-left-color: var(--sprail-hot);
 }
 
 /* --- the settled timer reads as the rail's footnote --- */
