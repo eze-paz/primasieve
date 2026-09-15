@@ -227,6 +227,11 @@
   ul.fs-list button.name { background: none; border: none; padding: 0; margin: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
   ul.fs-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; cursor: pointer; }
   ul.fs-list .name:hover { text-decoration: underline; }
+  /* ...but NOT in the chat list: those rows already answer the cursor with a
+     colour lift (dim -> --sp-text), and an underline on top of it was a
+     second signal for the same event. The Files list keeps the underline --
+     there the name is the click target, here the whole row is. */
+  ul.conv-list .name:hover { text-decoration: none; }
   ul.fs-list .name.folder { color: var(--sp-text); }
   ul.fs-list .file-size { font-size: 0.7rem; color: var(--sp-text-dim); white-space: nowrap; margin-left: 0.5rem; }
   /* Collapsible "SANDPIE" section header in the Files panel — splits the app's
@@ -4045,6 +4050,42 @@ html[data-theme="olive"] .msg.user > .msg-actions {
   padding: 0; margin-top: 2px; transform: none;
 }
 html[data-theme="olive"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
+
+/* --- machinery: the two-storey card collapses to one line. The title row
+   and the tray share a baseline, the DRAM strip goes, the count stays. --- */
+html[data-theme="olive"] .conv-host > .msg.tool-group,
+html[data-theme="olive"] #messages > .msg.tool-group,
+html[data-theme="olive"] #messagesSide > .msg.tool-group {
+  border-left-color: var(--sprail-ops);
+  padding-top: 2px; padding-bottom: 2px;
+  /* shrink-wrap, never a fixed cap: the count stays beside its title at any
+     configured chat width, and the group still cannot exceed the column. */
+  width: fit-content; max-width: 100%;
+  overflow: visible;
+  font: 11px/1.65 var(--sprail-mono);
+}
+html[data-theme="olive"] .tool-group .tg-hd {
+  flex-direction: row; align-items: baseline; border-bottom: 0; gap: 0.6ch;
+}
+html[data-theme="olive"] .tool-group .tg-row { padding: 0; gap: 0.6ch; color: var(--sp-text-dim); flex: 1 1 auto; }
+html[data-theme="olive"] .tool-group .tg-hd:hover .tg-row { background: none; color: var(--sp-text); }
+html[data-theme="olive"] .tool-group .tg-prompt { display: none; }   /* the bar is the prompt now */
+html[data-theme="olive"] .tool-group .tg-title { color: inherit; }
+html[data-theme="olive"] .tool-group .tg-tray { background: none; padding: 0; flex: none; gap: 0.5ch; }
+html[data-theme="olive"] .tool-group .tg-strip { display: none; }
+html[data-theme="olive"] .tool-group .tg-count {
+  font-size: 10px; color: var(--sprail-count); font-variant-numeric: tabular-nums;
+}
+/* the one warm point on the rail: the group that is running right now.
+   There is no .running class — a live group is the one holding a .tg-cell.run. */
+html[data-theme="olive"] .conv-host > .msg.tool-group:has(.tg-cell.run),
+html[data-theme="olive"] #messages > .msg.tool-group:has(.tg-cell.run),
+html[data-theme="olive"] #messagesSide > .msg.tool-group:has(.tg-cell.run) {
+  border-left-color: color-mix(in srgb, var(--sp-accent) 60%, transparent);
+}
+html[data-theme="olive"] .tool-group:has(.tg-cell.run) .tg-row { color: var(--sp-text); }
+/* expanded call log keeps its own indent under the collapsed header */
+html[data-theme="olive"] .tool-group .tg-log { padding: 0.15rem 0 0; }
 
 /* --- the reply: the only sans, and the only thing at reading size --- */
 html[data-theme="olive"] .conv-host > .msg.assistant,
