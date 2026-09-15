@@ -161,7 +161,7 @@ self.onmessage = async (ev) => {
         return;
       }
     }
-    try { code = runNode(); }
+    try { code = await runNode(); }
     catch (e) {
       if (e instanceof ProcExit) code = e.code;
       else { trace('RUN THREW: ' + String((e && e.stack) || e).slice(0, 500)); code = 139; self.postMessage({ t: 'trap', error: String((e && e.stack) || e).slice(0, 800) }); }
@@ -170,8 +170,21 @@ self.onmessage = async (ev) => {
     // interval cannot wedge the process forever.
     const pending = runNode.pending;
     if (pending) {
+      // Exit when the loop has been QUIET for a while, not the instant the counter
+      // touches zero. The count legitimately dips between async boundaries -- a pump
+      // re-schedules itself, node emits 'close' on a later tick, a handler starts the
+      // next child -- and sampling exactly in one of those gaps retired the process
+      // with work still to come. That is what made async child_process and ESM output
+      // appear in some runs and not others, and why adding a console.log "fixed" it.
+      // Requiring sustained quiet turns a knife-edge race into a stable condition.
+      const QUIET_MS = 120;
       const deadline = Date.now() + 10000;
-      while (pending.n > 0 && Date.now() < deadline) {
+      let quietSince = null;
+      for (;;) {
+        if (pending.n > 0) quietSince = null;
+        else if (quietSince === null) quietSince = Date.now();
+        else if (Date.now() - quietSince >= QUIET_MS) break;
+        if (Date.now() >= deadline) break;
         await new Promise((r) => setTimeout(r, 1));
       }
       const rt = runNode.rt;
@@ -185,7 +198,7 @@ self.onmessage = async (ev) => {
   }
 };
 
-function runNode() {
+async function runNode() {
   const { makeArena, makeSyscalls } = require('./syscall-bridge.js');
   const { KernelVfs } = require('./kernel-vfs.js');
   const { boot } = require('./boot.js');
@@ -224,7 +237,7 @@ function runNode() {
 
   let code;
   try {
-    code = main(rt, sys, arena, trace);
+    code = await main(rt, sys, arena, trace);
     raw('main returned ' + code + '; syscalls=' + vfs.calls);
   } catch (e) {
     raw('MAIN THREW: ' + String((e && e.stack) || e).slice(0, 600));

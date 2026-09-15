@@ -51,7 +51,7 @@ async function runNode(argv, seed, opts) {
   if (seed) seed(rt.require('fs'));
 
   let code, thrown = null;
-  try { code = main(rt, sys, arena); }
+  try { code = await main(rt, sys, arena); }
   catch (e) { thrown = e; code = 139; }
   // Same exit rule as the worker: wait for outstanding async work.
   const deadline = Date.now() + 5000;

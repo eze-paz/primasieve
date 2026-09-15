@@ -127,4 +127,37 @@ c.on('close', (code) => {
 CPAEOF
 node /tmp/cpa.js
 
+echo "--- ESM ---"
+mkdir -p /tmp/esm
+cat > /tmp/esm/dep.mjs <<'D1'
+export const greet = (n) => 'hello ' + n;
+export let counter = 0;
+export function bump() { counter++; }
+D1
+cat > /tmp/esm/lib.cjs <<'D2'
+module.exports = { fromCjs: 'cjs-value' };
+D2
+cat > /tmp/esm/main.mjs <<'D3'
+import { greet, counter, bump } from './dep.mjs';
+import * as fsns from 'node:fs';
+import cjs from './lib.cjs';
+bump(); bump();
+console.log('ESM-BASIC:' + greet('esm'));
+console.log('ESM-LIVE:' + counter);
+console.log('ESM-BUILTIN:' + (typeof fsns.readFileSync));
+console.log('ESM-CJS:' + cjs.fromCjs);
+const dyn = await import('./dep.mjs');
+console.log('ESM-DYNAMIC:' + dyn.greet('dyn'));
+D3
+node /tmp/esm/main.mjs
+
+echo "--- a REAL ESM-only package from the registry ---"
+npm-lite nanoid@5.0.4 >/dev/null 2>&1
+cat > /tmp/esm/pkg.mjs <<'D4'
+import { nanoid, customAlphabet } from 'nanoid';
+const id = nanoid();
+console.log('ESM-PKG:' + id.length + ':' + (typeof customAlphabet));
+D4
+node /tmp/esm/pkg.mjs
+
 echo "--- done ---"

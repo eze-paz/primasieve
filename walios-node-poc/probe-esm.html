@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ESM-in-worker probe</title>
+<pre id="out">running…</pre>
+<script>
+// Decides the ESM architecture. node-proc-worker.js is a CLASSIC worker (it uses
+// importScripts), and dynamic import() has not always been available in one. If it IS,
+// ESM can be real: compile each module to a blob URL with its specifiers rewritten and
+// let V8 link it, which gives live bindings and circular imports for free. If it is
+// NOT, the only route is transforming ESM source to CJS, which cannot do either.
+const out = document.getElementById('out');
+const src = `
+self.onmessage = async () => {
+  const r = {};
+  try {
+    const m = await import('data:text/javascript,export default 42; export const k = 7;');
+    r.dataUrl = 'ok default=' + m.default + ' k=' + m.k;
+  } catch (e) { r.dataUrl = 'FAILED: ' + (e && e.message || e); }
+  try {
+    const url = URL.createObjectURL(new Blob(['export const v = "blob-ok";'], { type: 'text/javascript' }));
+    const m = await import(url);
+    r.blobUrl = 'ok v=' + m.v;
+  } catch (e) { r.blobUrl = 'FAILED: ' + (e && e.message || e); }
+  try {
+    // The one that matters most: a blob module importing ANOTHER blob module, which
+    // is how a dependency graph would be linked.
+    const dep = URL.createObjectURL(new Blob(['export const dep = "inner";'], { type: 'text/javascript' }));
+    const top = URL.createObjectURL(new Blob(['import { dep } from "' + dep + '"; export const all = "outer+" + dep;'], { type: 'text/javascript' }));
+    const m = await import(top);
+    r.linked = 'ok ' + m.all;
+  } catch (e) { r.linked = 'FAILED: ' + (e && e.message || e); }
+  try {
+    // Live bindings + circularity, the two things a CJS transform cannot give you.
+    const a = URL.createObjectURL(new Blob(['export let n = 1; export function bump(){ n++; }'], { type: 'text/javascript' }));
+    const b = URL.createObjectURL(new Blob(['import { n, bump } from "' + a + '"; bump(); export const after = n;'], { type: 'text/javascript' }));
+    const m = await import(b);
+    r.liveBinding = (m.after === 2) ? 'ok live (n=2)' : 'STALE n=' + m.after;
+  } catch (e) { r.liveBinding = 'FAILED: ' + (e && e.message || e); }
+  self.postMessage(r);
+};
+`;
+const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+w.onmessage = (e) => { out.textContent = 'RESULT ' + JSON.stringify(e.data, null, 2); };
+w.onerror = (e) => { out.textContent = 'WORKER ERROR: ' + (e.message || e); };
+w.postMessage('go');
+</script>
