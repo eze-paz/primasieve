@@ -1021,7 +1021,10 @@
   .sp-loading .sp-bar::after { content: ''; position: absolute; top: 0; height: 100%; width: 40%; background: var(--sp-accent); border-radius: 2px; animation: sp-indeterminate 1.1s ease-in-out infinite; }
   @keyframes sp-indeterminate { 0% { left: -42%; } 100% { left: 100%; } }
   ul.conv-list li { cursor: pointer; transition: background 0.1s, border-color 0.1s; }
-  ul.conv-list li:hover { background: var(--sp-surface); border-color: var(--sp-border-bright); }
+  /* Hover is a TEXT change only -- the background swap read as a second
+     selected state next to .active. The colour lift lives in the .name rule
+     below; nothing here paints a ground. */
+  ul.conv-list li:hover { background: transparent; }
   ul.conv-list li.active,
 ul.conv-list li.in-panel {
   background: var(--sp-panel);
@@ -1119,24 +1122,29 @@ ul.conv-list li.active {
   }
   ul.conv-list li.conv-group:first-child { padding-top: 0.1rem; }
 
-  /* Collapsible groups. The <li> above keeps pointer-events:none (so a
-     shift+drag starting on the header still becomes a rubber band); the button
-     is the only thing that takes a click, and it is only as wide as its text. */
-  ul.conv-list li.conv-group .cg-btn {
+  /* Collapsible groups: the header row IS the control -- no inner button.
+     pointer-events go back to auto, which the rubber band survives: its
+     listener is on the <ul>, the event still bubbles there, and the band only
+     bails when the target sits inside an li[data-cid]. A header has no cid. */
+  ul.conv-list li.conv-group[role="button"] {
     pointer-events: auto;
     display: flex; align-items: center; gap: 0.35rem;
-    background: none; border: 0; padding: 0; margin: 0;
-    font: inherit; letter-spacing: inherit; text-transform: inherit;
-    color: inherit; cursor: pointer;
+    /* ul.fs-list li sets justify-content:space-between (name left, meta right);
+       a header is one group of three spans, so it packs to the start instead --
+       without this the chevron pinned left and the label flew to the right. */
+    justify-content: flex-start;
     white-space: nowrap;      /* "LAST WEEK" wrapped to two lines without this */
-    text-align: left;
+    cursor: pointer;
   }
-  ul.conv-list li.conv-group .cg-btn:hover { color: var(--sp-text); }
+  ul.conv-list li.conv-group:hover { color: var(--sp-text); }
+  ul.conv-list li.conv-group:focus-visible {
+    outline: 1px solid var(--sp-accent); outline-offset: 2px; border-radius: 3px;
+  }
   ul.conv-list li.conv-group .cg-chev {
     display: inline-block; font-size: 0.7rem; line-height: 1;
     opacity: 0.55; transition: transform 0.14s ease, opacity 0.14s ease;
   }
-  ul.conv-list li.conv-group .cg-btn:hover .cg-chev { opacity: 1; }
+  ul.conv-list li.conv-group:hover .cg-chev { opacity: 1; }
   ul.conv-list li.conv-group.cg-closed .cg-chev { transform: rotate(-90deg); }
   /* The hidden-row count appears only while the group is closed, so an open
      list carries no extra numbers. :empty keeps the gap from reserving space. */
@@ -2631,7 +2639,7 @@ ul.conv-list li.active {
 [data-theme="aurora"] aside button:disabled:hover { background: transparent; border-color: rgba(148,163,184,0.08); color: #94a3b8; }
 [data-theme="aurora"] .status-dot.ok { background: #38bdf8; box-shadow: 0 0 6px rgba(56,189,248,0.3); }
 [data-theme="aurora"] .status-dot.err { background: #f87171; }
-[data-theme="aurora"] ul.conv-list li:hover { background: rgba(255,255,255,0.04); border-color: rgba(148,163,184,0.08); }
+[data-theme="aurora"] ul.conv-list li:hover { background: transparent; }
 [data-theme="aurora"] ul.conv-list li.active,
 [data-theme="aurora"] ul.conv-list li.in-panel {
   background: linear-gradient(135deg, rgba(56,189,248,0.1), rgba(129,140,248,0.06));
@@ -2827,10 +2835,7 @@ ul.conv-list li.active {
   font-weight: 500;
   transition: all 0.15s;
 }
-[data-theme="electric"] ul.conv-list li:hover {
-  background: var(--sp-panel);
-  border-color: var(--sp-border);
-}
+[data-theme="electric"] ul.conv-list li:hover { background: transparent; }
 [data-theme="electric"] ul.conv-list li.active,
 [data-theme="electric"] ul.conv-list li.in-panel {
   background: var(--sp-bg);
@@ -3214,10 +3219,7 @@ body.sp-decoding *::after {
   font-weight: 500;
   transition: all 0.15s;
 }
-[data-theme="clear"] ul.conv-list li:hover {
-  background: var(--sp-panel);
-  border-color: var(--sp-border);
-}
+[data-theme="clear"] ul.conv-list li:hover { background: transparent; }
 [data-theme="clear"] ul.conv-list li.active,
 [data-theme="clear"] ul.conv-list li.in-panel {
   background: var(--sp-bg);

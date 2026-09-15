@@ -2589,8 +2589,7 @@ function _cgApply(head) {
   const rows = _cgRowsOf(head);
   for (const r of rows) r.classList.toggle('conv-row-hidden', closed);
   head.classList.toggle('cg-closed', closed);
-  const btn = head.querySelector('.cg-btn');
-  if (btn) btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+  head.setAttribute('aria-expanded', closed ? 'false' : 'true');
   // The count only appears while closed -- open, the rows speak for themselves.
   const n = head.querySelector('.cg-n');
   if (n) n.textContent = closed ? String(rows.length) : '';
@@ -2972,21 +2971,24 @@ async function refreshConversationList() {
     const li = document.createElement('li');
     li.className = 'conv-group';
     li.dataset.group = text;
-    // The <li> keeps pointer-events:none so a shift+drag starting anywhere on
-    // the header row still falls through to the rubber band; only the button
-    // itself takes clicks.
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cg-btn';
-    btn.innerHTML = '<span class="cg-chev" aria-hidden="true">▾</span>' +
-                    '<span class="cg-label"></span><span class="cg-n"></span>';
-    btn.querySelector('.cg-label').textContent = text;
-    btn.addEventListener('click', (ev) => {
+    // The header row is the control itself -- no inner button. role+tabindex
+    // keep it operable by keyboard; the rubber band still works because its
+    // listener is on the <ul> and only bails inside an li[data-cid].
+    li.setAttribute('role', 'button');
+    li.tabIndex = 0;
+    li.innerHTML = '<span class="cg-chev" aria-hidden="true">▾</span>' +
+                   '<span class="cg-label"></span><span class="cg-n"></span>';
+    li.querySelector('.cg-label').textContent = text;
+    li.addEventListener('click', (ev) => {
       if (ev.shiftKey) return;        // leave shift for selection gestures
       ev.stopPropagation();
       _cgToggle(li);
     });
-    li.appendChild(btn);
+    li.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      _cgToggle(li);
+    });
     frag.appendChild(li);
   };
 
