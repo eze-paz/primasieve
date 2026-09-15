@@ -142,9 +142,10 @@ const checks = [
   ['exit code propagated', /exit code was 3/.test(outText)],
   ['echo | node ran stdin as a script', /from-stdin-777/.test(outText)],
   ['node < file ran the redirect', /from-redirect-888/.test(outText)],
-  ['npm-lite installed from the real registry', /installed left-pad@1\.3\.0/.test(outText)],
-  ['tarball sha512 was verified', /integrity sha512 ok/.test(outText)],
+  ['npm-lite installed from the real registry', /left-pad@1\.3\.0/.test(outText)],
+  ['tarball sha512 was verified', /sha512 ok/.test(outText)],
   ['the installed package runs', /\[00000042\]/.test(outText)],
+  ['a dependency TREE installed and resolved', /glob=true/.test(outText)],
   ['net.connect over REAL sockets', /NET-CONNECT-OK/.test(outText)],
   ['node http over REAL sockets', /HTTP-OVER-SYSCALLS/.test(outText)],
 ];

@@ -61,7 +61,12 @@ async function run(argv, label) {
   setArgv(argv);
   const Module = R('module');
   const M = Module.Module || Module;
+  // node's resolver caches path lookups (_pathCache) and stat results across a
+  // require tree. A file written AFTER a previous run had already looked for it is
+  // remembered as missing -- which is why /app.js "could not be found" moments after
+  // being written, while a file whose name had never been looked up resolved fine.
   delete M._cache[argv[1]];
+  if (M._pathCache) for (const k of Object.keys(M._pathCache)) delete M._pathCache[k];
   let code = 0;
   try { code = main(rt, sys, arena); }
   catch (e) { err += String(e && e.stack || e); code = 1; }
@@ -94,36 +99,53 @@ function setArgv(argv) {
   }
 }
 
+// pull one matching line out of output without embedding a newline in a regex
+const firstLine = (s, needle) => (s.split(String.fromCharCode(10)).find((l) => l.includes(needle)) || '').trim();
+
 const ok = [], bad = [];
 const check = (name, cond, detail) => { (cond ? ok : bad).push(name + (detail ? '  -> ' + detail : '')); };
 
-// ---- install ----------------------------------------------------------------
-const r1 = await run(['/bin/node', '/usr/bin/npm-lite', 'left-pad@1.3.0'], 'npm-lite install left-pad@1.3.0');
-check('install reported success', /installed left-pad@1\.3\.0/.test(r1.out), (r1.out.match(/installed[^\n]*/) || [''])[0]);
-check('integrity was verified', /integrity sha\d+ ok/.test(r1.out));
-check('files landed in the walios fs', (() => { try { return fs.readdirSync('/node_modules/left-pad').length > 0; } catch { return false; } })(),
-  (() => { try { return fs.readdirSync('/node_modules/left-pad').sort().join(','); } catch { return 'MISSING'; } })());
-check('package.json is real JSON', (() => {
-  try { return JSON.parse(fs.readFileSync('/node_modules/left-pad/package.json', 'utf8')).name === 'left-pad'; } catch { return false; }
-})());
+// ---- real packages, with real dependency trees -----------------------------
+const r1 = await run(['/bin/node', '/usr/bin/npm-lite', 'debug@4.3.4'], 'install debug@4.3.4 (has deps)');
+check('debug installed', /debug@4\.3\.4/.test(r1.out));
+check('its dependency ms came too', /ms@/.test(r1.out), firstLine(r1.out, 'ms@'));
 
-// ---- use it -----------------------------------------------------------------
-fs.writeFileSync('/app.js', 'const leftPad = require("/node_modules/left-pad");'
-  + 'console.log("[" + leftPad("42", 8, "0") + "]");');
-const r2 = await run(['/bin/node', '/app.js'], 'require the installed package');
-check('the installed package actually runs', /\[00000042\]/.test(r2.out), r2.out.trim());
+fs.writeFileSync('/use-debug.js',
+  'const debug = require("/node_modules/debug");'
+  + 'const log = debug("demo");'
+  + 'console.log("debug loaded, enabled=" + (typeof log === "function"));');
+console.log('  [probe] /app.js exists=' + fs.existsSync('/use-debug.js')
+  + ' size=' + (fs.existsSync('/use-debug.js') ? fs.statSync('/use-debug.js').size : -1)
+  + ' root=' + JSON.stringify(fs.readdirSync('/').sort().slice(0, 12)));
+const r2 = await run(['/bin/node', '/use-debug.js'], 'require debug (resolves ms through the tree)');
+check('debug requires and runs', /debug loaded, enabled=true/.test(r2.out), r2.out.trim());
 
-// ---- a package with a dependency tree shape (scoped name) -------------------
-const r3 = await run(['/bin/node', '/usr/bin/npm-lite', 'is-number@7.0.0'], 'npm-lite install is-number@7.0.0');
-check('second package installed', /installed is-number@7\.0\.0/.test(r3.out));
-fs.writeFileSync('/app2.js', 'const isNumber = require("/node_modules/is-number");'
-  + 'console.log(isNumber(7) + "," + isNumber("x"));');
-const r4 = await run(['/bin/node', '/app2.js'], 'require the second package');
-check('second package runs', /true,false/.test(r4.out), r4.out.trim());
+// minimatch pulls brace-expansion -> balanced-match + concat-map: a 3-deep tree
+const r3 = await run(['/bin/node', '/usr/bin/npm-lite', 'minimatch@5.1.6'], 'install minimatch@5.1.6 (deep tree)');
+check('minimatch tree installed', /installed [2-9] package/.test(r3.out), firstLine(r3.out, 'installed'));
 
-// ---- integrity is actually enforced -----------------------------------------
-const r5 = await run(['/bin/node', '/usr/bin/npm-lite', 'left-pad@0.0.0-does-not-exist'], 'unknown version is rejected');
-check('a bad version fails cleanly', /no such version/.test(r5.err) || /no such version/.test(r5.out));
+check('transitive dep came too', /balanced-match@|brace-expansion@/.test(r3.out));
+
+fs.writeFileSync('/use-minimatch.js',
+  'const mm = require("/node_modules/minimatch");'
+  + 'const f = mm.minimatch || mm;'
+  + 'console.log("minimatch: " + f("src/a.js", "src/*.js") + "," + f("src/a.js", "*.ts"));');
+const r4 = await run(['/bin/node', '/use-minimatch.js'], 'require minimatch and actually glob');
+check('minimatch runs its real logic', /minimatch: true,false/.test(r4.out), r4.out.trim());
+
+// a big single package: ~1000 files, exercises the tar/write path at scale
+const r5 = await run(['/bin/node', '/usr/bin/npm-lite', 'lodash@4.17.21'], 'install lodash (1000+ files)');
+check('lodash installed', /lodash@4\.17\.21/.test(r5.out), firstLine(r5.out, 'installed'));
+
+fs.writeFileSync('/use-lodash.js',
+  'const _ = require("/node_modules/lodash");'
+  + 'console.log("lodash: " + _.chunk([1,2,3,4],2).length + "," + _.camelCase("hello world"));');
+const r6 = await run(['/bin/node', '/use-lodash.js'], 'require lodash and call it');
+check('lodash runs', /lodash: 2,helloWorld/.test(r6.out), r6.out.trim());
+
+const r7 = await run(['/bin/node', '/usr/bin/npm-lite', 'left-pad@0.0.0-nope'], 'a bad range fails cleanly');
+check('unsatisfiable range is rejected', /no version of left-pad satisfies/.test(r7.err + r7.out));
+
 
 console.log('\nPASS (' + ok.length + ')');
 for (const s of ok) console.log('  + ' + s);

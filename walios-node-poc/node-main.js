@@ -250,7 +250,12 @@ function main(rt, sys, arena, trace) {
       return typeof process.exitCode === 'number' ? process.exitCode : 0;
     } catch (e) {
       if (e && e.code === 'MODULE_NOT_FOUND') {
-        errOut('node: cannot find module ' + JSON.stringify(script) + '\n');
+        // Report the error's OWN message. Blaming `script` hid the real cause: the
+        // miss was usually an inner require (a dependency), not the entry file.
+        errOut('node: ' + e.message.split(NL)[0] + NL);
+        if (e.requireStack && e.requireStack.length) {
+          errOut('  required from: ' + e.requireStack.join(' <- ') + NL);
+        }
         return 1;
       }
       errOut(formatErr(e) + '\n');

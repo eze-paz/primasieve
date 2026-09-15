@@ -94,15 +94,92 @@ function verify(bytes, integrity) {
   return algo + ' ok';
 }
 
-async function install(spec, prefix) {
-  const at = spec.lastIndexOf('@');
-  const name = at > 0 ? spec.slice(0, at) : spec;
-  const wanted = at > 0 ? spec.slice(at + 1) : null;
 
+// ---- semver ------------------------------------------------------------------
+// Enough of the grammar that real dependency ranges resolve: exact, x-ranges,
+// caret, tilde, comparators, and ||-alternatives. Not a spec-complete
+// implementation -- prerelease ordering in particular is simplified.
+function parseV(v) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(String(v).trim());
+  return m ? { major: +m[1], minor: +m[2], patch: +m[3], pre: m[4] || null } : null;
+}
+function cmp(a, b) {
+  if (a.major !== b.major) return a.major - b.major;
+  if (a.minor !== b.minor) return a.minor - b.minor;
+  if (a.patch !== b.patch) return a.patch - b.patch;
+  if (a.pre && !b.pre) return -1;          // 1.0.0-rc < 1.0.0
+  if (!a.pre && b.pre) return 1;
+  return 0;
+}
+function satisfiesOne(v, range) {
+  range = range.trim();
+  // An exact range with a prerelease tag ("0.0.0-nope") must match exactly. Without
+  // this the numeric comparison below ignored the tag and happily installed 0.0.0.
+  if (/^v?\d+\.\d+\.\d+-/.test(range)) return String(v).replace(/^v/, '') === range.replace(/^v/, '');
+  if (!range || range === '*' || range === 'latest' || range === 'x') return true;
+  if (/^(https?:|git|file:|npm:)/.test(range)) return false;      // not a version range
+  const V = parseV(v);
+  if (!V) return false;
+
+  // a range can be several space-separated comparators, all of which must hold
+  const parts = range.split(/\s+/).filter(Boolean);
+  if (parts.length > 1 && !/^[~^]/.test(range)) return parts.every((p) => satisfiesOne(v, p));
+
+  let m;
+  if ((m = /^([~^]?)v?(\d+)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?/.exec(range))) {
+    const op = m[1];
+    const maj = +m[2];
+    const minS = m[3], patS = m[4];
+    const minorAny = minS === undefined || minS === 'x' || minS === '*';
+    const patchAny = patS === undefined || patS === 'x' || patS === '*';
+    const min = minorAny ? 0 : +minS;
+    const pat = patchAny ? 0 : +patS;
+    const lo = { major: maj, minor: min, patch: pat, pre: null };
+    if (cmp(V, lo) < 0) return false;
+    if (op === '^') {
+      // ^0.2.3 is >=0.2.3 <0.3.0; ^1.2.3 is >=1.2.3 <2.0.0
+      if (maj > 0) return V.major === maj;
+      if (min > 0 || !minorAny) return V.major === 0 && V.minor === min;
+      return V.major === 0;
+    }
+    if (op === '~') return V.major === maj && (minorAny || V.minor === min);
+    if (minorAny) return V.major === maj;
+    if (patchAny) return V.major === maj && V.minor === min;
+    return cmp(V, lo) === 0;
+  }
+  if ((m = /^(>=|<=|>|<|=)\s*v?(.+)$/.exec(range))) {
+    const R = parseV(m[2]);
+    if (!R) return false;
+    const c = cmp(V, R);
+    switch (m[1]) {
+      case '>=': return c >= 0;
+      case '<=': return c <= 0;
+      case '>': return c > 0;
+      case '<': return c < 0;
+      default: return c === 0;
+    }
+  }
+  return false;
+}
+function satisfies(v, range) {
+  return String(range).split('||').some((r) => satisfiesOne(v, r));
+}
+function pickVersion(meta, range) {
+  if (meta.versions[range]) return range;                       // exact pin
+  const tag = meta['dist-tags'] && meta['dist-tags'][range];
+  if (tag) return tag;
+  const all = Object.keys(meta.versions).map(parseV).filter(Boolean);
+  const ok = Object.keys(meta.versions).filter((v) => satisfies(v, range));
+  if (!ok.length) return null;
+  // highest satisfying version, which is what npm does
+  return ok.sort((a, b) => cmp(parseV(a), parseV(b))).pop();
+}
+
+async function installOne(name, range, prefix) {
   const meta = await getJSON(REGISTRY + '/' + name);
-  const version = wanted || (meta['dist-tags'] && meta['dist-tags'].latest);
-  const v = meta.versions && meta.versions[version];
-  if (!v) throw new Error('no such version: ' + name + '@' + version);
+  const version = pickVersion(meta, range || 'latest');
+  const v = version && meta.versions && meta.versions[version];
+  if (!v) throw new Error('no version of ' + name + ' satisfies ' + JSON.stringify(range));
 
   const tgz = await getBytes(v.dist.tarball);
   const integrity = verify(tgz, v.dist.integrity || (v.dist.shasum && 'sha1-' + Buffer.from(v.dist.shasum, 'hex').toString('base64')));
@@ -121,7 +198,41 @@ async function install(spec, prefix) {
     fs.writeFileSync(full, e.data);
     written++; bytes += e.data.length;
   }
-  return { name, version, dest, written, bytes, tgz: tgz.length, integrity };
+  return { name, version, dest, written, bytes, tgz: tgz.length, integrity, deps: v.dependencies || {} };
+}
+
+// Walk the dependency graph breadth-first into a FLAT /node_modules, which is what
+// npm has done since v3 and what node's resolver expects: every package sits at
+// <prefix>/<name>, so a nested require finds it by walking up. A single version per
+// name -- no conflict resolution, so a genuine diamond with incompatible ranges
+// resolves to whichever was seen first, and says so.
+async function installTree(specs, prefix, log) {
+  const want = new Map();                 // name -> range
+  for (const spec of specs) {
+    const at = spec.lastIndexOf('@');
+    if (at > 0) want.set(spec.slice(0, at), spec.slice(at + 1));
+    else want.set(spec, 'latest');
+  }
+  const done = new Map();                 // name -> version installed
+  const queue = [...want.entries()];
+  const conflicts = [];
+  let files = 0, bytes = 0;
+
+  while (queue.length) {
+    const [name, range] = queue.shift();
+    if (done.has(name)) {
+      if (!satisfies(done.get(name), range)) conflicts.push(name + '@' + done.get(name) + ' vs ' + range);
+      continue;
+    }
+    const r = await installOne(name, range, prefix);
+    done.set(name, r.version);
+    files += r.written; bytes += r.bytes;
+    log('  ' + (name + '@' + r.version).padEnd(34) + r.written + ' files  ' + r.integrity);
+    for (const [dep, depRange] of Object.entries(r.deps)) {
+      if (!done.has(dep)) queue.push([dep, depRange]);
+    }
+  }
+  return { count: done.size, files, bytes, conflicts, tree: done };
 }
 
 async function main() {
@@ -133,16 +244,15 @@ async function main() {
     specs.push(args[i]);
   }
   if (!specs.length) {
-    console.error('usage: npm-lite <pkg>[@version] [--prefix DIR]');
+    console.error('usage: npm-lite <pkg>[@range]... [--prefix DIR]');
     process.exitCode = 1;
     return;
   }
-  for (const spec of specs) {
-    const r = await install(spec, prefix);
-    console.log('installed ' + r.name + '@' + r.version
-      + '  (' + r.written + ' files, ' + r.bytes + ' bytes, tarball ' + r.tgz + ', integrity ' + r.integrity + ')');
-    console.log('  -> ' + r.dest);
-  }
+  const t0 = Date.now();
+  const r = await installTree(specs, prefix, (s) => console.log(s));
+  console.log('installed ' + r.count + ' package(s), ' + r.files + ' files, '
+    + r.bytes + ' bytes in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's -> ' + prefix);
+  if (r.conflicts.length) console.log('version conflicts (first wins): ' + r.conflicts.join('; '));
 }
 
 main().catch((e) => { console.error('npm-lite: ' + (e && e.message || e)); process.exitCode = 1; });

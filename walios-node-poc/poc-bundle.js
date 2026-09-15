@@ -1500,14 +1500,58 @@ function makeBindings(vfs, trace, realm) {
     })(),
     blob: { createBlob: () => ({}), getDataObject: () => undefined, storeDataObject: () => {}, revokeDataObject: () => {}, concat: () => new Uint8Array(0), FixedSizeBlobCopyJob: class {} },
     messaging: { MessageChannel: class {}, MessagePort: class {}, JSTransferable: class {}, setDeserializerCreateObjectFunction: () => {}, broadcastChannel: () => ({}), structuredClone: (v) => v },
-    modules: {
-      readPackageJSON: () => undefined, getNearestParentPackageJSON: () => undefined,
-      getNearestParentPackageJSONType: () => undefined, getPackageScopeConfig: () => undefined,
-      getPackageJSONScripts: () => undefined, flushCompileCache: () => {},
-      setCompileCacheDir: () => {}, getCompileCacheDir: () => undefined,
-      enableCompileCache: () => ({ status: 0 }),
-      compileCacheStatus: ['FAILED', 'ENABLED', 'ALREADY_ENABLED', 'DISABLED'],
-    },
+    // Package resolution. Stubbing these out is why any package with an "exports"
+    // map (debug, minimatch -- most modern ones) failed to resolve while lodash,
+    // which has only "main", worked: without a package config node cannot apply
+    // exports and gives up. The binding returns a SIX-ELEMENT ARRAY, not an object:
+    //   [name, main, type, imports, exports, path]   (see deserializePackageJSON)
+    // where imports/exports are JSON strings when they are not plain strings.
+    modules: (() => {
+      const readPkg = (jsonPath) => {
+        let txt;
+        try { txt = new TextDecoder().decode(readFileBytes(jsonPath)); } catch (_) { return undefined; }
+        let j;
+        try { j = JSON.parse(txt); } catch (_) { return undefined; }
+        const ser = (v) => (v === undefined ? undefined : (typeof v === 'string' ? v : JSON.stringify(v)));
+        return [
+          typeof j.name === 'string' ? j.name : undefined,
+          typeof j.main === 'string' ? j.main : undefined,
+          j.type === 'module' || j.type === 'commonjs' ? j.type : 'none',
+          ser(j.imports),
+          ser(j.exports),
+          undefined,
+        ];
+      };
+      const readFileBytes = (p2) => {
+        const st = vfs.statPath(p2);
+        const fd = vfs.open(p2, 0, 0);
+        const b = new Uint8Array(st.size);
+        vfs.read(fd, b, 0, st.size, 0);
+        vfs.close(fd);
+        return b;
+      };
+      // Walk up for the nearest package.json, as node's resolver does.
+      const nearest = (start) => {
+        let dir = String(start).replace(/\/[^/]*$/, '');
+        for (;;) {
+          const cand = (dir || '') + '/package.json';
+          const r = readPkg(cand);
+          if (r) return { cfg: r, path: cand };
+          if (!dir || dir === '/') return null;
+          dir = dir.replace(/\/[^/]*$/, '');
+        }
+      };
+      return {
+        readPackageJSON: (jsonPath) => readPkg(jsonPath),
+        getNearestParentPackageJSON: (p2) => { const n = nearest(p2); return n ? n.cfg : undefined; },
+        getNearestParentPackageJSONType: (p2) => { const n = nearest(p2); return n ? [n.cfg[2], n.path] : undefined; },
+        getPackageScopeConfig: (p2) => { const n = nearest(p2); return n ? n.cfg : undefined; },
+        getPackageJSONScripts: () => undefined,
+        flushCompileCache: () => {}, setCompileCacheDir: () => {},
+        getCompileCacheDir: () => undefined, enableCompileCache: () => ({ status: 0 }),
+        compileCacheStatus: ['FAILED', 'ENABLED', 'ALREADY_ENABLED', 'DISABLED'],
+      };
+    })(),
     builtins: { builtinIds: [], setInternalLoaders: () => {}, canBeRequiredByUsers: () => true, getCanBeRequiredByUsersWithoutSchemeList: () => [], getCanBeRequiredByUsersList: () => [], hasCachedBuiltins: () => false },
     encoding_binding: {
       encodeInto: (s, u8) => { const r = new TextEncoder().encodeInto(s, u8); return new Uint32Array([r.read, r.written]); },
@@ -1596,6 +1640,18 @@ function makeBindings(vfs, trace, realm) {
     // HTTP/1.1 in JS in place of llhttp, driven through node's callback-slot protocol.
     http_parser: makeHttpParser({ getBuffer: () => realm.Buffer }),
 
+    // isatty(2), via the same ioctl(TCGETS) probe the REPL uses. Packages branch on
+    // this constantly (debug colourises only on a terminal).
+    tty_wrap: {
+      isTTY: (fd) => { try { return !!vfs.isatty(fd); } catch (_) { return false; } },
+      guessHandleType: (fd) => { try { return vfs.isatty(fd) ? 'TTY' : 'FILE'; } catch (_) { return 'FILE'; } },
+      TTY: class TTY {
+        constructor(fd) { this.fd = fd; }
+        setRawMode() { return 0; }
+        getWindowSize(out) { if (out) { out[0] = 100; out[1] = 30; } return 0; }
+        ref() {} unref() {} close(cb) { if (cb) queueMicrotask(cb); return 0; }
+      },
+    },
     stream_wrap: {
       streamBaseState: STREAM_BASE_STATE,
       kReadBytesOrError: 0, kArrayBufferOffset: 1, kBytesWritten: 2,
@@ -3048,7 +3104,12 @@ function main(rt, sys, arena, trace) {
       return typeof process.exitCode === 'number' ? process.exitCode : 0;
     } catch (e) {
       if (e && e.code === 'MODULE_NOT_FOUND') {
-        errOut('node: cannot find module ' + JSON.stringify(script) + '\n');
+        // Report the error's OWN message. Blaming `script` hid the real cause: the
+        // miss was usually an inner require (a dependency), not the entry file.
+        errOut('node: ' + e.message.split(NL)[0] + NL);
+        if (e.requireStack && e.requireStack.length) {
+          errOut('  required from: ' + e.requireStack.join(' <- ') + NL);
+        }
         return 1;
       }
       errOut(formatErr(e) + '\n');
