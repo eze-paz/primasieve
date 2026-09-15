@@ -3840,7 +3840,12 @@ html[data-theme="aurora"] .conv-host > .msg,
 html[data-theme="aurora"] #messages > .msg,
 html[data-theme="aurora"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.2rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.2rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -4000,7 +4005,12 @@ html[data-theme="olive"] .conv-host > .msg,
 html[data-theme="olive"] #messages > .msg,
 html[data-theme="olive"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.2rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.2rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -4186,7 +4196,12 @@ html[data-theme="light"] .conv-host > .msg,
 html[data-theme="light"] #messages > .msg,
 html[data-theme="light"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.2rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.2rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -4347,7 +4362,12 @@ html[data-theme="clear"] .conv-host > .msg,
 html[data-theme="clear"] #messages > .msg,
 html[data-theme="clear"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.2rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.2rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
