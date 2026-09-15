@@ -5791,18 +5791,25 @@ function tgUpdate(group) {
   const est = (!group.classList.contains('tg-untitled')
                && act && (act.activeForm || act.content || '') === (group._tgSt && group._tgSt.title)
                && Number.isFinite(+act.est) && +act.est > 0) ? Math.round(+act.est) : 0;
-  // Counter: "14/~20 · ≈17s" while under the estimate, an honest "23/20+" past
-  // it (no negative countdown), plain "N calls" otherwise. Pops on change.
+  // Counter: "[14/~20 · ≈17s]" while under the estimate, an honest "[23/20+]"
+  // past it (no negative countdown), plain "[6]" otherwise. Pops on change.
+  // The brackets ARE the label -- they mark the figure as the machine's own
+  // counter (same voice as the [s] mark and the >>> prompt), which is why the
+  // word "calls" is gone from the row. It is not lost: the localised long form
+  // moves to the title attribute, so hovering still says "6 calls".
   const countEl = group.querySelector('.tg-count');
   if (countEl) {
     const w = TG_CALLS[tcLang()] || TG_CALLS.en;
+    const word = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
     let txt;
     if (est && calls.length > est) txt = calls.length + '/' + est + '+';
     else if (est) {
       txt = calls.length + '/~' + est;
       const eta = _tgEtaText(group._tgSt, est - calls.length);
       if (eta) txt += ' · ≈' + eta;
-    } else txt = calls.length + ' ' + (calls.length === 1 ? w[0] : w[1]);
+    } else txt = String(calls.length);
+    txt = '[' + txt + ']';
+    if (countEl.title !== word) countEl.title = word;
     if (countEl.textContent !== txt) {
       countEl.textContent = txt;
       countEl.classList.remove('tick');
