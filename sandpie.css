@@ -1037,6 +1037,24 @@ ul.conv-list li.active {
     border-color: var(--sp-accent);
   }
   ul.conv-list li.selected .name { color: var(--sp-text); }
+  /* Sidebar hierarchy: the chat list is an INDEX, not content. Left at
+     --sp-text every title competed with the message you are actually reading
+     (and with the panel title), while every other label in the panel --
+     timestamps, group headers, the count -- was already dim. Inactive names
+     drop to --sp-text-dim; hover brings one back to full strength; the
+     active row keeps whatever colour its theme paints on the <li>.
+
+     `color: inherit` on the states below is load-bearing: several themes
+     colour the ROW (e.g. [data-theme="electric"] ul.conv-list li.active
+     { color: var(--sp-accent) }) and let .name inherit it. A direct colour
+     on .name would beat that inheritance and kill the accent. These rules
+     must also stay AFTER the :hover rule -- they tie on specificity. */
+  ul.conv-list li .name { color: var(--sp-text-dim); transition: color 0.1s; }
+  ul.conv-list li:hover .name { color: var(--sp-text); }
+  ul.conv-list li.active .name,
+  ul.conv-list li.in-panel .name,
+  ul.conv-list li.lp-active .name,
+  ul.conv-list li.conv-retitled .name { color: inherit; }
   /* Translucent rubber-band rectangle drawn when the user shift+drags on empty
      sidebar space; every conv row it intersects joins the selection. */
   .conv-rubber {
@@ -1074,7 +1092,7 @@ ul.conv-list li.active {
     ul.conv-list li.conv-retitled .name { animation: none; }
     ul.conv-list .name.conv-typing::after { content: none; }
   }
-  ul.conv-list li.archived { opacity: 0.55; }
+  ul.conv-list li.archived { opacity: 0.75; }   /* was 0.55: names are dim now, and 0.55 on top of that fell below AA */
 
   /* ── Sidebar date-group headers ────────────────────────────────────────────
      Rendered as <li> inside the list so they flow with it, but they carry no
