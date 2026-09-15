@@ -105,6 +105,14 @@ const SCRIPT = [
   'echo "ppn_ar=$(cc -print-prog-name=ar)"',
   'echo "ppn_unknown=$(cc -print-prog-name=nosuchtool)"',
   '',
+  '# 8. A LINK OUTPUT MUST BE EXECUTABLE. autoconf ends every link test with',
+  '#    test -x conftest$ac_exeext -- so a 0644 output makes AC_CHECK_LIB report "no"',
+  '#    on a link that SUCCEEDED. jq answered no to all 47 of its libm probes.',
+  'rm -f xo; cc conftest.c -o xo 2>/dev/null; echo "linkx=$([ -x xo ] && echo yes || echo no)"',
+  'rm -f a.out; cc conftest.c 2>/dev/null; echo "aoutx=$([ -x a.out ] && echo yes || echo no)"',
+  '# CONTROL: an OBJECT is not a program and must NOT be marked executable.',
+  'rm -f xo.o; cc -c conftest.c -o xo.o 2>/dev/null; echo "objx=$([ -x xo.o ] && echo yes || echo no)"',
+  '',
   '# 8. FAILURE must be non-zero. A compile error and a link error, both.',
   'cc bad.c -o bad 2>/dev/null; echo "badc_rc=$?"',
   'printf "extern void nosuchsym(void);\\nint main(void){nosuchsym();return 0;}\\n" > /tmp/cclab/ln.c',
@@ -142,6 +150,9 @@ try {
   // non-zero" would also pass on a cc that failed at everything.
   check('a compile ERROR is reported as non-zero', /badc_rc=[1-9]/.test(out), out);
   check('a link ERROR is reported as non-zero', /badlink_rc=[1-9]/.test(out), out);
+  check('a linked program is executable (autoconf test -x)', /linkx=yes/.test(out), out);
+  check('the default a.out is executable too', /aoutx=yes/.test(out), out);
+  check('CONTROL: a -c object is NOT marked executable', /objx=no/.test(out), out);
   check('-print-prog-name=ld gives an absolute path libtool accepts', /ppn_ld=\/usr\/bin\/ld/.test(out), out);
   check('-print-prog-name=ar gives an absolute path', /ppn_ar=\/usr\/bin\/ar/.test(out), out);
   // CONTROL: a tool we do NOT ship must still echo the bare name back, or the check above

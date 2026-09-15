@@ -1,0 +1,123 @@
+#!/bin/sh
+# cc -- clang for the WALI target, running as an ordinary walios guest (clang.wasm is
+# yowasp's LLVM, converted to shared memory). The driver cannot spawn its own steps --
+# WASI has no processes -- so this asks it for the plan (-###) and runs each step here as
+# its own walios process: cc1, then wasm-ld (the same module, dispatching on argv[0]).
+# Both the terminal and the run_walios tool get this file from the shared boot, so a C
+# build behaves the same in both. `clang` itself is the raw driver; use it for -E/-S/-c.
+#
+# Defaults (unless you pass your own --target): the WALI musl sysroot, the wasm features
+# the kernel expects (shared memory, exceptions, sjlj), -O2, and libc + compiler-rt on a
+# link. -w LAST silences third-party warning spam; errors still show.
+# clang.wasm is a WASI binary, and this wasi-libc has no cwd of its own: it resolves every
+# RELATIVE path against "/". `cc conftest.c` therefore looked for /conftest.c and died with
+# "no such file or directory". That is what stopped autotools dead -- configure's very first
+# test compiles ./conftest.c, so EVERY autoconf project failed at "C compiler cannot create
+# executables" before doing anything at all.
+#
+# This is a REGRESSION, not a law of nature: clang used to run PAGE-SIDE through a bridge
+# that resolved paths, and that went away when it became a guest process (57f712c).
+#
+# The principled fix is a preopen advertised as "." pointing at the process cwd -- what
+# `wasmtime --dir .` does. That was TRIED and is not a drop-in: wasi-libc's prefix matching
+# then routes ABSOLUTE paths to it as well and they break instead. Worth another go in the
+# kernel some day. Until then the driver absolutises, which is the job it already does since
+# it runs every compile step by hand anyway. (This clang has no PWD/chdir symbol either, so
+# exporting PWD does nothing.)
+#
+# Only clang is affected. make.wasm and busybox are WALI binaries with a real cwd.
+# -print-prog-name=X: answer with an ABSOLUTE path for the tools we actually ship.
+# clang only knows its own install tree, so it echoed the bare name back ("ld"), and that
+# one detail failed configure for every libtool project: AC_PROG_LD takes an absolute answer
+# as final, but a relative one sends it hunting through $PATH and then judging the result --
+#   case `$LD -v` in *GNU*) ... ;; *) test yes != "$with_gnu_ld" && break ;; esac
+# -- and our LLD is not GNU ld, so the search fell through and configure aborted with "no
+# acceptable ld found in $PATH" while /usr/bin/ld sat there working. A real toolchain driver
+# reports where its tools live; now so does this one.
+for _a in "$@"; do
+  case "$_a" in
+    -print-prog-name=*)
+      _n=${_a#-print-prog-name=}
+      for _d in /usr/bin /bin; do
+        if [ -x "$_d/$_n" ]; then printf '%s
+' "$_d/$_n"; exit 0; fi
+      done
+      printf '%s
+' "$_n"; exit 0 ;;
+  esac
+done
+here=$(pwd)
+ccout=; wantflag=
+abs() { case "$1" in /*|'') printf %s "$1" ;; *) printf %s "$here/$1" ;; esac; }
+n=$#; i=0; want=0
+while [ $i -lt $n ]; do
+  a=$1; shift; i=$((i+1))
+  # the path argument of a flag we saw last time round
+  if [ $want = 1 ]; then _p=$(abs "$a"); [ "$wantflag" = "-o" ] && ccout=$_p; set -- "$@" "$_p"; want=0; continue; fi
+  case "$a" in
+    # flags whose NEXT argument is a path. -MT/-MQ are make target names, not paths.
+    -o|-I|-L|-isystem|-include|-iquote|-idirafter|-MF) set -- "$@" "$a"; wantflag=$a; want=1 ;;
+    -I?*)  set -- "$@" "-I$(abs "${a#-I}")" ;;
+    -L?*)  set -- "$@" "-L$(abs "${a#-L}")" ;;
+    -MF?*) set -- "$@" "-MF$(abs "${a#-MF}")" ;;
+    -*)    set -- "$@" "$a" ;;
+    # an input file. Absolutise only what actually exists: a non-existent name is left
+    # alone so clang reports it by the name the caller used.
+    *)     if [ -e "$a" ]; then set -- "$@" "$(abs "$a")"; else set -- "$@" "$a"; fi ;;
+  esac
+done
+
+hastarget=0; linking=1; inputs=0
+for a in "$@"; do
+  case "$a" in
+    --target=*|-target|--target) hastarget=1 ;;
+    -c|-E|-S|-###|--version|-v|-print-*|-M|-MM|--help|-dumpmachine|-dumpversion) linking=0 ;;
+    -*) ;;
+    *) inputs=1 ;;
+  esac
+done
+[ $inputs = 1 ] || linking=0
+if [ $hastarget = 0 ]; then
+  set -- --target=wasm32-unknown-linux-muslwali --sysroot=/sysroot \
+    -nostdlibinc -isystem /sysroot/include -I/opt/wali/include -L/opt/wali/lib -D_GNU_SOURCE \
+    -O2 -mllvm -wasm-enable-sjlj -fwasm-exceptions -matomics -mbulk-memory -mexception-handling \
+    -L/sysroot/lib -nodefaultlibs -Wl,--shared-memory,--export-memory,--max-memory=2147483648,-z,stack-size=8388608 \
+    "$@"
+  [ $linking = 1 ] && set -- "$@" -lc /sysroot/lib/libclang_rt.builtins.a
+  set -- "$@" -w
+fi
+plan=$(mktemp) || exit 1
+clang -### "$@" 2>"$plan"; rc=$?
+if [ $rc -ne 0 ]; then grep -v '^clang version\|^Target:\|^Thread model\|^InstalledDir\|^Build config' "$plan" >&2; rm -f "$plan"; exit $rc; fi
+# Every command line the driver would have spawned: ` "" "clang" "-cc1" ...` / ` "wasm-ld" ...`.
+# The leading "" is the (empty) InstalledDir; the tools resolve by name on PATH.
+# ...and the same for every OUTPUT the driver chose for us. With no -o, clang defaults to a
+# RELATIVE name -- `a.out` when linking, `conftest.o` for -c -- which the WASI steps would
+# write to / instead of here. autoconf's ac_compile is literally `$CC -c conftest.c`, with no
+# -o at all, so this case is not exotic. Rewriting -o in the PLAN catches all of them at once
+# (default names, one -o per input for a multi-input -c) instead of guessing in the argv pass.
+# The [^/] guard leaves paths that are already absolute alone.
+cmds=$(grep '^ *"' "$plan" | sed 's/^ *"" //' | sed -e 's|"-o" "\([^/"][^"]*\)"|"-o" "@CCHERE@/\1"|g' -e "s|@CCHERE@|$here|g")
+rm -f "$plan"
+if [ -z "$cmds" ]; then exec clang "$@"; fi        # nothing to spawn (--version, -print-*, ...): the driver did the work
+# A pipeline's exit status is its LAST element's, and the while loop IS that element, so
+# `exit $?` inside the subshell does propagate out of cc. I briefly believed otherwise and
+# rewrote this as a heredoc loop; that was wrong. Verified both ways: a compile STEP that
+# fails (absolute paths, so the plan stage succeeds and cc1 is what dies) gives cc exit 1.
+echo "$cmds" | while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  eval "$line" || exit $?
+done || exit $?
+
+# A linker leaves its output EXECUTABLE. wasm-ld's lands 0644 here, and walios does not
+# enforce the x-bit on exec -- so `./a.out` ran fine and nothing looked wrong. autoconf
+# noticed: ac_fn_c_try_link ends with
+#     test -s conftest$ac_exeext && { test "$cross_compiling" = yes || test -x conftest$ac_exeext }
+# so EVERY AC_CHECK_LIB / AC_CHECK_FUNC reported "no" on a link that had actually
+# succeeded ($? = 0 right above "failed program was" in config.log). jq's whole libm
+# probe answered no, which would have configured a deliberately crippled build.
+if [ $linking = 1 ]; then
+  [ -n "$ccout" ] || ccout="$here/a.out"
+  [ -f "$ccout" ] && chmod 755 "$ccout"
+fi
+exit 0
