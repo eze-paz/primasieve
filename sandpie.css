@@ -2355,6 +2355,14 @@ ul.conv-list li.active {
      2-track template has no such coupling; each track is 0..400px, so the pair
      narrows with the pane instead of collapsing to a single card. */
   .artifact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 400px)); gap: 12px; margin-top: 0.5rem; align-self: stretch; }
+  /* Same 0.3rem inset the message blocks carry, so an artifact lines up with
+     the conversation instead of sitting proud of it. On a bare card (the
+     legacy path renders one straight into the host, outside any grid) the
+     rule applies to the wrap itself; inside a grid the GRID owns the inset,
+     or the two would stack. */
+  .artifact-grid,
+  .file-bundle,
+  .conv-host > .artifact-wrap { margin-left: 0.3rem; margin-right: 0.3rem; }
   .artifact-grid > .artifact-wrap { margin-top: 0 !important; min-width: 0; }
   .artifact-grid > .artifact-wrap.ac-hidden { display: none !important; }
   /* "+N more" overflow tile — folds a flood of cards behind one cell (GRID_CAP). */
