@@ -217,7 +217,16 @@ WORKER_V = 'killall33';
                'rustc-threads.wasm': [['wali-rust-sysroot.tar.gz', '/sysroot']],
                // clang's resource dir (builtin headers, compiler-rt) at /usr, the WALI musl
                // headers + libc at /sysroot. rustc's sysroot unions into /sysroot (lib/rustlib/).
-               [CLANG]: [['llvm-resources.tar.gz', '/usr'], ['wali-sysroot.tar.gz', '/sysroot']] };
+               // onig-wali unpacks /opt/wali/{lib/libonig.a,include/oniguruma.h}, which `cc`
+               // already has on its default -I/-L (see walios/bin/cc), so `-lonig` just works.
+               // The OS ships it because WALI's ABI defeats oniguruma's own type selection:
+               // st.h/regint.h pick a pointer-sized integer from {long, long long} only, and
+               // here BOTH are 8 while a pointer is 4, so neither branch fires and st_data_t
+               // and hash_data_type are never declared. Every dependent (jq's vendored copy
+               // included) died on "unknown type name 'hash_data_type'". scripts/
+               // build-oniguruma-wali.sh supplies uintptr_t by FLAG, with no source patch.
+               [CLANG]: [['llvm-resources.tar.gz', '/usr'], ['wali-sysroot.tar.gz', '/sysroot'],
+                         ['onig-wali.tar.gz', '/']] };
     },
 
     env(_mode) {
