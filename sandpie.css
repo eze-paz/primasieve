@@ -4008,10 +4008,10 @@ html[data-theme="olive"] .conv-host { gap: 0; }
 html[data-theme="olive"] .conv-host > .msg.user,
 html[data-theme="olive"] #messages > .msg.user,
 html[data-theme="olive"] #messagesSide > .msg.user {
-  border-left-color: var(--sp-accent);
-  background: var(--sprail-ground);
+  border-left-color: var(--sprail-ops);
+  background: none;
   padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  margin-top: 26px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="olive"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="olive"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4066,8 +4066,10 @@ html[data-theme="olive"] .tool-group .tg-log { padding: 0.15rem 0 0; }
 html[data-theme="olive"] .conv-host > .msg.assistant,
 html[data-theme="olive"] #messages > .msg.assistant,
 html[data-theme="olive"] #messagesSide > .msg.assistant {
-  border-left-color: var(--sprail-out);
-  padding-top: 7px; padding-bottom: 4px;
+  border-left-color: var(--sp-accent);
+  background: var(--sprail-ground);
+  padding-top: 7px; padding-bottom: 10px;
+  margin-bottom: 14px;         /* separation after the reply */
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="olive"] .msg.assistant p { margin: 0 0 0.58em; }
@@ -4090,12 +4092,14 @@ html[data-theme="olive"] #messagesSide > .msg.think {
 
 /* --- the rail answers the cursor --- */
 html[data-theme="olive"] .conv-host > .msg.tool-group:hover,
-html[data-theme="olive"] .conv-host > .msg.assistant:hover,
 html[data-theme="olive"] #messages > .msg.tool-group:hover,
-html[data-theme="olive"] #messages > .msg.assistant:hover,
-html[data-theme="olive"] #messagesSide > .msg.tool-group:hover,
-html[data-theme="olive"] #messagesSide > .msg.assistant:hover {
+html[data-theme="olive"] #messagesSide > .msg.tool-group:hover {
   border-left-color: var(--sprail-hot);
+}
+html[data-theme="olive"] .conv-host > .msg.assistant:hover,
+html[data-theme="olive"] #messages > .msg.assistant:hover,
+html[data-theme="olive"] #messagesSide > .msg.assistant:hover {
+  border-left-color: color-mix(in srgb, var(--sp-accent) 70%, var(--sp-text));
 }
 
 /* --- the settled timer reads as the rail's footnote --- */
