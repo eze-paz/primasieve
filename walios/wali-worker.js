@@ -7,7 +7,32 @@
 const PAGE = 65536;
 const CHILD_DONE = 0x7e57n;
 try { self.addEventListener('unhandledrejection', (e) => { try { self.postMessage({ t: 'out', fd: 2, s: '[host] UNHANDLED: ' + ((e.reason && e.reason.stack) || e.reason) + '\n' }); } catch {} }); } catch {}
-const E = { PERM:1, NOENT:2, SRCH:3, INTR:4, IO:5, BADF:9, CHILD:10, AGAIN:11, NOMEM:12, ACCES:13, EXIST:17, XDEV:18, NOTDIR:20, ISDIR:21, INVAL:22, NOTTY:25, SPIPE:29, PIPE:32, NOSYS:38, NOTEMPTY:39, TIMEDOUT:110 };
+const E = { PERM:1, NOENT:2, SRCH:3, INTR:4, IO:5, BADF:9, CHILD:10, AGAIN:11, NOMEM:12, ACCES:13, EXIST:17, XDEV:18, NOTDIR:20, ISDIR:21, INVAL:22, NOTTY:25, SPIPE:29, PIPE:32, NOSPC:28, NOSYS:38, NOTEMPTY:39,
+            ADDRINUSE:98, ADDRNOTAVAIL:99, CONNREFUSED:111, TIMEDOUT:110 };
+
+// LOOPBACK TCP, entirely inside this kernel.
+//
+// listen() used to hand the port to the WISP relay (OP.LISTEN). But WISP is an OUTBOUND
+// transport -- a browser cannot accept inbound TCP -- so the relay refused, and since it
+// refused with -98 the guest saw "Address in use" on EVERY port. Measured on unused ports
+// in a fresh kernel, three independent stacks agreeing:
+//     nc -l -p 9001        -> nc: listen: Address in use
+//     python bind(9002)    -> [Errno 98] Address in use
+//     tlswrap -L 9443 ...  -> listen: Address in use
+// which made the tlswrap -L LOCALPORT HOST 443 workflow the tool documents impossible,
+// and a local server unbuildable.
+//
+// A 127.0.0.1 listener never needed the relay: both ends are in here. Connections are
+// ordinary socketpairs, so read/write/poll/close all work through the existing spair paths
+// with no new plumbing -- and accept blocks the way the relay one does, by returning
+// EAGAIN for sysAsync to retry.
+//
+// 0.0.0.0 is treated as local too. A guest binding "any" in a browser has no "any" to bind:
+// there is no route by which an outside connection could arrive, so local is the only
+// meaning it can have -- and it is what makes a plain `nc -l -p N` work.
+const localListeners = new Map();          // port -> { port, backlog: [] }
+const isLocalBindIp = (ip) => !ip || ip === '0.0.0.0' || ip === '::' || ip === '127.0.0.1'
+  || (typeof ip === 'string' && (ip.startsWith('127.') || ip === '::1'));
 const err = (e) => BigInt(-e);
 const td = new TextDecoder(), te = new TextEncoder();
 
@@ -885,7 +910,26 @@ class Process {
           post(`[host] pid ${this.pid} (${(this.argv||[]).slice(0,2).join(' ')}): handler set for signal ${sig} but binary lacks --export-table; default action\n`, 2); }
       }
       if (SIG_DFL_IGNORE.has(sig)) continue;
-      if (SIG_STOPPERS.has(sig)) { if (!this.inChild()) { this.stopped = sig; this.stopReported = false; notifyStopped(this); } continue; }
+      // Job control was COSMETIC: a stopper set P.stopped and told the parent (so ^Z made
+      // the shell print "Stopped" and hand back the prompt) but the child NEVER stopped
+      // running. contWaiters was initialised and drained by SIGCONT, yet nothing ever
+      // pushed to it, so no code path waited for one. Measured: a `kill -STOP` on a busy
+      // job kept writing straight through it -- 9652 bytes before the stop, 20944 after,
+      // 32532 later still.
+      // Now it really parks: this is the ASYNC delivery path, so the syscall simply does
+      // not return until SIGCONT drains contWaiters (line ~579). The kernel is an async
+      // syscall server, so a parked process costs nothing while it waits.
+      // NB the SYNC twin (predeliver) cannot await and still only sets the flag; a process
+      // spinning in pure computation therefore parks at its next BLOCKING syscall, not
+      // instantly. That is fine for builds, which are syscall-bound, but it is why the
+      // caller must keep a kill fallback for a genuine runaway.
+      if (SIG_STOPPERS.has(sig)) {
+        if (!this.inChild()) {
+          this.stopped = sig; this.stopReported = false; notifyStopped(this);
+          await new Promise((res) => { this.contWaiters.push(res); });
+        }
+        continue;
+      }
       if (this.inChild()) return this.parkChild({ exited: 128 + sig });
       throw new ExitError(128 + sig);
     }
@@ -954,6 +998,9 @@ class Process {
     if (h.std !== undefined) return true;
     if (h.fifo) return h.fifo.chunks.length > 0 || h.fifo.writers <= 0;
     if (h.spair) return h.spair.rd.chunks.length > 0 || h.spair.rd.writers <= 0;
+    // A listening socket is "readable" when a connection is waiting, which is how a
+    // poll/select-driven server (rather than a blocking-accept one) learns to accept.
+    if (h.sock && h.sock.local && h.sock.listener) return h.sock.local.backlog.length > 0;
     if (h.pty !== undefined) { const p = ptys.get(h.pty); return h.master ? p.toMaster.length > 0 : (p.toSlave.length > 0 || !!p.slaveEof); }
     if (h.tfd) { this.pollTfd(h.tfd); return h.tfd.count > 0; }
     if (h.sock && h.sock.icmp) { const pg = h.sock.ping;
@@ -1210,6 +1257,30 @@ class Process {
     opfsFault(path2);
     if (path2 === '/dev/ptmx') { const id = newPty(); const g = this.allocFd(); this.fds.set(g, { pty: id, master: true, cloexec: ce }); return BigInt(g); }
     if (path2 === '/dev/null') { const g = this.allocFd(); this.fds.set(g, { devnull: true, cloexec: ce }); return BigInt(g); }
+    // /dev/stdin, /dev/stdout, /dev/stderr: open() them and you get a DUP of that fd, which
+    // is what Linux gives you (they are symlinks into /proc/self/fd). Shell and build glue
+    // leans on them constantly -- `cmd > /dev/stdout`, `... < /dev/stdin`, and the
+    // "write to stdout by name" idiom autoconf and many Makefiles use -- and here they did
+    // not exist at all, so every one of those was a plain ENOENT.
+    {
+      const stdio = { '/dev/stdin': 0, '/dev/stdout': 1, '/dev/stderr': 2 };
+      if (path2 in stdio) {
+        const src = this.fds.get(stdio[path2]);
+        if (!src) return err(E.BADF);
+        const g = this.allocFd();
+        // A dup SHARES the open-file description (offset included), which is why this
+        // copies the handle by reference rather than making a fresh one -- the same rule
+        // the fork/dup2 paths follow.
+        this.fds.set(g, { ...src, cloexec: ce });
+        this.bumpFifo(src);
+        return BigInt(g);
+      }
+    }
+    // /dev/zero and /dev/full. zero reads as endless NULs and swallows writes; full does
+    // the same on read but every write fails ENOSPC, which is exactly what it is for --
+    // configure scripts and test suites use it to check an out-of-space path.
+    if (path2 === '/dev/zero') { const g = this.allocFd(); this.fds.set(g, { devzero: true, cloexec: ce }); return BigInt(g); }
+    if (path2 === '/dev/full') { const g = this.allocFd(); this.fds.set(g, { devzero: true, devfull: true, cloexec: ce }); return BigInt(g); }
     // /dev/hostcall: the guest<->host RPC channel that does NOT ride stdio. The old channel
     // (frames on fd 1, replies on fd 0) broke the moment a program was piped or fed a
     // heredoc: `python3 -c "import matplotlib" | head` sent its bundle request into the
@@ -1298,6 +1369,7 @@ class Process {
         if (h.spair) { if (!h.spair.rd.chunks.length && h.nonblock && h.spair.rd.writers > 0) return err(E.AGAIN); const b = pipeRead(h.spair.rd, a[2]); S.wbytes(a[1], b); return BigInt(b.length); }
         if (h.hostcall) { if (!h.hostcall.chunks.length) return err(E.AGAIN); const b = pipeRead(h.hostcall, a[2]); S.wbytes(a[1], b); return BigInt(b.length); }   // a blocking read waits in sysAsync
         if (h.devnull) return 0n;
+        if (h.devzero) { const n = a[2] | 0; S.wbytes(a[1], new Uint8Array(n)); return BigInt(n); }   // endless NULs
         if (h.devrandom) { const n = a[2] | 0; let done = 0; while (done < n) { const k = Math.min(n - done, 65536); const b = new Uint8Array(k); crypto.getRandomValues(b); S.wbytes(a[1] + done, b); done += k; } return BigInt(n); }
         if (h.tfd) { const t = h.tfd; // timerfd: 8-byte expiration count (a blocking read waits in sysAsync)
           if (!t.count) return err(E.AGAIN);
@@ -1328,6 +1400,8 @@ class Process {
           if (a[2] === 0) return 0n;                                   // same rule as the pipe above
           h.spair.wr.chunks.push(S.u8.slice(a[1], a[1] + a[2])); wakePipe(h.spair.wr); return BigInt(a[2]); }
         if (h.devnull) return BigInt(a[2]);
+        if (h.devfull) return err(E.NOSPC);      // the whole point of /dev/full
+        if (h.devzero) return BigInt(a[2]);
         if (h.hostcall) { hostcallWrite(h.hostcall, S.u8.slice(a[1], a[1] + a[2])); return BigInt(a[2]); }
         if (h.devrandom) return BigInt(a[2]);
         if (h.pty !== undefined) { const p = ptys.get(h.pty); const b = S.u8.slice(a[1], a[1] + a[2]); if (h.master) ptyMasterWrite(p, b); else ptySlaveWrite(p, b); return BigInt(a[2]); }
@@ -1349,18 +1423,23 @@ class Process {
         if (h.tfd) { if (h.tfd.to) clearTimeout(h.tfd.to); const w = h.tfd.waiters; h.tfd.waiters = []; for (const f of w) f('t'); S.fds.delete(a[0]); return 0n; }
         // a dup'd/forked socket fd shares ONE wisp stream — only an unshared close may
         // tear it down, or a child's close_range kills the parent's live connection.
+        // Closing a local listener frees the port, or the next bind of it would get a
+        // (this time genuine) EADDRINUSE from a listener nobody can reach any more.
+        if (h.sock && h.sock.local && h.sock.listener && !h.shared
+            && localListeners.get(h.sock.local.port) === h.sock.local) localListeners.delete(h.sock.local.port);
         if (h.sock && h.sock.id && !h.shared) initWisp().call(initWisp().OP.CLOSE, h.sock.id, 0, 0);
         S.fds.delete(a[0]); S.dirState.delete(a[0]);
         if (h.file && h.file.brId) opfsMaybeRelease(h.file);   // last fd gone -> give the OPFS lock back
         return 0n; }
       case 'lseek': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
-        if (h.std !== undefined || h.fifo || h.sock || h.pty !== undefined || h.devnull || h.devrandom) return err(E.SPIPE);
+        if (h.std !== undefined || h.fifo || h.sock || h.pty !== undefined || h.devnull || h.devrandom || h.devzero) return err(E.SPIPE);
         const size = h.file ? h.file.size : 0; const o = (h.off ??= { v: 0 });
         o.v = a[2] === 0 ? Number(a[1]) : a[2] === 1 ? o.v + Number(a[1]) : size + Number(a[1]);
         return BigInt(o.v); }
       case 'fstat': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
         if (h.pty !== undefined) { S.putStat(a[1], ptyStatObj(h.pty, h.master)); return 0n; }
         if (h.devnull) { S.putStat(a[1], { size: 0, mode: 0o020620 }); return 0n; }
+        if (h.devzero) { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
         if (h.devrandom) { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
         if (h.std !== undefined || h.fifo || h.sock || h.spair) { S.putStat(a[1], { size: 0, mode: (h.fifo || h.sock || h.spair) ? 0o010600 : 0o020620 }); return 0n; }
         if (h.exe) { S.putStat(a[1], { size: 1, mode: 0o100755 }); return 0n; }
@@ -1368,13 +1447,17 @@ class Process {
       case 'stat': case 'lstat': { const p = S.atPath(-100, S.cstr(a[0])); let m;
         if (p === '/dev/ptmx') { S.putStat(a[1], ptyStatObj(0, true)); return 0n; }
         if ((m = p.match(/^\/dev\/pts\/(\d+)$/))) { if (!ptys.has(+m[1])) return err(E.NOENT); S.putStat(a[1], ptyStatObj(+m[1], false)); return 0n; }
-        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/urandom' || p === '/dev/random') { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
+        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/urandom' || p === '/dev/random'
+            || p === '/dev/zero' || p === '/dev/full' || p === '/dev/stdin' || p === '/dev/stdout' || p === '/dev/stderr')
+          { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
         return S.statPath(p, a[1], name === 'stat'); }
       case 'newfstatat': { const s = S.cstr(a[1]); return s === '' ? S.sys('fstat', [a[0], a[2]]) : S.statPath(S.atPath(a[0], s), a[2]); }
       case 'access': case 'faccessat': case 'faccessat2': {
         const p = name === 'access' ? S.atPath(-100, S.cstr(a[0])) : S.atPath(a[0], S.cstr(a[1]));
         if (p === '/proc/self/exe') return 0n;
-        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/ptmx' || p === '/dev/urandom' || p === '/dev/random') return 0n; // devices exist (scripts' `test -e`)
+        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/ptmx' || p === '/dev/urandom' || p === '/dev/random'
+            || p === '/dev/zero' || p === '/dev/full' || p === '/dev/stdin' || p === '/dev/stdout' || p === '/dev/stderr')
+          return 0n; // devices exist (scripts' `test -e`)
         { const m = p.match(/^\/dev\/pts\/(\d+)$/); if (m) return ptys.has(+m[1]) ? 0n : err(E.NOENT); }
         opfsFault(p); const pf = S.follow(p);
         const want = (name === 'access' ? (a[1] | 0) : (a[2] | 0)) & 6; // X not enforced
@@ -1842,12 +1925,32 @@ class Process {
         S.refresh(); h.sock.bindAddr = readSockaddr(S, a[1]); return 0n; }
       case 'listen': { const h = S.fds.get(a[0]); if (!h || !h.sock) return err(E.BADF);
         const ba = h.sock.bindAddr || { ip: '0.0.0.0', port: 0 };
+        // Loopback/any: keep it in the kernel. See localListeners above for why the relay
+        // path cannot serve this (and reported every port as already in use).
+        if (isLocalBindIp(ba.ip)) {
+          if (!ba.port) return err(E.INVAL);                       // ephemeral port 0: not supported locally
+          const prev = localListeners.get(ba.port);
+          if (prev && prev !== h.sock.local) return err(E.ADDRINUSE);   // a REAL collision, unlike before
+          const L = h.sock.local || { port: ba.port, backlog: [] };
+          localListeners.set(ba.port, L);
+          h.sock.listener = true; h.sock.local = L; h.sock.boundPort = ba.port;
+          return 0n; }
         const br = initWisp(); if (!br.OP.LISTEN) return err(E.NOSYS);
         const r = br.call(br.OP.LISTEN, ba.port, 0, 0);
         if (r.res < 0) return BigInt(r.res);
         h.sock.id = r.res; h.sock.listener = true; h.sock.boundPort = r.aux;
         return 0n; }
       case 'accept': case 'accept4': { const h = S.fds.get(a[0]); if (!h || !h.sock || !h.sock.listener) return err(E.INVAL);
+        if (h.sock.local) {
+          const c = h.sock.local.backlog.shift();
+          // EAGAIN is how a blocking accept waits here: sysAsync retries it. Same contract
+          // the relay accept below documents, so nothing special is needed to park.
+          if (!c) return err(E.AGAIN);
+          S.refresh();
+          if (a[1]) { const n = writeSockaddr(S, a[1], { ip: '127.0.0.1', port: h.sock.local.port }); if (a[2]) S.i32(a[2], n); }
+          const g = S.allocFd();
+          S.fds.set(g, { spair: c.srv, nonblock: !!(a[3] & 0x800), cloexec: !!(a[3] & 0x80000) });
+          return BigInt(g); }
         const br = initWisp();
         const r = br.call(br.OP.ACCEPT, h.sock.id, 1, 0);   // never park here: sysAsync loops on EAGAIN
         if (r.res < 0) return BigInt(r.res);
@@ -1859,6 +1962,18 @@ class Process {
       case 'connect': { const h = S.fds.get(a[0]); if (!h || !h.sock) return err(E.BADF); S.refresh();
         const dst = readSockaddr(S, a[1]);
         if (h.sock.udp || h.sock.icmp) { h.sock.dest = dst; return 0n; }
+        // A loopback destination is served in here, by whoever is listening on that port.
+        // The two ends are an ordinary socketpair, so from here on this fd behaves like any
+        // connected socket (read/write/poll/close all go through the spair paths, which are
+        // checked BEFORE h.sock everywhere).
+        if (dst.ip && (dst.ip === '127.0.0.1' || dst.ip.startsWith('127.') || dst.ip === '::1')) {
+          const L = localListeners.get(dst.port);
+          if (!L) return err(E.CONNREFUSED);        // nothing listening: the honest answer
+          const f1 = mkPipe(), f2 = mkPipe();
+          L.backlog.push({ srv: { rd: f1, wr: f2 } });
+          h.spair = { rd: f2, wr: f1 };
+          h.sock.connectedLocal = true;
+          return 0n; }
         const br = initWisp(); const spec = te.encode(`${dst.ip}|${dst.port}${h.sock.tls ? '|T' : ''}`);
         const r = br.call(br.OP.CONNECT, spec.length, 0, 0, spec); if (r.res < 0) return BigInt(r.res); h.sock.id = r.res; return 0n; }
       case 'sendto': case 'sendmsg': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
@@ -1897,6 +2012,18 @@ class Process {
       case 'recvmsg': case 'recvfrom': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
         if (h.spair) { S.refresh();
           if (!h.spair.rd.chunks.length && (!h.spair.rd.fds || !h.spair.rd.fds.length)) { if (h.spair.rd.writers <= 0) return 0n; if (h.nonblock) return err(E.AGAIN); }
+          // recvfrom is NOT recvmsg: its a[1] is a plain buffer and a[2] its length, while
+          // recvmsg's a[1] is a msghdr. The code below reads a[1]+8 as an iov pointer, so a
+          // recvfrom landed on a wild address -- and the exception that followed came back
+          // as -1, i.e. EPERM, which is what conn.recv() reported after a local accept:
+          //     PermissionError: [Errno 1] Operation not permitted
+          // The sendto/sendmsg twin already separates the two; this side never did, because
+          // until loopback sockets existed nothing reached it by the recvfrom shape (the
+          // socketpair users all go through recvmsg, for SCM_RIGHTS).
+          if (name === 'recvfrom') {
+            const b = pipeRead(h.spair.rd, a[2]); S.wbytes(a[1], b);
+            if (a[4]) { const n = writeSockaddr(S, a[4], { ip: '127.0.0.1', port: 0 }); if (a[5]) S.i32(a[5], n); }
+            return BigInt(b.length); }
           const iov = S.r32(a[1] + 8), iovn = S.r32(a[1] + 12); let total = 0;
           for (let i = 0; i < iovn; i++) { const p = S.r32(iov + i * 8), l = S.r32(iov + i * 8 + 4); if (!l) continue; const b = pipeRead(h.spair.rd, l); if (!b.length) break; S.wbytes(p, b); total += b.length; if (b.length < l) break; }
           const ctl = S.r32(a[1] + 20), ctllen = S.r32(a[1] + 24);
@@ -2771,6 +2898,47 @@ class Process {
         reply(BigInt(n));
         continue;
       }
+      // posix_spawn(pathPtr, argvPtr, envpPtr, fdmapPtr, fdmapLen) -> pid | -errno
+      // fdmapLen pairs of int32 [childFd, parentFd]; parentFd < 0 closes childFd.
+      // Unlike execve this starts a NEW pid and leaves the caller running, so the
+      // existing wait4/SIGCHLD machinery reaps it with no change.
+      if (state === KCTL.REQ && names[Atomics.load(i32, 1)] === 'wali.SYS_posix_spawn') {
+        this.curTid = tid;
+        const b = KCTL.ARGS >> 3;
+        const a0 = Number(i64[b]), a1 = Number(i64[b + 1]), a2 = Number(i64[b + 2]),
+              a3 = Number(i64[b + 3]), a4 = Number(i64[b + 4]);
+        let path = '', av = [], ev = null; const spec = [];
+        try {
+          path = this.cstr(a0); av = this.rPtrArray(a1);
+          ev = a2 ? this.rPtrArray(a2) : null;
+          for (let k = 0; k < a4; k++) spec.push([this.r32(a3 + k * 8), this.r32(a3 + k * 8 + 4)]);
+        } catch (_) { reply(BigInt(-E.INVAL)); continue; }
+        const target = await resolveExec(path, av, this.cwd.p, this.modKey, 0);
+        // The await let other threads run and they move curTid, which is what fds keys
+        // on (see the execve handler for what that cost the last time).
+        this.curTid = tid;
+        if (!target) { reply(BigInt(-E.NOENT)); continue; }
+        let childFds;
+        try { childFds = spawnFdTable(this.fds, spec); }
+        catch (e) { reply(BigInt(-(e && e.badf ? E.BADF : E.INVAL))); continue; }
+        const proc = new Process(target.key, target.argv, ev || this.env, childFds, this.cwd.p);
+        if (this.cred) proc.cred = { ...this.cred };
+        proc.ppid = this.pid; proc.pgid = this.pgid;
+        const childPid = proc.pid;
+        if (STRACE) stracePost(`[strace ${this.pid}] posix_spawn(${JSON.stringify(path)}) = ${childPid}
+`, 2);
+        const task = Promise.resolve(proc.runInWorker()).then((code) => {
+          this.reaped.set(childPid, code === null ? 127 : code);
+          releaseFds(childFds);
+          this.childTasks.delete(childPid);
+          postSignal(this, SIG.CHLD); wakeWaiters(this);
+          return code;
+        });
+        inflight.add(task); task.finally(() => inflight.delete(task));
+        this.childTasks.set(childPid, task);
+        reply(BigInt(childPid));
+        continue;
+      }
       if (state === KCTL.REQ && names[Atomics.load(i32, 1)] === 'wali.SYS_execve') {
         this.curTid = tid;
         // A thread may fork+exec (the child branch runs on IT): served here like the main
@@ -2912,6 +3080,25 @@ function resolveExecKey(p, cwd, selfKey) {
   }
   // busybox multi-call fallback: any still-unresolved name runs busybox, which
   // dispatches on argv[0] (busybox itself may still be a lazy manifest URL).
+  //
+  // NOT for an explicit path to a file that does not exist. That must be ENOENT, or
+  // execvp() can never walk $PATH: it tries /bin/foo first, the fallback makes that
+  // "succeed" by running busybox, busybox prints "foo: applet not found" and exits -- and
+  // the loop never reaches /usr/bin/foo, where the program actually is. Measured:
+  //     timeout 260 build-pkg tree   -> "build-pkg: applet not found"  (it is in /usr/bin)
+  //     timeout 5 /usr/bin/build-pkg -> runs
+  // which silently broke `timeout CMD`, `env CMD`, `find -exec CMD` and anything else that
+  // spawns a helper by name. A whole batch of package builds reported failure in 0s each
+  // because of it -- none of them had started.
+  //
+  // A name with NO slash still falls back: "run the applet" is the intended meaning there,
+  // and that is what /bin/sed and the other 17-byte applet stubs rely on (they EXIST, so
+  // they come through the branch above and are not affected by this).
+  const explicitPath = p.includes('/');
+  const existsInVfs = files.has(p.startsWith('/') ? norm(p, '/') : norm(p, cwd));
+  if (!key && explicitPath && !existsInVfs) {
+    return null;                       // -> ENOENT, so the caller's PATH walk continues
+  }
   if (!key && manifest['busybox']) key = manifest['busybox'];
   if (!key) { post(`[host] execve: cannot resolve ${p}\n`, 2); return null; }
   return key;
@@ -2956,7 +3143,26 @@ async function S_await(S, sysname, args) {
 // terminal answered -- in the tool `cc` hung to the timeout. clang is a guest now.) Every caller (boot, the worker
 // loop's execve, the vfork child's execve) goes through resolveExec + startProcess, so
 // pid/pgid inheritance, the fd table and lazy loading are decided in one place.
+// execvp() also accepts a BARE name and looks it up along $PATH. The shell does that
+// itself, so shell-run commands were fine; a program exec'ing a bare name was not. Manifest
+// names still win (checked first), so `sed` keeps resolving to busybox rather than to a
+// stray /bin/sed stub. /bin:/usr/bin is hardcoded because this layer has no env, and it is
+// walios' PATH.
+function pathSearch(p, cwd) {
+  if (!p || p.includes('/')) return null;
+  for (const d of ['/bin', '/usr/bin']) {
+    const cand = d + '/' + p;
+    opfsFault(cand);
+    if (files.has(cand)) return cand;
+  }
+  return null;
+}
+
 async function resolveExec(p, argv, cwd, selfKey, depth) {
+  if (!resolveModuleKey(p, selfKey)) {
+    const onPath = pathSearch(p, cwd);
+    if (onPath) p = onPath;
+  }
   if (!resolveModuleKey(p, selfKey) && (depth || 0) < 4) {
     const sc = scriptExecRewrite(p, argv, cwd);
     if (sc) return resolveExec(sc.path, sc.argv, cwd, selfKey, (depth || 0) + 1);
@@ -2965,6 +3171,31 @@ async function resolveExec(p, argv, cwd, selfKey, depth) {
   if (!key) return null;
   if (!(await ensureModule(key))) return null;   // LAZY: fetch + compile on first exec
   return { key, argv };
+}
+
+// A spawned child SHARES fd handles with its parent (both hold the same pipe), so every
+// inherited handle must take a reference; releaseFds() gives it back when the child
+// exits. Getting this wrong does not fail loudly -- the reader simply never sees EOF.
+function retainFd(h) {
+  if (!h) return h;
+  if (h.fifo) { if (h.end === 'w') h.fifo.writers++; else if (h.end === 'r') h.fifo.readers++; }
+  else if (h.spair) { h.spair.wr.writers++; h.spair.rd.readers++; }
+  return h;
+}
+// Build the child's fd table: the parent's non-cloexec fds, then the explicit
+// redirections. An explicit action wins over FD_CLOEXEC, exactly as dup2 clears it --
+// node marks its pipe ends cloexec and then maps them onto 0/1/2.
+function spawnFdTable(parentFds, spec) {
+  const out = new Map();
+  for (const [fd, h] of parentFds) if (!(h && h.cloexec)) out.set(fd, h);
+  for (const [childFd, parentFd] of spec) {
+    if (parentFd < 0) { out.delete(childFd); continue; }
+    const h = parentFds.get(parentFd);
+    if (!h) { const e = new Error('EBADF'); e.badf = true; throw e; }
+    out.set(childFd, h);
+  }
+  for (const h of out.values()) retainFd(h);
+  return out;
 }
 
 // Start a resolved program as a process on its own worker. `asPid` is the pid of the
@@ -3031,6 +3262,29 @@ self.onmessage = async (ev) => {
     // 137 = 128 + SIGKILL, what a shell reports for a killed job.
     for (const P of [...procs.values()]) { try { P.groupExit(137); } catch (_) {} }
     self.postMessage({ t: 'killed-all' });
+    return; }
+  // SUSPEND / RESUME. killall preserves the FILESYSTEM but destroys the RUN: a ./configure
+  // that ran out of budget still had to start over, because configure is not resumable.
+  // These park the processes instead, so the work in flight survives and the next call
+  // carries on from the same instruction.
+  //
+  // The reply says how many are CONFIRMED parked, not how many were signalled, because the
+  // two differ: a stopper is honoured in the async delivery path, so a process parks at its
+  // next BLOCKING syscall. Builds are syscall-bound and park within milliseconds, but a
+  // process spinning in pure computation would not -- and the caller must be able to tell,
+  // so it can fall back to killing rather than silently leave something burning CPU.
+  if (m.t === 'stopall' || m.t === 'contall') {
+    const sig = m.t === 'stopall' ? SIG.STOP : SIG.CONT;
+    const all = [...procs.values()];
+    for (const P of all) { try { postSignal(P, sig); } catch (_) {} }
+    const settle = () => {
+      const parked = all.filter((P) => procs.has(P.pid) && P.stopped).length;
+      const live = all.filter((P) => procs.has(P.pid)).length;
+      self.postMessage({ t: m.t === 'stopall' ? 'stopped-all' : 'contd-all', parked, live });
+    };
+    // One turn of the loop is enough for anything already blocked in a syscall; the grace
+    // gives a running process time to reach its next one.
+    if (m.t === 'stopall') setTimeout(settle, 250); else settle();
     return; }
   if (m.t === 'sigint') { // page-level Ctrl-C -> guest foreground group (pty pgrp if set, else the root)
     let fg = 0; for (const p of ptys.values()) if (p.pgrp) fg = p.pgrp;

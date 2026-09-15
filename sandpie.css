@@ -2254,9 +2254,20 @@ ul.conv-list li.active {
   .font-warning .fw-retry { background: var(--sp-accent); border-color: var(--sp-accent); color: #0d1117; font-weight: 600; }
   .font-warning button:hover { filter: brightness(1.1); }
   /* V2 preview-thumbnail artifact card (office body + collapsed representation) */
-  .artifact-card-body { cursor: pointer; outline: none; }
+  /* The preview fills the whole card and the footer floats ON it, so the
+     image is the card rather than a band above a label. */
+  .artifact-card-body {
+    cursor: pointer; outline: none; position: relative;
+    /* a neutral grey mixed from the theme's own ground and ink: dark grey on
+       the dark palettes, light grey on white, opaque enough to sit on any
+       image without a scrim behind it. */
+    --acf-pill: color-mix(in srgb, var(--sp-bg) 78%, var(--sp-text));
+  }
   .artifact-card-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sp-accent); }
-  .artifact-card-body .ac-thumb { position: relative; height: 104px; background: var(--sp-bg); display: grid; place-items: center; border-bottom: 1px solid var(--sp-border); overflow: hidden; }
+  /* 154px = the old 104px band plus the ~50px the footer used to occupy
+     below it, so the card keeps its overall height while the image gains
+     the footer's strip. No bottom border: nothing sits under it now. */
+  .artifact-card-body .ac-thumb { position: relative; height: 154px; background: var(--sp-bg); display: grid; place-items: center; border-bottom: 0; overflow: hidden; }
   /* ↗ open-in-new-tab — the ONLY inline control (pin/share/download live in the
      side panel). Sits top-right of the thumb; stops the card's open action. */
   .artifact-card-body .ac-newtab {
@@ -2285,8 +2296,32 @@ ul.conv-list li.active {
   .artifact-card-body .ac-page i.t { width: 40%; height: 6px; background: var(--sp-accent); margin-bottom: 9px; }
   .artifact-card-body .ac-page i.m { width: 84%; }
   .artifact-card-body .ac-page i.s { width: 56%; }
-  .artifact-card-body .ac-ft { display: flex; align-items: center; gap: 10px; padding: 10px 12px; transition: background 0.12s; }
-  .artifact-card-body:hover .ac-ft { background: color-mix(in srgb, var(--sp-accent) 9%, transparent); }
+  /* The footer is a PILL sitting on the image -- icon + kind, nothing else.
+     No scrim across the card and no backdrop blur: the pill carries its own
+     ground, so the preview stays unobscured everywhere but under the label. */
+  .artifact-card-body .ac-ft {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 11px 4px 5px;
+    position: absolute; left: 10px; bottom: 10px; right: auto; z-index: 2;
+    width: fit-content; max-width: calc(100% - 20px);
+    background: var(--acf-pill);
+    border-radius: 999px;
+    transition: background 0.12s;
+  }
+  .artifact-card-body:hover .ac-ft {
+    background: color-mix(in srgb, var(--sp-accent) 24%, var(--acf-pill));
+  }
+  /* inside a pill the label sizes to its text instead of pushing to the edge */
+  .artifact-card-body .ac-ft .ac-sub { flex: none; }
+  /* Compact cards have no visible thumb -- the footer IS the card, so it goes
+     back into the flow or it would collapse to nothing. */
+  .artifact-compact .ac-ft {
+    position: static; background: none;
+    display: flex; width: auto; max-width: none;
+    border-radius: 0; padding: 3px 10px;
+  }
+  .artifact-compact .ac-ft .ac-sub { flex: 1; }
+  .artifact-compact:hover .ac-ft { background: color-mix(in srgb, var(--sp-accent) 9%, transparent); }
   .artifact-card-body .ac-ic { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; }
   .artifact-card-body .ac-ic svg { width: 17px; height: 17px; }
   .artifact-card-body .ac-sub { flex: 1; min-width: 0; font-size: 11.5px; color: var(--sp-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2352,7 +2387,7 @@ ul.conv-list li.active {
      standalone HTML/image/office deliverable folds into one "N other files" pile. */
   /* flex:none + align-self:stretch are load-bearing: .conv-host is a flex column,
      so without them this card gets squeezed to ~1px (same gotcha as .artifact-compact). */
-  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 0.5rem; flex: none; align-self: stretch; width: fit-content; }
+  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 12px; flex: none; align-self: stretch; width: fit-content; }
   .file-bundle .fb-head { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; user-select: none; transition: background 0.12s; }
   .file-bundle .fb-head:hover { background: color-mix(in srgb, var(--sp-accent) 6%, transparent); }
   /* Layered pile of file edges with a count badge on the top card */
@@ -2701,22 +2736,6 @@ ul.conv-list li.active {
 [data-theme="olive"] body {
   background: #1D1D1B;
   color: #FAF9F2;
-  background-image: radial-gradient(circle, rgba(147,163,50,0.08) 0%, transparent 70%),
-    radial-gradient(circle at 80% 20%, rgba(201,162,90,0.06) 0%, transparent 60%);
-}
-
-[data-theme="olive"] body::before {
-  content: '';
-  position: fixed; inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(147,163,50,0.04) 0%, transparent 50%);
-  animation: olivePulse 8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 1;
-}
-
-@keyframes olivePulse {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.1); }
 }
 
 [data-theme="olive"] aside {
@@ -3856,7 +3875,12 @@ html[data-theme="aurora"] .conv-host > .msg,
 html[data-theme="aurora"] #messages > .msg,
 html[data-theme="aurora"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.3rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.3rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -3874,8 +3898,8 @@ html[data-theme="aurora"] #messagesSide > .msg.user {
      rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  padding: 2rem 10px 2rem var(--sprail-gut);
+  margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="aurora"] .msg.user::before { display: none; }   /* offset ghost */
@@ -3883,12 +3907,8 @@ html[data-theme="aurora"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
-html[data-theme="aurora"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="aurora"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -3933,7 +3953,7 @@ html[data-theme="aurora"] #messagesSide > .msg.assistant {
   border-left-color: var(--sp-accent);
   background: var(--sprail-ground);
   padding-right: 12px;   /* the tint needs air on the far side of the prose */
-  padding-top: 7px; padding-bottom: 4px;
+  padding-top: 2rem; padding-bottom: 2rem;
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="aurora"] .msg.assistant p { margin: 0 0 0.68em; }
@@ -4020,7 +4040,12 @@ html[data-theme="olive"] .conv-host > .msg,
 html[data-theme="olive"] #messages > .msg,
 html[data-theme="olive"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.3rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.3rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -4035,8 +4060,8 @@ html[data-theme="olive"] #messages > .msg.user,
 html[data-theme="olive"] #messagesSide > .msg.user {
   border-left-color: var(--sprail-ops);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 26px;            /* the gap in the rail = the turn separator */
+  padding: 2rem 10px 2rem var(--sprail-gut);
+  margin-top: 40px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="olive"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="olive"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4044,12 +4069,8 @@ html[data-theme="olive"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
-html[data-theme="olive"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="olive"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4093,7 +4114,7 @@ html[data-theme="olive"] #messages > .msg.assistant,
 html[data-theme="olive"] #messagesSide > .msg.assistant {
   border-left-color: var(--sp-accent);
   background: var(--sprail-ground);
-  padding-top: 7px; padding-bottom: 10px;
+  padding-top: 2rem; padding-bottom: 2rem;
   margin-bottom: 14px;         /* separation after the reply */
   font-size: 13.5px; line-height: 1.6;
 }
@@ -4193,11 +4214,9 @@ html[data-theme="olive"] .msg-timer { font-size: 10.5px; }
 html[data-theme="light"] {
   --sprail-w: 2px;
   --sprail-gut: 11px;
-  /* #85c4f0 cannot hold a 2px rule on white -- it disappears. The rail
-     deepens the theme's own accent toward the ink so the hue survives but
-     the line actually reads. Everything else derives from this one key. */
-  --sprail-key:    color-mix(in srgb, var(--sp-accent) 62%, var(--sp-text));
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 3.5%, transparent);
+  /* The rail uses the theme's accent as published -- no deepening. */
+  --sprail-key:    var(--sp-accent);
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 10%, transparent);   /* light ink on white needs far more than a dark theme does */
   --sprail-ops:    color-mix(in srgb, var(--sprail-key) 42%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 20%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 70%, transparent);
@@ -4212,7 +4231,12 @@ html[data-theme="light"] .conv-host > .msg,
 html[data-theme="light"] #messages > .msg,
 html[data-theme="light"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.3rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.3rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -4230,8 +4254,8 @@ html[data-theme="light"] #messagesSide > .msg.user {
      rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  padding: 2rem 10px 2rem var(--sprail-gut);
+  margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="light"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="light"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4239,12 +4263,8 @@ html[data-theme="light"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
-html[data-theme="light"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="light"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4289,7 +4309,7 @@ html[data-theme="light"] #messagesSide > .msg.assistant {
   border-left-color: var(--sprail-key);
   background: var(--sprail-ground);
   padding-right: 12px;   /* the tint needs air on the far side of the prose */
-  padding-top: 7px; padding-bottom: 4px;
+  padding-top: 2rem; padding-bottom: 2rem;
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="light"] .msg.assistant p { margin: 0 0 0.68em; }
@@ -4362,7 +4382,7 @@ html[data-theme="clear"] {
      at three strengths" becomes ONE INK at three strengths -- solid on the
      reply, 30% on machinery, 18% on the query. Swiss, not decorative. */
   --sprail-key:    var(--sp-text);
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 3%, transparent);
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 6%, transparent);    /* pure black on pure white: 6% is already a visible panel */
   --sprail-ops:    color-mix(in srgb, var(--sp-text) 30%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 18%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 75%, transparent);
@@ -4377,7 +4397,12 @@ html[data-theme="clear"] .conv-host > .msg,
 html[data-theme="clear"] #messages > .msg,
 html[data-theme="clear"] #messagesSide > .msg {
   align-self: stretch; width: auto; max-width: none; min-width: 0;
-  margin: 0;                                   /* NOTHING breaks the line */
+  /* 0.3rem of side margin on every block. Left/right only -- the vertical
+     margins stay 0 so the rail is still one unbroken line, and so the
+     later rules that own margin-top (the turn separator) still win.
+     It cannot live on .conv-host: that element's padding-inline is the
+     chat-width cap, so adding to it fights the width setting. */
+  margin: 0 0.3rem;
   border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
   padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
   background: none;
@@ -4395,8 +4420,8 @@ html[data-theme="clear"] #messagesSide > .msg.user {
      rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
   background: none;
-  padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  padding: 2rem 10px 2rem var(--sprail-gut);
+  margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="clear"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="clear"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4404,12 +4429,8 @@ html[data-theme="clear"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
-html[data-theme="clear"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="clear"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4454,7 +4475,7 @@ html[data-theme="clear"] #messagesSide > .msg.assistant {
   border-left-color: var(--sprail-key);
   background: var(--sprail-ground);
   padding-right: 12px;   /* the tint needs air on the far side of the prose */
-  padding-top: 7px; padding-bottom: 4px;
+  padding-top: 2rem; padding-bottom: 2rem;
   font-size: 13.5px; line-height: 1.6;
 }
 html[data-theme="clear"] .msg.assistant p { margin: 0 0 0.68em; }
@@ -4497,3 +4518,71 @@ html[data-theme="clear"] #messagesSide > .msg.think {
 
 /* --- the settled timer reads as the rail's footnote --- */
 html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
+/* ═══════════════════════════════════════════════════════════════════════
+   MESSAGE ACTIONS — a kebab, top-right, menu on click.  ALL THEMES.
+
+   The toolbar used to render permanently under every reply: three icons on
+   every turn, which over a long thread is more chrome than content. The
+   buttons and their handlers are untouched (attachKebab in
+   conversations.js) -- they just live inside a popover now, and the only
+   thing on screen is a 3-dot mark that fades in while you are over the
+   message.
+
+   Anchored to the block's top-right corner. Note this is the one element
+   in the conversation that uses a right-hand edge; everything else hangs
+   off the left rail.
+   ═══════════════════════════════════════════════════════════════════════ */
+.msg { position: relative; }
+.msg > .msg-kebab {
+  position: absolute; top: 3px; right: 3px; z-index: 5;
+  width: 22px; height: 22px; padding: 0; margin: 0; border: 0;
+  /* a slight ground so the mark is findable once revealed: three dim dots
+     alone on a busy reply were easy to miss. */
+  background: color-mix(in srgb, var(--sp-text) 7%, transparent);
+  border-radius: 5px; cursor: pointer;
+  display: grid; place-items: center;
+  color: color-mix(in srgb, var(--sp-text) 42%, transparent);
+  opacity: 0; transition: opacity 0.13s ease, color 0.13s ease, background 0.13s ease;
+}
+.msg > .msg-kebab svg { width: 14px; height: 14px; display: block; fill: currentColor; }
+.msg:hover > .msg-kebab,
+.msg.kebab-open > .msg-kebab { opacity: 1; }
+.msg > .msg-kebab:hover,
+.msg.kebab-open > .msg-kebab {
+  color: var(--sp-text);
+  background: color-mix(in srgb, var(--sp-text) 15%, transparent);
+}
+.msg > .msg-kebab:focus-visible { opacity: 1; outline: 1px solid var(--sp-accent); outline-offset: 1px; }
+
+/* the old strip becomes the menu: hidden until the kebab opens it. The
+   !important is unfortunate but earned -- several themes set their own
+   .msg-actions display/opacity and this has to win in all of them. */
+.msg > .msg-actions {
+  display: none !important;
+  /* The legacy user-bubble rule pins this toolbar with bottom:-34px and
+     left/right offsets of its own, and an absolutely positioned box with
+     BOTH top and bottom set stretches between them -- so the menu has to
+     null those out, not just set its own top. opacity/pointer-events are
+     forced for the same reason: that rule hides the strip at opacity 0. */
+  position: absolute; top: 28px; right: 3px !important; bottom: auto !important; left: auto !important;
+  z-index: 6;
+  flex-direction: column; align-items: stretch; gap: 2px;
+  min-width: 34px; margin: 0; padding: 3px;
+  background: var(--sp-surface);
+  border: 1px solid var(--sp-border-bright);
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.38);
+  opacity: 1 !important; transform: none !important; pointer-events: auto !important;
+}
+.msg.kebab-open > .msg-actions { display: flex !important; }
+.msg.kebab-open > .msg-actions .act-copy {
+  width: 100%; justify-content: center;
+  background: none; border: 0; border-radius: 5px;
+}
+.msg.kebab-open > .msg-actions .act-copy:hover {
+  background: color-mix(in srgb, var(--sp-text) 10%, transparent);
+  border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg > .msg-kebab { transition: none; }
+}

@@ -2562,6 +2562,46 @@ function fmtElapsed(totalSec, tenths = false) {
 }
 // ---- Multi-conversation selection (shift/ctrl click + shift-drag rubber band) ----
 // PC-first: shift+click = range (anchor to row), ctrl/cmd+click = toggle, 
+
+// ---- Message actions: a kebab in the top-right, menu on click ----------
+// The per-message toolbar used to sit permanently under every reply -- three
+// icons on every turn, which in a long thread is pure chrome. The buttons and
+// their handlers are unchanged; they just live inside a popover now, and the
+// only thing on screen is a 3-dot mark that fades in when you are over the
+// message. Anchored top-right of the block.
+const KEBAB_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+  '<circle cx="8" cy="3.2" r="1.35"/><circle cx="8" cy="8" r="1.35"/><circle cx="8" cy="12.8" r="1.35"/></svg>';
+function _closeKebabs(except) {
+  document.querySelectorAll('.msg.kebab-open').forEach((m) => {
+    if (m === except) return;
+    m.classList.remove('kebab-open');
+    const k = m.querySelector(':scope > .msg-kebab');
+    if (k) k.setAttribute('aria-expanded', 'false');
+  });
+}
+function attachKebab(msgEl) {
+  if (!msgEl || msgEl.querySelector(':scope > .msg-kebab')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'msg-kebab';
+  btn.title = 'Message actions';
+  btn.setAttribute('aria-label', 'Message actions');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.innerHTML = KEBAB_SVG;
+  btn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const open = msgEl.classList.toggle('kebab-open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    _closeKebabs(msgEl);
+  });
+  msgEl.appendChild(btn);
+}
+// One document listener closes any open menu: clicking elsewhere, pressing
+// Escape, or running an action (the buttons live inside the menu, so their
+// click bubbles to here).
+document.addEventListener('click', () => _closeKebabs(null));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') _closeKebabs(null); });
+
 // ---- Collapsible sidebar groups (Pinned / Today / Yesterday / months / years) ----
 // State lives per DEVICE in localStorage, keyed by the group LABEL, because the
 // labels are what persist across renders -- the rows under "Today" are different
@@ -4902,6 +4942,7 @@ function addMsg(role, text = '', host = null, animate = false) {
       });
       acts.appendChild(rewind);
       div.appendChild(acts);
+      attachKebab(div);
     }
     if (role === 'assistant') {
       // Hover-reveal copy action: copy this reply as plain text.
@@ -4966,6 +5007,7 @@ function addMsg(role, text = '', host = null, animate = false) {
       });
       acts.appendChild(report);
       div.appendChild(acts);
+      attachKebab(div);
     }
   }
   if (role === 'user' && animate) {

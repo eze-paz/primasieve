@@ -164,7 +164,7 @@ function buildArtifactCard(clean, ext, opts) {
     : '';
   el.innerHTML = thumb +
     '<div class="ac-ft"><div class="ac-ic ac-t-' + kind + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + _ARTIFACT_ICON[kind] + '</svg></div>' +
-    '<span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '<span class="ac-go">›</span></div>';
+    '<span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '</div>';
   el.querySelector('.ac-sub').textContent = label;
   const open = (e) => { if (e) e.preventDefault(); if (opts.onOpen) opts.onOpen(); };
   el.onclick = open;
@@ -172,15 +172,10 @@ function buildArtifactCard(clean, ext, opts) {
   const nt = el.querySelector('.ac-newtab');
   if (nt && opts.onNewTab) nt.onclick = (e) => { e.stopPropagation(); e.preventDefault(); opts.onNewTab(); };
   if (opts.showThumb) _fillArtifactThumb(el, clean, ext);
-  (async () => {
-    try {
-      const { parts, name } = splitPath(await resolveArtifactPath(clean));
-      const dir = await opfs.resolveDir(parts);
-      const file = await (await dir.getFileHandle(name)).getFile();
-      const sub = el.querySelector('.ac-sub');
-      if (sub && file.size > 0) sub.textContent = label + ' · ' + formatArtifactBytes(file.size);
-    } catch (_) {}
-  })();
+  // The subtitle is the KIND only ("Web page", "Image"). It used to append the
+  // file size, which meant an OPFS stat per card for a number nobody acts on --
+  // and it read as noise next to the kind. formatArtifactBytes still serves the
+  // files list and the image-stack tile, where size is the point.
   return el;
 }
 

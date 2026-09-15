@@ -8,9 +8,14 @@
 // problem: calls already share one per-conversation kernel, so /tmp survives a normal
 // return. Only the timeout path was throwing it away.
 //
-// Now the deadline posts {t:'killall'} to the kernel, which groupExit()s every process and
-// KEEPS the kernel, the VFS, the compiled modules and the OPFS bridge. The next call
-// carries on from there.
+// Now the deadline SUSPENDS: every process is parked with SIGSTOP and kept, and the kernel,
+// the VFS, the compiled modules and the OPFS bridge all stay. The next call resumes the
+// same run (resume:true) or, if it sends a script instead, abandons it.
+//
+// THIS FILE covers the FILESYSTEM half -- work written before the deadline is still there
+// on a LATER, UNRELATED call. e2e-suspend-resume.mjs covers the process half: that the
+// parked run continues the same command rather than restarting. Both matter, and neither
+// implies the other: killing the processes (what this used to do) still preserved /tmp.
 //
 // The second assertion is the one that must never regress: the stopped work is really
 // STOPPED. Keeping the session is only safe if a runaway loop does not keep burning CPU
@@ -97,9 +102,9 @@ try {
 
   const a = await run(HANG, 8);
   console.log('    ' + String(a).replace(/\n/g, '\n    '));
-  check('the deadline reports a stop, not a destroyed worker', /exceeded 8s and was stopped/.test(a), a);
+  check('the deadline reports a stop, not a destroyed worker', /exceeded 8s/.test(a) && /SUSPENDED/.test(a), a);
   check('partial output from before the deadline comes back', /started/.test(a), a);
-  check('the reply says the session survived', /session is intact/i.test(a), a);
+  check('the reply says the session survived', /parked exactly where they were/i.test(a), a);
 
   const b = await run(CHECK, 40);
   console.log('    ' + String(b).replace(/\n/g, '\n    '));
