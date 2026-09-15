@@ -9,6 +9,8 @@ const { makeTcpWrap } = require('./tcp-wrap.js');
 const { makeDnsWrap } = require('./dns-wrap.js');
 const { makeHttpParser } = require('./http-parser.js');
 const { makeChildProcess } = require('./child-process.js');
+const { makePipeWrap } = require('./pipe-wrap.js');
+const { makeProcessWrap } = require('./process-wrap.js');
 
 // privateSymbols is read off internalBinding('util') (lib/internal/errors.js:939),
 // and must be STABLE across reads -- a fresh Symbol per access silently breaks
@@ -29,6 +31,18 @@ function makeBindings(vfs, trace, realm) {
   realm = realm || {};
   const hit = (n, k) => { trace.used.add(n + '.' + k); };
   const miss = (n, k) => { trace.missing.add(n + '.' + k); };
+
+  // ONE pipe_wrap for both bindings. child_process constructs its stdio handles from
+  // internalBinding('pipe_wrap').Pipe and passes them into process_wrap's spawn(), so
+  // a second instance would hand it a different class than the one it built.
+  const PIPE_WRAP = (realm.sys && realm.mem) ? makePipeWrap(realm.sys, realm.mem, {
+    streamBaseState: STREAM_BASE_STATE,
+    kReadBytesOrError: 0, kArrayBufferOffset: 1, kBytesWritten: 2, kLastWriteWasAsync: 3,
+    getBuffer: () => realm.Buffer,
+    pending: realm.pending,
+    trace: (m) => realm.trace && realm.trace('[pipe] ' + m),
+    uvErrno: { UV_EOF: -4095 },
+  }) : null;
 
   // ---- fs: the binding that actually proves the thesis -------------------
   function statArray(st, bigint) {
@@ -640,6 +654,18 @@ function makeBindings(vfs, trace, realm) {
     // child_process. Only the SYNC half: spawnSync/execSync/execFileSync. The async
     // path needs process_wrap on the event loop and is not built yet, so
     // child_process.spawn() still fails -- deliberately, rather than half-working.
+    // The ASYNC half: pipe_wrap gives child_process real streams and process_wrap
+    // polls the exit. Both share tcp_wrap's STREAM_BASE_STATE, because
+    // stream_base_commons drives every stream handle through the same array.
+    pipe_wrap: PIPE_WRAP,
+    process_wrap: (() => {
+      if (!PIPE_WRAP) return null;
+      return makeProcessWrap(realm.sys, realm.mem, {
+        pending: realm.pending,
+        Pipe: PIPE_WRAP.Pipe,
+        trace: (m) => realm.trace && realm.trace('[proc] ' + m),
+      });
+    })(),
     spawn_sync: (() => {
       if (!realm.sys || !realm.mem) return null;          // headless callers with no kernel
       return makeChildProcess(realm.sys, realm.mem, {

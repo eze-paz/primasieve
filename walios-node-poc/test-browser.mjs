@@ -165,6 +165,8 @@ const checks = [
   ['execSync returned output', /CP-EXECSYNC:alpha/.test(outText)],
   ['a missing program is 127 + applet-not-found, not ENOENT', /CP-MISSING:127:applet-not-found/.test(outText)],
   ['an unknown /bin name is busybox exiting 127', /CP-BIN-APPLET:127/.test(outText)],
+  ['async spawn streamed stdout and stderr', /SPAWN-CLOSE:3 OUT:async-out ERR:async-err/.test(outText)],
+  ['async spawn wrote to child stdin', /SPAWN-STDIN:async-piped/.test(outText)],
   ['&& chaining worked', /&& worked/.test(outText)],
   ['exit code propagated', /exit code was 3/.test(outText)],
   ['echo | node ran stdin as a script', /from-stdin-777/.test(outText)],
