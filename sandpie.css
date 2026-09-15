@@ -3702,10 +3702,16 @@ html[data-theme="aurora"] #messages > .msg.user,
 html[data-theme="aurora"] #messagesSide > .msg.user {
   border-left-color: transparent;
   background: none;
+  /* ONE rule, above only. Two rules boxed every query in, and at a
+     1000px column a pair of full-width hairlines around three lines of
+     text shouted louder than the fill ever did. One rule reads as "new
+     turn starts here" and stacks without turning the page into a form. */
   border-top: 1px solid var(--sprail-band);
-  border-bottom: 1px solid var(--sprail-band);
-  padding: 9px 0 10px 0;
-  margin-top: 22px;
+  border-bottom: 0;
+  /* aligned with the machinery and the reply: the query used to start
+     13px to their left, which read as a misalignment bug. */
+  padding: 14px 0 2px var(--sprail-gut);
+  margin-top: 26px;
 }
 html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 4px; }
 /* machinery follows the band closely -- the rules already did the separating */
@@ -3714,9 +3720,12 @@ html[data-theme="aurora"] #messages > .msg.user + .msg.tool-group,
 html[data-theme="aurora"] #messagesSide > .msg.user + .msg.tool-group { padding-top: 8px; }
 html[data-theme="aurora"] .msg.user::before { display: none; }   /* offset ghost */
 html[data-theme="aurora"] .msg.user .bubble {
-  background: none; color: var(--sp-text); padding: 0; clip-path: none;
-  box-shadow: none; border-radius: 0; font-weight: 400;
-  font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  background: none; padding: 0; clip-path: none;
+  box-shadow: none; border-radius: 0;
+  /* with no fill and no bar, contrast is what marks the query: it is the
+     brightest, heaviest text in the turn. */
+  color: #fff; font-weight: 500;
+  font: 500 12.5px/1.6 var(--sprail-mono); white-space: pre-wrap;
 }
 html[data-theme="aurora"] .msg.user > .msg-actions {
   position: static; opacity: 0; background: none; border: 0; box-shadow: none;
@@ -3764,7 +3773,7 @@ html[data-theme="aurora"] .tool-group .tg-log { padding: 0.15rem 0 0; }
 html[data-theme="aurora"] .conv-host > .msg.assistant,
 html[data-theme="aurora"] #messages > .msg.assistant,
 html[data-theme="aurora"] #messagesSide > .msg.assistant {
-  border-left-color: var(--sprail-out);
+  border-left-color: transparent;   /* prose sits on the page, not in a pen */
   padding-top: 7px; padding-bottom: 4px;
   font-size: 13.5px; line-height: 1.6;
 }
@@ -3788,11 +3797,8 @@ html[data-theme="aurora"] #messagesSide > .msg.think {
 
 /* --- the rail answers the cursor --- */
 html[data-theme="aurora"] .conv-host > .msg.tool-group:hover,
-html[data-theme="aurora"] .conv-host > .msg.assistant:hover,
 html[data-theme="aurora"] #messages > .msg.tool-group:hover,
-html[data-theme="aurora"] #messages > .msg.assistant:hover,
-html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover,
-html[data-theme="aurora"] #messagesSide > .msg.assistant:hover {
+html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover {
   border-left-color: var(--sprail-hot);
 }
 
