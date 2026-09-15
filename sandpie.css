@@ -1119,6 +1119,39 @@ ul.conv-list li.active {
   }
   ul.conv-list li.conv-group:first-child { padding-top: 0.1rem; }
 
+  /* Collapsible groups. The <li> above keeps pointer-events:none (so a
+     shift+drag starting on the header still becomes a rubber band); the button
+     is the only thing that takes a click, and it is only as wide as its text. */
+  ul.conv-list li.conv-group .cg-btn {
+    pointer-events: auto;
+    display: flex; align-items: center; gap: 0.35rem;
+    background: none; border: 0; padding: 0; margin: 0;
+    font: inherit; letter-spacing: inherit; text-transform: inherit;
+    color: inherit; cursor: pointer;
+    white-space: nowrap;      /* "LAST WEEK" wrapped to two lines without this */
+    text-align: left;
+  }
+  ul.conv-list li.conv-group .cg-btn:hover { color: var(--sp-text); }
+  ul.conv-list li.conv-group .cg-chev {
+    display: inline-block; font-size: 0.7rem; line-height: 1;
+    opacity: 0.55; transition: transform 0.14s ease, opacity 0.14s ease;
+  }
+  ul.conv-list li.conv-group .cg-btn:hover .cg-chev { opacity: 1; }
+  ul.conv-list li.conv-group.cg-closed .cg-chev { transform: rotate(-90deg); }
+  /* The hidden-row count appears only while the group is closed, so an open
+     list carries no extra numbers. :empty keeps the gap from reserving space. */
+  ul.conv-list li.conv-group .cg-n {
+    font-size: 0.55rem; letter-spacing: 0.06em;
+    opacity: 0.6; font-variant-numeric: tabular-nums;
+  }
+  ul.conv-list li.conv-group .cg-n:empty { display: none; }
+  /* Rows of a closed group. A class, not [hidden]: ul.fs-list li sets
+     display:flex, which would beat [hidden]'s display:none. */
+  ul.conv-list li.conv-row-hidden { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    ul.conv-list li.conv-group .cg-chev { transition: none; }
+  }
+
   /* Search only covers active conversations; this row is the way out to the
      archive, which has its own cloud-backed search. */
   ul.conv-list li.conv-arch-link {

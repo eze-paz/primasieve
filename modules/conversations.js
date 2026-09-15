@@ -2562,6 +2562,61 @@ function fmtElapsed(totalSec, tenths = false) {
 }
 // ---- Multi-conversation selection (shift/ctrl click + shift-drag rubber band) ----
 // PC-first: shift+click = range (anchor to row), ctrl/cmd+click = toggle, 
+// ---- Collapsible sidebar groups (Pinned / Today / Yesterday / months / years) ----
+// State lives per DEVICE in localStorage, keyed by the group LABEL, because the
+// labels are what persist across renders -- the rows under "Today" are different
+// conversations tomorrow, but "Today" is still the group the user closed.
+//
+// The rows stay in the DOM and are hidden with a class. `hidden` as an attribute
+// would NOT work: ul.fs-list li sets display:flex, which beats [hidden]'s
+// display:none.
+const _CG_KEY = 'sandpie-conv-collapsed';
+let _cgCollapsed = new Set();
+try { _cgCollapsed = new Set(JSON.parse(localStorage.getItem(_CG_KEY) || '[]')); } catch (e) {}
+function _cgSave() {
+  try { localStorage.setItem(_CG_KEY, JSON.stringify([..._cgCollapsed])); } catch (e) {}
+}
+// Rows belonging to a header = every sibling until the next header.
+function _cgRowsOf(head) {
+  const out = [];
+  let n = head.nextElementSibling;
+  while (n && !n.classList.contains('conv-group')) { out.push(n); n = n.nextElementSibling; }
+  return out;
+}
+function _cgApply(head) {
+  const label = head.dataset.group || '';
+  const closed = _cgCollapsed.has(label);
+  const rows = _cgRowsOf(head);
+  for (const r of rows) r.classList.toggle('conv-row-hidden', closed);
+  head.classList.toggle('cg-closed', closed);
+  const btn = head.querySelector('.cg-btn');
+  if (btn) btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+  // The count only appears while closed -- open, the rows speak for themselves.
+  const n = head.querySelector('.cg-n');
+  if (n) n.textContent = closed ? String(rows.length) : '';
+}
+function _cgToggle(head) {
+  const label = head.dataset.group || '';
+  if (_cgCollapsed.has(label)) _cgCollapsed.delete(label);
+  else {
+    _cgCollapsed.add(label);
+    // Never leave a selection hidden behind a closed header: a bulk action on
+    // rows the user cannot see is exactly the kind of surprise to design out.
+    let touched = false;
+    for (const r of _cgRowsOf(head)) {
+      if (r.dataset.cid && _selConvs.delete(r.dataset.cid)) touched = true;
+    }
+    if (touched) _selHighlight();
+  }
+  _cgSave();
+  _cgApply(head);
+}
+// Re-apply every header after the list is rebuilt.
+function _cgApplyAll() {
+  const ul = $('convList');
+  if (ul) for (const h of ul.querySelectorAll('li.conv-group')) _cgApply(h);
+}
+
 // shift+drag on empty list space = rubber-band, right-click on selection = bulk
 // actions (Pin all / Archive all / Duplicate all / Delete all). Plain click opens.
 const _selConvs = new Set();
@@ -2916,7 +2971,22 @@ async function refreshConversationList() {
   const addHead = (text) => {
     const li = document.createElement('li');
     li.className = 'conv-group';
-    li.textContent = text;
+    li.dataset.group = text;
+    // The <li> keeps pointer-events:none so a shift+drag starting anywhere on
+    // the header row still falls through to the rubber band; only the button
+    // itself takes clicks.
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cg-btn';
+    btn.innerHTML = '<span class="cg-chev" aria-hidden="true">▾</span>' +
+                    '<span class="cg-label"></span><span class="cg-n"></span>';
+    btn.querySelector('.cg-label').textContent = text;
+    btn.addEventListener('click', (ev) => {
+      if (ev.shiftKey) return;        // leave shift for selection gestures
+      ev.stopPropagation();
+      _cgToggle(li);
+    });
+    li.appendChild(btn);
     frag.appendChild(li);
   };
 
@@ -2938,6 +3008,7 @@ async function refreshConversationList() {
     }
   }
   ul.replaceChildren(frag);
+  _cgApplyAll();               // headers are only walkable once they are in the DOM
   _setConvCount(order, pinned.length);
 }
 // Search only covers the active conversations the sidebar holds. Rather than
