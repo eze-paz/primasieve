@@ -3247,11 +3247,11 @@ ul.conv-list li.active {
 
 
 [data-theme="olive-bold"] .user .bubble {
-  background: #3a3a3a;
+  background: #2b2b2b;
   color: #FAF9F2;
   padding: 0.9rem 1.2rem;
   border-radius: 16px 16px 4px 16px;
-  font-weight: 700;
+  font-weight: 400;
   box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   clip-path: none;
   transition: transform 0.2s;
