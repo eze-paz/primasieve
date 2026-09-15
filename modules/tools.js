@@ -430,11 +430,15 @@ LANGUAGE: author the questions and options in ENGLISH — the system automatical
     run_walios: {
       description: `Run a shell script (busybox ash) in walios, a sandboxed Linux in the browser. You get stdout, stderr and the exit code. NOT the user's machine — that is the \`shell\` tool.
 FILES: cwd and $HOME are /root, the same workspace the file tools and run_python see (/files is the same directory). Writes persist; rm deletes REAL files.
-STATE: one kernel across calls, so /tmp and anything you built survive. A timeout stops the run but keeps the session, so SPLIT long work (\`./configure\`, then \`make\`, then \`make\` again) instead of cramming one call. Default 120s, max 300.
+STATE: one kernel across calls, so /tmp and anything you built survive. A timeout stops the run but keeps the session. Default 120s, max 300.
+LONGER THAN 300s: background it and poll. A process keeps running between calls, so this is how you run something that cannot finish in one call:
+  call 1:  ( ./configure > /tmp/c.log 2>&1; echo $? > /tmp/c.done ) &
+  call 2+: [ -f /tmp/c.done ] || sleep 120; cat /tmp/c.done 2>/dev/null; tail -3 /tmp/c.log
+Do NOT just re-run a long command in the next call hoping it resumes. \`make\` does resume (it keeps its .o files), but \`./configure\`, \`tar\`, and downloads all restart from zero, so re-running them forever is the one way to never finish. jq's configure takes ~700s: background it, poll, then \`make\`.
 SCRIPT: pass it in "script", or omit it and put the raw text in your reply between <|walios|> and <|end_walios|> (no escaping; <|walios:90|> sets the timeout).
 BEYOND BUSYBOX: node, python3, git, curl, ssh, cc (clang 22), make, qjs, lua, rustc, soffice. "apk add NAME" earlier in the SAME script adds bc/cpio/m4/patch and more (instant); "build-pkg NAME" compiles from Alpine source (minutes, best effort, needs a 300s timeout).
 ABSENT: jq, zip, and xz — so -z/-j work but \`tar cJf\` fails ("xz: applet not found"); -J still extracts. Do jq work in run_python.
-NODE is real (node's own lib on the page's V8, not a port): --check, a REPL, and \`npm-lite NAME[@RANGE]\` to install real packages into /node_modules. No child_process, worker_threads, ESM or native addons.
+NODE is real (node's own lib on the page's V8, not a port): --check, a REPL, and \`npm-lite NAME[@RANGE]\` to install real packages into /node_modules. child_process is SYNC only (spawnSync/execSync/execFileSync); async spawn(), worker_threads, ESM and native addons are not there. A missing program is not ENOENT here -- any unresolvable path becomes a busybox applet lookup, so it exits 127 with \"applet not found\".
 NETWORK is real TCP/TLS, but nc/telnet are PLAINTEXT only — for TLS on a raw socket run \`tlswrap -L LOCALPORT HOST 443\` and talk to 127.0.0.1:LOCALPORT. For a private git repo the token is the PASSWORD: https://x-access-token:TOKEN@github.com/owner/repo
 GOTCHAS: qjs's std/os are MODULES, not globals (\`qjs --std -e CODE\`, or import * as std from "qjs:std"); give qjs absolute paths. The first cc fetches a 75MB compiler and the first soffice boots LibreOffice (30-90s, not charged to your timeout); soffice converts to PDF only. Prefer run_python for Python — its interpreter stays warm, and it cannot spawn processes, which is when you want this tool.`,
       parameters: {
