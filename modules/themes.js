@@ -25,9 +25,9 @@ const _themePalettes = {
     success: '#6C9E2C', danger: '#D8504A', warn: '#C9A25A'
   },
   'olive-bold': {
-    bg: '#0a0a0a', surface: '#141414', panel: '#1e1e1e',
+    bg: '#1D1D1B', surface: 'rgba(35,35,32,0.6)', panel: 'rgba(43,43,40,0.5)',
     accent: '#93a332', text: '#FAF9F2', textDim: '#BEBDB2',
-    border: '#2a2a2a', borderBright: '#444',
+    border: 'rgba(150,149,139,0.12)', borderBright: 'rgba(150,149,139,0.2)',
     success: '#6C9E2C', danger: '#D8504A', warn: '#C9A25A'
   },
   'electric': {
