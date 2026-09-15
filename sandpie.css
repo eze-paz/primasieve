@@ -3244,7 +3244,7 @@ ul.conv-list li.active {
   transition: transform 0.2s;
 }
 [data-theme="olive-bold"] .user::before { background: rgba(147,163,50,0.1); transform: translate(3px, 3px); }
-[data-theme="olive-bold"] .assistant { color: #FAF9F2; border-left: 2px solid rgba(201,162,90,0.3); background: var(--sp-panel); }
+[data-theme="olive-bold"] .assistant { color: #FAF9F2; border-left: 2px solid rgba(201,162,90,0.3); background: #2B2B28; }
 [data-theme="olive-bold"] .assistant::before { background: linear-gradient(180deg, #93a332, #C9A25A); box-shadow: 0 0 12px rgba(147,163,50,0.2); }
 [data-theme="olive-bold"] .assistant code { color: #93a332; }
 [data-theme="olive-bold"] .assistant pre { background: rgba(35,35,32,0.8); border-left: 2px solid #93a332; }
