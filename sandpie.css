@@ -2674,7 +2674,7 @@ ul.conv-list li.active {
   /* Aurora is glass, not flat: the rail gets its own translucent ground. */
   --sp-rail: rgba(18,18,16,0.72);
   --sp-rail-border: rgba(150,149,139,0.16);
-  --sp-rail-ink: var(--sp-text-dim, #ABA99E);
+  --sp-rail-ink: var(--sp-text-dim, #BEBDB2);
   --sp-rail-ink-hot: var(--sp-accent, #93a332);
   --sp-rail-hot-bg: rgba(147,163,50,0.16);
   --sp-bg: #1D1D1B;
@@ -2684,8 +2684,8 @@ ul.conv-list li.active {
   --sp-panel: rgba(43,43,40,0.5);
   --sp-accent: #93a332;
   --sp-accent-dim: rgba(147,163,50,0.15);
-  --sp-text: #F2F1E8;
-  --sp-text-dim: #ABA99E;
+  --sp-text: #FAF9F2;
+  --sp-text-dim: #BEBDB2;
   --sp-success: #6C9E2C;
   --sp-danger: #D8504A;
   --sp-warn: #C9A25A;
@@ -2693,7 +2693,7 @@ ul.conv-list li.active {
 
 [data-theme="olive"] body {
   background: #1D1D1B;
-  color: #F2F1E8;
+  color: #FAF9F2;
   background-image: radial-gradient(circle, rgba(147,163,50,0.08) 0%, transparent 70%),
     radial-gradient(circle at 80% 20%, rgba(201,162,90,0.06) 0%, transparent 60%);
 }
@@ -2726,7 +2726,7 @@ ul.conv-list li.active {
   font-family: 'Outfit', sans-serif;
   font-weight: 600;
   font-size: 1.15rem;
-  color: #ABA99E;
+  color: #BEBDB2;
   letter-spacing: 0.5px;
 }
 
@@ -2735,15 +2735,15 @@ ul.conv-list li.active {
   transition: color 0.3s ease;
 }
 
-[data-theme="olive"] .sidebar-brand:hover .bracket { color: #F2F1E8; }
+[data-theme="olive"] .sidebar-brand:hover .bracket { color: #FAF9F2; }
 [data-theme="olive"] .sidebar-brand:hover .name { color: #93a332; }
 
 [data-theme="olive"] aside button { background: #93a332; border: none; color: #1D1D1B; border-radius: 6px; font-weight: 500; }
-[data-theme="olive"] aside button:hover { background: #F2F1E8; color: #93a332; }
+[data-theme="olive"] aside button:hover { background: #FAF9F2; color: #93a332; }
 [data-theme="olive"] .sidebar-collapse-btn {
   background: rgba(43,43,40,0.5);
   border: 1px solid rgba(150,149,139,0.1);
-  color: #ABA99E;
+  color: #BEBDB2;
   border-radius: 8px;
 }
 
@@ -2756,7 +2756,7 @@ ul.conv-list li.active {
 [data-theme="olive"] .files-open-btn {
   background: rgba(43,43,40,0.5);
   border: 1px solid rgba(150,149,139,0.1);
-  color: #ABA99E;
+  color: #BEBDB2;
   border-radius: 8px;
 }
 
@@ -2766,26 +2766,26 @@ ul.conv-list li.active {
   color: #93a332;
 }
 
-[data-theme="olive"] .files-open-btn .material-symbols-outlined { color: #ABA99E; }
+[data-theme="olive"] .files-open-btn .material-symbols-outlined { color: #BEBDB2; }
 [data-theme="olive"] .files-open-btn:hover .material-symbols-outlined { color: #93a332; }
 
 [data-theme="olive"] aside details.service summary {
   background: rgba(43,43,40,0.5);
-  color: #ABA99E;
+  color: #BEBDB2;
   border: 1px solid rgba(150,149,139,0.06);
   border-radius: 8px;
   backdrop-filter: blur(12px);
 }
 
 [data-theme="olive"] aside details.service[open] summary { color: #93a332; }
-[data-theme="olive"] aside details.service summary:hover { color: #F2F1E8; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); }
+[data-theme="olive"] aside details.service summary:hover { color: #FAF9F2; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); }
 [data-theme="olive"] aside details.service .service-body { background: rgba(35,35,32,0.4); border-radius: 0 0 8px 8px; margin-top: -4px; padding-top: 0.75rem; backdrop-filter: blur(12px); }
-[data-theme="olive"] aside input { background: rgba(0,0,0,0.2); border: 1px solid rgba(150,149,139,0.1); color: #F2F1E8; border-radius: 6px; }
+[data-theme="olive"] aside input { background: rgba(0,0,0,0.2); border: 1px solid rgba(150,149,139,0.1); color: #FAF9F2; border-radius: 6px; }
 [data-theme="olive"] aside input:focus { border-color: #93a332; box-shadow: 0 0 0 3px rgba(147,163,50,0.1); background: rgba(0,0,0,0.35); }
 [data-theme="olive"] aside button.ghost { background: transparent; color: #93a332; border: 1px solid rgba(150,149,139,0.15); border-radius: 6px; }
 [data-theme="olive"] aside button.ghost:hover { background: rgba(147,163,50,0.05); border-color: rgba(147,163,50,0.25); }
 [data-theme="olive"] aside button:disabled,
-[data-theme="olive"] aside button:disabled:hover { background: transparent; border-color: rgba(150,149,139,0.08); color: #ABA99E; }
+[data-theme="olive"] aside button:disabled:hover { background: transparent; border-color: rgba(150,149,139,0.08); color: #BEBDB2; }
 [data-theme="olive"] .status-dot.ok { background: #93a332; box-shadow: 0 0 6px rgba(147,163,50,0.3); }
 [data-theme="olive"] .status-dot.err { background: #D8504A; }
 [data-theme="olive"] ul.conv-list li:hover { background: transparent; }
@@ -2804,17 +2804,17 @@ ul.conv-list li.active {
 
 [data-theme="olive"] .user .bubble { background: linear-gradient(135deg, #93a332, #C9A25A); color: #fff; border-radius: 18px 18px 6px 18px; font-weight: 500; box-shadow: 0 4px 16px rgba(147,163,50,0.2); }
 [data-theme="olive"] .user::before { background: rgba(147,163,50,0.1); transform: translate(3px, 3px); }
-[data-theme="olive"] .assistant { color: #F2F1E8; border-left: 2px solid rgba(201,162,90,0.3); background: rgba(35,35,32,0.55); }
+[data-theme="olive"] .assistant { color: #FAF9F2; border-left: 2px solid rgba(201,162,90,0.3); background: rgba(35,35,32,0.55); }
 [data-theme="olive"] .assistant::before { background: linear-gradient(180deg, #93a332, #C9A25A); box-shadow: 0 0 12px rgba(147,163,50,0.2); }
 [data-theme="olive"] .assistant code { color: #93a332; }
 [data-theme="olive"] .assistant pre { background: rgba(35,35,32,0.8); border-left: 2px solid #93a332; }
-[data-theme="olive"] .assistant pre code { background: transparent; color: #ABA99E; }
+[data-theme="olive"] .assistant pre code { background: transparent; color: #BEBDB2; }
 
 [data-theme="olive"] .input-wrap { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
 [data-theme="olive"] .mp-panel { background: rgba(35,35,32,0.92); border: 1px solid rgba(150,149,139,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
 [data-theme="olive"] .input-wrap:focus-within { border-color: rgba(147,163,50,0.3); background: rgba(0,0,0,0.4); box-shadow: 0 0 0 3px rgba(147,163,50,0.08), 0 8px 32px rgba(0,0,0,0.2); }
-[data-theme="olive"] .input-wrap textarea { color: #F2F1E8; }
-[data-theme="olive"] .attach-btn { background: transparent !important; color: #ABA99E !important; }
+[data-theme="olive"] .input-wrap textarea { color: #FAF9F2; }
+[data-theme="olive"] .attach-btn { background: transparent !important; color: #BEBDB2 !important; }
 [data-theme="olive"] .attach-btn:hover { background: rgba(255,255,255,0.05) !important; color: #93a332 !important; }
 [data-theme="olive"] .send-btn { width: 36px; height: 36px; background: linear-gradient(135deg, #93a332, #C9A25A) !important; border: none !important; border-radius: 12px; color: #fff !important; box-shadow: 0 2px 12px rgba(147,163,50,0.25); }
 [data-theme="olive"] .send-btn:hover { background: linear-gradient(135deg, #93a332, #C9A25A) !important; box-shadow: 0 4px 20px rgba(147,163,50,0.35); transform: translateY(-1px); }
@@ -2829,7 +2829,7 @@ ul.conv-list li.active {
 [data-theme="olive"] .context-item:hover { background: rgba(147,163,50,0.08); }
 [data-theme="olive"] .modal-content { background: #232320; }
 [data-theme="olive"] .ctx-popup { background: #232320; border-color: rgba(150,149,139,0.12); }
-[data-theme="olive"] .ctx-popup .ctx-popup-row b { color: #F2F1E8; }
+[data-theme="olive"] .ctx-popup .ctx-popup-row b { color: #FAF9F2; }
 
 [data-theme="electric"] {
   --sp-accent-2: #ffcc00;
@@ -3951,6 +3951,155 @@ html[data-theme="aurora"] #messagesSide > .msg.assistant:hover {
 
 /* --- the settled timer reads as the rail's footnote --- */
 html[data-theme="aurora"] .msg-timer { font-size: 10.5px; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   OLIVE — rail conversation layout.  OLIVE ONLY. (identical copy of the aurora block: only colors differ)
+
+   Every selector in this block is prefixed html[data-theme="olive"], so
+   classic-dark / classic-light / electric / clear keep the shipped layout
+   untouched. Nothing outside this block was modified.
+
+   The idea: one continuous 2px rail down the left of a turn, its TONE
+   changing per role — accent for your query, a hairline for machinery, a
+   mid tone for the reply. Blocks butt together (margin:0, space from
+   internal padding) so the line never breaks; a new turn simply leaves a
+   gap in the rail, and that gap IS the separator. The only warm point on
+   the rail is whatever is running right now.
+
+   Colours are all derived from the theme's own tokens via color-mix, so a
+   customised olive palette carries the layout with it.
+
+   WIDTH: this block sets no measure of its own. --sp-chat-max-w (the
+   Appearance chat-width slider, themes.js _applyChatWidth) is the only
+   authority, exactly as in every other theme -- no ch caps anywhere, or
+   the slider would stop doing anything past ~74ch.
+   ═══════════════════════════════════════════════════════════════════════ */
+html[data-theme="olive"] {
+  /* NB: --rail-* is already taken by the icon rail; these are --sprail-*. */
+  --sprail-w: 2px;
+  --sprail-gut: 11px;
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 4%, transparent);
+  --sprail-ops:    color-mix(in srgb, var(--sp-text) 14%, transparent);
+  --sprail-out:    color-mix(in srgb, var(--sp-text) 26%, transparent);
+  --sprail-hot:    color-mix(in srgb, var(--sp-text) 42%, transparent);
+  --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 55%, transparent);
+  --sprail-chip:   color-mix(in srgb, var(--sp-text) 7%, transparent);
+  /* same stack the tool-group header already uses */
+  --sprail-mono: 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+}
+
+/* --- one left edge for every role: no align-self, no per-role width ---
+   Child combinators only: .msg.tool-call lives nested inside .tg-log and
+   must keep its own styling. */
+html[data-theme="olive"] .conv-host > .msg,
+html[data-theme="olive"] #messages > .msg,
+html[data-theme="olive"] #messagesSide > .msg {
+  align-self: stretch; width: auto; max-width: none; min-width: 0;
+  margin: 0;                                   /* NOTHING breaks the line */
+  border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
+  padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
+  background: none;
+  transition: border-color 0.14s ease;
+}
+/* the host's own flex gap would reopen the breaks the margins just lost */
+html[data-theme="olive"] .conv-host { gap: 0; }
+
+/* --- your query: head of the rail. Full text, never compressed. --- */
+html[data-theme="olive"] .conv-host > .msg.user,
+html[data-theme="olive"] #messages > .msg.user,
+html[data-theme="olive"] #messagesSide > .msg.user {
+  border-left-color: var(--sp-accent);
+  background: var(--sprail-ground);
+  padding: 7px 10px 8px var(--sprail-gut);
+  margin-top: 22px;            /* the gap in the rail = the turn separator */
+}
+html[data-theme="olive"] .conv-host > .msg.user:first-child { margin-top: 0; }
+html[data-theme="olive"] .msg.user::before { display: none; }   /* offset ghost */
+html[data-theme="olive"] .msg.user .bubble {
+  background: none; color: var(--sp-text); padding: 0; clip-path: none;
+  box-shadow: none; border-radius: 0; font-weight: 400;
+  font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+}
+html[data-theme="olive"] .msg.user > .msg-actions {
+  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
+  padding: 0; margin-top: 2px; transform: none;
+}
+html[data-theme="olive"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
+
+/* --- machinery: the two-storey card collapses to one line. The title row
+   and the tray share a baseline, the DRAM strip goes, the count stays. --- */
+html[data-theme="olive"] .conv-host > .msg.tool-group,
+html[data-theme="olive"] #messages > .msg.tool-group,
+html[data-theme="olive"] #messagesSide > .msg.tool-group {
+  border-left-color: var(--sprail-ops);
+  padding-top: 2px; padding-bottom: 2px;
+  /* shrink-wrap, never a fixed cap: the count stays beside its title at any
+     configured chat width, and the group still cannot exceed the column. */
+  width: fit-content; max-width: 100%;
+  overflow: visible;
+  font: 11px/1.65 var(--sprail-mono);
+}
+html[data-theme="olive"] .tool-group .tg-hd {
+  flex-direction: row; align-items: baseline; border-bottom: 0; gap: 0.6ch;
+}
+html[data-theme="olive"] .tool-group .tg-row { padding: 0; gap: 0.6ch; color: var(--sp-text-dim); flex: 1 1 auto; }
+html[data-theme="olive"] .tool-group .tg-hd:hover .tg-row { background: none; color: var(--sp-text); }
+html[data-theme="olive"] .tool-group .tg-prompt { display: none; }   /* the bar is the prompt now */
+html[data-theme="olive"] .tool-group .tg-title { color: inherit; }
+html[data-theme="olive"] .tool-group .tg-tray { background: none; padding: 0; flex: none; gap: 0.5ch; }
+html[data-theme="olive"] .tool-group .tg-strip { display: none; }
+html[data-theme="olive"] .tool-group .tg-count {
+  font-size: 10px; color: var(--sprail-count); font-variant-numeric: tabular-nums;
+}
+/* the one warm point on the rail: the group that is running right now.
+   There is no .running class — a live group is the one holding a .tg-cell.run. */
+html[data-theme="olive"] .conv-host > .msg.tool-group:has(.tg-cell.run),
+html[data-theme="olive"] #messages > .msg.tool-group:has(.tg-cell.run),
+html[data-theme="olive"] #messagesSide > .msg.tool-group:has(.tg-cell.run) {
+  border-left-color: color-mix(in srgb, var(--sp-accent) 60%, transparent);
+}
+html[data-theme="olive"] .tool-group:has(.tg-cell.run) .tg-row { color: var(--sp-text); }
+/* expanded call log keeps its own indent under the collapsed header */
+html[data-theme="olive"] .tool-group .tg-log { padding: 0.15rem 0 0; }
+
+/* --- the reply: the only sans, and the only thing at reading size --- */
+html[data-theme="olive"] .conv-host > .msg.assistant,
+html[data-theme="olive"] #messages > .msg.assistant,
+html[data-theme="olive"] #messagesSide > .msg.assistant {
+  border-left-color: var(--sprail-out);
+  padding-top: 7px; padding-bottom: 4px;
+  font-size: 13.5px; line-height: 1.6;
+}
+html[data-theme="olive"] .msg.assistant p { margin: 0 0 0.58em; }
+html[data-theme="olive"] .msg.assistant ul { margin: 0.3em 0 0.62em; padding-left: 1.12em; }
+html[data-theme="olive"] .msg.assistant li { margin: 0.22em 0; }
+html[data-theme="olive"] .msg.assistant li::marker { color: var(--sprail-out); }
+html[data-theme="olive"] .msg.assistant > .bubble > :last-child { margin-bottom: 0; }
+html[data-theme="olive"] .msg.assistant code {
+  font-size: 11.5px; padding: 1.5px 5px; border-radius: 4px; background: var(--sprail-chip);
+}
+
+/* --- thinking blocks sit on the rail too, or the line breaks around them --- */
+html[data-theme="olive"] .conv-host > .msg.think,
+html[data-theme="olive"] #messages > .msg.think,
+html[data-theme="olive"] #messagesSide > .msg.think {
+  border-left-color: var(--sprail-ops);
+  padding-top: 2px; padding-bottom: 2px;
+  font-size: 11.5px;
+}
+
+/* --- the rail answers the cursor --- */
+html[data-theme="olive"] .conv-host > .msg.tool-group:hover,
+html[data-theme="olive"] .conv-host > .msg.assistant:hover,
+html[data-theme="olive"] #messages > .msg.tool-group:hover,
+html[data-theme="olive"] #messages > .msg.assistant:hover,
+html[data-theme="olive"] #messagesSide > .msg.tool-group:hover,
+html[data-theme="olive"] #messagesSide > .msg.assistant:hover {
+  border-left-color: var(--sprail-hot);
+}
+
+/* --- the settled timer reads as the rail's footnote --- */
+html[data-theme="olive"] .msg-timer { font-size: 10.5px; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    RUNNING TOOL-GROUP — title shimmer.  ALL THEMES.
