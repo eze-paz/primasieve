@@ -138,6 +138,8 @@ const checks = [
   ['node read ash’s file', /hello-from-ash/.test(outText)],
   ['node script.js ran', /script says: one,two/.test(outText)],
   ['pipe into grep worked', /findme-123/.test(outText)],
+  ['node --check passed good source silently', /CHECK-OK-SILENT/.test(outText) && !/SHOULD NOT RUN/.test(outText)],
+  ['node --check rejected bad source', /CHECK-REJECTED-BAD-SOURCE/.test(outText)],
   ['&& chaining worked', /&& worked/.test(outText)],
   ['exit code propagated', /exit code was 3/.test(outText)],
   ['echo | node ran stdin as a script', /from-stdin-777/.test(outText)],

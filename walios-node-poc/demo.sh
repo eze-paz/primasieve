@@ -78,4 +78,10 @@ s.on('error', (e) => console.log('net failed: ' + e.message));
 NETEOF
 node /tmp/net.js
 
+echo "--- node --check: parse without running ---"
+echo 'const x = 1; console.log("SHOULD NOT RUN")' > /tmp/ok.js
+node --check /tmp/ok.js && echo "CHECK-OK-SILENT"
+echo 'function ( {' > /tmp/bad.js
+node --check /tmp/bad.js || echo "CHECK-REJECTED-BAD-SOURCE"
+
 echo "--- done ---"
