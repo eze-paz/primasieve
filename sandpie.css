@@ -3668,7 +3668,6 @@ html[data-theme="aurora"] {
   --sprail-out:    color-mix(in srgb, var(--sp-text) 26%, transparent);
   --sprail-hot:    color-mix(in srgb, var(--sp-text) 42%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 55%, transparent);
-  --sprail-band:   color-mix(in srgb, var(--sp-text) 13%, transparent);
   --sprail-chip:   color-mix(in srgb, var(--sp-text) 7%, transparent);
   /* same stack the tool-group header already uses */
   --sprail-mono: 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
@@ -3690,42 +3689,21 @@ html[data-theme="aurora"] #messagesSide > .msg {
 /* the host's own flex gap would reopen the breaks the margins just lost */
 html[data-theme="aurora"] .conv-host { gap: 0; }
 
-/* --- your query: a BAND, not a box. Full text, never compressed. ---
-   No fill and no bar. A tinted ground under the query was the loudest
-   thing on the screen and, on a short prompt, mostly empty; an accent bar
-   here would just repeat what the rules already say. So the query is
-   delimited instead: one hairline above, one below, both spanning the
-   whole column. The rules are the turn separator too, which is why the
-   rail gap above them can stay small. */
+/* --- your query: head of the rail. Full text, never compressed. --- */
 html[data-theme="aurora"] .conv-host > .msg.user,
 html[data-theme="aurora"] #messages > .msg.user,
 html[data-theme="aurora"] #messagesSide > .msg.user {
-  border-left-color: transparent;
-  background: none;
-  /* ONE rule, above only. Two rules boxed every query in, and at a
-     1000px column a pair of full-width hairlines around three lines of
-     text shouted louder than the fill ever did. One rule reads as "new
-     turn starts here" and stacks without turning the page into a form. */
-  border-top: 1px solid var(--sprail-band);
-  border-bottom: 0;
-  /* aligned with the machinery and the reply: the query used to start
-     13px to their left, which read as a misalignment bug. */
-  padding: 14px 0 2px var(--sprail-gut);
-  margin-top: 26px;
+  border-left-color: var(--sp-accent);
+  background: var(--sprail-ground);
+  padding: 7px 10px 8px var(--sprail-gut);
+  margin-top: 22px;            /* the gap in the rail = the turn separator */
 }
-html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 4px; }
-/* machinery follows the band closely -- the rules already did the separating */
-html[data-theme="aurora"] .conv-host > .msg.user + .msg.tool-group,
-html[data-theme="aurora"] #messages > .msg.user + .msg.tool-group,
-html[data-theme="aurora"] #messagesSide > .msg.user + .msg.tool-group { padding-top: 8px; }
+html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="aurora"] .msg.user::before { display: none; }   /* offset ghost */
 html[data-theme="aurora"] .msg.user .bubble {
-  background: none; padding: 0; clip-path: none;
-  box-shadow: none; border-radius: 0;
-  /* with no fill and no bar, contrast is what marks the query: it is the
-     brightest, heaviest text in the turn. */
-  color: #fff; font-weight: 500;
-  font: 500 12.5px/1.6 var(--sprail-mono); white-space: pre-wrap;
+  background: none; color: var(--sp-text); padding: 0; clip-path: none;
+  box-shadow: none; border-radius: 0; font-weight: 400;
+  font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
 }
 html[data-theme="aurora"] .msg.user > .msg-actions {
   position: static; opacity: 0; background: none; border: 0; box-shadow: none;
@@ -3773,7 +3751,7 @@ html[data-theme="aurora"] .tool-group .tg-log { padding: 0.15rem 0 0; }
 html[data-theme="aurora"] .conv-host > .msg.assistant,
 html[data-theme="aurora"] #messages > .msg.assistant,
 html[data-theme="aurora"] #messagesSide > .msg.assistant {
-  border-left-color: transparent;   /* prose sits on the page, not in a pen */
+  border-left-color: var(--sprail-out);
   padding-top: 7px; padding-bottom: 4px;
   font-size: 13.5px; line-height: 1.6;
 }
@@ -3797,8 +3775,11 @@ html[data-theme="aurora"] #messagesSide > .msg.think {
 
 /* --- the rail answers the cursor --- */
 html[data-theme="aurora"] .conv-host > .msg.tool-group:hover,
+html[data-theme="aurora"] .conv-host > .msg.assistant:hover,
 html[data-theme="aurora"] #messages > .msg.tool-group:hover,
-html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover {
+html[data-theme="aurora"] #messages > .msg.assistant:hover,
+html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover,
+html[data-theme="aurora"] #messagesSide > .msg.assistant:hover {
   border-left-color: var(--sprail-hot);
 }
 
