@@ -3831,7 +3831,9 @@ html[data-theme="aurora"] {
   /* NB: --rail-* is already taken by the icon rail; these are --sprail-*. */
   --sprail-w: 2px;
   --sprail-gut: 11px;
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 4%, transparent);
+  /* 2.5%, not 4%: the ground is only on the reply now, and a tint that
+     is pleasant behind three lines accumulates real weight behind thirty. */
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 2.5%, transparent);
   /* machinery joins the accent family: the turn is ONE hue at three
      strengths -- reply 100%, machinery 30%, query neutral. */
   --sprail-ops:    color-mix(in srgb, var(--sp-accent) 30%, transparent);
