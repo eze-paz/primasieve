@@ -53,7 +53,18 @@ n=$#; i=0; want=0
 while [ $i -lt $n ]; do
   a=$1; shift; i=$((i+1))
   # the path argument of a flag we saw last time round
-  if [ $want = 1 ]; then _p=$(abs "$a"); [ "$wantflag" = "-o" ] && ccout=$_p; set -- "$@" "$_p"; want=0; continue; fi
+  if [ $want = 1 ]; then
+    # -include names a FILE that clang resolves through the include SEARCH PATH when it is
+    # not relative to the cwd, so absolutising it unconditionally broke every system header:
+    #     cc -include stdint.h x.c
+    #       -> fatal error: '/here/stdint.h' file not found
+    # Absolutise it only when it really is a local file (which is the case the rewriting
+    # exists for -- `-include config.h` in a build dir). Same guard as an input file below,
+    # and as bin/ld uses. The other flags here take DIRECTORIES (-I/-L/-isystem/-iquote/
+    # -idirafter) or OUTPUT paths (-o/-MF), which are cwd-relative by definition.
+    if [ "$wantflag" = "-include" ] && [ ! -e "$a" ]; then set -- "$@" "$a"; want=0; continue; fi
+    _p=$(abs "$a"); [ "$wantflag" = "-o" ] && ccout=$_p; set -- "$@" "$_p"; want=0; continue
+  fi
   case "$a" in
     # flags whose NEXT argument is a path. -MT/-MQ are make target names, not paths.
     -o|-I|-L|-isystem|-include|-iquote|-idirafter|-MF) set -- "$@" "$a"; wantflag=$a; want=1 ;;

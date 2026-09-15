@@ -113,6 +113,21 @@ const SCRIPT = [
   '# CONTROL: an OBJECT is not a program and must NOT be marked executable.',
   'rm -f xo.o; cc -c conftest.c -o xo.o 2>/dev/null; echo "objx=$([ -x xo.o ] && echo yes || echo no)"',
   '',
+  '# 9. -include names a FILE that clang resolves through the include SEARCH PATH when it',
+  '#    is not cwd-relative. cc absolutised it unconditionally, so every SYSTEM header died',
+  '#    as   fatal error: /here/stdint.h file not found.  That silently blocked any package',
+  '#    passing -include on CPPFLAGS (oniguruma needs -include stdint.h on this ABI), and it',
+  '#    surfaced as "C compiler cannot create executables" -- i.e. looking like a broken',
+  '#    toolchain rather than a bad flag rewrite.',
+  'printf "int main(void){ uintptr_t z=0; return (int)z; }\\n" > /tmp/cclab/inc1.c',
+  'cd /tmp/cclab && cc -include stdint.h inc1.c -o inc1 2>/dev/null; echo "incsys_rc=$? incsys=$([ -f /tmp/cclab/inc1 ] && echo yes || echo no)"',
+  '# CONTROL: a LOCAL -include must STILL be absolutised -- the case the rewrite exists for',
+  '# (`-include config.h` in a build dir, which clang would otherwise look for at /).',
+  'printf "#define LOCAL_OK 1\\n" > /tmp/cclab/loc.h',
+  'printf "int main(void){ return LOCAL_OK-1; }\\n" > /tmp/cclab/inc2.c',
+  'cd /tmp/cclab && cc -include loc.h inc2.c -o inc2 2>/dev/null; echo "incloc_rc=$? incloc=$([ -f /tmp/cclab/inc2 ] && echo yes || echo no)"',
+  './inc2; echo "incloc_run=$?"',
+  '',
   '# 8. FAILURE must be non-zero. A compile error and a link error, both.',
   'cc bad.c -o bad 2>/dev/null; echo "badc_rc=$?"',
   'printf "extern void nosuchsym(void);\\nint main(void){nosuchsym();return 0;}\\n" > /tmp/cclab/ln.c',
@@ -148,6 +163,8 @@ try {
   check('nothing was written to /', /leaked=\s*0/.test(out), out);
   // The control for 7 is test 1 above: a GOOD compile returns 0. Without it, "failure is
   // non-zero" would also pass on a cc that failed at everything.
+  check('-include finds a SYSTEM header on the include path', /incsys_rc=0 incsys=yes/.test(out), out);
+  check('CONTROL: -include still absolutises a LOCAL header', /incloc_rc=0 incloc=yes/.test(out) && /incloc_run=0/.test(out), out);
   check('a compile ERROR is reported as non-zero', /badc_rc=[1-9]/.test(out), out);
   check('a link ERROR is reported as non-zero', /badlink_rc=[1-9]/.test(out), out);
   check('a linked program is executable (autoconf test -x)', /linkx=yes/.test(out), out);
