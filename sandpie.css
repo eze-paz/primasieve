@@ -3256,8 +3256,8 @@ ul.conv-list li.active {
 [data-theme="olive-bold"] .input-wrap textarea { color: #FAF9F2; }
 [data-theme="olive-bold"] .attach-btn { background: transparent !important; color: #BEBDB2 !important; }
 [data-theme="olive-bold"] .attach-btn:hover { background: rgba(255,255,255,0.05) !important; color: #93a332 !important; }
-[data-theme="olive-bold"] .send-btn { width: 36px; height: 36px; background: linear-gradient(135deg, #93a332, #C9A25A) !important; border: none !important; border-radius: 12px; color: #fff !important; box-shadow: 0 2px 12px rgba(147,163,50,0.25); }
-[data-theme="olive-bold"] .send-btn:hover { background: linear-gradient(135deg, #93a332, #C9A25A) !important; box-shadow: 0 4px 20px rgba(147,163,50,0.35); transform: translateY(-1px); }
+[data-theme="olive-bold"] .send-btn { width: 36px; height: 36px; background: #93a332 !important; border: none !important; border-radius: 12px; color: #fff !important; box-shadow: 0 2px 12px rgba(147,163,50,0.25); }
+[data-theme="olive-bold"] .send-btn:hover { background: #A6B63C !important; box-shadow: 0 4px 20px rgba(147,163,50,0.35); transform: translateY(-1px); }
 [data-theme="olive-bold"] .modal-backdrop {
   background: rgba(7,11,20,0.7);
 }
