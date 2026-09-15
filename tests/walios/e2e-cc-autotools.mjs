@@ -13,11 +13,15 @@
 //     `conftest.o` for -c, both relative, both landing in / instead of the cwd. autoconf's
 //     ac_compile is literally `$CC -c conftest.c` with no -o at all.
 //
-//  3. EXIT STATUS ALWAYS 0. The driver ran its compile steps in `echo "$cmds" | while
-//     ...`, and the right-hand side of a pipe is a SUBSHELL -- so `exit $?` exited the
-//     subshell and cc returned 0 however badly a step failed. autoconf decides everything
-//     by exit status, so every feature test read as success. This is the one that most
-//     deserves a regression test: it is invisible until something is supposed to fail.
+// Both are a REGRESSION from 57f712c, which moved clang from a page-side bridge (that
+// resolved paths for it) to an ordinary guest process.
+//
+// CORRECTION: this file previously claimed a third bug -- that cc always exited 0 because
+// its step loop ran in a pipeline subshell. That was WRONG. A pipeline's exit status is its
+// last element's, and the while loop is that element, so `exit $?` propagates. The original
+// driver was verified to return 1 on a failing compile step. The evidence I mistook for it
+// was `$? = 0` in config.log, which was really the env-newline bug making ac_link_default
+// EMPTY -- and `eval ""` succeeds. The exit-status checks below are kept as a genuine guard.
 //
 // REQUIREMENTS: walios assets in walios/ INCLUDING clang.wasm + llvm-resources.tar.gz +
 // wali-sysroot.tar.gz (~84MB, gitignored), ../sandpie-server for wisp.js, playwright.
