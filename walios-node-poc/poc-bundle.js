@@ -1272,8 +1272,10 @@ function makeChildProcess(sys, mem, opts) {
     const st = alloc(8);
     dv().setInt32(st, 0, true);
     const r = Number(sys.wait4(pid, st, 0, 0));
+    const wRaw = dv().getInt32(st, true);
+    if (opts.trace) opts.trace('wait4(' + pid + ') -> r=' + r + ' status=0x' + (wRaw >>> 0).toString(16));
     if (r < 0) return { status: null, signal: null, errno: -r };
-    const w = dv().getInt32(st, true);
+    const w = wRaw;
     // POSIX wait status: the low 7 bits are the terminating signal, byte 1 the exit code.
     const termSig = w & 0x7f;
     if (termSig) return { status: null, signal: termSig, errno: 0 };
