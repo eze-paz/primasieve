@@ -3601,7 +3601,7 @@ body.sp-decoding *::after {
      never reintroduces the O(n^2) re-render the 2026-09-02 one-shot fix removed.
      Hidden state is gated on .ll-play so history re-renders, streaming paints
      and reduced-motion always show the reply instantly. */
-  .assistant.ll-play > .ll-block {
+  .msg.assistant.ll-play .ll-block {
     opacity: 0;
     transform: translateY(0.5em);
     animation: llPop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
@@ -3609,7 +3609,7 @@ body.sp-decoding *::after {
   }
   @keyframes llPop { to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
-    .assistant.ll-play > .ll-block { animation: none; opacity: 1; transform: none; }
+    .msg.assistant.ll-play .ll-block { animation: none; opacity: 1; transform: none; }
   }
   .proj-panel .proj-add {
     display: flex; align-items: center; gap: 0.45rem; margin: 0.25rem 0.15rem 0.15rem;
