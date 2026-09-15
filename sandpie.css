@@ -2813,7 +2813,7 @@ ul.conv-list li.active {
 [data-theme="olive"] .input-wrap { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
 [data-theme="olive"] .mp-panel { background: rgba(35,35,32,0.92); border: 1px solid rgba(150,149,139,0.15); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
 [data-theme="olive"] .input-wrap:focus-within { border-color: rgba(147,163,50,0.3); background: rgba(0,0,0,0.4); box-shadow: 0 0 0 3px rgba(147,163,50,0.08), 0 8px 32px rgba(0,0,0,0.2); }
-[data-theme="olive"] .input-wrap textarea { color: #E9E9E0; font-family: 'JetBrains Mono', monospace; }
+[data-theme="olive"] .input-wrap textarea { color: #E9E9E0; }
 [data-theme="olive"] .attach-btn { background: transparent !important; color: #96958B !important; }
 [data-theme="olive"] .attach-btn:hover { background: rgba(255,255,255,0.05) !important; color: #93a332 !important; }
 [data-theme="olive"] .send-btn { width: 36px; height: 36px; background: linear-gradient(135deg, #93a332, #C9A25A) !important; border: none !important; border-radius: 12px; color: #fff !important; box-shadow: 0 2px 12px rgba(147,163,50,0.25); }
