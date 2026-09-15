@@ -113,7 +113,10 @@
 // existing path is now EEXIST too, instead of silently succeeding (mkdir -p semantics).
 // killall33: the tool's deadline stops the PROCESSES and keeps the kernel, so a run that
 // runs out of budget no longer takes /tmp and every compiled module down with it.
-WORKER_V = 'devexec35';
+// devexec36: posix_spawn landed in the kernel (ef751c3) without a bump, so any browser
+// holding ?v=devexec35 kept running the kernel from BEFORE it -- node's child_process
+// broken, and no way to tell from the page that it was serving a stale worker.
+WORKER_V = 'devexec36';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
