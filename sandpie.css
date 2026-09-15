@@ -3869,11 +3869,6 @@ html[data-theme="aurora"] .msg.user .bubble {
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
   font-style: italic;
 }
-html[data-theme="aurora"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="aurora"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4031,11 +4026,6 @@ html[data-theme="olive"] .msg.user .bubble {
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
   font-style: italic;
 }
-html[data-theme="olive"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="olive"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4227,11 +4217,6 @@ html[data-theme="light"] .msg.user .bubble {
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
   font-style: italic;
 }
-html[data-theme="light"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="light"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4393,11 +4378,6 @@ html[data-theme="clear"] .msg.user .bubble {
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
   font-style: italic;
 }
-html[data-theme="clear"] .msg.user > .msg-actions {
-  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
-  padding: 0; margin-top: 2px; transform: none;
-}
-html[data-theme="clear"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
 
 /* --- machinery: the two-storey card collapses to one line. The title row
    and the tray share a baseline, the DRAM strip goes, the count stays. --- */
@@ -4485,3 +4465,62 @@ html[data-theme="clear"] #messagesSide > .msg.think {
 
 /* --- the settled timer reads as the rail's footnote --- */
 html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
+/* ═══════════════════════════════════════════════════════════════════════
+   MESSAGE ACTIONS — a kebab, top-right, menu on click.  ALL THEMES.
+
+   The toolbar used to render permanently under every reply: three icons on
+   every turn, which over a long thread is more chrome than content. The
+   buttons and their handlers are untouched (attachKebab in
+   conversations.js) -- they just live inside a popover now, and the only
+   thing on screen is a 3-dot mark that fades in while you are over the
+   message.
+
+   Anchored to the block's top-right corner. Note this is the one element
+   in the conversation that uses a right-hand edge; everything else hangs
+   off the left rail.
+   ═══════════════════════════════════════════════════════════════════════ */
+.msg { position: relative; }
+.msg > .msg-kebab {
+  position: absolute; top: 3px; right: 3px; z-index: 5;
+  width: 22px; height: 22px; padding: 0; margin: 0; border: 0;
+  background: none; border-radius: 5px; cursor: pointer;
+  display: grid; place-items: center;
+  color: color-mix(in srgb, var(--sp-text) 32%, transparent);
+  opacity: 0; transition: opacity 0.13s ease, color 0.13s ease, background 0.13s ease;
+}
+.msg > .msg-kebab svg { width: 14px; height: 14px; display: block; fill: currentColor; }
+.msg:hover > .msg-kebab,
+.msg.kebab-open > .msg-kebab { opacity: 1; }
+.msg > .msg-kebab:hover,
+.msg.kebab-open > .msg-kebab {
+  color: var(--sp-text);
+  background: color-mix(in srgb, var(--sp-text) 9%, transparent);
+}
+.msg > .msg-kebab:focus-visible { opacity: 1; outline: 1px solid var(--sp-accent); outline-offset: 1px; }
+
+/* the old strip becomes the menu: hidden until the kebab opens it. The
+   !important is unfortunate but earned -- several themes set their own
+   .msg-actions display/opacity and this has to win in all of them. */
+.msg > .msg-actions {
+  display: none !important;
+  position: absolute; top: 28px; right: 3px; z-index: 6;
+  flex-direction: column; align-items: stretch; gap: 2px;
+  min-width: 34px; margin: 0; padding: 3px;
+  background: var(--sp-surface);
+  border: 1px solid var(--sp-border-bright);
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.38);
+  opacity: 1 !important; transform: none !important; pointer-events: auto !important;
+}
+.msg.kebab-open > .msg-actions { display: flex !important; }
+.msg.kebab-open > .msg-actions .act-copy {
+  width: 100%; justify-content: center;
+  background: none; border: 0; border-radius: 5px;
+}
+.msg.kebab-open > .msg-actions .act-copy:hover {
+  background: color-mix(in srgb, var(--sp-text) 10%, transparent);
+  border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg > .msg-kebab { transition: none; }
+}
