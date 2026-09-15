@@ -164,7 +164,7 @@ function buildArtifactCard(clean, ext, opts) {
     : '';
   el.innerHTML = thumb +
     '<div class="ac-ft"><div class="ac-ic ac-t-' + kind + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + _ARTIFACT_ICON[kind] + '</svg></div>' +
-    '<span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '<span class="ac-go">›</span></div>';
+    '<span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '</div>';
   el.querySelector('.ac-sub').textContent = label;
   const open = (e) => { if (e) e.preventDefault(); if (opts.onOpen) opts.onOpen(); };
   el.onclick = open;

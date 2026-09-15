@@ -2258,8 +2258,10 @@ ul.conv-list li.active {
      image is the card rather than a band above a label. */
   .artifact-card-body {
     cursor: pointer; outline: none; position: relative;
-    --acf-near: color-mix(in srgb, var(--sp-bg) 94%, transparent);
-    --acf-far:  color-mix(in srgb, var(--sp-bg) 55%, transparent);
+    /* a neutral grey mixed from the theme's own ground and ink: dark grey on
+       the dark palettes, light grey on white, opaque enough to sit on any
+       image without a scrim behind it. */
+    --acf-pill: color-mix(in srgb, var(--sp-bg) 78%, var(--sp-text));
   }
   .artifact-card-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sp-accent); }
   /* 154px = the old 104px band plus the ~50px the footer used to occupy
@@ -2294,26 +2296,31 @@ ul.conv-list li.active {
   .artifact-card-body .ac-page i.t { width: 40%; height: 6px; background: var(--sp-accent); margin-bottom: 9px; }
   .artifact-card-body .ac-page i.m { width: 84%; }
   .artifact-card-body .ac-page i.s { width: 56%; }
+  /* The footer is a PILL sitting on the image -- icon + kind, nothing else.
+     No scrim across the card and no backdrop blur: the pill carries its own
+     ground, so the preview stays unobscured everywhere but under the label. */
   .artifact-card-body .ac-ft {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 11px 4px 5px;
+    position: absolute; left: 10px; bottom: 10px; right: auto; z-index: 2;
+    width: fit-content; max-width: calc(100% - 20px);
+    background: var(--acf-pill);
+    border-radius: 999px;
     transition: background 0.12s;
-    /* drawn over the image: a scrim mixed from the THEME background, so it
-       darkens on the dark palettes and lightens on white without the label
-       colours having to change. */
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-    background: linear-gradient(to top, var(--acf-near), var(--acf-far) 62%, transparent);
-    backdrop-filter: blur(3px);
   }
   .artifact-card-body:hover .ac-ft {
-    background: linear-gradient(to top,
-      color-mix(in srgb, var(--sp-accent) 20%, var(--acf-near)),
-      var(--acf-far) 62%, transparent);
+    background: color-mix(in srgb, var(--sp-accent) 24%, var(--acf-pill));
   }
+  /* inside a pill the label sizes to its text instead of pushing to the edge */
+  .artifact-card-body .ac-ft .ac-sub { flex: none; }
   /* Compact cards have no visible thumb -- the footer IS the card, so it goes
      back into the flow or it would collapse to nothing. */
   .artifact-compact .ac-ft {
-    position: static; background: none; backdrop-filter: none;
+    position: static; background: none;
+    display: flex; width: auto; max-width: none;
+    border-radius: 0; padding: 3px 10px;
   }
+  .artifact-compact .ac-ft .ac-sub { flex: 1; }
   .artifact-compact:hover .ac-ft { background: color-mix(in srgb, var(--sp-accent) 9%, transparent); }
   .artifact-card-body .ac-ic { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; }
   .artifact-card-body .ac-ic svg { width: 17px; height: 17px; }
@@ -2380,7 +2387,7 @@ ul.conv-list li.active {
      standalone HTML/image/office deliverable folds into one "N other files" pile. */
   /* flex:none + align-self:stretch are load-bearing: .conv-host is a flex column,
      so without them this card gets squeezed to ~1px (same gotcha as .artifact-compact). */
-  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 0.5rem; flex: none; align-self: stretch; width: fit-content; }
+  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 12px; flex: none; align-self: stretch; width: fit-content; }
   .file-bundle .fb-head { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; user-select: none; transition: background 0.12s; }
   .file-bundle .fb-head:hover { background: color-mix(in srgb, var(--sp-accent) 6%, transparent); }
   /* Layered pile of file edges with a count badge on the top card */
