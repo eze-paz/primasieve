@@ -4506,7 +4506,13 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
    .msg-actions display/opacity and this has to win in all of them. */
 .msg > .msg-actions {
   display: none !important;
-  position: absolute; top: 28px; right: 3px; z-index: 6;
+  /* The legacy user-bubble rule pins this toolbar with bottom:-34px and
+     left/right offsets of its own, and an absolutely positioned box with
+     BOTH top and bottom set stretches between them -- so the menu has to
+     null those out, not just set its own top. opacity/pointer-events are
+     forced for the same reason: that rule hides the strip at opacity 0. */
+  position: absolute; top: 28px; right: 3px !important; bottom: auto !important; left: auto !important;
+  z-index: 6;
   flex-direction: column; align-items: stretch; gap: 2px;
   min-width: 34px; margin: 0; padding: 3px;
   background: var(--sp-surface);
