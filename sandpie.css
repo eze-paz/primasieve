@@ -3883,6 +3883,7 @@ html[data-theme="aurora"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
 html[data-theme="aurora"] .msg.user > .msg-actions {
   position: static; opacity: 0; background: none; border: 0; box-shadow: none;
@@ -4044,6 +4045,7 @@ html[data-theme="olive"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
 html[data-theme="olive"] .msg.user > .msg-actions {
   position: static; opacity: 0; background: none; border: 0; box-shadow: none;
@@ -4197,7 +4199,7 @@ html[data-theme="light"] {
      deepens the theme's own accent toward the ink so the hue survives but
      the line actually reads. Everything else derives from this one key. */
   --sprail-key:    color-mix(in srgb, var(--sp-accent) 62%, var(--sp-text));
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 3.5%, transparent);
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 10%, transparent);   /* light ink on white needs far more than a dark theme does */
   --sprail-ops:    color-mix(in srgb, var(--sprail-key) 42%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 20%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 70%, transparent);
@@ -4239,6 +4241,7 @@ html[data-theme="light"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
 html[data-theme="light"] .msg.user > .msg-actions {
   position: static; opacity: 0; background: none; border: 0; box-shadow: none;
@@ -4362,7 +4365,7 @@ html[data-theme="clear"] {
      at three strengths" becomes ONE INK at three strengths -- solid on the
      reply, 30% on machinery, 18% on the query. Swiss, not decorative. */
   --sprail-key:    var(--sp-text);
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 3%, transparent);
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 6%, transparent);    /* pure black on pure white: 6% is already a visible panel */
   --sprail-ops:    color-mix(in srgb, var(--sp-text) 30%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 18%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 75%, transparent);
@@ -4404,6 +4407,7 @@ html[data-theme="clear"] .msg.user .bubble {
   background: none; color: var(--sp-text); padding: 0; clip-path: none;
   box-shadow: none; border-radius: 0; font-weight: 400;
   font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+  font-style: italic;
 }
 html[data-theme="clear"] .msg.user > .msg-actions {
   position: static; opacity: 0; background: none; border: 0; box-shadow: none;
