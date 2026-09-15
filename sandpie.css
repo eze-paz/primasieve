@@ -3617,6 +3617,11 @@ body.sp-decoding *::after {
 
    Colours are all derived from the theme's own tokens via color-mix, so a
    customised aurora palette carries the layout with it.
+
+   WIDTH: this block sets no measure of its own. --sp-chat-max-w (the
+   Appearance chat-width slider, themes.js _applyChatWidth) is the only
+   authority, exactly as in every other theme -- no ch caps anywhere, or
+   the slider would stop doing anything past ~74ch.
    ═══════════════════════════════════════════════════════════════════════ */
 html[data-theme="aurora"] {
   /* NB: --rail-* is already taken by the icon rail; these are --sprail-*. */
@@ -3655,7 +3660,6 @@ html[data-theme="aurora"] #messagesSide > .msg.user {
   border-left-color: var(--sp-accent);
   background: var(--sprail-ground);
   padding: 7px 10px 8px var(--sprail-gut);
-  max-width: 92ch;
   margin-top: 22px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 0; }
@@ -3678,7 +3682,10 @@ html[data-theme="aurora"] #messages > .msg.tool-group,
 html[data-theme="aurora"] #messagesSide > .msg.tool-group {
   border-left-color: var(--sprail-ops);
   padding-top: 2px; padding-bottom: 2px;
-  max-width: 54ch; overflow: visible;
+  /* shrink-wrap, never a fixed cap: the count stays beside its title at any
+     configured chat width, and the group still cannot exceed the column. */
+  width: fit-content; max-width: 100%;
+  overflow: visible;
   font: 11px/1.65 var(--sprail-mono);
 }
 html[data-theme="aurora"] .tool-group .tg-hd {
@@ -3711,7 +3718,6 @@ html[data-theme="aurora"] #messagesSide > .msg.assistant {
   border-left-color: var(--sprail-out);
   padding-top: 7px; padding-bottom: 4px;
   font-size: 13.5px; line-height: 1.6;
-  max-width: 74ch;
 }
 html[data-theme="aurora"] .msg.assistant p { margin: 0 0 0.58em; }
 html[data-theme="aurora"] .msg.assistant ul { margin: 0.3em 0 0.62em; padding-left: 1.12em; }
