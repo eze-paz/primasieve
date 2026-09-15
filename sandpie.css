@@ -2254,9 +2254,18 @@ ul.conv-list li.active {
   .font-warning .fw-retry { background: var(--sp-accent); border-color: var(--sp-accent); color: #0d1117; font-weight: 600; }
   .font-warning button:hover { filter: brightness(1.1); }
   /* V2 preview-thumbnail artifact card (office body + collapsed representation) */
-  .artifact-card-body { cursor: pointer; outline: none; }
+  /* The preview fills the whole card and the footer floats ON it, so the
+     image is the card rather than a band above a label. */
+  .artifact-card-body {
+    cursor: pointer; outline: none; position: relative;
+    --acf-near: color-mix(in srgb, var(--sp-bg) 94%, transparent);
+    --acf-far:  color-mix(in srgb, var(--sp-bg) 55%, transparent);
+  }
   .artifact-card-body:focus-visible { box-shadow: inset 0 0 0 2px var(--sp-accent); }
-  .artifact-card-body .ac-thumb { position: relative; height: 104px; background: var(--sp-bg); display: grid; place-items: center; border-bottom: 1px solid var(--sp-border); overflow: hidden; }
+  /* 154px = the old 104px band plus the ~50px the footer used to occupy
+     below it, so the card keeps its overall height while the image gains
+     the footer's strip. No bottom border: nothing sits under it now. */
+  .artifact-card-body .ac-thumb { position: relative; height: 154px; background: var(--sp-bg); display: grid; place-items: center; border-bottom: 0; overflow: hidden; }
   /* ↗ open-in-new-tab — the ONLY inline control (pin/share/download live in the
      side panel). Sits top-right of the thumb; stops the card's open action. */
   .artifact-card-body .ac-newtab {
@@ -2285,8 +2294,27 @@ ul.conv-list li.active {
   .artifact-card-body .ac-page i.t { width: 40%; height: 6px; background: var(--sp-accent); margin-bottom: 9px; }
   .artifact-card-body .ac-page i.m { width: 84%; }
   .artifact-card-body .ac-page i.s { width: 56%; }
-  .artifact-card-body .ac-ft { display: flex; align-items: center; gap: 10px; padding: 10px 12px; transition: background 0.12s; }
-  .artifact-card-body:hover .ac-ft { background: color-mix(in srgb, var(--sp-accent) 9%, transparent); }
+  .artifact-card-body .ac-ft {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    transition: background 0.12s;
+    /* drawn over the image: a scrim mixed from the THEME background, so it
+       darkens on the dark palettes and lightens on white without the label
+       colours having to change. */
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    background: linear-gradient(to top, var(--acf-near), var(--acf-far) 62%, transparent);
+    backdrop-filter: blur(3px);
+  }
+  .artifact-card-body:hover .ac-ft {
+    background: linear-gradient(to top,
+      color-mix(in srgb, var(--sp-accent) 20%, var(--acf-near)),
+      var(--acf-far) 62%, transparent);
+  }
+  /* Compact cards have no visible thumb -- the footer IS the card, so it goes
+     back into the flow or it would collapse to nothing. */
+  .artifact-compact .ac-ft {
+    position: static; background: none; backdrop-filter: none;
+  }
+  .artifact-compact:hover .ac-ft { background: color-mix(in srgb, var(--sp-accent) 9%, transparent); }
   .artifact-card-body .ac-ic { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; }
   .artifact-card-body .ac-ic svg { width: 17px; height: 17px; }
   .artifact-card-body .ac-sub { flex: 1; min-width: 0; font-size: 11.5px; color: var(--sp-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -172,15 +172,10 @@ function buildArtifactCard(clean, ext, opts) {
   const nt = el.querySelector('.ac-newtab');
   if (nt && opts.onNewTab) nt.onclick = (e) => { e.stopPropagation(); e.preventDefault(); opts.onNewTab(); };
   if (opts.showThumb) _fillArtifactThumb(el, clean, ext);
-  (async () => {
-    try {
-      const { parts, name } = splitPath(await resolveArtifactPath(clean));
-      const dir = await opfs.resolveDir(parts);
-      const file = await (await dir.getFileHandle(name)).getFile();
-      const sub = el.querySelector('.ac-sub');
-      if (sub && file.size > 0) sub.textContent = label + ' · ' + formatArtifactBytes(file.size);
-    } catch (_) {}
-  })();
+  // The subtitle is the KIND only ("Web page", "Image"). It used to append the
+  // file size, which meant an OPFS stat per card for a number nobody acts on --
+  // and it read as noise next to the kind. formatArtifactBytes still serves the
+  // files list and the image-stack tile, where size is the point.
   return el;
 }
 
