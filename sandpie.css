@@ -3600,3 +3600,146 @@ body.sp-decoding *::after {
   }
   .proj-panel .proj-add:hover { color: var(--sp-text); border-color: var(--sp-accent); }
   .proj-panel .proj-add .plus { color: var(--sp-accent); font-weight: 700; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AURORA — rail conversation layout.  AURORA ONLY.
+
+   Every selector in this block is prefixed html[data-theme="aurora"], so
+   classic-dark / classic-light / electric / clear keep the shipped layout
+   untouched. Nothing outside this block was modified.
+
+   The idea: one continuous 2px rail down the left of a turn, its TONE
+   changing per role — accent for your query, a hairline for machinery, a
+   mid tone for the reply. Blocks butt together (margin:0, space from
+   internal padding) so the line never breaks; a new turn simply leaves a
+   gap in the rail, and that gap IS the separator. The only warm point on
+   the rail is whatever is running right now.
+
+   Colours are all derived from the theme's own tokens via color-mix, so a
+   customised aurora palette carries the layout with it.
+   ═══════════════════════════════════════════════════════════════════════ */
+html[data-theme="aurora"] {
+  /* NB: --rail-* is already taken by the icon rail; these are --sprail-*. */
+  --sprail-w: 2px;
+  --sprail-gut: 11px;
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 4%, transparent);
+  --sprail-ops:    color-mix(in srgb, var(--sp-text) 14%, transparent);
+  --sprail-out:    color-mix(in srgb, var(--sp-text) 26%, transparent);
+  --sprail-hot:    color-mix(in srgb, var(--sp-text) 42%, transparent);
+  --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 55%, transparent);
+  --sprail-chip:   color-mix(in srgb, var(--sp-text) 7%, transparent);
+  /* same stack the tool-group header already uses */
+  --sprail-mono: 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+}
+
+/* --- one left edge for every role: no align-self, no per-role width ---
+   Child combinators only: .msg.tool-call lives nested inside .tg-log and
+   must keep its own styling. */
+html[data-theme="aurora"] .conv-host > .msg,
+html[data-theme="aurora"] #messages > .msg,
+html[data-theme="aurora"] #messagesSide > .msg {
+  align-self: stretch; width: auto; max-width: none; min-width: 0;
+  margin: 0;                                   /* NOTHING breaks the line */
+  border: 0; border-left: var(--sprail-w) solid transparent; border-radius: 0;
+  padding: 3px 0 3px var(--sprail-gut);        /* space comes from inside */
+  background: none;
+  transition: border-color 0.14s ease;
+}
+/* the host's own flex gap would reopen the breaks the margins just lost */
+html[data-theme="aurora"] .conv-host { gap: 0; }
+
+/* --- your query: head of the rail. Full text, never compressed. --- */
+html[data-theme="aurora"] .conv-host > .msg.user,
+html[data-theme="aurora"] #messages > .msg.user,
+html[data-theme="aurora"] #messagesSide > .msg.user {
+  border-left-color: var(--sp-accent);
+  background: var(--sprail-ground);
+  padding: 7px 10px 8px var(--sprail-gut);
+  max-width: 92ch;
+  margin-top: 22px;            /* the gap in the rail = the turn separator */
+}
+html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 0; }
+html[data-theme="aurora"] .msg.user::before { display: none; }   /* offset ghost */
+html[data-theme="aurora"] .msg.user .bubble {
+  background: none; color: var(--sp-text); padding: 0; clip-path: none;
+  box-shadow: none; border-radius: 0; font-weight: 400;
+  font: 12px/1.5 var(--sprail-mono); white-space: pre-wrap;
+}
+html[data-theme="aurora"] .msg.user > .msg-actions {
+  position: static; opacity: 0; background: none; border: 0; box-shadow: none;
+  padding: 0; margin-top: 2px; transform: none;
+}
+html[data-theme="aurora"] .msg.user:hover > .msg-actions { opacity: 1; pointer-events: auto; }
+
+/* --- machinery: the two-storey card collapses to one line. The title row
+   and the tray share a baseline, the DRAM strip goes, the count stays. --- */
+html[data-theme="aurora"] .conv-host > .msg.tool-group,
+html[data-theme="aurora"] #messages > .msg.tool-group,
+html[data-theme="aurora"] #messagesSide > .msg.tool-group {
+  border-left-color: var(--sprail-ops);
+  padding-top: 2px; padding-bottom: 2px;
+  max-width: 54ch; overflow: visible;
+  font: 11px/1.65 var(--sprail-mono);
+}
+html[data-theme="aurora"] .tool-group .tg-hd {
+  flex-direction: row; align-items: baseline; border-bottom: 0; gap: 0.6ch;
+}
+html[data-theme="aurora"] .tool-group .tg-row { padding: 0; gap: 0.6ch; color: var(--sp-text-dim); flex: 1 1 auto; }
+html[data-theme="aurora"] .tool-group .tg-hd:hover .tg-row { background: none; color: var(--sp-text); }
+html[data-theme="aurora"] .tool-group .tg-prompt { display: none; }   /* the bar is the prompt now */
+html[data-theme="aurora"] .tool-group .tg-title { color: inherit; }
+html[data-theme="aurora"] .tool-group .tg-tray { background: none; padding: 0; flex: none; gap: 0.5ch; }
+html[data-theme="aurora"] .tool-group .tg-strip { display: none; }
+html[data-theme="aurora"] .tool-group .tg-count {
+  font-size: 10px; color: var(--sprail-count); font-variant-numeric: tabular-nums;
+}
+/* the one warm point on the rail: the group that is running right now.
+   There is no .running class — a live group is the one holding a .tg-cell.run. */
+html[data-theme="aurora"] .conv-host > .msg.tool-group:has(.tg-cell.run),
+html[data-theme="aurora"] #messages > .msg.tool-group:has(.tg-cell.run),
+html[data-theme="aurora"] #messagesSide > .msg.tool-group:has(.tg-cell.run) {
+  border-left-color: color-mix(in srgb, var(--sp-accent) 60%, transparent);
+}
+html[data-theme="aurora"] .tool-group:has(.tg-cell.run) .tg-row { color: var(--sp-text); }
+/* expanded call log keeps its own indent under the collapsed header */
+html[data-theme="aurora"] .tool-group .tg-log { padding: 0.15rem 0 0; }
+
+/* --- the reply: the only sans, and the only thing at reading size --- */
+html[data-theme="aurora"] .conv-host > .msg.assistant,
+html[data-theme="aurora"] #messages > .msg.assistant,
+html[data-theme="aurora"] #messagesSide > .msg.assistant {
+  border-left-color: var(--sprail-out);
+  padding-top: 7px; padding-bottom: 4px;
+  font-size: 13.5px; line-height: 1.6;
+  max-width: 74ch;
+}
+html[data-theme="aurora"] .msg.assistant p { margin: 0 0 0.58em; }
+html[data-theme="aurora"] .msg.assistant ul { margin: 0.3em 0 0.62em; padding-left: 1.12em; }
+html[data-theme="aurora"] .msg.assistant li { margin: 0.22em 0; }
+html[data-theme="aurora"] .msg.assistant li::marker { color: var(--sprail-out); }
+html[data-theme="aurora"] .msg.assistant > .bubble > :last-child { margin-bottom: 0; }
+html[data-theme="aurora"] .msg.assistant code {
+  font-size: 11.5px; padding: 1.5px 5px; border-radius: 4px; background: var(--sprail-chip);
+}
+
+/* --- thinking blocks sit on the rail too, or the line breaks around them --- */
+html[data-theme="aurora"] .conv-host > .msg.think,
+html[data-theme="aurora"] #messages > .msg.think,
+html[data-theme="aurora"] #messagesSide > .msg.think {
+  border-left-color: var(--sprail-ops);
+  padding-top: 2px; padding-bottom: 2px;
+  font-size: 11.5px;
+}
+
+/* --- the rail answers the cursor --- */
+html[data-theme="aurora"] .conv-host > .msg.tool-group:hover,
+html[data-theme="aurora"] .conv-host > .msg.assistant:hover,
+html[data-theme="aurora"] #messages > .msg.tool-group:hover,
+html[data-theme="aurora"] #messages > .msg.assistant:hover,
+html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover,
+html[data-theme="aurora"] #messagesSide > .msg.assistant:hover {
+  border-left-color: var(--sprail-hot);
+}
+
+/* --- the settled timer reads as the rail's footnote --- */
+html[data-theme="aurora"] .msg-timer { font-size: 10.5px; }
