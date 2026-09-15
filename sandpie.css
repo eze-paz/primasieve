@@ -3832,7 +3832,9 @@ html[data-theme="aurora"] {
   --sprail-w: 2px;
   --sprail-gut: 11px;
   --sprail-ground: color-mix(in srgb, var(--sp-text) 4%, transparent);
-  --sprail-ops:    color-mix(in srgb, var(--sp-text) 14%, transparent);
+  /* machinery joins the accent family: the turn is ONE hue at three
+     strengths -- reply 100%, machinery 30%, query neutral. */
+  --sprail-ops:    color-mix(in srgb, var(--sp-accent) 30%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 26%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 55%, transparent);
   --sprail-chip:   color-mix(in srgb, var(--sp-text) 7%, transparent);
@@ -3860,10 +3862,11 @@ html[data-theme="aurora"] .conv-host { gap: 0; }
 html[data-theme="aurora"] .conv-host > .msg.user,
 html[data-theme="aurora"] #messages > .msg.user,
 html[data-theme="aurora"] #messagesSide > .msg.user {
-  /* Inverted: the ACCENT marks the answer, not the question. The query is
-     still unmistakably yours -- it is the only block with a ground. */
+  /* Inverted: the ACCENT marks the answer, not the question -- and the
+     tint follows it onto the reply. The query is a line of text on a
+     rail; the answer is the thing with weight. */
   border-left-color: var(--sprail-out);
-  background: var(--sprail-ground);
+  background: none;
   padding: 7px 10px 8px var(--sprail-gut);
   margin-top: 22px;            /* the gap in the rail = the turn separator */
 }
@@ -3921,6 +3924,8 @@ html[data-theme="aurora"] .conv-host > .msg.assistant,
 html[data-theme="aurora"] #messages > .msg.assistant,
 html[data-theme="aurora"] #messagesSide > .msg.assistant {
   border-left-color: var(--sp-accent);
+  background: var(--sprail-ground);
+  padding-right: 12px;   /* the tint needs air on the far side of the prose */
   padding-top: 7px; padding-bottom: 4px;
   font-size: 13.5px; line-height: 1.6;
 }
