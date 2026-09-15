@@ -111,7 +111,9 @@
 // the dispatcher turns any handler exception into -1. Broke `tar x` into /root,
 // `mkdir ~/.ssh`, git clone into a new dir, and multi-call builds. mkdir(2) on an
 // existing path is now EEXIST too, instead of silently succeeding (mkdir -p semantics).
-WORKER_V = 'mkdir32';
+// killall33: the tool's deadline stops the PROCESSES and keeps the kernel, so a run that
+// runs out of budget no longer takes /tmp and every compiled module down with it.
+WORKER_V = 'killall33';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise

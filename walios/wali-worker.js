@@ -3022,6 +3022,16 @@ self.onmessage = async (ev) => {
   if (m.t === 'winsize') { if (m.rows) winRows = m.rows; if (m.cols) winCols = m.cols;
     for (const p of ptys.values()) { p.rows = winRows; p.cols = winCols; if (p.pgrp) signalPgrp(p.pgrp, SIG.WINCH); } // POSIX: a size change raises SIGWINCH on the fg group so TUIs (vi, ssh) re-render
     return; }
+  if (m.t === 'killall') {
+    // Stop every process but KEEP this kernel: the VFS, the compiled modules and the OPFS
+    // bridge all survive. The tool's deadline used to terminate the whole worker, which
+    // threw away /tmp along with it -- so a build that ran out of budget lost the work it
+    // had already done, every time. groupExit() is the same teardown exit_group uses, so a
+    // parked wait4 or a blocked read is released rather than left hanging.
+    // 137 = 128 + SIGKILL, what a shell reports for a killed job.
+    for (const P of [...procs.values()]) { try { P.groupExit(137); } catch (_) {} }
+    self.postMessage({ t: 'killed-all' });
+    return; }
   if (m.t === 'sigint') { // page-level Ctrl-C -> guest foreground group (pty pgrp if set, else the root)
     let fg = 0; for (const p of ptys.values()) if (p.pgrp) fg = p.pgrp;
     if (!(fg && signalPgrp(fg, SIG.INT))) postSignal(rootProc, SIG.INT);

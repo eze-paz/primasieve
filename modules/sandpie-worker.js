@@ -3207,9 +3207,24 @@ async function tool_walios({ script, timeout }, ctx) {
       if (done) return;
       const left = deadline - Date.now();
       if (left > 0) { timer = setTimeout(tick, left); return; }
-      kill('Error: walios run exceeded ' + t + 's and was terminated (worker killed; the next call starts a fresh one).');
+      detach('Error: walios run exceeded ' + t + 's and was stopped.');
     };
     const finish = (result) => { if (done) return; done = true; clearTimeout(timer); k.busy = false; k.last = Date.now(); resolve({ result }); };
+    // DEADLINE: stop the processes, KEEP the session. The kernel, /tmp, the compiled
+    // modules and the OPFS bridge all stay, so the next call continues where this one
+    // stopped instead of starting from nothing. This used to call kill(), which dropped
+    // the whole kernel -- a build that ran out of budget threw away everything it had
+    // already done, which is exactly the trap a long ./configure falls into.
+    // ABORT still uses kill(): a stopped turn must leave nothing running.
+    const detach = (why) => {
+      if (done) return; done = true; clearTimeout(timer);
+      try { w.postMessage({ t: 'killall' }); } catch (_) {}
+      let partial = chunks.join(''); if (partial.length > 65536) partial = partial.slice(0, 65536) + '\n…[truncated]';
+      k.busy = false; k.last = Date.now();
+      resolve({ result: why + ' The session is intact -- /tmp, the workspace and anything already built are still there,'
+        + ' so the next walios call continues from here (run the remaining steps, or re-run a resumable command like `make`).'
+        + (partial ? '\n--- partial output ---\n' + partial.replace(/\n+$/, '') : '') });
+    };
     const kill = (why) => {
       if (done) return; done = true; clearTimeout(timer);
       // The OPFS bridge dies WITH the kernel (its exclusive handles would otherwise stay
