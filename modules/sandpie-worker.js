@@ -3325,18 +3325,16 @@ async function tool_walios({ script, timeout, resume }, ctx) {
       } else if (m.t === 'boot') {
         try { w.postMessage({ t: 'stdin-eof' }); } catch (_) {}   // non-interactive: stdin reads get EOF
       } else if (m.t === 'exit') {
-        // NOTHING OUTLIVES THE CALL. The root script has exited; anything it backgrounded
-        // with `&` is reaped here. Without this, `( ./configure ) &` was a way to dodge the
-        // deadline entirely -- the call returned in milliseconds and left a build running
-        // with nobody watching it, which on a phone is CPU and battery burnt behind the
-        // user's back. Suspending the deadline removed the REASON to background; this
-        // removes the ABILITY, so it is a guarantee rather than a request the model may
-        // ignore. Backgrounding WITHIN one call still works normally (`cmd & wait`), which
-        // is the legitimate use -- what cannot happen is surviving the call that started it.
+        // A backgrounded process DOES outlive the call that started it, deliberately. This
+        // briefly reaped everything on exit, to stop `&` being used to dodge the deadline --
+        // but that killed the legitimate case with the abusive one. A daemon is precisely a
+        // thing whose job is to outlive the command that started it: a local proxy, a
+        // server the next call talks to, a warm worker. Suspending the deadline already
+        // removed the REASON to background a long build (resume:true continues it), so what
+        // was left being prevented was mostly the useful kind.
         //
-        // The invariant, stated whole: when a walios call returns, every process it started
-        // is finished, killed, or PARKED. None is running.
-        try { w.postMessage({ t: 'killall' }); } catch (_) {}
+        // Nothing here is unbounded: the kernel is dropped WALIOS_IDLE_MS (10 min) after
+        // this conversation's last walios call, and everything in it goes with it.
         frames.flush();
         let text = chunks.join('');
         if (truncated) text = text.slice(0, 65536) + '\n…[output truncated at 64KB]';

@@ -4,7 +4,9 @@
 // the RUN -- and `./configure` is not resumable, so a build that ran out of budget started
 // over from zero every time. The only way round it was to background the job yourself
 // (`( ./configure ... ) &`) and poll, which is the wrong tool to hand a model: a
-// backgrounded runaway keeps burning CPU on a phone with nobody watching it.
+// backgrounded job you are not watching. (Backgrounding itself is ALLOWED and useful --
+// a daemon is meant to outlive its call; see check 4 -- the deadline just no longer forces
+// you to reach for it.)
 //
 // Underneath, walios' job control was COSMETIC. SIG_STOPPERS set P.stopped and told the
 // parent (so ^Z printed "Stopped" and gave back the prompt) but the child never stopped:
@@ -152,39 +154,32 @@ try {
   check('a run survives THREE suspensions and finishes', /CYCLE-RUN-FINISHED/.test(c4), c4);
   check('no work was lost across the cycles', /COUNT=24/.test(c4), c4);
 
-  // 4. BACKGROUNDING CANNOT OUTLIVE THE CALL. This is enforced, not requested: `&` was a
-  //    way to dodge the deadline entirely -- the call returned at once and left a build
-  //    running unattended, which on a phone is CPU burnt behind the user's back. The root
-  //    exiting now reaps whatever it started, so the only way to continue long work is
-  //    resume:true. Backgrounding WITHIN a call still works; surviving the call does not.
-  //    Two shapes, because a plain `&` is not the only thing a model would reach for. The
-  //    DOUBLE FORK is the interesting one: the intermediate parent exits at once, so the
-  //    worker is reparented and belongs to no job table the script can see. It is still
-  //    reaped, because killall walks the kernel's WHOLE process table rather than a pgid or
-  //    a job list -- there is no "outside" to detach to, every process being one the kernel
-  //    spawned. (nohup, setsid, disown, at, crontab, tmux and screen are not installed at
-  //    all, so those routes are closed by absence rather than by this.)
+  // 4. A BACKGROUNDED JOB DOES OUTLIVE THE CALL -- deliberately. This briefly did the
+  //    opposite: the root exiting reaped everything, to stop `&` being used to dodge the
+  //    deadline. That killed the legitimate case with it. A daemon is precisely a thing
+  //    meant to outlive the command that starts it (a local proxy, a server the next call
+  //    talks to), and suspending the deadline already removed the REASON to background a
+  //    long build. Nothing is unbounded: the kernel is dropped 10 min after the last call.
   const bg = await call({ timeout: 20, script: [
-    'rm -f /tmp/bgtick /tmp/bgtick2',
+    'rm -f /tmp/bgtick',
     '( while true; do echo x >> /tmp/bgtick; sleep 1; done ) &',
-    'sh -c \'( ( while true; do echo x >> /tmp/bgtick2; sleep 1; done ) & ) ; exit 0\' &',
     'sleep 2',
-    'echo "LAUNCHED size=$(wc -c < /tmp/bgtick) dbl=$(wc -c < /tmp/bgtick2)"',
+    'echo "LAUNCHED size=$(wc -c < /tmp/bgtick)"',
   ].join('\n') });
-  console.log('  [backgrounded then returned]\n    ' + String(bg).replace(/\n/g, '\n    '));
-  check('both backgrounded jobs did run during their own call',
-    /LAUNCHED size=[1-9]/.test(bg) && /dbl=[1-9]/.test(bg), bg);
-  // Give it a wall-clock window in which it WOULD have kept growing if it had survived.
-  await new Promise((r) => setTimeout(r, 6000));
+  check('a backgrounded job runs during its own call', /LAUNCHED size=[1-9]/.test(bg), bg);
+  await new Promise((r) => setTimeout(r, 5000));
   const bgAfter = await call({ timeout: 20, script: [
     'a=$(wc -c < /tmp/bgtick 2>/dev/null)',
     'sleep 3',
     'b=$(wc -c < /tmp/bgtick 2>/dev/null)',
     'echo "after_call=$a later=$b"',
+    'kill %1 2>/dev/null; pkill -f bgtick 2>/dev/null; true',
   ].join('\n') });
   const mb = /after_call=(\d+) later=(\d+)/.exec(String(bgAfter));
-  check('the backgrounded job did NOT survive the call that started it',
-    !!mb && mb[1] === mb[2], mb ? mb[0] : bgAfter);
+  check('it SURVIVES the call that started it (daemons are allowed)',
+    !!mb && Number(mb[1]) > 0, mb ? mb[0] : bgAfter);
+  check('and it is still making progress in the later call',
+    !!mb && Number(mb[2]) > Number(mb[1]), mb ? mb[0] : bgAfter);
 
   // 5. A suspended run must not be left parked forever: sending a script abandons it.
   const c = await call({ timeout: 20, script: 'echo NEW-SCRIPT-RAN' });

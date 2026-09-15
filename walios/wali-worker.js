@@ -7,7 +7,32 @@
 const PAGE = 65536;
 const CHILD_DONE = 0x7e57n;
 try { self.addEventListener('unhandledrejection', (e) => { try { self.postMessage({ t: 'out', fd: 2, s: '[host] UNHANDLED: ' + ((e.reason && e.reason.stack) || e.reason) + '\n' }); } catch {} }); } catch {}
-const E = { PERM:1, NOENT:2, SRCH:3, INTR:4, IO:5, BADF:9, CHILD:10, AGAIN:11, NOMEM:12, ACCES:13, EXIST:17, XDEV:18, NOTDIR:20, ISDIR:21, INVAL:22, NOTTY:25, SPIPE:29, PIPE:32, NOSYS:38, NOTEMPTY:39, TIMEDOUT:110 };
+const E = { PERM:1, NOENT:2, SRCH:3, INTR:4, IO:5, BADF:9, CHILD:10, AGAIN:11, NOMEM:12, ACCES:13, EXIST:17, XDEV:18, NOTDIR:20, ISDIR:21, INVAL:22, NOTTY:25, SPIPE:29, PIPE:32, NOSYS:38, NOTEMPTY:39,
+            ADDRINUSE:98, ADDRNOTAVAIL:99, CONNREFUSED:111, TIMEDOUT:110 };
+
+// LOOPBACK TCP, entirely inside this kernel.
+//
+// listen() used to hand the port to the WISP relay (OP.LISTEN). But WISP is an OUTBOUND
+// transport -- a browser cannot accept inbound TCP -- so the relay refused, and since it
+// refused with -98 the guest saw "Address in use" on EVERY port. Measured on unused ports
+// in a fresh kernel, three independent stacks agreeing:
+//     nc -l -p 9001        -> nc: listen: Address in use
+//     python bind(9002)    -> [Errno 98] Address in use
+//     tlswrap -L 9443 ...  -> listen: Address in use
+// which made the tlswrap -L LOCALPORT HOST 443 workflow the tool documents impossible,
+// and a local server unbuildable.
+//
+// A 127.0.0.1 listener never needed the relay: both ends are in here. Connections are
+// ordinary socketpairs, so read/write/poll/close all work through the existing spair paths
+// with no new plumbing -- and accept blocks the way the relay one does, by returning
+// EAGAIN for sysAsync to retry.
+//
+// 0.0.0.0 is treated as local too. A guest binding "any" in a browser has no "any" to bind:
+// there is no route by which an outside connection could arrive, so local is the only
+// meaning it can have -- and it is what makes a plain `nc -l -p N` work.
+const localListeners = new Map();          // port -> { port, backlog: [] }
+const isLocalBindIp = (ip) => !ip || ip === '0.0.0.0' || ip === '::' || ip === '127.0.0.1'
+  || (typeof ip === 'string' && (ip.startsWith('127.') || ip === '::1'));
 const err = (e) => BigInt(-e);
 const td = new TextDecoder(), te = new TextEncoder();
 
@@ -973,6 +998,9 @@ class Process {
     if (h.std !== undefined) return true;
     if (h.fifo) return h.fifo.chunks.length > 0 || h.fifo.writers <= 0;
     if (h.spair) return h.spair.rd.chunks.length > 0 || h.spair.rd.writers <= 0;
+    // A listening socket is "readable" when a connection is waiting, which is how a
+    // poll/select-driven server (rather than a blocking-accept one) learns to accept.
+    if (h.sock && h.sock.local && h.sock.listener) return h.sock.local.backlog.length > 0;
     if (h.pty !== undefined) { const p = ptys.get(h.pty); return h.master ? p.toMaster.length > 0 : (p.toSlave.length > 0 || !!p.slaveEof); }
     if (h.tfd) { this.pollTfd(h.tfd); return h.tfd.count > 0; }
     if (h.sock && h.sock.icmp) { const pg = h.sock.ping;
@@ -1368,6 +1396,10 @@ class Process {
         if (h.tfd) { if (h.tfd.to) clearTimeout(h.tfd.to); const w = h.tfd.waiters; h.tfd.waiters = []; for (const f of w) f('t'); S.fds.delete(a[0]); return 0n; }
         // a dup'd/forked socket fd shares ONE wisp stream — only an unshared close may
         // tear it down, or a child's close_range kills the parent's live connection.
+        // Closing a local listener frees the port, or the next bind of it would get a
+        // (this time genuine) EADDRINUSE from a listener nobody can reach any more.
+        if (h.sock && h.sock.local && h.sock.listener && !h.shared
+            && localListeners.get(h.sock.local.port) === h.sock.local) localListeners.delete(h.sock.local.port);
         if (h.sock && h.sock.id && !h.shared) initWisp().call(initWisp().OP.CLOSE, h.sock.id, 0, 0);
         S.fds.delete(a[0]); S.dirState.delete(a[0]);
         if (h.file && h.file.brId) opfsMaybeRelease(h.file);   // last fd gone -> give the OPFS lock back
@@ -1861,12 +1893,32 @@ class Process {
         S.refresh(); h.sock.bindAddr = readSockaddr(S, a[1]); return 0n; }
       case 'listen': { const h = S.fds.get(a[0]); if (!h || !h.sock) return err(E.BADF);
         const ba = h.sock.bindAddr || { ip: '0.0.0.0', port: 0 };
+        // Loopback/any: keep it in the kernel. See localListeners above for why the relay
+        // path cannot serve this (and reported every port as already in use).
+        if (isLocalBindIp(ba.ip)) {
+          if (!ba.port) return err(E.INVAL);                       // ephemeral port 0: not supported locally
+          const prev = localListeners.get(ba.port);
+          if (prev && prev !== h.sock.local) return err(E.ADDRINUSE);   // a REAL collision, unlike before
+          const L = h.sock.local || { port: ba.port, backlog: [] };
+          localListeners.set(ba.port, L);
+          h.sock.listener = true; h.sock.local = L; h.sock.boundPort = ba.port;
+          return 0n; }
         const br = initWisp(); if (!br.OP.LISTEN) return err(E.NOSYS);
         const r = br.call(br.OP.LISTEN, ba.port, 0, 0);
         if (r.res < 0) return BigInt(r.res);
         h.sock.id = r.res; h.sock.listener = true; h.sock.boundPort = r.aux;
         return 0n; }
       case 'accept': case 'accept4': { const h = S.fds.get(a[0]); if (!h || !h.sock || !h.sock.listener) return err(E.INVAL);
+        if (h.sock.local) {
+          const c = h.sock.local.backlog.shift();
+          // EAGAIN is how a blocking accept waits here: sysAsync retries it. Same contract
+          // the relay accept below documents, so nothing special is needed to park.
+          if (!c) return err(E.AGAIN);
+          S.refresh();
+          if (a[1]) { const n = writeSockaddr(S, a[1], { ip: '127.0.0.1', port: h.sock.local.port }); if (a[2]) S.i32(a[2], n); }
+          const g = S.allocFd();
+          S.fds.set(g, { spair: c.srv, nonblock: !!(a[3] & 0x800), cloexec: !!(a[3] & 0x80000) });
+          return BigInt(g); }
         const br = initWisp();
         const r = br.call(br.OP.ACCEPT, h.sock.id, 1, 0);   // never park here: sysAsync loops on EAGAIN
         if (r.res < 0) return BigInt(r.res);
@@ -1878,6 +1930,18 @@ class Process {
       case 'connect': { const h = S.fds.get(a[0]); if (!h || !h.sock) return err(E.BADF); S.refresh();
         const dst = readSockaddr(S, a[1]);
         if (h.sock.udp || h.sock.icmp) { h.sock.dest = dst; return 0n; }
+        // A loopback destination is served in here, by whoever is listening on that port.
+        // The two ends are an ordinary socketpair, so from here on this fd behaves like any
+        // connected socket (read/write/poll/close all go through the spair paths, which are
+        // checked BEFORE h.sock everywhere).
+        if (dst.ip && (dst.ip === '127.0.0.1' || dst.ip.startsWith('127.') || dst.ip === '::1')) {
+          const L = localListeners.get(dst.port);
+          if (!L) return err(E.CONNREFUSED);        // nothing listening: the honest answer
+          const f1 = mkPipe(), f2 = mkPipe();
+          L.backlog.push({ srv: { rd: f1, wr: f2 } });
+          h.spair = { rd: f2, wr: f1 };
+          h.sock.connectedLocal = true;
+          return 0n; }
         const br = initWisp(); const spec = te.encode(`${dst.ip}|${dst.port}${h.sock.tls ? '|T' : ''}`);
         const r = br.call(br.OP.CONNECT, spec.length, 0, 0, spec); if (r.res < 0) return BigInt(r.res); h.sock.id = r.res; return 0n; }
       case 'sendto': case 'sendmsg': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
@@ -1916,6 +1980,18 @@ class Process {
       case 'recvmsg': case 'recvfrom': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
         if (h.spair) { S.refresh();
           if (!h.spair.rd.chunks.length && (!h.spair.rd.fds || !h.spair.rd.fds.length)) { if (h.spair.rd.writers <= 0) return 0n; if (h.nonblock) return err(E.AGAIN); }
+          // recvfrom is NOT recvmsg: its a[1] is a plain buffer and a[2] its length, while
+          // recvmsg's a[1] is a msghdr. The code below reads a[1]+8 as an iov pointer, so a
+          // recvfrom landed on a wild address -- and the exception that followed came back
+          // as -1, i.e. EPERM, which is what conn.recv() reported after a local accept:
+          //     PermissionError: [Errno 1] Operation not permitted
+          // The sendto/sendmsg twin already separates the two; this side never did, because
+          // until loopback sockets existed nothing reached it by the recvfrom shape (the
+          // socketpair users all go through recvmsg, for SCM_RIGHTS).
+          if (name === 'recvfrom') {
+            const b = pipeRead(h.spair.rd, a[2]); S.wbytes(a[1], b);
+            if (a[4]) { const n = writeSockaddr(S, a[4], { ip: '127.0.0.1', port: 0 }); if (a[5]) S.i32(a[5], n); }
+            return BigInt(b.length); }
           const iov = S.r32(a[1] + 8), iovn = S.r32(a[1] + 12); let total = 0;
           for (let i = 0; i < iovn; i++) { const p = S.r32(iov + i * 8), l = S.r32(iov + i * 8 + 4); if (!l) continue; const b = pipeRead(h.spair.rd, l); if (!b.length) break; S.wbytes(p, b); total += b.length; if (b.length < l) break; }
           const ctl = S.r32(a[1] + 20), ctllen = S.r32(a[1] + 24);
