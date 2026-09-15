@@ -3861,7 +3861,9 @@ html[data-theme="aurora"] .conv-host { gap: 0; }
 html[data-theme="aurora"] .conv-host > .msg.user,
 html[data-theme="aurora"] #messages > .msg.user,
 html[data-theme="aurora"] #messagesSide > .msg.user {
-  border-left-color: var(--sp-accent);
+  /* Inverted: the ACCENT marks the answer, not the question. The query is
+     still unmistakably yours -- it is the only block with a ground. */
+  border-left-color: var(--sprail-out);
   background: var(--sprail-ground);
   padding: 7px 10px 8px var(--sprail-gut);
   margin-top: 22px;            /* the gap in the rail = the turn separator */
@@ -3919,7 +3921,7 @@ html[data-theme="aurora"] .tool-group .tg-log { padding: 0.15rem 0 0; }
 html[data-theme="aurora"] .conv-host > .msg.assistant,
 html[data-theme="aurora"] #messages > .msg.assistant,
 html[data-theme="aurora"] #messagesSide > .msg.assistant {
-  border-left-color: var(--sprail-out);
+  border-left-color: var(--sp-accent);
   padding-top: 7px; padding-bottom: 4px;
   font-size: 13.5px; line-height: 1.6;
 }
@@ -3942,12 +3944,11 @@ html[data-theme="aurora"] #messagesSide > .msg.think {
 }
 
 /* --- the rail answers the cursor --- */
+/* The reply is deliberately NOT here: its rail is the accent now, and the
+   hover tone is a grey -- lifting it would read as the answer dimming. */
 html[data-theme="aurora"] .conv-host > .msg.tool-group:hover,
-html[data-theme="aurora"] .conv-host > .msg.assistant:hover,
 html[data-theme="aurora"] #messages > .msg.tool-group:hover,
-html[data-theme="aurora"] #messages > .msg.assistant:hover,
-html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover,
-html[data-theme="aurora"] #messagesSide > .msg.assistant:hover {
+html[data-theme="aurora"] #messagesSide > .msg.tool-group:hover {
   border-left-color: var(--sprail-hot);
 }
 
