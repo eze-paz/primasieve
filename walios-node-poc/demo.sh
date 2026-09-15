@@ -96,14 +96,14 @@ console.log('CP-EXIT:' + s3.status);
 const s4 = cp.spawnSync('/bin/busybox', ['cat'], { input: 'piped-in' });
 console.log('CP-STDIN:' + String(s4.stdout).trim());
 console.log('CP-EXECSYNC:' + cp.execSync('echo alpha').toString().trim());
-// walios resolves ANY unresolvable path to a busybox applet by basename, so a
-// missing program is never ENOENT here the way it is on Linux -- it starts
-// busybox, which exits 127 with "applet not found". Asserting ENOENT would be
-// asserting Linux, not this platform.
+// A missing program IS ENOENT, as on Linux. It briefly was not: exec resolution
+// used to fall back to a busybox applet by basename, so an unknown name started
+// busybox and exited 127. That was fixed kernel-side, and this asserts the
+// contract node actually promises rather than the old quirk.
 const s5 = cp.spawnSync('/tmp/definitely-not-here', []);
-console.log('CP-MISSING:' + s5.status + ':' + (/applet not found/.test(String(s5.stderr)) ? 'applet-not-found' : 'other'));
+console.log('CP-MISSING:' + ((s5.error && s5.error.code) || 'NO-ERROR'));
 const s6 = cp.spawnSync('/bin/nope-xyz', []);
-console.log('CP-BIN-APPLET:' + s6.status);   // busybox: applet not found
+console.log('CP-BIN-UNKNOWN:' + ((s6.error && s6.error.code) || 'NO-ERROR'));
 CPEOF
 node /tmp/cp.js
 
