@@ -2356,7 +2356,7 @@ ul.conv-list li.active {
      standalone HTML/image/office deliverable folds into one "N other files" pile. */
   /* flex:none + align-self:stretch are load-bearing: .conv-host is a flex column,
      so without them this card gets squeezed to ~1px (same gotcha as .artifact-compact). */
-  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 0.5rem; flex: none; align-self: stretch; }
+  .file-bundle { border: 1px solid var(--sp-border); border-radius: 8px; overflow: hidden; margin-top: 0.5rem; flex: none; align-self: stretch; width: fit-content; }
   .file-bundle .fb-head { display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer; user-select: none; transition: background 0.12s; }
   .file-bundle .fb-head:hover { background: color-mix(in srgb, var(--sp-accent) 6%, transparent); }
   /* Layered pile of file edges with a count badge on the top card */
@@ -2374,7 +2374,6 @@ ul.conv-list li.active {
   .file-bundle .fb-chevron { width: 14px; height: 14px; display: grid; place-items: center; transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
   .file-bundle.fb-open .fb-chevron { transform: rotate(90deg); }
   .file-bundle .fb-lbl-hide { display: none; }
-  .file-bundle.fb-open .fb-lbl-show { display: none; }
   .file-bundle.fb-open .fb-lbl-hide { display: inline; }
   .file-bundle .fb-list { border-top: 1px solid var(--sp-border); max-height: 340px; overflow: auto; }
   .file-bundle .fb-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--sp-border); transition: background 0.1s; }

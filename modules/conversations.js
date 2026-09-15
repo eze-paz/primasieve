@@ -1248,7 +1248,7 @@ function renderFileBundle(target, bundleFiles) {
       '<span class="fb-title"><b>' + count + ' other file' + (count !== 1 ? 's' : '') + '</b> created or edited</span>' +
       '<span class="fb-sub"><span class="fb-size"></span>' + (typeLabel ? '<span class="fb-types">' + typeLabel + '</span>' : '') + '</span>' +
     '</span>' +
-    '<span class="fb-cta"><span class="fb-lbl-show">Show all</span><span class="fb-lbl-hide">Hide</span>' +
+    '<span class="fb-cta"><span class="fb-lbl-hide">Hide</span>' +
       '<span class="fb-chevron"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span>';
   wrap.appendChild(header);
 
