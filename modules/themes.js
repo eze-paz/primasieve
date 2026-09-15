@@ -18,6 +18,12 @@ const _themePalettes = {
     border: 'rgba(148,163,184,0.12)', borderBright: 'rgba(148,163,184,0.2)',
     success: '#34d399', danger: '#f87171', warn: '#fbbf24'
   },
+  'olive': {
+    bg: '#1D1D1B', surface: 'rgba(35,35,32,0.6)', panel: 'rgba(43,43,40,0.5)',
+    accent: '#93a332', text: '#E9E9E0', textDim: '#96958B',
+    border: 'rgba(150,149,139,0.12)', borderBright: 'rgba(150,149,139,0.2)',
+    success: '#6C9E2C', danger: '#D8504A', warn: '#C9A25A'
+  },
   'electric': {
     bg: '#0a0a0a', surface: '#141414', panel: '#1e1e1e',
     accent: '#77C078', text: '#fafafa', textDim: '#888',
@@ -383,6 +389,7 @@ var _APPEARANCE_HTML = `<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
       <button class="ghost theme-btn" data-t="classic-dark" onclick="setTheme('classic-dark')" title="Classic dark">Dark</button>
       <button class="ghost theme-btn" data-t="classic-light" onclick="setTheme('classic-light')" title="Classic light">Light</button>
       <button class="ghost theme-btn" data-t="aurora" onclick="setTheme('aurora')" title="Aurora glass">Aurora</button>
+      <button class="ghost theme-btn" data-t="olive" onclick="setTheme('olive')" title="GasN2 dark oliva">Olive</button>
       <button class="ghost theme-btn" data-t="electric" onclick="setTheme('electric')" title="Electric bold">Bold</button>
       <button class="ghost theme-btn" data-t="clear" onclick="setTheme('clear')" title="Clear minimal">Clear</button>
     </div>
