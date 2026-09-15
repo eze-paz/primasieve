@@ -132,6 +132,16 @@ const SCRIPT = [
   'cc bad.c -o bad 2>/dev/null; echo "badc_rc=$?"',
   'printf "extern void nosuchsym(void);\\nint main(void){nosuchsym();return 0;}\\n" > /tmp/cclab/ln.c',
   'cc ln.c -o ln 2>/dev/null; echo "badlink_rc=$?"',
+  '',
+  '# 9. /etc/config.site must LOAD, whatever build_alias is. autoconf sources it and aborts',
+  '#    on a non-zero return ("failed to load site script"), so a trailing `test -z ... && ...`',
+  '#    guard fails the instant a --build=... is passed -- which build-pkg always passes.',
+  '#    That made every autotools ./configure die before its first check.',
+  'sh -c \'. /etc/config.site; echo "site_unset_rc=$?"\'',
+  'sh -c \'build_alias=wasm32-unknown-linux-musl; . /etc/config.site; echo "site_set_rc=$?"\'',
+  '# and the guard still does its job: no build_alias -> the triple is preset; explicit -> untouched',
+  'sh -c \'. /etc/config.site; echo "site_preset=$ac_cv_build"\'',
+  'sh -c \'build_alias=x; ac_cv_build=mine; . /etc/config.site; echo "site_explicit=$ac_cv_build"\'',
 ].join('\n');
 
 let browser;
@@ -167,6 +177,13 @@ try {
   check('CONTROL: -include still absolutises a LOCAL header', /incloc_rc=0 incloc=yes/.test(out) && /incloc_run=0/.test(out), out);
   check('a compile ERROR is reported as non-zero', /badc_rc=[1-9]/.test(out), out);
   check('a link ERROR is reported as non-zero', /badlink_rc=[1-9]/.test(out), out);
+
+  // config.site: sourcing it must SUCCEED in both states, or configure aborts with
+  // "failed to load site script" before running a single check.
+  check('config.site loads with build_alias unset', /site_unset_rc=0/.test(out), out);
+  check('config.site loads with build_alias SET (what build-pkg does)', /site_set_rc=0/.test(out), out);
+  check('config.site presets the build triple when nothing was asked for', /site_preset=wasm32-unknown-linux-musl/.test(out), out);
+  check('CONTROL: an explicit build type still wins', /site_explicit=mine/.test(out), out);
   check('a linked program is executable (autoconf test -x)', /linkx=yes/.test(out), out);
   check('the default a.out is executable too', /aoutx=yes/.test(out), out);
   check('CONTROL: a -c object is NOT marked executable', /objx=no/.test(out), out);

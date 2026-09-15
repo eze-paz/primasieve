@@ -113,7 +113,7 @@
 // existing path is now EEXIST too, instead of silently succeeding (mkdir -p semantics).
 // killall33: the tool's deadline stops the PROCESSES and keeps the kernel, so a run that
 // runs out of budget no longer takes /tmp and every compiled module down with it.
-WORKER_V = 'killall33';
+WORKER_V = 'devexec35';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -229,8 +229,15 @@ WORKER_V = 'killall33';
                          ['onig-wali.tar.gz', '/']] };
     },
 
-    env(_mode) {
+    env(mode) {
       const e = Object.assign({}, PY_ENV);
+      // NO_COLOR for the agent-facing hosts only. stdout looks like a tty here, so
+      // colourising tools reach for ANSI: `jq '.a'` came back as
+      // ESC[1;39m[ESC[0;39m2ESC[0m... which is noise in a tool result a model has to
+      // read, and worse, noise it might quote back. The interactive TERMINAL is the one
+      // host where colour is wanted, so it is excluded. NO_COLOR is the cross-tool
+      // convention (jq, ls, grep, ripgrep and others honour it).
+      if (mode !== 'terminal') e.NO_COLOR = '1';
       // This backend is the BROWSER host: every process gets its own worker and the
       // kernel answers blocking syscalls asynchronously (dlopen17), so epoll — and
       // therefore asyncio — works.
@@ -238,6 +245,11 @@ WORKER_V = 'killall33';
       // walios-repl.py's _loop_usable() then drives coroutines directly.
       e.SANDPIE_ASYNCIO = '1';
       e.SANDPIE_LAZY_PKGS = JSON.stringify(LAZY_PKGS);
+      // Autoconf reads $CONFIG_SITE before anything else and, failing that, only
+      // $prefix/share/config.site -- where prefix is the PACKAGE's --prefix (default
+      // /usr/local), not ours. So the file has to be named explicitly or configure would
+      // never look at /etc. See toolBlobs() for what it contains and why.
+      e.CONFIG_SITE = '/etc/config.site';
       return e;
     },
 
@@ -348,10 +360,55 @@ WORKER_V = 'killall33';
     async toolBlobs(base) {
       const b = {};
       await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld',
-                         'nm', 'strip', 'objdump'].map(async (n) => {
+                         'nm', 'strip', 'objdump', 'pkg-config'].map(async (n) => {
         try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=2'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
+      // config.site -- so a PLAIN `./configure` works, on every autotools package.
+      //
+      // config.guess does not recognise us. `uname -m` is wasm32 and `uname -s` is Linux,
+      // and the config.guess shipped in current tarballs (jq 1.7.1 carries 2022-01-09) has
+      // no wasm case at all -- zero matches for "wasm" in the whole script. So:
+      //     ./configure
+      //     configure: error: cannot guess build type; you must specify one
+      // Every build here passed --build=... by hand, which is why this went unnoticed: it
+      // is the FIRST thing a plain `./configure` does, so it blocked every autotools
+      // package before a single check ran.
+      //
+      // config.site is autoconf's own hook for this, so no package is patched. Only `build`
+      // is set: leaving `host` unset means host=build, i.e. NOT a cross build, so configure
+      // keeps RUNNING its test programs (which works here) rather than guessing answers --
+      // passing --host would silently switch it to cross mode and change every result.
+      // The build_alias guard keeps an explicit --build=... winning: AC_CACHE_CHECK skips
+      // its body when ac_cv_build is already set, so an unguarded preset would silently
+      // override the caller.
+      // config.sub already accepts the triple (`config.sub wasm32-unknown-linux-musl` echoes
+      // it back); autoconf simply cannot DETECT it.
+      //
+      // Verified A/B on jq 1.7.1: without it `./configure` exits 1 on "cannot guess build
+      // type"; with it, 193 checks, a Makefile, and -- because the build type is finally
+      // known -- it also auto-detects the oniguruma we ship, with no --with-oniguruma flag:
+      //     checking for oniguruma.h... yes
+      //     checking for onig_version in -lonig... yes
+      //
+      // THE GUARD MUST BE AN `if`, NOT A `&&` LIST. autoconf SOURCES this file and treats a
+      // non-zero return as fatal: `. "$ac_site_file" || as_fn_error ... "failed to load site
+      // script"`. A trailing `test -z "$build_alias" && ac_cv_build=...` returns 1 whenever
+      // build_alias IS set -- which is exactly what build-pkg does, it passes
+      // --build=wasm32-unknown-linux-musl -- so the file that exists to make ./configure work
+      // aborted every configure that named its build type:
+      //     configure: error: failed to load site script /etc/config.site
+      // Measured in-guest: `build_alias=x; . /etc/config.site` -> rc 1, unset -> rc 0. An `if`
+      // returns 0 when its condition is false, so the guard survives and the file loads.
+      b['/etc/config.site'] = new TextEncoder().encode(
+        '# walios. config.guess has no wasm32 case, so tell autoconf what we are.\n' +
+        '# Guarded so an explicit --build=... still wins (AC_CACHE_CHECK skips a set var).\n' +
+        '# Only build is set: host then defaults to build, so this is NOT a cross build and\n' +
+        '# configure keeps running its test programs.\n' +
+        '# The guard is an `if`: autoconf aborts if sourcing this file returns non-zero, and\n' +
+        '# a `&&` list returns 1 once build_alias is set.\n' +
+        'if test -z "$build_alias"; then ac_cv_build=${ac_cv_build=wasm32-unknown-linux-musl}; fi\n'
+      ).buffer;
       // Applet links. Real busybox is installed with `busybox --install -s`, one symlink per
       // applet in /bin and /usr/bin. We never did that, so /bin/sed and friends did not EXIST
       // as files. Running them was fine (resolveExecKey falls back to busybox by name), but
