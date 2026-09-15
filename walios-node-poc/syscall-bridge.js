@@ -69,6 +69,12 @@ const SYSCALL_NAMES = [
   // sockets -- net and http ride on these
   'socket', 'connect', 'bind', 'listen', 'accept4', 'sendto', 'recvfrom',
   'setsockopt', 'getsockopt', 'shutdown',
+  // processes -- child_process rides on these. posix_spawn is NOT a Linux syscall:
+  // fork()/vfork() in this kernel snapshot a wasm image (asyncify stack + linear
+  // memory) that a JS process does not have, so fork+exec is unavailable to us by
+  // construction. The kernel serves this instead: make a new pid directly, then reap
+  // it with the ordinary wait4.
+  'posix_spawn', 'wait4', 'pipe2', 'dup2', 'dup3', 'poll', 'kill',
   // misc
   'getrandom', 'exit_group', 'exit',
 ];

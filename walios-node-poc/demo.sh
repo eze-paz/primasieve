@@ -84,4 +84,27 @@ node --check /tmp/ok.js && echo "CHECK-OK-SILENT"
 echo 'function ( {' > /tmp/bad.js
 node --check /tmp/bad.js || echo "CHECK-REJECTED-BAD-SOURCE"
 
+echo "--- child_process over posix_spawn ---"
+cat > /tmp/cp.js <<'CPEOF'
+const cp = require('child_process');
+const r = cp.spawnSync('/bin/busybox', ['echo', 'from-child']);
+console.log('CP-STATUS:' + r.status + ' OUT:' + String(r.stdout).trim());
+const s2 = cp.spawnSync('/bin/busybox', ['sh', '-c', 'echo O; echo E 1>&2']);
+console.log('CP-SPLIT:' + String(s2.stdout).trim() + '/' + String(s2.stderr).trim());
+const s3 = cp.spawnSync('/bin/busybox', ['sh', '-c', 'exit 7']);
+console.log('CP-EXIT:' + s3.status);
+const s4 = cp.spawnSync('/bin/busybox', ['cat'], { input: 'piped-in' });
+console.log('CP-STDIN:' + String(s4.stdout).trim());
+console.log('CP-EXECSYNC:' + cp.execSync('echo alpha').toString().trim());
+// walios resolves ANY unresolvable path to a busybox applet by basename, so a
+// missing program is never ENOENT here the way it is on Linux -- it starts
+// busybox, which exits 127 with "applet not found". Asserting ENOENT would be
+// asserting Linux, not this platform.
+const s5 = cp.spawnSync('/tmp/definitely-not-here', []);
+console.log('CP-MISSING:' + s5.status + ':' + (/applet not found/.test(String(s5.stderr)) ? 'applet-not-found' : 'other'));
+const s6 = cp.spawnSync('/bin/nope-xyz', []);
+console.log('CP-BIN-APPLET:' + s6.status);   // busybox: applet not found
+CPEOF
+node /tmp/cp.js
+
 echo "--- done ---"

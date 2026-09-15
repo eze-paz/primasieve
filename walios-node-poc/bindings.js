@@ -8,6 +8,7 @@ const { makeBufferBinding } = require('./buffer-binding.js');
 const { makeTcpWrap } = require('./tcp-wrap.js');
 const { makeDnsWrap } = require('./dns-wrap.js');
 const { makeHttpParser } = require('./http-parser.js');
+const { makeChildProcess } = require('./child-process.js');
 
 // privateSymbols is read off internalBinding('util') (lib/internal/errors.js:939),
 // and must be STABLE across reads -- a fresh Symbol per access silently breaks
@@ -636,6 +637,16 @@ function makeBindings(vfs, trace, realm) {
 
     // HTTP/1.1 in JS in place of llhttp, driven through node's callback-slot protocol.
     http_parser: makeHttpParser({ getBuffer: () => realm.Buffer }),
+    // child_process. Only the SYNC half: spawnSync/execSync/execFileSync. The async
+    // path needs process_wrap on the event loop and is not built yet, so
+    // child_process.spawn() still fails -- deliberately, rather than half-working.
+    spawn_sync: (() => {
+      if (!realm.sys || !realm.mem) return null;          // headless callers with no kernel
+      return makeChildProcess(realm.sys, realm.mem, {
+        getBuffer: () => realm.Buffer,
+        trace: (m) => realm.trace && realm.trace('[cp] ' + m),
+      });
+    })(),
 
     // isatty(2), via the same ioctl(TCGETS) probe the REPL uses. Packages branch on
     // this constantly (debug colourises only on a terminal).

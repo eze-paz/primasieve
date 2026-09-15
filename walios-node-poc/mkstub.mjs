@@ -23,6 +23,10 @@ const SYSCALLS = [
   ['getrandom', 3],
   ['rename', 2], ['ftruncate', 2], ['fsync', 1], ['readlink', 3], ['chdir', 1],
   ['getcwd', 2], ['exit_group', 1], ['exit', 1],
+  // processes. posix_spawn(path, argv, envp, fdmap, fdmapLen) is this kernel's own:
+  // see syscall-bridge.js for why fork+exec cannot serve a JS process.
+  ['posix_spawn', 5], ['wait4', 4], ['pipe2', 2], ['dup2', 2], ['dup3', 3],
+  ['poll', 3], ['kill', 2],
 ];
 // (name, params, result) for the non-SYS wali imports
 const WALI_MISC = [
