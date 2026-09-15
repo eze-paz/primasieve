@@ -3325,6 +3325,18 @@ async function tool_walios({ script, timeout, resume }, ctx) {
       } else if (m.t === 'boot') {
         try { w.postMessage({ t: 'stdin-eof' }); } catch (_) {}   // non-interactive: stdin reads get EOF
       } else if (m.t === 'exit') {
+        // NOTHING OUTLIVES THE CALL. The root script has exited; anything it backgrounded
+        // with `&` is reaped here. Without this, `( ./configure ) &` was a way to dodge the
+        // deadline entirely -- the call returned in milliseconds and left a build running
+        // with nobody watching it, which on a phone is CPU and battery burnt behind the
+        // user's back. Suspending the deadline removed the REASON to background; this
+        // removes the ABILITY, so it is a guarantee rather than a request the model may
+        // ignore. Backgrounding WITHIN one call still works normally (`cmd & wait`), which
+        // is the legitimate use -- what cannot happen is surviving the call that started it.
+        //
+        // The invariant, stated whole: when a walios call returns, every process it started
+        // is finished, killed, or PARKED. None is running.
+        try { w.postMessage({ t: 'killall' }); } catch (_) {}
         frames.flush();
         let text = chunks.join('');
         if (truncated) text = text.slice(0, 65536) + '\n…[output truncated at 64KB]';

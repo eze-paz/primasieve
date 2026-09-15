@@ -128,7 +128,65 @@ try {
   check('CONTROL: the work was really FROZEN while suspended (stamp gap ~= the pause)',
     !!m && Number(m[1]) >= 5, m ? 'MAXGAP=' + m[1] + 's over a ' + gapSec + 's pause' : b);
 
-  // 3. A suspended run must not be left parked forever: sending a script abandons it.
+  // 3. MULTI-CYCLE. The real case suspends more than once: a ~700s ./configure against a
+  //    300s cap needs three calls, i.e. it is suspended, resumed, suspended AGAIN and
+  //    resumed again. One cycle working proves nothing about the second -- a resume that
+  //    forgot to re-arm the deadline, or left k.suspended false, would pass every check
+  //    above and still make the feature useless for the thing it was built for.
+  const LONG = [
+    'rm -rf /tmp/sus2; mkdir -p /tmp/sus2',
+    'echo CYCLE-RUN-STARTED',
+    'i=0',
+    'while [ $i -lt 24 ]; do i=$((i+1)); echo $i >> /tmp/sus2/n; sleep 1; done',
+    'echo CYCLE-RUN-FINISHED',
+    'echo "COUNT=$(wc -l < /tmp/sus2/n)"',
+  ].join('\n');
+  const c1 = await call({ timeout: 6, script: LONG });
+  check('cycle 1 suspends', /SUSPENDED/.test(c1) && !/CYCLE-RUN-FINISHED/.test(c1), c1);
+  const c2 = await call({ timeout: 6, resume: true });
+  check('cycle 2 resumes and suspends AGAIN', /SUSPENDED/.test(c2) && !/CYCLE-RUN-FINISHED/.test(c2), c2);
+  const c3 = await call({ timeout: 6, resume: true });
+  check('cycle 3 resumes and suspends a THIRD time', /SUSPENDED/.test(c3) && !/CYCLE-RUN-FINISHED/.test(c3), c3);
+  const c4 = await call({ timeout: 90, resume: true });
+  console.log('  [final resume]\n    ' + String(c4).replace(/\n/g, '\n    '));
+  check('a run survives THREE suspensions and finishes', /CYCLE-RUN-FINISHED/.test(c4), c4);
+  check('no work was lost across the cycles', /COUNT=24/.test(c4), c4);
+
+  // 4. BACKGROUNDING CANNOT OUTLIVE THE CALL. This is enforced, not requested: `&` was a
+  //    way to dodge the deadline entirely -- the call returned at once and left a build
+  //    running unattended, which on a phone is CPU burnt behind the user's back. The root
+  //    exiting now reaps whatever it started, so the only way to continue long work is
+  //    resume:true. Backgrounding WITHIN a call still works; surviving the call does not.
+  //    Two shapes, because a plain `&` is not the only thing a model would reach for. The
+  //    DOUBLE FORK is the interesting one: the intermediate parent exits at once, so the
+  //    worker is reparented and belongs to no job table the script can see. It is still
+  //    reaped, because killall walks the kernel's WHOLE process table rather than a pgid or
+  //    a job list -- there is no "outside" to detach to, every process being one the kernel
+  //    spawned. (nohup, setsid, disown, at, crontab, tmux and screen are not installed at
+  //    all, so those routes are closed by absence rather than by this.)
+  const bg = await call({ timeout: 20, script: [
+    'rm -f /tmp/bgtick /tmp/bgtick2',
+    '( while true; do echo x >> /tmp/bgtick; sleep 1; done ) &',
+    'sh -c \'( ( while true; do echo x >> /tmp/bgtick2; sleep 1; done ) & ) ; exit 0\' &',
+    'sleep 2',
+    'echo "LAUNCHED size=$(wc -c < /tmp/bgtick) dbl=$(wc -c < /tmp/bgtick2)"',
+  ].join('\n') });
+  console.log('  [backgrounded then returned]\n    ' + String(bg).replace(/\n/g, '\n    '));
+  check('both backgrounded jobs did run during their own call',
+    /LAUNCHED size=[1-9]/.test(bg) && /dbl=[1-9]/.test(bg), bg);
+  // Give it a wall-clock window in which it WOULD have kept growing if it had survived.
+  await new Promise((r) => setTimeout(r, 6000));
+  const bgAfter = await call({ timeout: 20, script: [
+    'a=$(wc -c < /tmp/bgtick 2>/dev/null)',
+    'sleep 3',
+    'b=$(wc -c < /tmp/bgtick 2>/dev/null)',
+    'echo "after_call=$a later=$b"',
+  ].join('\n') });
+  const mb = /after_call=(\d+) later=(\d+)/.exec(String(bgAfter));
+  check('the backgrounded job did NOT survive the call that started it',
+    !!mb && mb[1] === mb[2], mb ? mb[0] : bgAfter);
+
+  // 5. A suspended run must not be left parked forever: sending a script abandons it.
   const c = await call({ timeout: 20, script: 'echo NEW-SCRIPT-RAN' });
   check('a new script runs normally', /NEW-SCRIPT-RAN/.test(c), c);
   const d = await call({ timeout: 20, resume: true });
