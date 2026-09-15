@@ -55,9 +55,7 @@
   const TUNE = {
     'classic-dark': { mode: 'clouds', tint: 'dim',  reach: .28, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
     'aurora':       { mode: 'clouds', tint: 'dim',  reach: .2576, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
-    'olive':        { mode: 'clouds', tint: 'dim',  reach: .2576, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
     'electric':     { mode: 'clouds', tint: 'dim',  reach: .2464, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
-    'olive-bold':   { mode: 'clouds', tint: 'dim',  reach: .2576, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
     'classic-light':{ mode: 'sky',    tint: 'text', reach: .204, size: 1.15, cover: .51, tempo: 3, speed: .06 },
     'clear':        { mode: 'sky',    tint: 'text', reach: .144, size: 1.2,  cover: .53, tempo: 4, speed: .05 },
   };
@@ -94,7 +92,7 @@
     // colours, more reach) — capped so it never leaves the monochrome family.
     const reach = Math.min(.55, tune.reach * (isWater() ? 1.7 : 1));
     const pal = [0, 1, 2, 3, 4].map(i => mix(bg, tint, (i / 4) * reach));
-    return { pal, tune };
+    return { pal, tune, tint };
   }
 
   /* ── noise: one fixed lattice, smooth value noise, 4 octaves ── */
@@ -135,30 +133,76 @@
     gw = Math.ceil(W / cell); gh = Math.ceil(H / cell);
     off.width = gw; off.height = gh; img = octx.createImageData(gw, gh);
     ctx.imageSmoothingEnabled = false;
+    moon = null;                     // every redraw (resize/remount) respawns the moon
     dirty = true;
   }
   /* ── water fields (round-3 mockups W1/W3, monochrome via the shared ramp) ── */
+  /* ── open water: tuned field (mockup round 4) + moon with reflection ──
+     The moon spawns at a RANDOM position on every redraw (resize / remount),
+     constrained to the sky band and never overlapping the greeting message. */
+  const MOON = { x: .7, y: .06, r: .04, soft: .4, glintW: .11, glintAmp: 1 };
+  let moon = null;                       // { x, y } in pane fractions, spawned per redraw
+  function greetingRect() {
+    // bounding box of the greeting text in canvas cell coords (or null)
+    const g = document.querySelector('#messages .home-greeting');
+    if (!g || !canvas) return null;
+    const gr = g.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+    if (gr.bottom < cr.top || gr.top > cr.bottom) return null;
+    return {
+      x0: (gr.left - cr.left) / cell, x1: (gr.right - cr.left) / cell,
+      y0: (gr.top - cr.top) / cell,  y1: (gr.bottom - cr.top) / cell,
+    };
+  }
+  function spawnMoon() {
+    const horizon = gh * .5;
+    const r = Math.min(gw, gh) * MOON.r;
+    const m = 6;                                    // clearance around the greeting, cells
+    const g = greetingRect();
+    const pad = r * 2 + m;
+    for (let tries = 0; tries < 40; tries++) {
+      const x = pad / gw + Math.random() * Math.max(0, 1 - 2 * pad / gw);
+      const yMin = (r + 2) / gh, yMax = Math.max(yMin, (horizon - r - 2) / gh);
+      const y = yMin + Math.random() * Math.max(0, yMax - yMin);
+      const cx = x * gw, cy = y * gh;
+      if (g && cx > g.x0 - pad && cx < g.x1 + pad && cy > g.y0 - pad && cy < g.y1 + pad) continue;
+      moon = { x, y };
+      return;
+    }
+    moon = { x: MOON.x, y: MOON.y };                // fallback: the tuned spot
+  }
   function paintWaterOpen() {
     if (!img || !pal) return;
-    const d = img.data, T = tick / 60, horizon = gh * .12;
+    if (!moon) spawnMoon();
+    const d = img.data, T = tick / 60, horizon = gh * .5;
+    const mx = moon.x * gw, my = moon.y * gh, mr = Math.min(gw, gh) * MOON.r;
+    const gx = moon.x * gw, halfw = gw * MOON.glintW;
     for (let y = 0; y < gh; y++) {
       for (let x = 0; x < gw; x++) {
-        let c;
-        if (y < horizon) c = clamp((1 - y / horizon) * .1, 0, .1);
-        else {
+        let c, moonCore = false;
+        if (y < horizon) {
+          // EMPTY sky — no pattern, just the moon disc
+          const dist = Math.hypot(x - mx, y - my);
+          const edge = clamp((mr - dist) / Math.max(1, mr * MOON.soft), 0, 1);
+          c = edge * edge * (3 - 2 * edge);
+          moonCore = edge > .55;                    // core in the raw tint colour
+        } else {
           const dn = (y - horizon) / (gh - horizon);
-          const persp = .12 + dn * dn * 2.2;
-          const warp = fbm(x * .04 + T * .02, dn * 3 - T * .06);
-          const rip = fbm(x * .06 + warp * 1.6, dn * 22 * persp - T * .10 * persp);
-          const slope = fbm(x * .06 + warp * 1.6 + .35, dn * 22 * persp - T * .10 * persp) - rip;
-          const glint = Math.pow(Math.max(0, rip - .55) * 2.2, 3) * (1 + Math.max(0, slope) * 6);
-          const swell = fbm(x * .03 + T * .015, dn * 4 - T * .05) * (.25 + dn * .5);
-          c = .18 + swell * .5 + rip * .35 * (.4 + dn * .8) + glint;
+          const persp = .12 + Math.pow(dn, .5) * 5;
+          const rip = fbm(x * .06, dn * 32 * persp - T * .10 * persp);
+          const slope = fbm(x * .06 + .35, dn * 32 * persp - T * .10 * persp) - rip;
+          const glint = Math.pow(Math.max(0, rip - .47) * 2.2, 3.2) * (1 + Math.max(0, slope) * 3.5);
+          c = rip * .3 * (.4 + dn * .8) + glint;
           const sp = fbm(x * .3, dn * 40 * persp + T * .3);
           if (sp > .93) c += (sp - .93) * 8 * (1.2 - dn);
+          // moon reflection: shimmer column under the moon — gaussian across x,
+          // fading with depth, flickering with the ripple field
+          const across = Math.exp(-((x - gx) * (x - gx)) / (2 * halfw * halfw));
+          const depth = clamp(1 - dn * 1.15, 0, 1);
+          const flicker = .55 + .45 * fbm(x * .12 + T * .05, dn * 26 * persp - T * .12);
+          c += across * depth * flicker * MOON.glintAmp;
           c = clamp(c, 0, 1);
         }
-        const p = pal[dither(c, x, y)], q = (y * gw + x) * 4;
+        const p = moonCore ? (tintCol || pal[4]) : pal[dither(c, x, y)], q = (y * gw + x) * 4;
         d[q] = p[0]; d[q + 1] = p[1]; d[q + 2] = p[2]; d[q + 3] = 255;
       }
     }
@@ -232,7 +276,8 @@
   }
   function start() { if (running) return; running = true; if (!raf) raf = requestAnimationFrame(frame); }
   function stop() { running = false; if (raf) { cancelAnimationFrame(raf); raf = 0; } }
-  function retheme() { ({ pal, tune } = buildPalette()); dirty = true; }
+  let tintCol = null;
+  function retheme() { let r; ({ pal, tune, tint: tintCol } = buildPalette()); dirty = true; }
 
   /* ── show only on the welcome state: #homeCenter connected in the LEFT pane
      and not retired by .home-leave (conversations.js flips that on the first
