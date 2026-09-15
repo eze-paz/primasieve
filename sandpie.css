@@ -3386,7 +3386,7 @@ body.sp-decoding *::after {
    host); the bottom padding is what lifts it. Fades out with .home-leave. */
 .home-greeting {
   font-weight: 300; font-size: 1.3rem; line-height: 1.2; letter-spacing: .01em;
-  color: var(--sp-text-dim); text-align: center; white-space: nowrap;
+  color: var(--sp-text); text-align: center; white-space: nowrap;
   padding-bottom: clamp(3rem, 22vh, 14rem);
 }
 
