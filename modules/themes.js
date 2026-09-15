@@ -20,7 +20,7 @@ const _themePalettes = {
   },
   'olive': {
     bg: '#1D1D1B', surface: 'rgba(35,35,32,0.6)', panel: 'rgba(43,43,40,0.5)',
-    accent: '#93a332', text: '#E9E9E0', textDim: '#96958B',
+    accent: '#93a332', text: '#F2F1E8', textDim: '#ABA99E',
     border: 'rgba(150,149,139,0.12)', borderBright: 'rgba(150,149,139,0.2)',
     success: '#6C9E2C', danger: '#D8504A', warn: '#C9A25A'
   },
