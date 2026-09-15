@@ -179,6 +179,8 @@ const checks = [
   ['new vm.Script throws on bad syntax', /VM-SYNTAX:SyntaxError/.test(outText)],
   ['fork() IPC sends both ways', /FORK-IPC:2,4 exit=0/.test(outText)],
   ['worker_threads loads and reports the truth', /WT:true:0:function/.test(outText)],
+  ['env reaches node -e', /ENV-E:bar/.test(outText)],
+  ['env reaches node script.js', /ENV-SCRIPT:bar/.test(outText)],
   ['new Worker() fails by name, not silently', /WT-WORKER:ERR_WORKER_UNSUPPORTED_OPERATION/.test(outText)],
   ['&& chaining worked', /&& worked/.test(outText)],
   ['exit code propagated', /exit code was 3/.test(outText)],

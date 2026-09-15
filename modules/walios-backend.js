@@ -362,8 +362,12 @@ WORKER_V = 'devexec36';
     // in-guest). Source of truth: sandpie-server/walios/bin/*, served under /walios/bin/.
     async toolBlobs(base) {
       const b = {};
+      // npm-lite: installs a package from the real npm registry into /node_modules.
+      // It is a #!/bin/node script, so it needs nothing but node -- and it used to be
+      // seeded ONLY by walios-node-poc/index.html, which meant npm packages worked on
+      // the poc page and were simply absent in the tool and the terminal.
       await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld',
-                         'nm', 'strip', 'objdump', 'pkg-config'].map(async (n) => {
+                         'nm', 'strip', 'objdump', 'pkg-config', 'npm-lite'].map(async (n) => {
         try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=3'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);

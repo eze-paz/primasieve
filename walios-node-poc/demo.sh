@@ -229,4 +229,11 @@ node /tmp/tls.js
 echo "--- worker_threads (present, honest) ---"
 node -e 'const w=require("worker_threads"); console.log("WT:"+w.isMainThread+":"+w.threadId+":"+(typeof w.MessageChannel)); try { new w.Worker("/x.js"); } catch (e) { console.log("WT-WORKER:"+e.code); }'
 
+echo "--- env passthrough ---"
+# -e AND a script: the env read used to sit after the -e branch (which returns), so
+# `FOO=bar node -e` saw nothing while `node script.js` saw everything. Test both.
+FOO=bar node -e 'console.log("ENV-E:" + (process.env.FOO || "MISSING"))'
+echo 'console.log("ENV-SCRIPT:" + (process.env.FOO || "MISSING"))' > /tmp/envs.js
+FOO=bar node /tmp/envs.js
+
 echo "--- done ---"

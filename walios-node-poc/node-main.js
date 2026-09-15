@@ -251,33 +251,11 @@ function main(rt, sys, arena, trace) {
     script = a;
   }
 
-  // ---- node -e / -p ---------------------------------------------------------
-  if (evalCode !== null) { trace('branch: -e/-p code=' + JSON.stringify(String(evalCode).slice(0, 40)));
-    if (evalCode === undefined) { errOut('node: -e requires an argument\n'); return 9; }
-    try {
-      const Module = R('module');
-      const M = Module.Module || Module;
-      const m = new M('[eval]', null);
-      m.filename = '/[eval]';
-      m.paths = [];
-      const binding = rt.internalBinding('contextify');
-      const compiled = binding.compileFunctionForCJSLoader(
-        printResult ? 'module.exports = (' + evalCode + '\n);' : evalCode,
-        '[eval]',
-      );
-      const result = compiled.function.call(m.exports, m.exports, m.require.bind(m), m, '/[eval]', '/');
-      if (printResult) {
-        const v = m.exports === undefined ? result : m.exports;
-        out(typeof v === 'string' ? v + '\n' : R('util').inspect(v) + '\n');
-      }
-      // `node -e 'process.exitCode = 3'` must exit 3, like real node.
-      return typeof process.exitCode === 'number' ? process.exitCode : 0;
-    } catch (e) {
-      errOut(formatErr(e) + '\n');
-      return 1;
-    }
-  }
-
+  // NB these two run BEFORE any branch. They used to sit after the -e/-p branch,
+  // which returns -- so `FOO=bar node -e ...` never read its environment while
+  // `node script.js` did. That asymmetry is exactly why fork() worked (its child runs
+  // a SCRIPT and so got NODE_CHANNEL_FD) while plain env passthrough did not, which
+  // looked like a contradiction until the ordering explained both.
   // ---- environment ----------------------------------------------------------
   // The kernel hands a process its env as a FILE whose path __get_init_envfile writes
   // into a buffer (newline-separated K=V). Reading it is what makes `FOO=1 node x.js`,
@@ -316,6 +294,33 @@ function main(rt, sys, arena, trace) {
       R('child_process')._forkChild(fd, mode);
       trace('ipc channel opened on fd ' + fd);
     } catch (e) { trace('ipc channel failed: ' + ((e && e.message) || e)); }
+  }
+
+  // ---- node -e / -p ---------------------------------------------------------
+  if (evalCode !== null) { trace('branch: -e/-p code=' + JSON.stringify(String(evalCode).slice(0, 40)));
+    if (evalCode === undefined) { errOut('node: -e requires an argument\n'); return 9; }
+    try {
+      const Module = R('module');
+      const M = Module.Module || Module;
+      const m = new M('[eval]', null);
+      m.filename = '/[eval]';
+      m.paths = [];
+      const binding = rt.internalBinding('contextify');
+      const compiled = binding.compileFunctionForCJSLoader(
+        printResult ? 'module.exports = (' + evalCode + '\n);' : evalCode,
+        '[eval]',
+      );
+      const result = compiled.function.call(m.exports, m.exports, m.require.bind(m), m, '/[eval]', '/');
+      if (printResult) {
+        const v = m.exports === undefined ? result : m.exports;
+        out(typeof v === 'string' ? v + '\n' : R('util').inspect(v) + '\n');
+      }
+      // `node -e 'process.exitCode = 3'` must exit 3, like real node.
+      return typeof process.exitCode === 'number' ? process.exitCode : 0;
+    } catch (e) {
+      errOut(formatErr(e) + '\n');
+      return 1;
+    }
   }
 
   // ---- node --check script.js ----------------------------------------------
