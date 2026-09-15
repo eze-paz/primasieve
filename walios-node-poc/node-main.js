@@ -74,19 +74,25 @@ function makeConsole(R, stdout, stderr) {
 // rt   : the object boot() returned
 // sys  : syscall bag (needs argc/argvLen/copyArgv wired)
 // arena: marshalling arena
-// Built once per process and only if something actually imports: constructing it
+// Built once per RUNTIME, and only if something actually imports: constructing it
 // pulls in the resolver and touches package.json, which a plain CJS run need not pay.
-let __esmHost = null;
+//
+// Cached on `rt`, NOT in a module-level variable. In the worker each process gets a
+// fresh realm so either would do, but the headless harness runs many runtimes in ONE
+// process: a module-level cache handed the second script run a host still bound to the
+// FIRST run's rt, whose kernel worker had already been terminated -- so its next
+// syscall parked in Atomics.wait and never came back. That deadlock reads as "the
+// suite got slow", which is exactly how I first mis-diagnosed it.
 function makeEsmHostOnce(rt, trace) {
-  if (__esmHost !== null) return __esmHost;
+  if (rt.__esmHost !== undefined) return rt.__esmHost;
   try {
     const { makeEsmHost } = require('./esm-host.js');
-    __esmHost = makeEsmHost(rt, { trace: (m) => trace && trace('[esm] ' + m) });
+    rt.__esmHost = makeEsmHost(rt, { trace: (m) => trace && trace('[esm] ' + m) });
   } catch (e) {
     trace && trace('[esm] host unavailable: ' + ((e && e.message) || e));
-    __esmHost = false;
+    rt.__esmHost = false;
   }
-  return __esmHost;
+  return rt.__esmHost;
 }
 
 function main(rt, sys, arena, trace) {
