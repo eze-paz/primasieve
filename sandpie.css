@@ -3859,7 +3859,7 @@ html[data-theme="aurora"] #messagesSide > .msg.user {
   border-left-color: var(--sprail-out);
   background: none;
   padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="aurora"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="aurora"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4021,7 +4021,7 @@ html[data-theme="olive"] #messagesSide > .msg.user {
   border-left-color: var(--sprail-ops);
   background: none;
   padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 26px;            /* the gap in the rail = the turn separator */
+  margin-top: 40px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="olive"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="olive"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4217,7 +4217,7 @@ html[data-theme="light"] #messagesSide > .msg.user {
   border-left-color: var(--sprail-out);
   background: none;
   padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="light"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="light"] .msg.user::before { display: none; }   /* offset ghost */
@@ -4383,7 +4383,7 @@ html[data-theme="clear"] #messagesSide > .msg.user {
   border-left-color: var(--sprail-out);
   background: none;
   padding: 7px 10px 8px var(--sprail-gut);
-  margin-top: 22px;            /* the gap in the rail = the turn separator */
+  margin-top: 36px;            /* the gap in the rail = the turn separator */
 }
 html[data-theme="clear"] .conv-host > .msg.user:first-child { margin-top: 0; }
 html[data-theme="clear"] .msg.user::before { display: none; }   /* offset ghost */
