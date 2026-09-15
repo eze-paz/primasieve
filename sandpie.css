@@ -4169,10 +4169,8 @@ html[data-theme="olive"] .msg-timer { font-size: 10.5px; }
 html[data-theme="light"] {
   --sprail-w: 2px;
   --sprail-gut: 11px;
-  /* #85c4f0 cannot hold a 2px rule on white -- it disappears. The rail
-     deepens the theme's own accent toward the ink so the hue survives but
-     the line actually reads. Everything else derives from this one key. */
-  --sprail-key:    color-mix(in srgb, var(--sp-accent) 62%, var(--sp-text));
+  /* The rail uses the theme's accent as published -- no deepening. */
+  --sprail-key:    var(--sp-accent);
   --sprail-ground: color-mix(in srgb, var(--sp-text) 10%, transparent);   /* light ink on white needs far more than a dark theme does */
   --sprail-ops:    color-mix(in srgb, var(--sprail-key) 42%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 20%, transparent);
