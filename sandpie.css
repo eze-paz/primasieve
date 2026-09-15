@@ -1140,14 +1140,11 @@ ul.conv-list li.active {
   ul.conv-list li.conv-group:focus-visible {
     outline: 1px solid var(--sp-accent); outline-offset: 2px; border-radius: 3px;
   }
-  ul.conv-list li.conv-group .cg-chev {
-    display: inline-block; font-size: 0.7rem; line-height: 1;
-    opacity: 0.55; transition: transform 0.14s ease, opacity 0.14s ease;
-  }
-  ul.conv-list li.conv-group:hover .cg-chev { opacity: 1; }
-  ul.conv-list li.conv-group.cg-closed .cg-chev { transform: rotate(-90deg); }
-  /* The hidden-row count appears only while the group is closed, so an open
-     list carries no extra numbers. :empty keeps the gap from reserving space. */
+  /* No chevron: a closed group is signalled by its hidden-row count appearing
+     and its rows going away. The affordance that a header is clickable is the
+     pointer cursor plus the colour lift on hover. */
+  /* The count appears only while the group is closed, so an open list carries
+     no extra numbers. :empty keeps the gap from reserving space. */
   ul.conv-list li.conv-group .cg-n {
     font-size: 0.55rem; letter-spacing: 0.06em;
     opacity: 0.6; font-variant-numeric: tabular-nums;
@@ -1156,9 +1153,6 @@ ul.conv-list li.active {
   /* Rows of a closed group. A class, not [hidden]: ul.fs-list li sets
      display:flex, which would beat [hidden]'s display:none. */
   ul.conv-list li.conv-row-hidden { display: none; }
-  @media (prefers-reduced-motion: reduce) {
-    ul.conv-list li.conv-group .cg-chev { transition: none; }
-  }
 
   /* Search only covers active conversations; this row is the way out to the
      archive, which has its own cloud-backed search. */

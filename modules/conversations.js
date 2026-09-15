@@ -2976,8 +2976,7 @@ async function refreshConversationList() {
     // listener is on the <ul> and only bails inside an li[data-cid].
     li.setAttribute('role', 'button');
     li.tabIndex = 0;
-    li.innerHTML = '<span class="cg-chev" aria-hidden="true">▾</span>' +
-                   '<span class="cg-label"></span><span class="cg-n"></span>';
+    li.innerHTML = '<span class="cg-label"></span><span class="cg-n"></span>';
     li.querySelector('.cg-label').textContent = text;
     li.addEventListener('click', (ev) => {
       if (ev.shiftKey) return;        // leave shift for selection gestures
