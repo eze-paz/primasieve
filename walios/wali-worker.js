@@ -7,7 +7,7 @@
 const PAGE = 65536;
 const CHILD_DONE = 0x7e57n;
 try { self.addEventListener('unhandledrejection', (e) => { try { self.postMessage({ t: 'out', fd: 2, s: '[host] UNHANDLED: ' + ((e.reason && e.reason.stack) || e.reason) + '\n' }); } catch {} }); } catch {}
-const E = { PERM:1, NOENT:2, SRCH:3, INTR:4, IO:5, BADF:9, CHILD:10, AGAIN:11, NOMEM:12, ACCES:13, EXIST:17, XDEV:18, NOTDIR:20, ISDIR:21, INVAL:22, NOTTY:25, SPIPE:29, PIPE:32, NOSYS:38, NOTEMPTY:39,
+const E = { PERM:1, NOENT:2, SRCH:3, INTR:4, IO:5, BADF:9, CHILD:10, AGAIN:11, NOMEM:12, ACCES:13, EXIST:17, XDEV:18, NOTDIR:20, ISDIR:21, INVAL:22, NOTTY:25, SPIPE:29, PIPE:32, NOSPC:28, NOSYS:38, NOTEMPTY:39,
             ADDRINUSE:98, ADDRNOTAVAIL:99, CONNREFUSED:111, TIMEDOUT:110 };
 
 // LOOPBACK TCP, entirely inside this kernel.
@@ -1257,6 +1257,30 @@ class Process {
     opfsFault(path2);
     if (path2 === '/dev/ptmx') { const id = newPty(); const g = this.allocFd(); this.fds.set(g, { pty: id, master: true, cloexec: ce }); return BigInt(g); }
     if (path2 === '/dev/null') { const g = this.allocFd(); this.fds.set(g, { devnull: true, cloexec: ce }); return BigInt(g); }
+    // /dev/stdin, /dev/stdout, /dev/stderr: open() them and you get a DUP of that fd, which
+    // is what Linux gives you (they are symlinks into /proc/self/fd). Shell and build glue
+    // leans on them constantly -- `cmd > /dev/stdout`, `... < /dev/stdin`, and the
+    // "write to stdout by name" idiom autoconf and many Makefiles use -- and here they did
+    // not exist at all, so every one of those was a plain ENOENT.
+    {
+      const stdio = { '/dev/stdin': 0, '/dev/stdout': 1, '/dev/stderr': 2 };
+      if (path2 in stdio) {
+        const src = this.fds.get(stdio[path2]);
+        if (!src) return err(E.BADF);
+        const g = this.allocFd();
+        // A dup SHARES the open-file description (offset included), which is why this
+        // copies the handle by reference rather than making a fresh one -- the same rule
+        // the fork/dup2 paths follow.
+        this.fds.set(g, { ...src, cloexec: ce });
+        this.bumpFifo(src);
+        return BigInt(g);
+      }
+    }
+    // /dev/zero and /dev/full. zero reads as endless NULs and swallows writes; full does
+    // the same on read but every write fails ENOSPC, which is exactly what it is for --
+    // configure scripts and test suites use it to check an out-of-space path.
+    if (path2 === '/dev/zero') { const g = this.allocFd(); this.fds.set(g, { devzero: true, cloexec: ce }); return BigInt(g); }
+    if (path2 === '/dev/full') { const g = this.allocFd(); this.fds.set(g, { devzero: true, devfull: true, cloexec: ce }); return BigInt(g); }
     // /dev/hostcall: the guest<->host RPC channel that does NOT ride stdio. The old channel
     // (frames on fd 1, replies on fd 0) broke the moment a program was piped or fed a
     // heredoc: `python3 -c "import matplotlib" | head` sent its bundle request into the
@@ -1345,6 +1369,7 @@ class Process {
         if (h.spair) { if (!h.spair.rd.chunks.length && h.nonblock && h.spair.rd.writers > 0) return err(E.AGAIN); const b = pipeRead(h.spair.rd, a[2]); S.wbytes(a[1], b); return BigInt(b.length); }
         if (h.hostcall) { if (!h.hostcall.chunks.length) return err(E.AGAIN); const b = pipeRead(h.hostcall, a[2]); S.wbytes(a[1], b); return BigInt(b.length); }   // a blocking read waits in sysAsync
         if (h.devnull) return 0n;
+        if (h.devzero) { const n = a[2] | 0; S.wbytes(a[1], new Uint8Array(n)); return BigInt(n); }   // endless NULs
         if (h.devrandom) { const n = a[2] | 0; let done = 0; while (done < n) { const k = Math.min(n - done, 65536); const b = new Uint8Array(k); crypto.getRandomValues(b); S.wbytes(a[1] + done, b); done += k; } return BigInt(n); }
         if (h.tfd) { const t = h.tfd; // timerfd: 8-byte expiration count (a blocking read waits in sysAsync)
           if (!t.count) return err(E.AGAIN);
@@ -1375,6 +1400,8 @@ class Process {
           if (a[2] === 0) return 0n;                                   // same rule as the pipe above
           h.spair.wr.chunks.push(S.u8.slice(a[1], a[1] + a[2])); wakePipe(h.spair.wr); return BigInt(a[2]); }
         if (h.devnull) return BigInt(a[2]);
+        if (h.devfull) return err(E.NOSPC);      // the whole point of /dev/full
+        if (h.devzero) return BigInt(a[2]);
         if (h.hostcall) { hostcallWrite(h.hostcall, S.u8.slice(a[1], a[1] + a[2])); return BigInt(a[2]); }
         if (h.devrandom) return BigInt(a[2]);
         if (h.pty !== undefined) { const p = ptys.get(h.pty); const b = S.u8.slice(a[1], a[1] + a[2]); if (h.master) ptyMasterWrite(p, b); else ptySlaveWrite(p, b); return BigInt(a[2]); }
@@ -1405,13 +1432,14 @@ class Process {
         if (h.file && h.file.brId) opfsMaybeRelease(h.file);   // last fd gone -> give the OPFS lock back
         return 0n; }
       case 'lseek': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
-        if (h.std !== undefined || h.fifo || h.sock || h.pty !== undefined || h.devnull || h.devrandom) return err(E.SPIPE);
+        if (h.std !== undefined || h.fifo || h.sock || h.pty !== undefined || h.devnull || h.devrandom || h.devzero) return err(E.SPIPE);
         const size = h.file ? h.file.size : 0; const o = (h.off ??= { v: 0 });
         o.v = a[2] === 0 ? Number(a[1]) : a[2] === 1 ? o.v + Number(a[1]) : size + Number(a[1]);
         return BigInt(o.v); }
       case 'fstat': { const h = S.fds.get(a[0]); if (!h) return err(E.BADF);
         if (h.pty !== undefined) { S.putStat(a[1], ptyStatObj(h.pty, h.master)); return 0n; }
         if (h.devnull) { S.putStat(a[1], { size: 0, mode: 0o020620 }); return 0n; }
+        if (h.devzero) { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
         if (h.devrandom) { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
         if (h.std !== undefined || h.fifo || h.sock || h.spair) { S.putStat(a[1], { size: 0, mode: (h.fifo || h.sock || h.spair) ? 0o010600 : 0o020620 }); return 0n; }
         if (h.exe) { S.putStat(a[1], { size: 1, mode: 0o100755 }); return 0n; }
@@ -1419,13 +1447,17 @@ class Process {
       case 'stat': case 'lstat': { const p = S.atPath(-100, S.cstr(a[0])); let m;
         if (p === '/dev/ptmx') { S.putStat(a[1], ptyStatObj(0, true)); return 0n; }
         if ((m = p.match(/^\/dev\/pts\/(\d+)$/))) { if (!ptys.has(+m[1])) return err(E.NOENT); S.putStat(a[1], ptyStatObj(+m[1], false)); return 0n; }
-        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/urandom' || p === '/dev/random') { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
+        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/urandom' || p === '/dev/random'
+            || p === '/dev/zero' || p === '/dev/full' || p === '/dev/stdin' || p === '/dev/stdout' || p === '/dev/stderr')
+          { S.putStat(a[1], { size: 0, mode: 0o020666 }); return 0n; }
         return S.statPath(p, a[1], name === 'stat'); }
       case 'newfstatat': { const s = S.cstr(a[1]); return s === '' ? S.sys('fstat', [a[0], a[2]]) : S.statPath(S.atPath(a[0], s), a[2]); }
       case 'access': case 'faccessat': case 'faccessat2': {
         const p = name === 'access' ? S.atPath(-100, S.cstr(a[0])) : S.atPath(a[0], S.cstr(a[1]));
         if (p === '/proc/self/exe') return 0n;
-        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/ptmx' || p === '/dev/urandom' || p === '/dev/random') return 0n; // devices exist (scripts' `test -e`)
+        if (p === '/dev/null' || p === '/dev/tty' || p === '/dev/ptmx' || p === '/dev/urandom' || p === '/dev/random'
+            || p === '/dev/zero' || p === '/dev/full' || p === '/dev/stdin' || p === '/dev/stdout' || p === '/dev/stderr')
+          return 0n; // devices exist (scripts' `test -e`)
         { const m = p.match(/^\/dev\/pts\/(\d+)$/); if (m) return ptys.has(+m[1]) ? 0n : err(E.NOENT); }
         opfsFault(p); const pf = S.follow(p);
         const want = (name === 'access' ? (a[1] | 0) : (a[2] | 0)) & 6; // X not enforced
@@ -3007,6 +3039,25 @@ function resolveExecKey(p, cwd, selfKey) {
   }
   // busybox multi-call fallback: any still-unresolved name runs busybox, which
   // dispatches on argv[0] (busybox itself may still be a lazy manifest URL).
+  //
+  // NOT for an explicit path to a file that does not exist. That must be ENOENT, or
+  // execvp() can never walk $PATH: it tries /bin/foo first, the fallback makes that
+  // "succeed" by running busybox, busybox prints "foo: applet not found" and exits -- and
+  // the loop never reaches /usr/bin/foo, where the program actually is. Measured:
+  //     timeout 260 build-pkg tree   -> "build-pkg: applet not found"  (it is in /usr/bin)
+  //     timeout 5 /usr/bin/build-pkg -> runs
+  // which silently broke `timeout CMD`, `env CMD`, `find -exec CMD` and anything else that
+  // spawns a helper by name. A whole batch of package builds reported failure in 0s each
+  // because of it -- none of them had started.
+  //
+  // A name with NO slash still falls back: "run the applet" is the intended meaning there,
+  // and that is what /bin/sed and the other 17-byte applet stubs rely on (they EXIST, so
+  // they come through the branch above and are not affected by this).
+  const explicitPath = p.includes('/');
+  const existsInVfs = files.has(p.startsWith('/') ? norm(p, '/') : norm(p, cwd));
+  if (!key && explicitPath && !existsInVfs) {
+    return null;                       // -> ENOENT, so the caller's PATH walk continues
+  }
   if (!key && manifest['busybox']) key = manifest['busybox'];
   if (!key) { post(`[host] execve: cannot resolve ${p}\n`, 2); return null; }
   return key;
@@ -3051,7 +3102,26 @@ async function S_await(S, sysname, args) {
 // terminal answered -- in the tool `cc` hung to the timeout. clang is a guest now.) Every caller (boot, the worker
 // loop's execve, the vfork child's execve) goes through resolveExec + startProcess, so
 // pid/pgid inheritance, the fd table and lazy loading are decided in one place.
+// execvp() also accepts a BARE name and looks it up along $PATH. The shell does that
+// itself, so shell-run commands were fine; a program exec'ing a bare name was not. Manifest
+// names still win (checked first), so `sed` keeps resolving to busybox rather than to a
+// stray /bin/sed stub. /bin:/usr/bin is hardcoded because this layer has no env, and it is
+// walios' PATH.
+function pathSearch(p, cwd) {
+  if (!p || p.includes('/')) return null;
+  for (const d of ['/bin', '/usr/bin']) {
+    const cand = d + '/' + p;
+    opfsFault(cand);
+    if (files.has(cand)) return cand;
+  }
+  return null;
+}
+
 async function resolveExec(p, argv, cwd, selfKey, depth) {
+  if (!resolveModuleKey(p, selfKey)) {
+    const onPath = pathSearch(p, cwd);
+    if (onPath) p = onPath;
+  }
   if (!resolveModuleKey(p, selfKey) && (depth || 0) < 4) {
     const sc = scriptExecRewrite(p, argv, cwd);
     if (sc) return resolveExec(sc.path, sc.argv, cwd, selfKey, (depth || 0) + 1);

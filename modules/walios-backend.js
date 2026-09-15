@@ -113,7 +113,7 @@
 // existing path is now EEXIST too, instead of silently succeeding (mkdir -p semantics).
 // killall33: the tool's deadline stops the PROCESSES and keeps the kernel, so a run that
 // runs out of budget no longer takes /tmp and every compiled module down with it.
-WORKER_V = 'suspend34';
+WORKER_V = 'devexec35';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
@@ -229,8 +229,15 @@ WORKER_V = 'suspend34';
                          ['onig-wali.tar.gz', '/']] };
     },
 
-    env(_mode) {
+    env(mode) {
       const e = Object.assign({}, PY_ENV);
+      // NO_COLOR for the agent-facing hosts only. stdout looks like a tty here, so
+      // colourising tools reach for ANSI: `jq '.a'` came back as
+      // ESC[1;39m[ESC[0;39m2ESC[0m... which is noise in a tool result a model has to
+      // read, and worse, noise it might quote back. The interactive TERMINAL is the one
+      // host where colour is wanted, so it is excluded. NO_COLOR is the cross-tool
+      // convention (jq, ls, grep, ripgrep and others honour it).
+      if (mode !== 'terminal') e.NO_COLOR = '1';
       // This backend is the BROWSER host: every process gets its own worker and the
       // kernel answers blocking syscalls asynchronously (dlopen17), so epoll — and
       // therefore asyncio — works.
@@ -353,7 +360,7 @@ WORKER_V = 'suspend34';
     async toolBlobs(base) {
       const b = {};
       await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld',
-                         'nm', 'strip', 'objdump'].map(async (n) => {
+                         'nm', 'strip', 'objdump', 'pkg-config'].map(async (n) => {
         try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=2'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
