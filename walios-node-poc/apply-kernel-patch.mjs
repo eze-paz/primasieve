@@ -7,11 +7,16 @@
 //   node walios-node-poc/apply-kernel-patch.mjs          apply
 //   node walios-node-poc/apply-kernel-patch.mjs --check   report only
 //   node walios-node-poc/apply-kernel-patch.mjs --revert  remove
+//   node walios-node-poc/apply-kernel-patch.mjs <path>    patch that file instead
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 
-const KERNEL = join(dirname(fileURLToPath(new URL('.', import.meta.url))), 'walios', 'wali-worker.js');
+// A path argument lets this run against a COPY of a deployed kernel, so the
+// server's own file can be patched in place rather than overwritten with a
+// local one that may be missing another session's changes.
+const pathArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
+const KERNEL = pathArg || join(dirname(fileURLToPath(new URL('.', import.meta.url))), 'walios', 'wali-worker.js');
 const mode = process.argv.includes('--check') ? 'check' : process.argv.includes('--revert') ? 'revert' : 'apply';
 
 const CONSTS_ANCHOR = 'const modSigs = new Map();';

@@ -36,3 +36,6 @@ test/lang-harness/.env
 experiments/primasieve/emergence/kb_cache.json
 experiments/primasieve/selftest.err
 experiments/primasieve/emergence/*.out
+
+# short-lived session token minted for production browser tests
+walios-node-poc/.prod-token

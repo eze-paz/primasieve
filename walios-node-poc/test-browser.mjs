@@ -18,11 +18,16 @@ const { chromium } = require(GLOBAL_ROOT + '/playwright');
 
 const PORT = Number(process.env.PORT || 8791);
 const HEADED = process.argv.includes('--headed');
-const URL_ = `http://localhost:${PORT}/walios-node-poc/`;
+// PROD=<origin> drives a deployed page instead of the local one. The local
+// server and wisp relay are then not started: the remote origin serves the
+// assets and owns its own egress, which is the point of testing it.
+const PROD = process.env.PROD || '';
+const URL_ = PROD ? PROD.replace(/\/$/, '') + '/walios-node-poc/index.html'
+                  : `http://localhost:${PORT}/walios-node-poc/`;
 const WAIT_MS = Number(process.env.WAIT_MS || 60000);
 
 // ---- server -----------------------------------------------------------------
-const server = spawn(process.execPath, [new URL('./serve.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')], {
+const server = PROD ? { kill() {}, stdout: { on() {} }, stderr: { on() {} } } : spawn(process.execPath, [new URL('./serve.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')], {
   env: { ...process.env, PORT: String(PORT) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -34,7 +39,7 @@ process.on('exit', stop);
 
 // The WISP relay: without it the kernel has no egress and `net`/`http` cannot work.
 // serve.mjs proxies /wisp to it. Permissive allow-list because this is a local test.
-const wisp = spawn(process.execPath, ['../../sandpie-server/scripts/wisp-standalone.mjs', '6970'], {
+const wisp = PROD ? { kill() {}, stdout: { on() {} }, stderr: { on() {} } } : spawn(process.execPath, ['../../sandpie-server/scripts/wisp-standalone.mjs', '6970'], {
   cwd: new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
   env: { ...process.env, WISP_ENABLED: '1', WISP_ALLOW_HOSTS: '*', WISP_ALLOW_PORTS: '53,80,443', WISP_ALLOW_ORIGINS: 'http://localhost:' + PORT },
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -50,6 +55,19 @@ await new Promise((r) => setTimeout(r, 900));
 // ---- browser ----------------------------------------------------------------
 const browser = await chromium.launch({ headless: !HEADED });
 const ctx = await browser.newContext();
+// A deployment gates the kernel (/walios/*) behind its session cookie, so the
+// page loads and then dies with no kernel. PROD_TOKEN_FILE holds a short-lived
+// token minted server-side; it is read from disk rather than passed on the
+// command line so it stays out of the process table and out of any log.
+if (PROD) {
+  const tokFile = process.env.PROD_TOKEN_FILE || '.prod-token';
+  let tok = '';
+  try { tok = (await import('node:fs')).readFileSync(tokFile, 'utf8').trim(); } catch (_) {}
+  if (!tok) { console.log('PROD set but no token in ' + tokFile + ' -- the kernel will 401'); }
+  else {
+    await ctx.addCookies([{ name: 'sp_session', value: tok, domain: new URL(PROD).hostname, path: '/', httpOnly: true, secure: true, sameSite: 'Lax' }]);
+  }
+}
 const page = await ctx.newPage();
 
 const console_ = [];
