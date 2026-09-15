@@ -180,7 +180,18 @@ function pickVersion(meta, range) {
   return ok.sort((a, b) => cmp(parseV(a), parseV(b))).pop();
 }
 
+// Progress to a FILE when NPM_LITE_DEBUG is set. stdout is buffered and is lost if the
+// process dies mid-install, which is exactly the case being investigated -- a file
+// survives it and shows where it stopped.
+const DBG = (typeof process !== 'undefined' && process.env && process.env.NPM_LITE_DEBUG) || '';
+let dbgSeq = 0;
+function dbg(msg) {
+  if (!DBG) return;
+  try { fs.appendFileSync(DBG, (++dbgSeq) + ' ' + Date.now() + ' ' + msg + String.fromCharCode(10)); } catch (_) {}
+}
+
 async function installOne(name, range, prefix) {
+  dbg('installOne:enter ' + name + '@' + range);
   const meta = await getJSON(REGISTRY + '/' + name);
   const version = pickVersion(meta, range || 'latest');
   const v = version && meta.versions && meta.versions[version];
@@ -230,6 +241,7 @@ async function installTree(specs, prefix, log) {
       continue;
     }
     const r = await installOne(name, range, prefix);
+    dbg('installed ' + name + '@' + r.version + ' queue=' + queue.length + ' done=' + done.size);
     done.set(name, r.version);
     files += r.written; bytes += r.bytes;
     log('  ' + (name + '@' + r.version).padEnd(34) + r.written + ' files  ' + r.integrity);
@@ -263,8 +275,11 @@ async function main() {
   // looked installed. A single explicit hold removes the whole class.
   const hold = setInterval(() => {}, 200);
   let r;
+  dbg('main:start ' + specs.join(','));
   try { r = await installTree(specs, prefix, (s) => console.log(s)); }
-  finally { clearInterval(hold); }
+  catch (e) { dbg('main:THREW ' + ((e && e.stack) || e)); throw e; }
+  finally { clearInterval(hold); dbg('main:installTree returned'); }
+  dbg('main:done count=' + r.count);
   console.log('installed ' + r.count + ' package(s), ' + r.files + ' files, '
     + r.bytes + ' bytes in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's -> ' + prefix);
   if (r.conflicts.length) console.log('version conflicts (first wins): ' + r.conflicts.join('; '));
