@@ -5662,6 +5662,7 @@ function renderTcPreparing(div, fname, args) {
   }
   const meta = el.querySelector('.tc-meta');
   if (meta) meta.textContent = tok > 0 ? `~${tok} tok` : '';
+  tgRefresh(div);
 }
 
 function renderTcRunning(div, fname, args) {
@@ -5673,6 +5674,7 @@ function renderTcRunning(div, fname, args) {
       REPL_LOADER() +
       `<span class="tc-title" title="${tcEscape(fname || 'tool')}">${tcLabelHtml(div, fname, 'doing', args)}…</span>`;
   }
+  tgRefresh(div);
 }
 
 function renderTcDone(div, fname, args) {
@@ -5690,6 +5692,7 @@ function renderTcDone(div, fname, args) {
   // (write_todos used to auto-expand too — removed: the checklist card now
   //  starts collapsed like every other tool's box.)
   if (fname === 'load_image' || fname === 'ask') div.classList.add('expanded');
+  tgRefresh(div);
 }
 
 // ---- Task Register ---------------------------------------------------------
@@ -5826,6 +5829,25 @@ function _tgBuild(title, st) {
 // Repaint a group's header (call count, checklist progress, cell strip) from
 // its current DOM. Cheap enough to run per tool event; an emptied group (its
 // only call was a removed respond box) removes itself.
+function tgRefresh(div) {
+  if (!div || !div.closest) return;
+  const g = div.closest('.msg.tool-group');
+  if (g) tgUpdate(g);
+}
+// The label an untitled register should wear for a given call box: the box's own
+// rendered header, or — if it hasn't been rendered yet (tgUpdate runs from addMsg,
+// BEFORE renderTcPreparing/Done paints .tc-title) — the tool's plain verb. Never
+// returns '' for a box that knows its tool, so a register can't render bare.
+function _tgCallLabel(el) {
+  if (!el) return '';
+  const t = ((el.querySelector('.tc-title') || {}).textContent || '').trim();
+  if (t) return t;
+  const fname = (el.dataset && el.dataset.fname) || '';
+  if (!fname) return '';
+  const parts = tcLabelParts(fname, 'done', undefined);
+  const target = (el.dataset && el.dataset.tcTarget) || parts.target || '';
+  return (parts.verb + (target ? ' ' + target : '')).trim();
+}
 function tgUpdate(group) {
   if (!group || !group.classList || !group.classList.contains('tool-group')) return;
   const log = group.querySelector(':scope > .tg-log');
@@ -5847,10 +5869,14 @@ function tgUpdate(group) {
   // Untitled register: the header mirrors the LATEST call's own label ("Saving
   // to memory…" → "Saved to memory") instead of a fabricated task name.
   if (group.classList.contains('tg-untitled')) {
-    const last = calls[calls.length - 1];
-    const t = last ? ((last.querySelector('.tc-title') || {}).textContent || '') : '';
+    // Walk BACK from the newest call to the first one that can name itself: the
+    // newest box may still be pre-render (addMsg calls tgUpdate before the header
+    // is painted), and an empty label must never blank the register's title —
+    // that is what produced a bare "[1]" block in both live and replayed turns.
+    let t = '';
+    for (let i = calls.length - 1; i >= 0 && !t; i--) t = _tgCallLabel(calls[i]);
     const titleEl = group.querySelector('.tg-title');
-    if (titleEl && titleEl.textContent !== t) { titleEl.textContent = t; titleEl.title = t; }
+    if (t && titleEl && titleEl.textContent !== t) { titleEl.textContent = t; titleEl.title = t; }
   }
   // ETA: only the register of the CURRENTLY ACTIVE task measures itself
   // against the model's est (expected tool calls, declared in write_todos);
