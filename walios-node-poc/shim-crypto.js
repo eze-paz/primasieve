@@ -214,6 +214,24 @@ module.exports = {
     return b;
   },
   randomUUID: () => crypto.randomUUID(),
+  // uuid and friends fill an existing buffer rather than allocating one.
+  randomFillSync: (buf, offset = 0, size = (buf.length - offset)) => {
+    const view = new Uint8Array(buf.buffer || buf, (buf.byteOffset || 0) + offset, size);
+    if (SYS_RANDOM) SYS_RANDOM(view); else crypto.getRandomValues(view);
+    return buf;
+  },
+  randomFill: (buf, a, b, cb) => {
+    const done = typeof a === 'function' ? a : (typeof b === 'function' ? b : cb);
+    module.exports.randomFillSync(buf);
+    if (done) queueMicrotask(() => done(null, buf));
+    return buf;
+  },
+  randomInt: (min, max) => {
+    if (max === undefined) { max = min; min = 0; }
+    const r = new Uint32Array(1);
+    if (SYS_RANDOM) SYS_RANDOM(new Uint8Array(r.buffer)); else crypto.getRandomValues(r);
+    return min + (r[0] % (max - min));
+  },
   timingSafeEqual: (a, b) => {
     if (a.length !== b.length) return false;
     let d = 0;

@@ -254,7 +254,26 @@ function makeBindings(vfs, trace, realm) {
       getExternalValue: () => 0n,
       propertyFilter: { ALL_PROPERTIES: 0, ONLY_ENUMERABLE: 2, SKIP_STRINGS: 8, SKIP_SYMBOLS: 16 },
       shouldRetainSymbols: () => false, isInsideNodeModules: () => false,
-      getCallerLocation: () => [], defineLazyProperties: () => {},
+      getCallerLocation: () => [],
+      // NOT a no-op. lib/util.js publishes TextEncoder/TextDecoder, parseArgs,
+      // MIMEType and diff through this; stubbing it left util.TextEncoder
+      // undefined, and axios failed with "is not a constructor" rather than with
+      // anything of its own. Define real lazy getters that load the builtin on
+      // first touch and then replace themselves with the plain value.
+      defineLazyProperties: (target, id, keys, enumerable = true) => {
+        for (const key of keys) {
+          Object.defineProperty(target, key, {
+            configurable: true,
+            enumerable,
+            get() {
+              const v = realm.requireBuiltin(id)[key];
+              Object.defineProperty(target, key, { configurable: true, enumerable, writable: true, value: v });
+              return v;
+            },
+            set(v) { Object.defineProperty(target, key, { configurable: true, enumerable, writable: true, value: v }); },
+          });
+        }
+      },
       // 'FILE' makes node build stdout/stderr as internal/fs/sync_write_stream,
       // which writes through fs.writeSync -> our fs binding -> SYS_write. 'TTY'
       // would pull in tty_wrap, which we do not serve yet.
@@ -386,19 +405,130 @@ function makeBindings(vfs, trace, realm) {
         getNearestParentPackageJSONType: (p2) => { const n = nearest(p2); return n ? [n.cfg[2], n.path] : undefined; },
         getPackageScopeConfig: (p2) => { const n = nearest(p2); return n ? n.cfg : undefined; },
         getPackageJSONScripts: () => undefined,
+        getRepresentativeMainPath: () => undefined,
         flushCompileCache: () => {}, setCompileCacheDir: () => {},
         getCompileCacheDir: () => undefined, enableCompileCache: () => ({ status: 0 }),
         compileCacheStatus: ['FAILED', 'ENABLED', 'ALREADY_ENABLED', 'DISABLED'],
       };
     })(),
     builtins: { builtinIds: [], setInternalLoaders: () => {}, canBeRequiredByUsers: () => true, getCanBeRequiredByUsersWithoutSchemeList: () => [], getCanBeRequiredByUsersList: () => [], hasCachedBuiltins: () => false },
-    encoding_binding: {
-      encodeInto: (s, u8) => { const r = new TextEncoder().encodeInto(s, u8); return new Uint32Array([r.read, r.written]); },
-      encodeUtf8String: (s) => new TextEncoder().encode(s),
-      decodeUTF8: (u8) => new TextDecoder().decode(u8),
-      toASCII: (s) => s, toUnicode: (s) => s,
-    },
-    url: { domainToASCII: (s) => s, domainToUnicode: (s) => s, parse: () => undefined, format: () => '', canParse: () => false, pathToFileURL: (p) => 'file://' + p },
+    // TextEncoder/TextDecoder are bindings over the page's own, not reimplementations.
+    // encodeIntoResults is the shared Uint32Array node reads [read, written] out of,
+    // so it must be one stable array rather than a fresh one per call.
+    encoding_binding: (() => {
+      const RESULTS = new Uint32Array(2);
+      const dec = (label, ignoreBOM, fatal, input) =>
+        new TextDecoder(label, { ignoreBOM: !!ignoreBOM, fatal: !!fatal })
+          .decode(input === undefined ? new Uint8Array(0) : input);
+      return {
+        encodeIntoResults: RESULTS,
+        encodeInto: (s, u8) => { const r = new TextEncoder().encodeInto(s, u8); RESULTS[0] = r.read; RESULTS[1] = r.written; return RESULTS; },
+        encodeUtf8String: (s) => new TextEncoder().encode(s),
+        decodeUTF8: (u8, ignoreBOM, fatal) => dec('utf-8', ignoreBOM, fatal, u8),
+        decodeWindows1252: (u8, ignoreBOM, fatal) => dec('windows-1252', ignoreBOM, fatal, u8),
+        decodeLatin1: (u8, ignoreBOM, fatal) => dec('windows-1252', ignoreBOM, fatal, u8),
+        toASCII: (s) => { try { return new URL('http://' + s).hostname; } catch (_) { return s; } },
+        toUnicode: (s) => s,
+      };
+    })(),
+    // config.hasIntl is true because the page HAS full ICU -- but that makes
+    // internal/encoding take the ICU branch, which needs this binding. Without it
+    // util.TextDecoder resolved to undefined and axios died on
+    // "util.TextEncoder is not a constructor". A converter handle is just a
+    // platform TextDecoder; the FLUSH flag is the inverse of {stream:true}.
+    icu: (() => {
+      const FLUSH = 0x1, FATAL = 0x2, IGNORE_BOM = 0x4;
+      return {
+        getConverter: (encoding, flags) => {
+          try {
+            return new TextDecoder(encoding, {
+              fatal: !!(flags & FATAL), ignoreBOM: !!(flags & IGNORE_BOM),
+            });
+          } catch (_) { return undefined; }
+        },
+        decode: (handle, input, flags) =>
+          handle.decode(input === undefined ? new Uint8Array(0) : input, { stream: !(flags & FLUSH) }),
+        hasConverter: (encoding) => { try { void new TextDecoder(encoding); return true; } catch (_) { return false; } },
+        toASCII: (s) => { try { return new URL('http://' + s).hostname; } catch (_) { return s; } },
+        toUnicode: (s) => s,
+        // Real ICU measures East Asian width; node only uses this for console
+        // alignment, so codepoint count is close enough to be honest about.
+        getStringWidth: (s) => [...String(s)].length,
+        icuErrName: (n) => 'U_ERROR_' + n,
+      };
+    })(),
+    // A binding over the page's own WHATWG URL parser -- not a reimplementation.
+    // lib/internal/url.js does not read parse()'s return value for the pieces: it
+    // destructures the 9-slot `urlComponents` array the binding writes as a side
+    // effect, then slices href by those offsets. Omitting it made `new URL(...)`
+    // throw "Cannot destructure property '0' of 'bindingUrl.urlComponents'", which
+    // is what took qs down; getting the offsets subtly wrong is worse, because
+    // fileURLToPath then returns '' and the CJS resolver reports "Cannot find
+    // module ''". So the offsets are derived from the END of href backwards --
+    // the only way that holds for file:/// (empty host) and node: (no authority).
+    url: (() => {
+      const OMITTED = 4294967295;                   // ada's uint32_t(-1)
+      // ada::scheme::type, in ada's order -- NOT alphabetical.
+      const SCHEME = { 'http:': 0, 'https:': 2, 'ws:': 3, 'ftp:': 4, 'wss:': 5, 'file:': 6 };
+      const mk = (input, base) => (base === undefined || base === null ? new URL(input) : new URL(input, base));
+      const b = {
+        urlComponents: new Uint32Array(9),
+        domainToASCII: (v) => { try { return new URL('http://' + v).hostname; } catch (_) { return ''; } },
+        domainToUnicode: (v) => v,
+        canParse: (input, base) => { try { mk(input, base); return true; } catch (_) { return false; } },
+        getOrigin: (input) => { try { return mk(input).origin; } catch (_) { return undefined; } },
+        format: (href) => href,
+        pathToFileURL: (p2) => {
+          // Windows drive letters never occur here: the guest's paths are the
+          // kernel's, which are POSIX.
+          const u = new URL('file:///');
+          u.pathname = String(p2);
+          return u.href;
+        },
+        parse: (input, base, raiseException) => {
+          let u;
+          try { u = mk(input, base); }
+          catch (e) { if (raiseException) throw e; return undefined; }
+          return b.fill(u);
+        },
+        // The setter path: url.js hands back href plus what changed and re-reads
+        // the components, so one shared filler serves both.
+        update: (href, action, value) => {
+          let u;
+          try { u = new URL(href); } catch (_) { return undefined; }
+          const field = ['protocol', 'host', 'hostname', 'port', 'username',
+                         'password', 'pathname', 'search', 'hash', 'href'][action];
+          try { u[field] = String(value); } catch (_) { return undefined; }
+          return b.fill(u);
+        },
+        fill: (u) => {
+          const href = u.href;
+          const c = b.urlComponents;
+          const protoEnd = u.protocol.length;                 // includes the ':'
+          const hashStart = u.hash ? href.length - u.hash.length : OMITTED;
+          const searchStart = u.search
+            ? (u.hash ? hashStart : href.length) - u.search.length : OMITTED;
+          const pathEnd = u.search ? searchStart : (u.hash ? hashStart : href.length);
+          const pathStart = pathEnd - u.pathname.length;
+          const hostEnd = pathStart - (u.port ? 1 + u.port.length : 0);
+          // With credentials host_start points AT the '@': url.js skips it
+          // explicitly and slices the password out of the gap before it.
+          const hasCred = !!(u.username || u.password);
+          const hostStart = hasCred ? href.indexOf('@', protoEnd + 2) : hostEnd - u.hostname.length;
+          c[0] = protoEnd;
+          c[1] = hasCred ? protoEnd + 2 + u.username.length : hostStart;
+          c[2] = hostStart;
+          c[3] = hostEnd;
+          c[4] = u.port ? Number(u.port) : OMITTED;
+          c[5] = pathStart;
+          c[6] = searchStart;
+          c[7] = hashStart;
+          c[8] = SCHEME[u.protocol] === undefined ? 1 : SCHEME[u.protocol];   // 1 = NOT_SPECIAL
+          return href;
+        },
+      };
+      return b;
+    })(),
     // observerCounts is read as observerCounts[getObserverType(type)] by
     // internal/perf/observe.js hasObserver(); absent, dns.lookup died on
     // "Cannot read properties of undefined (reading 'undefined')".
@@ -435,18 +565,46 @@ function makeBindings(vfs, trace, realm) {
           const nl = content.indexOf(String.fromCharCode(10));
           content = nl < 0 ? '' : content.slice(nl);
         }
-        const inner = new Function(
-          'process', 'Buffer', 'console', 'setTimeout', 'setInterval', 'setImmediate', 'clearTimeout', 'clearInterval',
-          'globalThis', 'global', 'require', 'module', 'exports', '__filename', '__dirname',
-          content + '\n//# sourceURL=' + filename);
+        // Shadowing as PARAMETERS is not quite what node does: node has these as
+        // real globals, which a module-level `const process = ...` may legally
+        // shadow. As parameters that same declaration is a redeclaration, and
+        // commander died on "Identifier 'process' has already been declared".
+        // So: compile, and if V8 names a colliding identifier, drop that one
+        // global and retry -- the module then sees its own binding, as under node.
+        const GLOBALS = ['process', 'Buffer', 'console', 'setTimeout', 'setInterval', 'setImmediate',
+                         'clearTimeout', 'clearInterval', 'globalThis', 'global'];
+        const CJS = ['require', 'module', 'exports', '__filename', '__dirname'];
+        const valueOf = (n) => (n === 'globalThis' || n === 'global' ? realm.global : realm[n]);
+        const gnames = GLOBALS.slice();
+        let inner;
+        for (;;) {
+          try {
+            inner = new Function(...gnames, ...CJS, content + String.fromCharCode(10) + '//# sourceURL=' + filename);
+            break;
+          } catch (e) {
+            const m = (e instanceof SyntaxError)
+              ? /Identifier '([^']+)' has already been declared/.exec(e.message || '') : null;
+            const i = m ? gnames.indexOf(m[1]) : -1;
+            if (i < 0) throw e;                     // a real syntax error in the module
+            gnames.splice(i, 1);
+          }
+        }
+        const gvals = gnames.map(valueOf);
         function wrapper(exports, require, module, __filename, __dirname) {
-          return inner.call(this, realm.process, realm.Buffer, realm.console,
-            realm.setTimeout, realm.setInterval, realm.setImmediate, realm.clearTimeout, realm.clearInterval,
-            realm.global, realm.global,
-            require, module, exports, __filename, __dirname);
+          return inner.call(this, ...gvals, require, module, exports, __filename, __dirname);
         }
         return { __proto__: null, function: wrapper, sourceMapURL: undefined, sourceURL: filename, canParseAsESM: false };
       },
+        // cjs/loader.js calls this to decide whether a file that failed to parse as
+        // CJS is actually ESM, so it must exist before the loader can report any
+        // syntax error at all -- axios died on "containsModuleSyntax is not a
+        // function" rather than on anything of its own. V8 is the parser: try the
+        // source as a CJS function body; if only the ESM-only keywords explain the
+        // failure, call it module syntax.
+        containsModuleSyntax: (content) => {
+          try { new Function(content); return false; }
+          catch (_) { return /(^|[;}\n])\s*(import|export)[\s{*]/.test(content) || /\bimport\s*\.\s*meta\b/.test(content); }
+        },
       compileFunction: (content, filename, ...rest) => new Function(content),
     },
     // stream_base's shared scratch: node reads read/write results out of this array

@@ -162,6 +162,11 @@ function boot(libDir, opts = {}) {
   // from node's own source -- these three are the whole deviation.
   const shims = opts.shims || {};
 
+  // internalBinding('util').defineLazyProperties needs to load builtins, so the
+  // loader has to be reachable from the binding table. requireBuiltin is a
+  // hoisted function declaration, so this is set before any module evaluates.
+  realm.requireBuiltin = requireBuiltin;
+
   function requireBuiltin(id) {
     if (typeof id !== 'string') throw new TypeError('require() id must be a string, got ' + typeof id);
     if (id.startsWith('node:')) id = id.slice(5);

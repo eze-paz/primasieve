@@ -99,9 +99,12 @@ function verify(bytes, integrity) {
 // Enough of the grammar that real dependency ranges resolve: exact, x-ranges,
 // caret, tilde, comparators, and ||-alternatives. Not a spec-complete
 // implementation -- prerelease ordering in particular is simplified.
+// Minor and patch are optional. Comparators are routinely written short ("< 3",
+// ">= 2.1"), and demanding all three components made `<3` unparseable -- so the
+// comparator returned false and express could not resolve safer-buffer.
 function parseV(v) {
-  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(String(v).trim());
-  return m ? { major: +m[1], minor: +m[2], patch: +m[3], pre: m[4] || null } : null;
+  const m = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?/.exec(String(v).trim());
+  return m ? { major: +m[1], minor: +(m[2] || 0), patch: +(m[3] || 0), pre: m[4] || null } : null;
 }
 function cmp(a, b) {
   if (a.major !== b.major) return a.major - b.major;
@@ -121,8 +124,10 @@ function satisfiesOne(v, range) {
   const V = parseV(v);
   if (!V) return false;
 
-  // a range can be several space-separated comparators, all of which must hold
-  const parts = range.split(/\s+/).filter(Boolean);
+  // A comparator may be written with a space after the operator (">= 2.1.2 < 3"),
+  // so glue operators to their versions before splitting -- otherwise ">=" and
+  // "2.1.2" became separate comparators and express failed to resolve safer-buffer.
+  const parts = range.replace(/([<>]=?|=)\s+/g, '$1').split(/\s+/).filter(Boolean);
   if (parts.length > 1 && !/^[~^]/.test(range)) return parts.every((p) => satisfiesOne(v, p));
 
   let m;
