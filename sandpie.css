@@ -4483,9 +4483,12 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 .msg > .msg-kebab {
   position: absolute; top: 3px; right: 3px; z-index: 5;
   width: 22px; height: 22px; padding: 0; margin: 0; border: 0;
-  background: none; border-radius: 5px; cursor: pointer;
+  /* a slight ground so the mark is findable once revealed: three dim dots
+     alone on a busy reply were easy to miss. */
+  background: color-mix(in srgb, var(--sp-text) 7%, transparent);
+  border-radius: 5px; cursor: pointer;
   display: grid; place-items: center;
-  color: color-mix(in srgb, var(--sp-text) 32%, transparent);
+  color: color-mix(in srgb, var(--sp-text) 42%, transparent);
   opacity: 0; transition: opacity 0.13s ease, color 0.13s ease, background 0.13s ease;
 }
 .msg > .msg-kebab svg { width: 14px; height: 14px; display: block; fill: currentColor; }
@@ -4494,7 +4497,7 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 .msg > .msg-kebab:hover,
 .msg.kebab-open > .msg-kebab {
   color: var(--sp-text);
-  background: color-mix(in srgb, var(--sp-text) 9%, transparent);
+  background: color-mix(in srgb, var(--sp-text) 15%, transparent);
 }
 .msg > .msg-kebab:focus-visible { opacity: 1; outline: 1px solid var(--sp-accent); outline-offset: 1px; }
 
