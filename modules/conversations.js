@@ -1140,6 +1140,14 @@ function applyGridFolding(grid) {
   applyGridOverflow(grid);
 }
 function renderFilesTouched(host, files, opts) {
+  // Cards are a TURN-END thing. Partial emits fire mid-turn as files first
+  // appear; rendering them then dropped a card into the middle of the reply,
+  // and a run that writes a scratch file, a rewrite and then the real thing
+  // left the deliverable buried under its own dead ends. Nothing is lost by
+  // ignoring them: the turn-end emit re-sends the FULL list for the turn (see
+  // the non-partial emit in sandpie-worker.js), and mergeFilesTouched has
+  // already recorded the paths for persistence.
+  if (opts && opts.partial) return;
   if (!Array.isArray(files) || !files.length) return;
   const partial = !!(opts && opts.partial);
   // Parentage guard: fall back to the ACTIVE stream's host only when it is the
@@ -1176,10 +1184,6 @@ function renderFilesTouched(host, files, opts) {
       const p = old.dataset && old.dataset.artifactPath;
       return p && (p === clean || p.replace(/^sandpie\//, '') === clean || 'sandpie/' + clean === p);
     });
-    if (partial && olds.length) {
-      if (typeof window._artifactEnsureHeader === 'function') for (const o of olds) window._artifactEnsureHeader(o);
-      continue;
-    }
     for (const old of olds) { const g = old.closest('.artifact-grid'); old.remove(); if (g && g !== grid && !g.querySelector('.artifact-wrap')) g.remove(); }
     const ext = clean.split('.').pop().toLowerCase();
     if (!grid) grid = _ftOpenGrid(target);
