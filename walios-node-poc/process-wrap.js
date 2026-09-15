@@ -61,6 +61,15 @@ function makeProcessWrap(sys, mem, deps) {
     const d = mem.dv();
     return [d.getInt32(p, true), d.getInt32(p + 4, true)];
   };
+  // AF_UNIX/SOCK_STREAM pair for the IPC channel. A pipe is one-way; fork()'s channel
+  // has to carry process.send() in BOTH directions over the same fd.
+  const AF_UNIX = 1, SOCK_STREAM = 1, SOCK_CLOEXEC = 0o2000000;
+  const socketpair = () => {
+    const p = alloc(8);
+    if (call('socketpair', AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, p) < 0) return null;
+    const d = mem.dv();
+    return [d.getInt32(p, true), d.getInt32(p + 4, true)];
+  };
 
   class Process {
     constructor() {
@@ -84,7 +93,15 @@ function makeProcessWrap(sys, mem, deps) {
 
       for (let i = 0; i < stdio.length; i++) {
         const s = stdio[i] || { type: 'ignore' };
-        if (s.type === 'pipe' && s.handle) {
+        if (s.ipc && s.handle) {
+          // The IPC slot. Both ends are sockets; the child gets its end at the fd
+          // number node put in NODE_CHANNEL_FD, which is this slot's index.
+          const sp = socketpair();
+          if (!sp) return UV_EINVAL;
+          const [mine, theirs] = sp;
+          fdmap.push([i, theirs]); ours.push(theirs);
+          attach.push([s.handle, mine]);
+        } else if (s.type === 'pipe' && s.handle) {
           // O_CLOEXEC so the child inherits neither end by accident; it gets exactly
           // the one named in fdmap, and an explicit mapping clears cloexec like dup2.
           const p = pipe2(O_CLOEXEC);
@@ -183,8 +200,12 @@ function makeProcessWrap(sys, mem, deps) {
     close(cb) {
       if (this._closed) { if (cb) queueMicrotask(cb); return; }
       this._closed = true;
-      cancel(this._poll); this._poll = null;
-      this._release();
+      // Do NOT stop watching if the child has not been reaped yet. node closes the
+      // handle as soon as the IPC channel EOFs, which is BEFORE the child's exit has
+      // been observed -- cancelling here meant wait4 was never polled again, onexit
+      // never fired, and the 'exit'/'close' events never arrived even though every
+      // message had been delivered.
+      if (this._exited) { cancel(this._poll); this._poll = null; this._release(); }
       if (cb) {
         if (pending) pending.n++;
         queueMicrotask(() => { if (pending) pending.n--; cb(); });

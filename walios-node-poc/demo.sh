@@ -160,4 +160,54 @@ console.log('ESM-PKG:' + id.length + ':' + (typeof customAlphabet));
 D4
 node /tmp/esm/pkg.mjs
 
+echo "--- vm ---"
+cat > /tmp/vmt.js <<'VMEOF'
+const vm = require('vm');
+console.log('VM-THIS:' + vm.runInThisContext('1+1'));
+const box = vm.createContext({ x: 5, out: null });
+
+vm.runInContext('out = x * 3', box);
+console.log('VM-CTX:' + box.out);
+const s = new vm.Script('y = 40 + 2');
+const b2 = vm.createContext({ y: null });
+s.runInContext(b2);
+console.log('VM-SCRIPT:' + b2.y);
+try { new vm.Script('function ( {'); console.log('VM-SYNTAX:no-throw'); }
+catch (e) { console.log('VM-SYNTAX:' + e.constructor.name); }
+VMEOF
+node /tmp/vmt.js
+
+echo "--- child_process.fork + IPC ---"
+cat > /tmp/kid.js <<'KIDEOF'
+const fs = require('fs');
+const log = (s) => { try { fs.appendFileSync('/tmp/kid.log', s + String.fromCharCode(10)); } catch (e) {} };
+log('kid started, send=' + typeof process.send + ' channelfd=' + process.env.NODE_CHANNEL_FD);
+process.on('uncaughtException', (e) => { log('kid threw: ' + (e && e.stack || e)); process.exit(9); });
+process.on('message', (m) => {
+  log('kid got ' + JSON.stringify(m));
+  process.send({ echo: m.n * 2 });
+  if (m.n >= 2) process.exit(0);
+});
+if (typeof process.send === 'function') process.send({ ready: true });
+else log('NO process.send');
+KIDEOF
+rm -f /tmp/kid.log /tmp/par.log
+cat > /tmp/parent.js <<'PAREOF'
+const cp = require('child_process');
+const fs = require('fs');
+const plog = (s) => { try { fs.appendFileSync('/tmp/par.log', s + String.fromCharCode(10)); } catch (e) {} };
+const k = cp.fork('/tmp/kid.js', [], { stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
+let got = [];
+k.on('message', (m) => {
+  plog('parent got ' + JSON.stringify(m));
+  if (m.ready) { k.send({ n: 1 }); return; }
+  got.push(m.echo);
+  if (got.length === 1) k.send({ n: 2 });
+});
+k.on('close', () => plog('parent saw close'));
+k.on('disconnect', () => plog('parent saw disconnect'));
+k.on('exit', (code) => { plog('parent saw exit ' + code); console.log('FORK-IPC:' + got.join(',') + ' exit=' + code); });
+PAREOF
+node /tmp/parent.js
+
 echo "--- done ---"

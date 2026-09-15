@@ -44,12 +44,29 @@ function boot(libDir, opts = {}) {
     versions: { node: '22.23.2', v8: '12.4.0', walios: '0.0.1' },
     argv: ['/bin/node', '/eval'], argv0: 'node',
     execPath: '/bin/node',
+    // Real node always has this as an array. child_process.fork() spreads it into the
+    // child's argv and validates every element, so `undefined` is not a harmless gap --
+    // fork() died in validateArgumentsNullCheck before it ever spawned anything.
+    execArgv: [],
     env: { NODE_ENV: '', PATH: '/bin:/usr/bin', HOME: '/root' },
     pid: 42, ppid: 1,
     cwd: () => '/',
     chdir: () => {},
     exitCode: undefined,
-    exit(code) { this.exitCode = code; },
+    // Actually EXIT. This used to only record a code and return, so process.exit()
+    // was a no-op with a misleading name: the script carried on, and anything holding
+    // the loop open (an IPC pump, a read pump) kept the process alive. A forked child
+    // that called process.exit(0) therefore never terminated, was never reaped, and
+    // its parent sat out the drain deadline waiting for an 'exit' event that could
+    // not come.
+    //
+    // exit_group retires the process kernel-side; the syscall does not return -- the
+    // control block flips to DIE and hostCall throws ProcExit, which unwinds to the
+    // worker's run handler. That unwind IS the exit, so nothing after this runs.
+    exit(code) {
+      this.exitCode = code === undefined ? (this.exitCode === undefined ? 0 : this.exitCode) : code;
+      if (opts.sys && opts.sys.exit_group) opts.sys.exit_group(this.exitCode | 0);
+    },
     // Onto the REAL microtask queue. The old synthetic queue was drained by nothing,
     // so every process.nextTick callback was silently dropped.
     nextTick(fn, ...a) { pending.n++; queueMicrotask(() => { pending.n--; try { fn(...a); } catch (e) { pending.onError(e); } }); },

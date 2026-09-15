@@ -278,6 +278,46 @@ function main(rt, sys, arena, trace) {
     }
   }
 
+  // ---- environment ----------------------------------------------------------
+  // The kernel hands a process its env as a FILE whose path __get_init_envfile writes
+  // into a buffer (newline-separated K=V). Reading it is what makes `FOO=1 node x.js`,
+  // an env: option to spawn, and fork()'s own NODE_CHANNEL_FD actually reach the child.
+  try {
+    if (sys.envFile) {
+      const p = arena.alloc(1024);
+      if (sys.envFile(p, 1024) === 1) {
+        const u8 = arena.u8();
+        let end = p; while (u8[end] !== 0 && end < p + 1024) end++;
+        const path = new TextDecoder().decode(u8.slice(p, end));
+        arena.reset();
+        const text = R('fs').readFileSync(path, 'utf8');
+        for (const line of text.split(NL)) {
+          if (!line) continue;
+          const eq = line.indexOf('=');
+          if (eq > 0) process.env[line.slice(0, eq)] = line.slice(eq + 1);
+        }
+        try { R('fs').unlinkSync(path); } catch (_) {}
+        trace('env: ' + Object.keys(process.env).length + ' variables');
+      } else { arena.reset(); }
+    }
+  } catch (e) { trace('env read failed: ' + ((e && e.message) || e)); }
+
+  // ---- fork()'s child half --------------------------------------------------
+  // node does this in internal/process/pre_execution.js, which we do not run: if the
+  // parent set NODE_CHANNEL_FD, open that fd as the IPC channel so process.send() and
+  // the 'message' event exist. Without it a forked child is just a spawned one and
+  // process.send is undefined.
+  if (process.env && process.env.NODE_CHANNEL_FD) {
+    const fd = parseInt(process.env.NODE_CHANNEL_FD, 10);
+    const mode = process.env.NODE_CHANNEL_SERIALIZATION_MODE || 'json';
+    delete process.env.NODE_CHANNEL_FD;
+    delete process.env.NODE_CHANNEL_SERIALIZATION_MODE;
+    try {
+      R('child_process')._forkChild(fd, mode);
+      trace('ipc channel opened on fd ' + fd);
+    } catch (e) { trace('ipc channel failed: ' + ((e && e.message) || e)); }
+  }
+
   // ---- node --check script.js ----------------------------------------------
   // Parse and do not run. Deliberately compiled WITHOUT the realm globals as
   // shadowed parameters: a module-level `const process` is legal source, and

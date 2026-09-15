@@ -74,13 +74,19 @@ const SYSCALL_NAMES = [
   // memory) that a JS process does not have, so fork+exec is unavailable to us by
   // construction. The kernel serves this instead: make a new pid directly, then reap
   // it with the ordinary wait4.
-  'posix_spawn', 'wait4', 'pipe2', 'dup2', 'dup3', 'poll', 'kill',
+  // socketpair, not pipe2, for the IPC channel: fork()'s channel is BIDIRECTIONAL
+  // (parent send -> child, child send -> parent) and a pipe only goes one way.
+  'posix_spawn', 'wait4', 'pipe2', 'dup2', 'dup3', 'poll', 'kill', 'socketpair',
   // misc
   'getrandom', 'exit_group', 'exit',
 ];
 
 // The non-SYS_ imports WALI uses for argv and exit.
-const WALI_NAMES = ['__cl_get_argc', '__cl_get_argv_len', '__cl_copy_argv', '__proc_exit'];
+// __get_init_envfile is how a guest receives its ENVIRONMENT: the kernel writes the
+// env to /.wali_env_<pid> as newline-separated K=V and copies that PATH into the
+// buffer. Without it our process.env was a hardcoded three-entry object, so anything
+// the parent set was invisible -- which is why fork()'s NODE_CHANNEL_FD never arrived.
+const WALI_NAMES = ['__cl_get_argc', '__cl_get_argv_len', '__cl_copy_argv', '__proc_exit', '__get_init_envfile'];
 
 // The full `names` array the kernel would hand a process, in stub-import order.
 function importNames() {
@@ -104,6 +110,9 @@ function makeSyscalls(names, hostCall) {
   if (iArgc !== null) sys.argc = () => Number(hostCall(iArgc, []));
   if (iLen !== null) sys.argvLen = (i) => Number(hostCall(iLen, [i]));
   if (iCopy !== null) sys.copyArgv = (buf, i) => Number(hostCall(iCopy, [buf, i]));
+  // Read this process's environment the way any WALI guest does.
+  const iEnv = wali('__get_init_envfile');
+  if (iEnv !== null) sys.envFile = (buf, sz) => Number(hostCall(iEnv, [buf, sz]));
   sys._idx = idx;
   return sys;
 }

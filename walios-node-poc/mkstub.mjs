@@ -26,7 +26,7 @@ const SYSCALLS = [
   // processes. posix_spawn(path, argv, envp, fdmap, fdmapLen) is this kernel's own:
   // see syscall-bridge.js for why fork+exec cannot serve a JS process.
   ['posix_spawn', 5], ['wait4', 4], ['pipe2', 2], ['dup2', 2], ['dup3', 3],
-  ['poll', 3], ['kill', 2],
+  ['poll', 3], ['kill', 2], ['socketpair', 4],
 ];
 // (name, params, result) for the non-SYS wali imports
 const WALI_MISC = [
@@ -34,6 +34,7 @@ const WALI_MISC = [
   ['__cl_get_argv_len', [I32], I32],
   ['__cl_copy_argv', [I32, I32], I32],
   ['__proc_exit', [I32], null],
+  ['__get_init_envfile', [I32, I32], I32],
 ];
 
 const uleb = (n) => { const out = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; out.push(b); } while (n); return out; };

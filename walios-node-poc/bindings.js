@@ -11,6 +11,7 @@ const { makeHttpParser } = require('./http-parser.js');
 const { makeChildProcess } = require('./child-process.js');
 const { makePipeWrap } = require('./pipe-wrap.js');
 const { makeProcessWrap } = require('./process-wrap.js');
+const { makeContextify } = require('./contextify.js');
 
 // privateSymbols is read off internalBinding('util') (lib/internal/errors.js:939),
 // and must be STABLE across reads -- a fresh Symbol per access silently breaks
@@ -557,9 +558,10 @@ function makeBindings(vfs, trace, realm) {
       }, milestones: new Float64Array(8), installGarbageCollectionTracking: () => {}, removeGarbageCollectionTracking: () => {}, markMilestone: () => {}, setupObservers: () => {}, timeOrigin: Date.now(), timeOriginTimestamp: Date.now(), loopIdleTime: () => 0, createELDHistogram: () => ({}), nodeTiming: {} },
     trace_events: { trace: () => {}, isTraceCategoryEnabled: () => false, getCategoryEnabledBuffer: () => new Uint8Array(1), setTraceCategoryState: () => {}, trace_category_state: new Uint8Array(1) },
     contextify: {
-      ContextifyScript: class {}, makeContext: () => {}, isContext: () => false,
-      measureMemory: () => {}, constants: { measureMemory: { mode: {}, execution: {} } },
-      startSigintWatchdog: () => {}, stopSigintWatchdog: () => {}, watchdogHasPendingSigint: () => false,
+      // vm. runInThisContext is exact (it is new Function, this realm); runInContext
+      // is an approximation over `with (sandbox)` -- see contextify.js for what that
+      // does and does not give you. It is NOT isolation, and it does not claim to be.
+      ...makeContextify(realm, PRIVATE_SYMBOLS),
       // THE seam where user source becomes a callable. In Node this is V8's
       // CompileFunction; in a browser it is just new Function -- same V8 underneath,
       // same JIT. This is why "native speed" is not an aspiration here.
