@@ -129,7 +129,8 @@
     const r = canvas.getBoundingClientRect();
     const W = Math.max(1, r.width | 0), H = Math.max(1, r.height | 0);
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-    cell = W < 500 ? 2 : W < 900 ? 3 : 4;
+    // pixel density 1.5: 1.5× the shipped pixels per area (finer dither)
+    cell = Math.max(1, Math.round((W < 500 ? 2 : W < 900 ? 3 : 4) / 1.5));
     gw = Math.ceil(W / cell); gh = Math.ceil(H / cell);
     off.width = gw; off.height = gh; img = octx.createImageData(gw, gh);
     ctx.imageSmoothingEnabled = false;
@@ -140,7 +141,7 @@
      The moon position is drawn ONCE per page load (boot) and kept for the
      whole session — resizes, pane remounts and focus changes never move it.
      It is constrained to the sky band and never overlaps the greeting. */
-  const MOON = { x: .7, y: .06, r: .04, soft: .4, glintW: .11, glintAmp: 1 };
+  const MOON = { x: .7, y: .06, r: .04, soft: .4, glintW: .11, glintAmp: 1, glareR: .9, glareAmp: 1.05 };
   let moon = null;                       // { x, y } in pane fractions, spawned per redraw
   function greetingRect() {
     // bounding box of the greeting text in canvas cell coords (or null)
@@ -183,7 +184,10 @@
           // EMPTY sky — no pattern, just the moon disc
           const dist = Math.hypot(x - mx, y - my);
           const edge = clamp((mr - dist) / Math.max(1, mr * MOON.soft), 0, 1);
-          c = edge * edge * (3 - 2 * edge);
+          const ss = edge * edge * (3 - 2 * edge);
+          // GLARE: hot bloom at the moon's centre (mockup A, user-tuned)
+          const glare = Math.exp(-(dist * dist) / (2 * mr * mr * MOON.glareR * MOON.glareR)) * MOON.glareAmp;
+          c = ss + glare;
           moonCore = edge > .55;                    // core in the raw tint colour
         } else {
           const dn = (y - horizon) / (gh - horizon);
