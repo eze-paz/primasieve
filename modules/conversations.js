@@ -1144,6 +1144,18 @@ function applyGridFolding(grid) {
   applyGridOverflow(grid);
 }
 function renderFilesTouched(host, files, opts) {
+  // RETIRED (2026-09-16, option a): artifact cards now live ONLY in the
+  // artifact dock (the drawer off the timer row) — the inline transcript grid
+  // is gone. This stub remains for legacy replay callers; the data still
+  // merges + persists via mergeFilesTouched and feeds the dock through
+  // _dockFilesLanded / _paintDockChip.
+  return;
+  // RETIRED (2026-09-16, option a): artifact cards now live ONLY in the
+  // artifact dock (the drawer off the timer row) — the inline transcript grid
+  // is gone. This stub remains for legacy replay callers; the data still
+  // merges + persists via mergeFilesTouched and feeds the dock through
+  // _dockFilesLanded / _paintDockChip.
+  return;
   if (!Array.isArray(files) || !files.length) return;
   const partial = !!(opts && opts.partial);
   // Parentage guard: fall back to the ACTIVE stream's host only when it is the
@@ -3293,9 +3305,14 @@ function setStreamSending(stream, sending) {
     // A new turn starts fresh — clear any stale pending-ask flag for this conv
     // (left behind if a previous turn was aborted mid-question).
     _askingConvs.delete(activeConvId);
+    // Artifact dock: collapse + busy pip for the new turn (manual override reset).
+    try { _dockTurnStart(stream); } catch (_) {}
   } else {
     stream.abort = null;
     stream.generating = false;
+    // Artifact dock: turn ended (natural, error, or abort) → consolidate the
+    // list and auto-open unless the user toggled the drawer mid-turn.
+    try { _dockTurnEnd(stream); } catch (_) {}
     // Ends off-screen (including an abort — the work stopped either way, and
     // there is something to come back to) → it becomes a badge on the toggle.
     try {
@@ -4214,6 +4231,7 @@ async function sendSingle(text, stream, opts = {}) {
       // artifact auto-reload keeps their content fresh); the final event
       // consolidates order (dedupe, most recently edited last).
       mergeFilesTouched(stream, ev.files);
+      try { _dockFilesLanded(stream, ev.files, !!ev.partial); } catch (_) {}
       try { renderFilesTouched(host, ev.files, { partial: !!ev.partial }); } catch (_) {}
     }
     dispatchAgentEvent(ev, renderer, host);
