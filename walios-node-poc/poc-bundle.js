@@ -3300,12 +3300,35 @@ function boot(libDir, opts = {}) {
   realm.process = process;
   // Timers go through the realm so outstanding ones can be counted; user code that
   // calls setTimeout must keep the process alive, exactly as in node.
+  // A LIVE INTERVAL KEEPS THE PROCESS ALIVE, as it does in node. setInterval used to
+  // be a bare passthrough that counted for nothing, so a script whose only remaining
+  // work was an interval could be retired at any moment -- and an explicit
+  // `setInterval` keepalive, the obvious way to hold a long async job open, did
+  // nothing at all. npm-lite installing express stopped partway and exited 0 because
+  // of this: the tree was written as far as it got, and the failure only surfaced
+  // later as "Cannot find module" from a package that looked installed.
+  //
+  // The count is released by clearInterval (or when the process ends), so an interval
+  // nobody clears holds the process open exactly as node's does.
+  const liveIntervals = new Set();
   const timers = {
-    setTimeout: (fn, ms, ...a) => { pending.n++; return setTimeout(() => { pending.n--; try { fn(...a); } catch (e) { pending.onError(e); } }, ms); },
-    setInterval: (fn, ms, ...a) => setInterval(fn, ms, ...a),
-    setImmediate: (fn, ...a) => { pending.n++; return setTimeout(() => { pending.n--; try { fn(...a); } catch (e) { pending.onError(e); } }, 0); },
+    // Decrement AFTER the callback, not before: a callback that schedules more work
+    // must not have the count drop to zero in the window between the two.
+    setTimeout: (fn, ms, ...a) => { pending.n++; return setTimeout(() => { try { fn(...a); } catch (e) { pending.onError(e); } finally { pending.n--; } }, ms); },
+    setInterval: (fn, ms, ...a) => {
+      pending.n++;
+      const id = setInterval(() => { try { fn(...a); } catch (e) { pending.onError(e); } }, ms);
+      liveIntervals.add(id);
+      return id;
+    },
+    setImmediate: (fn, ...a) => { pending.n++; return setTimeout(() => { try { fn(...a); } catch (e) { pending.onError(e); } finally { pending.n--; } }, 0); },
     clearTimeout: (t) => { if (t !== undefined) { clearTimeout(t); if (pending.n > 0) pending.n--; } },
-    clearInterval: (t) => clearInterval(t),
+    clearInterval: (t) => {
+      if (t !== undefined) {
+        clearInterval(t);
+        if (liveIntervals.delete(t) && pending.n > 0) pending.n--;
+      }
+    },
   };
   Object.assign(realm, timers);
   realm.global = Object.assign({ process, console: { log: (...a) => trace.stderr.push(a.join(' ')) } }, timers);

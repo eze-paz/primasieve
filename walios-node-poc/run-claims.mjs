@@ -19,7 +19,7 @@ await page.goto(ORIGIN + '/walios/terminal.html', { waitUntil: 'domcontentloaded
 console.log('crossOriginIsolated:', await page.evaluate(() => self.crossOriginIsolated));
 
 const settle = (ms) => new Promise((r) => setTimeout(r, ms));
-await settle(6000);                                   // busybox + ash come up
+await settle(12000);                                  // busybox + ash come up (a cold page is slower)
 await page.mouse.click(400, 300);                     // focus the terminal
 // Fetch over the guest's own TCP stack rather than typing the whole script in:
 // xterm keystroke injection is slow and mangles quoting.
@@ -29,7 +29,7 @@ await page.keyboard.press('Enter');
 const read = () => page.evaluate(() => (document.body.innerText || ''));
 const t0 = Date.now();
 let text = '';
-while (Date.now() - t0 < 180000) {
+while (Date.now() - t0 < 420000) {
   await settle(1500);
   text = await read();
   if (text.includes(process.env.DONE || 'CLAIMS-DONE')) break;

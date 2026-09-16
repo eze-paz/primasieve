@@ -254,7 +254,17 @@ async function main() {
     return;
   }
   const t0 = Date.now();
-  const r = await installTree(specs, prefix, (s) => console.log(s));
+  // Hold the event loop for the WHOLE install. Every individual await here is
+  // covered (the fetch shim and the zlib shim each register with the runtime's
+  // pending count), but an install is a long chain of them and the process only has
+  // to be judged idle ONCE, in a gap between two of them, to be retired mid-work --
+  // which is what was happening: npm-lite exited 0 having written part of the tree,
+  // and the failure only showed up later as "Cannot find module" from a package that
+  // looked installed. A single explicit hold removes the whole class.
+  const hold = setInterval(() => {}, 200);
+  let r;
+  try { r = await installTree(specs, prefix, (s) => console.log(s)); }
+  finally { clearInterval(hold); }
   console.log('installed ' + r.count + ' package(s), ' + r.files + ' files, '
     + r.bytes + ' bytes in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's -> ' + prefix);
   if (r.conflicts.length) console.log('version conflicts (first wins): ' + r.conflicts.join('; '));
