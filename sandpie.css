@@ -4,8 +4,8 @@
        set by the Appearance panel via localStorage; 100% = fill the pane. The cap
        is applied as horizontal PADDING on the scroll container so the scrollbar
        stays on the pane's right edge instead of hugging the narrowed content.
-       1240px matches themes.js _CHAT_W_DEFAULT so first paint = unset default. */
-    --sp-chat-max-w: 1240px;
+       900px matches themes.js _CHAT_W_DEFAULT so first paint = unset default. */
+    --sp-chat-max-w: 900px;
     --sp-bg: #0d1117;
     --sp-surface: #161b22;
     --sp-border: #30363d;
@@ -3329,6 +3329,9 @@ body.sp-decoding *::after {
   border-top: 1px solid var(--sp-border);
   font: 0.82rem 'JetBrains Mono', Consolas, monospace;
   line-height: 1.5;
+  /* Same horizontal cap as the chat column (--sp-chat-max-w, set by
+     themes.js applyChatWidth) so command output lines up with the chat. */
+  padding-inline: max(1.5rem, calc((100% - var(--sp-chat-max-w)) / 2));
 }
 .cmd-header {
   display: flex;

@@ -359,7 +359,7 @@ function computeAccentNeg() {
    0 / missing = fill the pane (the historical behaviour). */
 var _CHAT_WIDTH_KEY = 'sandpie-chat-max-w';
 var _CHAT_W_MIN = 560, _CHAT_W_MAX = 1600, _CHAT_W_STEP = 20;   // slider range; at MAX = fill the pane
-var _CHAT_W_DEFAULT = 1240;   // used when the device has never set a width
+var _CHAT_W_DEFAULT = 900;   // used when the device has never set a width
 // Storage: missing key = default (1240); "0" = user explicitly chose Full; else px.
 function getChatWidth() {
   try {
