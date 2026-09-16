@@ -1593,7 +1593,7 @@ function rebuildSettledTimer(target, s) {
     if (badge) {
       const snapshot = s.todos.slice();
       badge.onclick = () => {
-        showCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
+        toggleCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
       };
     }
   }
@@ -3233,6 +3233,23 @@ function showCmdPanelForEl(el, content, title) {
   const pane = el && el.closest ? el.closest('#messages, #messagesSide') : null;
   if (pane) _commandPanelTo(pane);
   if (typeof SandpieCommandView !== 'undefined') SandpieCommandView.show(content, title);
+}
+// Toggle variant for the timer badges (mt-todos): clicking the badge when its
+// Checklist panel is already open in the SAME pane CLOSES it instead of
+// re-rendering the same content. Anything else (closed, other pane, other
+// content showing) opens/routes the panel as usual.
+function toggleCmdPanelForEl(el, content, title) {
+  const panel = $('commandOutput');
+  const pane = el && el.closest ? el.closest('#messages, #messagesSide') : null;
+  if (panel && panel.style.display !== 'none' && typeof SandpieCommandView !== 'undefined') {
+    const panelPane = panel.closest('#messages, #messagesSide');
+    const prompt = panel.querySelector('.cmd-prompt');
+    if (panelPane && pane && panelPane === pane && prompt && prompt.textContent === '>>> ' + title) {
+      SandpieCommandView.hide();
+      return;
+    }
+  }
+  showCmdPanelForEl(el, content, title);
 }
 // The command panel shows a checklist SNAPSHOT (the badge click builds it once),
 // so a write_todos landing while it's open would leave stale rows on screen.
@@ -5199,7 +5216,7 @@ function renderTodos(tcId, todos, scopeEl) {
       badge.textContent = cur + '/' + todos.length;
       badge.title = (todos[ip] && todos[ip].content) || 'Checklist';
       badge.onclick = () => {
-        showCmdPanelForEl(badge, buildTodosView(todos), 'Checklist');
+        toggleCmdPanelForEl(badge, buildTodosView(todos), 'Checklist');
       };
     }
   }
@@ -7278,7 +7295,8 @@ async function maybeAutoTitle(convId, { force = false } = {}) {
     const title = await SandpieAutoTitle.generate({
       userText: _convText(firstUser.content),
       assistantText: firstAsst ? _convText(firstAsst.content) : '',
-      sessionId: 'Retitle:' + (await ensureSessionId(convId)),   // parent-session marker for /admin/transcripts
+      sessionId: 'Retitle:' + (await ensureSessionId(convId)),   // parent-session marker for /admin/transcripts,
+      convId,   // title on the CONVERSATION's model, not the app default
       signal: _titleAbort.signal,
     });
     if (!title || title === stored) return '';
@@ -8431,7 +8449,7 @@ function endTotalTimer(stream, label) {
       // state at turn-end, immune to later turns reassigning stream.todos.
       const snapshot = stream.todos.slice();
       badge.onclick = () => {
-        showCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
+        toggleCmdPanelForEl(badge, buildTodosView(snapshot), 'Checklist');
       };
     }
   }

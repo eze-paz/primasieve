@@ -48,12 +48,12 @@ const SandpieAutoTitle = (function () {
   // (a directly-authored title in a non-fluent language comes out garbled —
   // same regime split as the chat itself). Fluent/unknown-language => the old
   // behavior, title in the user's language.
-  function _titleLang() {
+  function _titleLang(activeProvider) {
     try {
       const SL = window.SandpieLanguage;
       const code = String((SL && SL.effective && SL.effective()) || 'en').split(/[-_]/)[0].toLowerCase();
       if (!code || code === 'en') return { line: '- Write it in the same language the user wrote in.', tx: null };
-      const p = SandpieProviders.getActive ? SandpieProviders.getActive() : null;
+      const p = activeProvider || null;
       const fl = (p && Array.isArray(p.fluent)) ? p.fluent.map(c => String(c).split(/[-_]/)[0].toLowerCase()) : null;
       if (fl && fl.includes(code)) return { line: '- Write it in the same language the user wrote in.', tx: null };
       const name = (SL && SL.name && SL.name(code)) || code;
@@ -102,19 +102,22 @@ const SandpieAutoTitle = (function () {
   // in-browser) via the shared SandpieProviders.complete(). Returns a clean title
   // or '' — it never throws for a bad/empty answer, only for a transport failure,
   // which the caller treats as "leave the title alone and try again next turn".
-  async function generate({ userText = '', assistantText = '', signal, sessionId = null } = {}) {
+  async function generate({ userText = '', assistantText = '', signal, sessionId = null, convId = null } = {}) {
     if (!isEnabled()) return '';
     if (typeof SandpieProviders === 'undefined' || !SandpieProviders.complete) return '';
     const u = String(userText || '').trim().slice(0, CHARS_PER_MSG);
     if (!u) return '';
     const a = String(assistantText || '').trim().slice(0, CHARS_PER_MSG);
 
-    const active = SandpieProviders.getActive ? SandpieProviders.getActive() : null;
+    // Use the CONVERSATION's model (per-conversation provider binding), falling
+    // back to the default provider only when the conv has none / isn't known.
+    const active = (convId && SandpieProviders.resolve) ? SandpieProviders.resolve(convId)
+                 : (SandpieProviders.getActive ? SandpieProviders.getActive() : null);
     const isLocal = false;  // local-LLM engines removed
     let user = 'User: ' + u + (a ? '\n\nAssistant: ' + a : '');
     if (isLocal) user += '\n\n/no_think';
 
-    const lang = _titleLang();
+    const lang = _titleLang(active);
     const out = await SandpieProviders.complete({
       system: getPrompt() + '\n' + lang.line,
       user,
