@@ -1233,10 +1233,6 @@ function renderFileBundle(target, bundleFiles) {
     const label = _codeFileLabel(e);
     if (!seen.has(label)) { seen.add(label); distinct.push(label); }
   }
-  let typeLabel = distinct.slice(0, 4).join(', ') + (distinct.length > 4 ? ', +' + (distinct.length - 4) + ' more' : '');
-  // Hard cap the rendered label length — long type names (e.g. GIT/OBJECTS hashes) blow out the subtitle
-  const TYPE_LABEL_MAX = 60;
-  if (typeLabel.length > TYPE_LABEL_MAX) typeLabel = typeLabel.slice(0, TYPE_LABEL_MAX - 1).replace(/[\s,]+$/, '') + '\u2026';
   const badge = count > 99 ? '99+' : String(count);
 
   const wrap = document.createElement('div');
@@ -1250,7 +1246,7 @@ function renderFileBundle(target, bundleFiles) {
     '<span class="fb-pile"><b></b><b></b><b><span class="fb-num">' + badge + '</span></b></span>' +
     '<span class="fb-body">' +
       '<span class="fb-title"><b>' + count + ' other file' + (count !== 1 ? 's' : '') + '</b> created or edited</span>' +
-      '<span class="fb-sub"><span class="fb-size"></span>' + (typeLabel ? '<span class="fb-types">' + typeLabel + '</span>' : '') + '</span>' +
+      '<span class="fb-sub"><span class="fb-size"></span></span>' +
     '</span>' +
     '<span class="fb-cta"><span class="fb-lbl-hide">Hide</span>' +
       '<span class="fb-chevron"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span>';
