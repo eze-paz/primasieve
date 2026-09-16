@@ -8618,6 +8618,11 @@ function startTotalTimer(stream) {
       _wireCtxCounter(slot, stream.id);
       _paintProjChip(slot, stream.id);
     }
+    // The dock chip must NEVER be missing from the timer row: the rebuild above
+    // wiped it at every round start (2026-09-16 bug: chip gone until turn end).
+    // Self-heal on every tick — any wipe path that ever misses its re-stamp is
+    // caught here within a tick, no exceptions.
+    if (!slot.querySelector(':scope > .dock')) _paintDockChip(slot, stream);
     // Ripple while a completion is actively streaming (respond()/plain content),
     // not only while a thought box is open. `generating` is the single source of
     // truth — true from send until the stream ends/aborts — re-asserted each tick
