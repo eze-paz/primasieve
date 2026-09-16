@@ -6061,8 +6061,10 @@ async function tool_delete_file({ path, recursive }, ctx) {
   if (!path) return { result: 'Error: path is required.' };
   const norm = String(path).replace(/^\/+/, '').replace(/^files\//, '');
   if (!norm) return { result: 'Refused: cannot delete the /files/ root.' };
-  if (norm === 'sandpie' || norm.startsWith('sandpie/')) {
-    return { result: `Refused: ${norm} is under sandpie/ — system data (memories, skills, conversations, scripts). Not deletable with this tool.` };
+  // sandpie/ is protected EXCEPT skills/: individual skill folders are user-manageable
+  // (install/remove at will), so deleting under sandpie/skills/ is allowed.
+  if (norm === 'sandpie' || (norm.startsWith('sandpie/') && !norm.startsWith('sandpie/skills/'))) {
+    return { result: `Refused: ${norm} is under sandpie/ — system data (memories, conversations, scripts). Not deletable with this tool. (Exception: sandpie/skills/ IS deletable.)` };
   }
   try {
     const root = await opfsRoot();
