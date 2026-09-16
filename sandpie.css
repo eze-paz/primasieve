@@ -2588,20 +2588,6 @@ ul.conv-list li.active {
     radial-gradient(circle at 80% 20%, rgba(192,132,252,0.06) 0%, transparent 60%);
 }
 
-[data-theme="aurora"] body::before {
-  content: '';
-  position: fixed; inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(56,189,248,0.04) 0%, transparent 50%);
-  animation: auroraPulse 8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 1;
-}
-
-@keyframes auroraPulse {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.1); }
-}
-
 [data-theme="aurora"] aside {
   background: rgba(15,23,42,0.55);
   border-right: 1px solid rgba(148,163,184,0.1);
