@@ -4375,7 +4375,7 @@ html[data-theme="light"] {
   --sprail-gut: 11px;
   /* The rail uses the theme's accent as published -- no deepening. */
   --sprail-key:    var(--sp-accent);
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 10%, transparent);   /* light ink on white needs far more than a dark theme does */
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 3%, transparent);
   --sprail-ops:    color-mix(in srgb, var(--sprail-key) 42%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 20%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 70%, transparent);
@@ -4541,7 +4541,7 @@ html[data-theme="clear"] {
      at three strengths" becomes ONE INK at three strengths -- solid on the
      reply, 30% on machinery, 18% on the query. Swiss, not decorative. */
   --sprail-key:    var(--sp-text);
-  --sprail-ground: color-mix(in srgb, var(--sp-text) 6%, transparent);    /* pure black on pure white: 6% is already a visible panel */
+  --sprail-ground: color-mix(in srgb, var(--sp-text) 3%, transparent);
   --sprail-ops:    color-mix(in srgb, var(--sp-text) 30%, transparent);
   --sprail-out:    color-mix(in srgb, var(--sp-text) 18%, transparent);
   --sprail-count:  color-mix(in srgb, var(--sp-text-dim) 75%, transparent);
