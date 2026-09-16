@@ -1658,11 +1658,22 @@ function _dockRenderItems(pane, stream, st) {
       const list = document.createElement('div');
       list.className = 'fb-list';
       table.appendChild(list);
-      for (const f of bundle) {
-        const clean = String((f && f.path) || '').replace(/^\/+/, '');
-        if (clean) list.appendChild(_fbRowFor(clean, f && f.ts));
+      // `bundle` entries are clean path strings (see the split loop above) —
+      // NOT {path,ts} objects like the retired renderFileBundle got. Reading
+      // f.path here yielded '' for every row (the empty-table bug).
+      for (const clean of bundle) {
+        if (clean) list.appendChild(_fbRowFor(clean));
       }
       grid.appendChild(table);
+      // The table sits below the cards inside the scrollable dock-in; after a
+      // re-render the scroll resets to the top and the table is below the fold.
+      // Bring it into view.
+      requestAnimationFrame(() => {
+        try {
+          const box = body.querySelector('.dock-in');
+          if (box) box.scrollTop = box.scrollHeight;
+        } catch (_) {}
+      });
     }
     const row = document.createElement('div');
     row.className = 'dock-more';
