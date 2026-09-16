@@ -4812,7 +4812,13 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
   padding: 4px 2px 0; cursor: pointer; text-align: center;
 }
 .dock-more:hover { color: var(--sp-text); }
-.dock.empty { display: none; }
+/* the drawer's 0-files placeholder (chip always renders, even at 0 files) */
+.dock-empty {
+  grid-column: 1 / -1;
+  text-align: center; padding: 16px 0 6px;
+  font: 10.5px 'JetBrains Mono', Consolas, monospace;
+  color: var(--sp-text-dim); letter-spacing: .06em;
+}
 @media (max-width: 767px) {
   .dock-in .grid { grid-template-columns: 1fr; }
 }

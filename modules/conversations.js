@@ -879,12 +879,13 @@ function renderConversation(msgs, compaction, host = null) {
   // deduped file list at the bottom — newest last, .html/images expanded, the
   // rest collapsed clickable cards. Cards rendered from legacy persisted
   // 'artifact:' results earlier in the replay are deduped away here.
+  // Artifact dock: repopulate from the persisted list (closed by default).
+  // ALWAYS stamps the chip, even for a conversation with 0 files.
+  try { const _pane = target.closest('#messages, #messagesSide');
+    if (_pane) { const _slot = _pane.querySelector(':scope > .msg-timer-slot .msg-timer'); _paintDockChip(_slot, s); }
+  } catch (_) {}
   if (s && Array.isArray(s.filesTouched) && s.filesTouched.length) {
     try { renderFilesTouched(target, s.filesTouched); } catch (_) {}
-    // Artifact dock: repopulate from the persisted list (closed by default).
-    try { const _pane = target.closest('#messages, #messagesSide');
-      if (_pane) { const _slot = _pane.querySelector(':scope > .msg-timer-slot .msg-timer'); _paintDockChip(_slot, s); }
-    } catch (_) {}
   }
   // A caller that wiped the host (clearActiveConvUI — rewind / compaction
   // re-render) destroyed the settled .msg-timer line, and nothing re-creates it:
@@ -1583,12 +1584,10 @@ function _paintDockChip(slot, stream) {
   const files = (stream && Array.isArray(stream.filesTouched)) ? stream.filesTouched : [];
   const stale = pane.querySelector(':scope > .msg-timer-slot .dock');
   if (stale) stale.remove();
-  if (!files.length) {
-    const body = _dockBodyFor(pane);
-    if (body) body.remove();
-    return;
-  }
-  const st = _dockState.get(convId) || { open: false, manual: false };
+  // NO GATES: the chip always renders, even with 0 files (an empty drawer
+  // shows the 'empty' placeholder instead). The old "remove chip when empty"
+  // branch is gone by design (2026-09-16).
+  const st = _dockState.get(convId) || { open: false };
   _dockState.set(convId, st);
   const chip = document.createElement('span');
   chip.className = 'dock' + (stream && stream.generating ? ' busy' : '');
@@ -1598,7 +1597,7 @@ function _paintDockChip(slot, stream) {
   chip.querySelector('.n').textContent = files.length;
   chip.querySelector('.dock-hd').addEventListener('click', (e) => {
     e.stopPropagation();
-    st.open = !st.open; st.manual = true;
+    st.open = !st.open;
     pane.classList.toggle('dock-slot', true);
     pane.classList.toggle('open', st.open);
   });
@@ -1626,6 +1625,13 @@ function _dockRenderItems(pane, stream, st) {
   // '+N older' expands the cap; 'N other files' toggles the bundle cards open.
   // Both are sticky per conversation (st.expanded / st.bundleOpen), so repaints
   // (timer-row rebuilds, file lands, deletes) keep the user's choice.
+  if (!individual.length && !bundle.length) {
+    const ph = document.createElement('div');
+    ph.className = 'dock-empty';
+    ph.textContent = 'empty';
+    grid.appendChild(ph);
+    return;
+  }
   const shown = st.expanded ? individual : individual.slice(-DOCK_CAP);
   const older = individual.length - shown.length;
   if (older > 0) {
@@ -1728,9 +1734,9 @@ function _dockTurnStart(stream) {
   const convId = '' + (stream.id || '');
   // New round → the drawer ALWAYS closes (Enter starts a round: collapse is
   // unconditional — a manually-opened drawer does not survive the send).
-  const st = _dockState.get(convId) || { open: false, manual: false };
+  const st = _dockState.get(convId) || { open: false };
   _dockState.set(convId, st);
-  st.open = false; st.manual = false;
+  st.open = false;
   const pane = _dockPane(stream);
   if (pane) {
     pane.classList.remove('open');
@@ -1749,7 +1755,10 @@ function _dockTurnEnd(stream) {
   if (!pane) return;
   const chip = pane.querySelector(':scope > .msg-timer-slot .dock');
   if (chip) chip.classList.remove('busy');
-  if (!st.manual) { st.open = true; pane.classList.add('open'); }
+  // ALWAYS open at end of round — the drawer shows the round's new files
+  // (or the 'empty' placeholder). No manual-condition gate.
+  st.open = true;
+  pane.classList.add('open');
   const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
   _paintDockChip(slot, stream);
 }
