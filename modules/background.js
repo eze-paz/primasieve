@@ -10,10 +10,9 @@
 
    Modes:
      clouds      — the original homeSky pixel-cloud field (default)
-     water-open  — open water seen from a low angle: ripple bands compress
-                   toward the horizon, glints shimmer on the slopes
-     water-river — flowing water in side view: long streaks pulled downstream,
-                   eddies peeling off, foam flecks in the fast lanes
+     water-open  — 'Selune': moonlit open water — ripple bands compress toward
+                   the horizon, glints shimmer, glare moon with a randomized
+                   phase (crescent) spawned once per page load
      none        — plain background, no animation
 
    The choice is persisted in SandpieConfig under the 'background' namespace
@@ -43,11 +42,10 @@
   let mode = 'clouds';
   const MODES = {
     'clouds':      { label: 'Clouds' },
-    'water-open':  { label: 'Open water' },
-    'water-river': { label: 'River' },
+    'water-open':  { label: 'Selune' },
     'none':        { label: 'None' },
   };
-  const isWater = () => mode === 'water-open' || mode === 'water-river';
+  const isWater = () => mode === 'water-open';
 
   /* ── per-theme tuning (from the round-13 studies). `reach` is how far along the
      bg→tint ramp the top step sits; light themes need far less because the eye
@@ -142,7 +140,9 @@
      whole session — resizes, pane remounts and focus changes never move it.
      It is constrained to the sky band and never overlaps the greeting. */
   const MOON = { x: .7, y: .06, r: .04, soft: .4, glintW: .11, glintAmp: 1, glareR: .9, glareAmp: 1.05 };
-  let moon = null;                       // { x, y } in pane fractions, spawned per redraw
+  let moon = null;                       // { x, y, ph } in pane fractions, spawned per redraw
+  // Phase params (mockup C, user-tuned): terminator softness 1, phase randomized
+  // per page load into the crescent bands 0.20-0.30 (waxing) or 0.70-0.80 (waning).
   function greetingRect() {
     // bounding box of the greeting text in canvas cell coords (or null)
     const g = document.querySelector('#messages .home-greeting');
@@ -166,14 +166,19 @@
       const y = yMin + Math.random() * Math.max(0, yMax - yMin);
       const cx = x * gw, cy = y * gh;
       if (g && cx > g.x0 - pad && cx < g.x1 + pad && cy > g.y0 - pad && cy < g.y1 + pad) continue;
-      moon = { x, y };
+      moon = { x, y, ph: spawnPhase() };
       return;
     }
-    moon = { x: MOON.x, y: MOON.y };                // fallback: the tuned spot
+    const ph = Math.random() < .5 ? .2 + Math.random() * .1 : .7 + Math.random() * .1;
+    moon = { x, y, ph };                            // fallback: the tuned spot
+  }
+  function spawnPhase() {
+    // crescent band: 0.20-0.30 waxing or 0.70-0.80 waning, rolled once per page load
+    return Math.random() < .5 ? .2 + Math.random() * .1 : .7 + Math.random() * .1;
   }
   function paintWaterOpen() {
     if (!img || !pal) return;
-    if (!moon) spawnMoon();          // lazily on first paint; position fixed for the session
+    if (!moon) spawnMoon();          // lazily on first paint; position + phase fixed for the session
     const d = img.data, T = tick / 60, horizon = gh * .5;
     const mx = moon.x * gw, my = moon.y * gh, mr = Math.min(gw, gh) * MOON.r;
     const gx = moon.x * gw, halfw = gw * MOON.glintW;
@@ -187,8 +192,19 @@
           const ss = edge * edge * (3 - 2 * edge);
           // GLARE: hot bloom at the moon's centre (mockup A, user-tuned)
           const glare = Math.exp(-(dist * dist) / (2 * mr * mr * MOON.glareR * MOON.glareR)) * MOON.glareAmp;
-          c = ss + glare;
-          moonCore = edge > .55;                    // core in the raw tint colour
+          // PHASE (mockup C, user-tuned): a shadow disc of the same radius slides
+          // across the moon — 0 new, .25 first quarter, .5 full, .75 last quarter.
+          // Softness 1 → the terminator fades across the whole disc. The glare
+          // follows the lit part; the halo/atmosphere stays full.
+          const ph = moon.ph == null ? .5 : moon.ph;
+          const waxing = ph < .5;
+          const ph2 = waxing ? ph : 1 - ph;          // 0 new .. .5 full
+          const dx = 4 * mr * ph2;                   // 0..2mr shadow offset
+          const sx = mx + (waxing ? -dx : dx);       // shadow slides from the lit side
+          const dSh = Math.hypot(x - sx, y - my);
+          const mask = clamp((dSh - mr) / (mr * 1) + .5, 0, 1);   // phaseSoft = 1
+          c = ss * mask + glare * mask;
+          moonCore = edge > .55 && mask > .6;        // core only on the lit part
         } else {
           const dn = (y - horizon) / (gh - horizon);
           const persp = .12 + Math.pow(dn, .5) * 5;
@@ -212,25 +228,6 @@
     }
     blit();
   }
-  function paintWaterRiver() {
-    if (!img || !pal) return;
-    const d = img.data, T = tick / 60;
-    for (let y = 0; y < gh; y++) {
-      for (let x = 0; x < gw; x++) {
-        const lane = .5 + .5 * fbm(x * .02, y * .05 + 3.1);
-        const streak = fbm(x * .05 - T * (.25 + lane * .55), y * .35 + fbm(x * .03 - T * .2, y * .08) * 2);
-        let c = .16 + streak * .5 * (.5 + lane);
-        const eddy = fbm(x * .08 + Math.sin(y * .1 + T * .4) * 2, y * .08 - T * .1);
-        c += Math.max(0, eddy - .62) * 1.2;
-        const foam = fbm(x * .25 - T * (.5 + lane * .8), y * .3);
-        if (foam > .8 && lane > .55) c += (foam - .8) * 3;
-        c = clamp(c, 0, 1);
-        const p = pal[dither(c, x, y)], q = (y * gw + x) * 4;
-        d[q] = p[0]; d[q + 1] = p[1]; d[q + 2] = p[2]; d[q + 3] = 255;
-      }
-    }
-    blit();
-  }
   function blit() {
     octx.putImageData(img, 0, 0);
     ctx.drawImage(off, 0, 0, gw * cell, gh * cell);
@@ -238,7 +235,6 @@
   function paint() {
     if (!img || !pal) return;
     if (mode === 'water-open') return paintWaterOpen();
-    if (mode === 'water-river') return paintWaterRiver();
     paintClouds();
   }
   function paintClouds() {
