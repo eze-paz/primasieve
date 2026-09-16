@@ -4768,10 +4768,6 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 .dock-hd .caret { font-size: 9px; opacity: .65; transition: transform .16s; }
 .dock-slot.open .dock-hd .caret { transform: rotate(90deg); }
 .dock-hd .n { color: var(--sp-text); font-variant-numeric: tabular-nums; }
-.dock-hd .live { display: none; align-items: center; gap: 6px; font-size: 9.5px; letter-spacing: .06em; color: color-mix(in srgb, var(--sp-accent) 85%, var(--sp-text)); }
-.dock.busy .dock-hd .live { display: inline-flex; }
-.dock-hd .live i { width: 5px; height: 5px; border-radius: 50%; background: currentcolor; animation: dk-pulse 1.1s ease-in-out infinite; }
-@keyframes dk-pulse { 0%,100% { opacity: 1; } 50% { opacity: .2; } }
 /* drawer body: grid of artifact cards, drops down under the timer row */
 .dock-body {
   max-height: 0; overflow: hidden;
@@ -4827,5 +4823,4 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dock-body { transition: none; }
-  .dock-hd .live i { animation: none; }
 }

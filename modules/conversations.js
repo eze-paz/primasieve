@@ -1590,10 +1590,9 @@ function _paintDockChip(slot, stream) {
   const st = _dockState.get(convId) || { open: false };
   _dockState.set(convId, st);
   const chip = document.createElement('span');
-  chip.className = 'dock' + (stream && stream.generating ? ' busy' : '');
+  chip.className = 'dock';
   chip.innerHTML = '<span class="dock-hd"><span class="caret">▸</span>' +
-    '<span><span class="n"></span> files</span>' +
-    '<span class="live"><i></i>writing</span></span>';
+    '<span><span class="n"></span> files</span></span>';
   chip.querySelector('.n').textContent = files.length;
   chip.querySelector('.dock-hd').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1743,7 +1742,7 @@ function _dockFilesLanded(stream, files, partial) {
   const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
   _paintDockChip(slot, stream);
 }
-// Hook: turn starts → collapse + busy (unless the user manually opened it).
+// Hook: turn starts → collapse the drawer (unconditional on a new round).
 function _dockTurnStart(stream) {
   if (!stream) return;
   const convId = '' + (stream.id || '');
@@ -1753,11 +1752,7 @@ function _dockTurnStart(stream) {
   _dockState.set(convId, st);
   st.open = false;
   const pane = _dockPane(stream);
-  if (pane) {
-    pane.classList.remove('open');
-    const chip = pane.querySelector(':scope > .msg-timer-slot .dock');
-    if (chip) chip.classList.add('busy');
-  }
+  if (pane) pane.classList.remove('open');
 }
 // Hook: turn ends (natural, error, or abort — hangs off the turn-end teardown,
 // not respond()) → consolidate + auto-open unless the user toggled mid-turn.
@@ -1768,8 +1763,6 @@ function _dockTurnEnd(stream) {
   _dockState.set(convId, st);
   const pane = _dockPane(stream);
   if (!pane) return;
-  const chip = pane.querySelector(':scope > .msg-timer-slot .dock');
-  if (chip) chip.classList.remove('busy');
   // ALWAYS open at end of round — the drawer shows the round's new files
   // (or the 'empty' placeholder). No manual-condition gate.
   st.open = true;
@@ -3414,7 +3407,7 @@ function setStreamSending(stream, sending) {
     // A new turn starts fresh — clear any stale pending-ask flag for this conv
     // (left behind if a previous turn was aborted mid-question).
     _askingConvs.delete(activeConvId);
-    // Artifact dock: collapse + busy pip for the new turn (manual override reset).
+    // Artifact dock: collapse the drawer for the new turn.
     try { _dockTurnStart(stream); } catch (_) {}
   } else {
     stream.abort = null;
