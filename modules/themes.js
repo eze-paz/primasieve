@@ -271,15 +271,15 @@ function updateThemeButtons() {
 }
 
 function applySavedCustom() {
-  var saved = getThemeName() || 'electric';
+  var saved = getThemeName() || 'olive';
   if (saved && _themePalettes[saved]) {
     applyTheme(saved);
     var pal = getPalette(saved);
     if (pal) { try { Object.assign(_themePalettes[saved], pal); applyThemePalette(saved); } catch (e) {} }
   } else {
-    applyTheme('electric');
+    applyTheme('olive');
   }
-  _reportTheme(getThemeName() || 'electric');   // also report users who never change theme
+  _reportTheme(getThemeName() || 'olive');   // also report users who never change theme
 }
 
 function rgbaToHex(rgba) {
