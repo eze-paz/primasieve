@@ -1632,8 +1632,15 @@ function _dockRenderItems(pane, stream, st) {
     grid.appendChild(ph);
     return;
   }
-  const shown = st.expanded ? individual : individual.slice(-DOCK_CAP);
+  // NEWEST FIRST (2026-09-16): the list is ts-ascending, so render it reversed —
+  // the newest deliverable lands at the top-left, a re-touched file jumps back
+  // to the top. The cap now hides the OLDEST files, so the '+N older' chip sits
+  // at the BOTTOM of the grid.
+  const shown = (st.expanded ? individual : individual.slice(-DOCK_CAP)).slice().reverse();
   const older = individual.length - shown.length;
+  for (const clean of shown) {
+    try { renderArtifact(grid, clean); } catch (_) {}
+  }
   if (older > 0) {
     const more = document.createElement('div');
     more.className = 'dock-more';
@@ -1645,9 +1652,6 @@ function _dockRenderItems(pane, stream, st) {
       _dockRenderItems(pane, stream, st);
     });
     grid.appendChild(more);
-  }
-  for (const clean of shown) {
-    try { renderArtifact(grid, clean); } catch (_) {}
   }
   if (bundle.length) {
     if (st.bundleOpen) {

@@ -81,7 +81,7 @@ const TAB_VIEWABLE_EXTS = new Set(['html', 'htm', 'svg', 'png', 'jpg', 'jpeg', '
 
 // V2 "preview thumbnail" artifact card — the body for panel-only office files and
 // the collapsed representation of every artifact type: a faux-page preview banner
-// on top, a footer with a type-tinted icon, a human label, and the file size.
+// on top, a footer that is just the plain filename (name + extension).
 const _ARTIFACT_KIND = {
   docx: 'doc', doc: 'doc', odt: 'doc', rtf: 'doc', txt: 'doc',
   pdf: 'pdf', xlsx: 'xls', xls: 'xls', ods: 'xls', csv: 'xls',
@@ -147,8 +147,6 @@ async function resolveArtifactPath(clean) {
 //               the slim strip used by non-renderable files.
 function buildArtifactCard(clean, ext, opts) {
   opts = opts || {};
-  const kind = _ARTIFACT_KIND[ext] || 'generic';
-  const label = _ARTIFACT_LABEL[ext] || (ext ? ext.toUpperCase() : 'File');
   const el = document.createElement('div');
   el.className = 'artifact-card-body';
   el.tabIndex = 0;
@@ -162,20 +160,19 @@ function buildArtifactCard(clean, ext, opts) {
       '<img class="ac-shot" alt="" aria-hidden="true" hidden>' +
       '<span class="ac-lx" hidden></span>' + ntBtn + '</div>'
     : '';
+  // Footer: PLAIN FILENAME (name + extension, e.g. "Test.html") — the icon and
+  // the filetype pill text ("Web page") are REMOVED (user decision 2026-09-16).
   el.innerHTML = thumb +
-    '<div class="ac-ft"><div class="ac-ic ac-t-' + kind + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + _ARTIFACT_ICON[kind] + '</svg></div>' +
-    '<span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '</div>';
-  el.querySelector('.ac-sub').textContent = label;
+    '<div class="ac-ft"><span class="ac-sub"></span>' + (opts.showThumb ? '' : ntBtn) + '</div>';
+  el.querySelector('.ac-sub').textContent = clean.split('/').pop();
   const open = (e) => { if (e) e.preventDefault(); if (opts.onOpen) opts.onOpen(); };
   el.onclick = open;
   el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') open(e); };
   const nt = el.querySelector('.ac-newtab');
   if (nt && opts.onNewTab) nt.onclick = (e) => { e.stopPropagation(); e.preventDefault(); opts.onNewTab(); };
   if (opts.showThumb) _fillArtifactThumb(el, clean, ext);
-  // The subtitle is the KIND only ("Web page", "Image"). It used to append the
-  // file size, which meant an OPFS stat per card for a number nobody acts on --
-  // and it read as noise next to the kind. formatArtifactBytes still serves the
-  // files list and the image-stack tile, where size is the point.
+  // The subtitle IS the filename (plain name + extension) since 2026-09-16 —
+  // the old kind label ("Web page") + icon are gone from the cards.
   return el;
 }
 

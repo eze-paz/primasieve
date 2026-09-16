@@ -4799,6 +4799,9 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 .dock-in .grid .file-bundle.dock-fb .fb-list { border-top: 1px solid var(--sp-border); }
 .dock-in .grid .file-bundle.dock-fb .fb-row { padding: 8px 11px; }
 .dock-in .grid { width: 100%; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 11px; }
+/* dock cards: compact filename pill (plain name, smaller) */
+.dock-in .grid .artifact-card-body .ac-ft { left: 6px; bottom: 6px; max-width: calc(100% - 12px); }
+.dock-in .grid .artifact-card-body .ac-sub { padding-right: 6px; font-size: 10px; }
 /* artifact cards live inside the dock grid: neutralize the transcript card's
    outer margins so the grid controls spacing */
 .dock-in .grid .artifact-wrap { margin-top: 0; align-self: stretch; max-width: 100%; }
