@@ -4790,6 +4790,9 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
   background: color-mix(in srgb, var(--sp-bg) 82%, var(--sp-text) 4%);
   overflow: hidden; margin-bottom: 6px;
 }
+/* expanded content (all files / bundle cards) scrolls inside the drawer:
+   the body keeps its 420px animation cap, the in-box scrolls beyond it */
+.dock-slot.open .dock-in { max-height: 396px; overflow-y: auto; }
 .dock-in .grid { width: 100%; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 11px; }
 /* artifact cards live inside the dock grid: neutralize the transcript card's
    outer margins so the grid controls spacing */

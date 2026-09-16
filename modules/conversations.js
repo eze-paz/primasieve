@@ -1623,22 +1623,42 @@ function _dockRenderItems(pane, stream, st) {
     const ext = clean.split('.').pop().toLowerCase();
     if (_ftIndividual(ext)) individual.push(clean); else bundle.push(clean);
   }
-  const shown = individual.slice(-DOCK_CAP);
+  // '+N older' expands the cap; 'N other files' toggles the bundle cards open.
+  // Both are sticky per conversation (st.expanded / st.bundleOpen), so repaints
+  // (timer-row rebuilds, file lands, deletes) keep the user's choice.
+  const shown = st.expanded ? individual : individual.slice(-DOCK_CAP);
   const older = individual.length - shown.length;
   if (older > 0) {
     const more = document.createElement('div');
     more.className = 'dock-more';
     more.textContent = '+' + older + ' older';
+    more.title = 'Show all files';
+    more.addEventListener('click', (e) => {
+      e.stopPropagation();
+      st.expanded = true;
+      _dockRenderItems(pane, stream, st);
+    });
     grid.appendChild(more);
   }
   for (const clean of shown) {
     try { renderArtifact(grid, clean); } catch (_) {}
   }
   if (bundle.length) {
+    if (st.bundleOpen) {
+      for (const clean of bundle) {
+        try { renderArtifact(grid, clean); } catch (_) {}
+      }
+    }
     const row = document.createElement('div');
     row.className = 'dock-more';
-    row.style.cursor = 'default';
-    row.textContent = bundle.length + (bundle.length === 1 ? ' other file' : ' other files');
+    row.textContent = (st.bundleOpen ? '\u2212 hide ' : '+ ') +
+      bundle.length + (bundle.length === 1 ? ' other file' : ' other files');
+    row.title = st.bundleOpen ? 'Hide code/data files' : 'Show code/data files';
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      st.bundleOpen = !st.bundleOpen;
+      _dockRenderItems(pane, stream, st);
+    });
     grid.appendChild(row);
   }
 }
