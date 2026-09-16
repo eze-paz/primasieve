@@ -385,6 +385,46 @@ const unknownSyscalls = new Set();
 const __waliWarned = new Set();
 function WARN(m) { if (__waliWarned.has(m)) return; __waliWarned.add(m); post('[host] ' + m + '\n', 2); }
 const modCache = new Map();   // key -> WebAssembly.Module
+// A WARM SPARE per module. Measured: starting a process costs ~20-45ms, and nearly all of
+// it is WebAssembly.instantiate INSIDE the worker -- `new Worker` itself is ~1ms, so a pool
+// of blank workers would buy nothing. What costs is instantiating THIS module, so the spare
+// is module-keyed and already past `init`: worker created, module instantiated, sitting on
+// its 'ready'. Taking one turns process start into a postMessage.
+//
+// ONLY for modules that DEFINE their own memory (busybox and the WALI binaries -- the shell
+// and its forks, i.e. most of the process count). A module that IMPORTS memory (clang) has
+// that memory created per-process by makeImports, and fork additionally needs the parent's
+// memory copied into it before the guest runs, so those keep the cold path. Never used for
+// a fork child for the same reason.
+const spares = new Map();          // modKey -> { w, ctl, bulk, ready } | 'pending'
+const SPARE_OK = (plan, opts) => !plan.memory && !(opts && opts.forkFrom);
+function takeSpare(modKey) {
+  const sp = spares.get(modKey);
+  if (!sp || sp === 'pending') return null;
+  spares.delete(modKey);
+  return sp;
+}
+function prepareSpare(modKey, plan) {
+  if (spares.has(modKey) || !plan || plan.memory) return;
+  spares.set(modKey, 'pending');
+  try {
+    const mod = modCache.get(modKey);
+    if (!mod) { spares.delete(modKey); return; }
+    let bulk;
+    try { bulk = new SharedArrayBuffer(1 << 20, { maxByteLength: 64 << 20 }); }
+    catch (_) { bulk = new SharedArrayBuffer(32 << 20); }
+    const ctl = new SharedArrayBuffer(KCTL.BYTES);
+    const w = new Worker(NODE_STUB_RE.test(modKey) ? NODE_WORKER_URL : 'wali-proc-worker.js');
+    let settle;
+    const ready = new Promise((res) => { settle = res; });
+    const sp = { w, ctl, bulk, ready, settle: (m) => settle(m) };
+    // The worker is silent after 'ready' until it is told to run, so buffering one message is enough.
+    w.onmessage = (ev) => { if (ev.data && ev.data.t === 'ready') settle(ev.data); };
+    w.onerror = () => { settle({ ok: false, error: 'spare worker failed' }); spares.delete(modKey); };
+    w.postMessage({ t: 'init', mod, ctl, names: plan.names, sigs: plan.sigv, bulk, memory: null });
+    spares.set(modKey, sp);
+  } catch (_) { spares.delete(modKey); }
+}
 const modSharedMem = new Map(); // key -> {initial, maximum} for a shared env.memory import (wasi-threads)
 // walios-node: a process whose USERSPACE is JavaScript on the page's own V8 rather
 // than a wasm guest. Everything else is identical -- same control block, same
@@ -593,6 +633,19 @@ function execDropCloexec(fdMap) {
 // table (--export-table --table-base=16), else default action. ----
 const SIG = { HUP:1, INT:2, QUIT:3, ILL:4, ABRT:6, KILL:9, USR1:10, SEGV:11, USR2:12, PIPE:13, ALRM:14, TERM:15, CHLD:17, CONT:18, STOP:19, TSTP:20, TTIN:21, TTOU:22, URG:23, WINCH:28 };
 const SIG_DFL_IGNORE = new Set([SIG.CHLD, SIG.CONT, SIG.URG, SIG.WINCH]);
+// SIGNAL DISPOSITION SENTINELS. In THIS ABI a handler is a FUNCTION-TABLE INDEX, so the
+// only non-handler values are SIG_DFL (0) and SIG_IGN (-2, i.e. 0xFFFFFFFE unsigned).
+// Measured in-guest: a real handler printed as pointer 1, SIG_IGN as 4294967294, SIG_DFL 0.
+//
+// The old code also treated ptr === 1 as SIG_IGN, "classic ABI". That is WRONG here: index
+// 1 is the FIRST function in the table, which is exactly where a small program's handler
+// lands -- so its signals were silently dropped. It cost nothing visible in the shell
+// (busybox's handlers sit at high indices) and everything in configure, whose test
+// programs are one function long: OpenSSH's `SA_RESTARTed signals interrupt select()`
+// check parks in select(NULL) waiting for an alarm that the kernel discarded, so every
+// OpenSSH build hung there forever rather than being slow.
+const isSigIgn = (ptr) => ptr === -2 || ptr === 0xFFFFFFFE;
+const isSigHandler = (ptr) => !!ptr && !isSigIgn(ptr);          // 0 = SIG_DFL
 const SIG_STOPPERS = new Set([SIG.STOP, SIG.TSTP, SIG.TTIN, SIG.TTOU]);
 // SysV shared memory: host-side buffers, snapshot in/out at attach/detach (see node host)
 const shmSegs = new Map(), shmById = new Map(); let nextShmId = 1;
@@ -604,7 +657,7 @@ function postSignal(P, sig) {
     if (P.stopped) { P.stopped = 0; const c = P.contWaiters; P.contWaiters = []; for (const f of c) f(); } }
   if (SIG_STOPPERS.has(sig)) P.sig.pending.delete(SIG.CONT);   // and a stop discards a pending CONT
   const h = P.sig.handlers.get(sig);
-  if (h && (h.ptr === -2 || h.ptr === 1) && sig !== SIG.KILL) return; // SIG_IGN (this musl: -2; classic ABI: 1)
+  if (h && isSigIgn(h.ptr) && sig !== SIG.KILL) return;         // SIG_IGN
   if ((!h || !h.ptr) && SIG_DFL_IGNORE.has(sig)) return;       // default-ignore
   P.sig.pending.add(sig);
   const w = P.sig.waiters; P.sig.waiters = []; for (const f of w) f('sig');
@@ -859,8 +912,8 @@ class Process {
       if (this.sig.mask & (1n << BigInt(sig - 1))) continue;
       this.sig.pending.delete(sig);
       const h = this.sig.handlers.get(sig);
-      if (h && (h.ptr === -2 || h.ptr === 1)) continue;      // SIG_IGN
-      if (h && h.ptr > 1 && sig !== SIG.KILL) {
+      if (h && isSigIgn(h.ptr)) continue;                    // SIG_IGN
+      if (h && isSigHandler(h.ptr) && sig !== SIG.KILL) {
         const table = this.inst && this.inst.exports.__indirect_function_table;
         if (table) {
           try { table.get(h.ptr)(sig); this.sigDelivered = true;
@@ -891,11 +944,18 @@ class Process {
       if (this.sig.mask & (1n << BigInt(sig - 1))) continue;
       this.sig.pending.delete(sig);
       const h = this.sig.handlers.get(sig);
-      if (h && (h.ptr === -2 || h.ptr === 1)) continue;      // SIG_IGN
-      if (h && h.ptr > 1 && sig !== SIG.KILL) {
+      if (h && isSigIgn(h.ptr)) continue;                    // SIG_IGN
+      if (h && isSigHandler(h.ptr) && sig !== SIG.KILL) {
         if (this.callGuest && this._plan && !this._plan.table) {
-          // worker model, binary linked without --export-table: fall through to the
-          // "no table" warning + default action below rather than trap the worker.
+          // Worker model, binary linked without --export-table: there is no way to reach
+          // the handler, so fall through to the default action -- but SAY SO. This used to
+          // be a silent downgrade (the warning below sits in the !callGuest branch, which
+          // this path never reaches), so a program whose handler was simply unreachable
+          // looked like one whose signal never arrived. bin/cc passes --export-table now;
+          // this stays for binaries built elsewhere.
+          if (!this.warnedNoTable) { this.warnedNoTable = true;
+            post(`[host] pid ${this.pid} (${(this.argv || []).slice(0, 2).join(' ')}): signal ${sig} has a handler but this binary exports no __indirect_function_table (link with -Wl,--export-table) -- taking the DEFAULT action instead
+`, 2); }
         } else if (this.callGuest) {
           // The instance is on another thread; ask it to run the handler.
           const savedMask = this.sig.mask;
@@ -1352,6 +1412,12 @@ class Process {
     if (!fill.exec) releaseFds(ctx.fds);
     this.unVfork(ctx);
     this.pending.push({ pid: ctx.pid, ...fill });
+    // The window is closed: this process is the PARENT again, so anything the child sent it
+    // is deliverable now (see 'kill' above).
+    if (this.sigQueuedForParent && this.sigQueuedForParent.length) {
+      const q = this.sigQueuedForParent; this.sigQueuedForParent = [];
+      for (const sg of q) postSignal(this, sg);
+    }
     return CHILD_DONE;
   }
   // The child branch ran in this process (vfork protocol, see sys 'fork'): give the
@@ -1824,7 +1890,18 @@ class Process {
         S.cred.groups = g; return 0n; }
       case 'chroot': return 0n;
       case 'getpid': return BigInt(S.inChild() ? S.childStack[S.childStack.length - 1].pid : S.pid);
-      case 'getppid': return BigInt(S.inChild() ? S.pid : (S.ppid || 1)); case 'gettid': return BigInt(S.curTid || S.pid);
+      // ORPHANS REPARENT TO INIT. This returned S.ppid unconditionally, so a child whose
+      // parent had already exited still named the DEAD pid -- Linux says 1. It matters
+      // because the idiom for "did my parent survive?" is exactly this comparison, and
+      // OpenSSH's configure uses it to decide whether to SIGKILL:
+      //     pid = getppid(); ... kill(pid, SIGTERM); sleep(1);
+      //     if (getppid() == pid) kill(pid, SIGKILL);   /* "parent did not exit, shoot it" */
+      // With a stale ppid that test is always true, so the child fires SIGKILL at a pid it
+      // no longer owns -- which, once pids are reused, is somebody else's process.
+      case 'getppid': { if (S.inChild()) return BigInt(S.pid);
+        const pp = S.ppid || 0;
+        return BigInt(pp && procs.has(pp) ? pp : 1); }
+      case 'gettid': return BigInt(S.curTid || S.pid);
       case 'getpgid': { const q = a[0] | 0; if (!q || q === S.pid) return BigInt(S.pgid);
         const T = procs.get(q); return T ? BigInt(T.pgid) : err(E.SRCH); }
       case 'getpgrp': return BigInt(S.pgid);
@@ -1842,6 +1919,22 @@ class Process {
           if (pid === -1) { for (const T of procs.values()) if (T !== S) targets.push(T); } // Linux: -1 excludes the caller
           else { const pg = pid === 0 ? S.pgid : -pid; for (const T of procs.values()) if (T.pgid === pg) targets.push(T); }
           if (!targets.length) return err(E.SRCH);
+        } else if (name === 'kill' && S.inChild() && pid === S.pid) {
+          // THE CHILD IS SIGNALLING ITS PARENT, and in the vfork protocol both run on THIS
+          // Process object -- the child inside the parent's window, the parent suspended at
+          // the fork site. Delivering now runs the PARENT's handler in the CHILD's context
+          // and consumes the signal, so the parent resumes having never seen it.
+          //
+          // That is the whole reason OpenSSH's configure hung: its SA_RESTART probe forks,
+          // the child kills the parent, and the parent then waits in select(NULL) for a
+          // signal the child had already absorbed. Measured: kill(128) from child 136 was
+          // "delivering to [128]" -- correct pid, wrong running context.
+          //
+          // So queue it. parkChild() drains the queue when the window closes, which is
+          // exactly when the parent becomes the running context again; predeliver runs at
+          // its next syscall entry, so a parked select() returns EINTR as POSIX promises.
+          (S.sigQueuedForParent || (S.sigQueuedForParent = [])).push(sig);
+          return 0n;
         } else {
           const T = procs.get(pid) || (isSelf(pid) ? S : null);
           if (!T) return err(E.SRCH);
@@ -2525,18 +2618,27 @@ class Process {
         const b = te.encode(f.sym).subarray(0, blen); S.wbytes(buf, b); S.i32(nptr, b.length); return OK; },
       path_create_directory: (dirfd, pptr, plen) => { const name = td.decode(S.u8.slice(pptr, pptr + plen));
         const h = S.fds.get(dirfd); const base = h && h.preopen ? h.preopen : S.cwd.p; mkdirp(norm(name, base)); return OK; },
+      // protectedDelete on BOTH ABIs. The Linux syscalls (unlink/rmdir/rename) have
+      // gated the app's own workspace since the `rm -rf /root/sandpie` incidents, but
+      // these three went straight to rmEntry() -- so a wasm32-wasi guest could still
+      // delete sandpie/{conversations,memory,secrets,skills}. EPERM is 63 in preview1.
       path_unlink_file: (dirfd, pptr, plen) => { const name = td.decode(S.u8.slice(pptr, pptr + plen));
         const h = S.fds.get(dirfd); const base = h && h.preopen ? h.preopen : S.cwd.p; const p = norm(name, base);
-        if (!files.has(p)) return NOENT; rmEntry(p); return OK; },
+        if (!files.has(p)) return NOENT;
+        if (protectedDelete(S, p)) return 63;
+        rmEntry(p); return OK; },
       path_remove_directory: (dirfd, pptr, plen) => { const name = td.decode(S.u8.slice(pptr, pptr + plen));
         const h = S.fds.get(dirfd); const base = h && h.preopen ? h.preopen : S.cwd.p; const p = norm(name, base);
-        if (!dirs.has(p)) return NOENT; rmEntry(p); return OK; },
+        if (!dirs.has(p)) return NOENT;
+        if (protectedDelete(S, p)) return 63;
+        rmEntry(p); return OK; },
       path_rename: (odfd, optr, olen, ndfd, nptr, nlen) => { S.refresh();
         const on = td.decode(S.u8.slice(optr, optr + olen)), nn = td.decode(S.u8.slice(nptr, nptr + nlen));
         const oh = S.fds.get(odfd), nh = S.fds.get(ndfd);
         const op = norm(on, oh && oh.preopen ? oh.preopen : S.cwd.p);
         const np = norm(nn, nh && nh.preopen ? nh.preopen : S.cwd.p);
         opfsFault(op); const f = files.get(op); if (!f) return NOENT;
+        if (!isAppPath(np) && protectedDelete(S, op)) return 63;   // moving out of the workspace == deleting it
         const bytes = f.br !== undefined ? fileRead(f, 0, f.size) : f.data.subarray(0, f.size);
         addFile(np, bytes.slice(), f.mode || 0o100644); rmEntry(op); return OK; },
       path_link: (odfd, oflags, optr, olen, ndfd, nptr, nlen) => { S.refresh();
@@ -2646,15 +2748,22 @@ class Process {
     // instance) but cannot read the VFS, and a parked thread cannot be handed a new
     // SharedArrayBuffer -- so one growable buffer is installed up front and every .so
     // travels through it. Growable SAB is Chrome 111+; fall back to a fixed 32MB.
+    const spare = SPARE_OK(plan, opts) ? takeSpare(this.modKey) : null;
     let bulk;
-    try { bulk = new SharedArrayBuffer(1 << 20, { maxByteLength: 64 << 20 }); }
-    catch (_) { bulk = new SharedArrayBuffer(32 << 20); }
+    if (spare) { bulk = spare.bulk; }
+    else {
+      try { bulk = new SharedArrayBuffer(1 << 20, { maxByteLength: 64 << 20 }); }
+      catch (_) { bulk = new SharedArrayBuffer(32 << 20); }
+    }
     this._bulk = bulk;
-    const ctl = new SharedArrayBuffer(KCTL.BYTES);
-    const w = new Worker(NODE_STUB_RE.test(this.modKey) ? NODE_WORKER_URL : 'wali-proc-worker.js');
+    const ctl = spare ? spare.ctl : new SharedArrayBuffer(KCTL.BYTES);
+    const w = spare ? spare.w : new Worker(NODE_STUB_RE.test(this.modKey) ? NODE_WORKER_URL : 'wali-proc-worker.js');
     this.procWorker = w;
     const st = { exit: null };
-    const ready = new Promise((res) => { this._procReady = res; });
+    const ready = spare ? spare.ready : new Promise((res) => { this._procReady = res; });
+    // The spare may not have seen its own 'ready' yet, and installing this process's
+    // onmessage below replaces the handler that was waiting for it -- so route it here.
+    if (spare) this._procReady = spare.settle;
     w.onmessage = (ev) => {
       const m = ev.data;
       if (m.t === 'ready') { this._procReady(m); return; }
@@ -2664,8 +2773,11 @@ class Process {
     };
     w.onerror = (ev) => { post(`[host] process worker for pid ${this.pid} failed: ${ev.message || ev}\n`, 2);
                           if (st.exit === null) st.exit = 139; Atomics.store(new Int32Array(ctl), 0, KCTL.DONE); Atomics.notify(new Int32Array(ctl), 0); };
-    w.postMessage({ t: 'init', mod, ctl, names: plan.names, sigs: plan.sigv, bulk, memory: plan.memory });
+    if (!spare) w.postMessage({ t: 'init', mod, ctl, names: plan.names, sigs: plan.sigv, bulk, memory: plan.memory });
     const r = await ready;
+    // Start the NEXT one warming while this process runs -- a build is the same few modules
+    // over and over, so the guess is nearly always right.
+    if (SPARE_OK(plan, opts)) { try { prepareSpare(this.modKey, plan); } catch (_) {} }
     if (!r.ok) { post(`[host] pid ${this.pid} failed to start: ${r.error}\n`, 2); w.terminate(); this.retire(); return 127; }
     this.memory = r.memory; this.membuf = null; this.refresh();
 
@@ -2840,6 +2952,11 @@ class Process {
         for (;;) {
           const st2 = Atomics.load(i32, 0);
           if (st2 === KCTL.SIGDONE || st2 === KCTL.DONE) return;
+          // The handler exited instead of returning (see the ST_DIE note in
+          // wali-proc-worker.js). Raise it as the exit it is, so the process dies the
+          // ordinary way -- reaped, parent woken -- rather than looking like a handler
+          // that came back to a guest which is in fact already unwinding.
+          if (st2 === KCTL.DIE) throw new ExitError(Atomics.load(i32, 3) & 0xff, true);
           if (st2 === KCTL.REQ) { await serveReq(); continue; }
           const q2 = Atomics.waitAsync(i32, 0, st2);
           if (q2.async) await q2.value; else await new Promise((res) => setTimeout(res, 0));
@@ -3280,6 +3397,13 @@ self.onmessage = async (ev) => {
     const settle = () => {
       const parked = all.filter((P) => procs.has(P.pid) && P.stopped).length;
       const live = all.filter((P) => procs.has(P.pid)).length;
+      for (const P of all) {
+        if (procs.has(P.pid) && !P.stopped) {
+          post('[spin] pid=' + P.pid + ' NOT parked: ' + (P.argv || []).join(' ').slice(0, 70)
+            + ' inChild=' + P.inChild() + ' pendingSig=' + [...P.sig.pending]
+            + ' queuedForParent=' + JSON.stringify(P.sigQueuedForParent || []) + " + NL + ", 2);
+        }
+      }
       self.postMessage({ t: m.t === 'stopall' ? 'stopped-all' : 'contd-all', parked, live });
     };
     // One turn of the loop is enough for anything already blocked in a syscall; the grace
