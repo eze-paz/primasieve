@@ -368,7 +368,7 @@ WORKER_V = 'devexec36';
       // the poc page and were simply absent in the tool and the terminal.
       await Promise.all(['cc', 'wfetch', 'wextract', 'build-pkg', 'ar', 'ranlib', 'ld',
                          'nm', 'strip', 'objdump', 'pkg-config', 'npm-lite'].map(async (n) => {
-        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=3'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
+        try { const r = await fetch((base || '/walios/') + 'bin/' + n + '?v=4'); if (r.ok) b['/usr/bin/' + n] = await r.arrayBuffer(); } catch (_) {}
       }));
       if (b['/usr/bin/cc']) b['/usr/bin/gcc'] = b['/usr/bin/cc'].slice(0);
       // config.site -- so a PLAIN `./configure` works, on every autotools package.
@@ -416,6 +416,58 @@ WORKER_V = 'devexec36';
         '# a `&&` list returns 1 once build_alias is set.\n' +
         'if test -z "$build_alias"; then ac_cv_build=${ac_cv_build=wasm32-unknown-linux-musl}; fi\n'
       ).buffer;
+      // sys/cdefs.h -- the reason is inside the file. musl omits it, and a glibc-written
+      // package then fails at its FIRST header and mis-blames everything after it.
+      // It goes in /sysroot/include, NOT /usr/include: cc runs -nostdlibinc with
+      // -isystem /sysroot/include, so /usr/include is not on the include path and a
+      // header placed there is present and invisible (measured -- the file existed and
+      // the build failed with the identical error). bin/cc force-includes it, because
+      // on glibc nothing includes sys/cdefs.h directly either: features.h pulls it in
+      // from essentially every libc header, which is why packages just use the macros.
+      b['/sysroot/include/sys/cdefs.h'] = new TextEncoder().encode([
+        '/* sys/cdefs.h -- the glibc-isms musl leaves out, supplied by the OS.',
+        ' *',
+        ' * WHY: musl defines no __BEGIN_DECLS/__END_DECLS and ships no sys/cdefs.h at all, so a',
+        ' * package written against glibc dies at its first header with',
+        ' *     utf8.h:30:1: error: unknown type name |__BEGIN_DECLS|',
+        ' * which names neither glibc nor the missing file. Worse, the parser desyncs after it and',
+        ' * the REST of the log fills with "expected function body after function declarator" on',
+        ' * perfectly good K&R definitions -- so the TAIL of the errors blames the wrong thing.',
+        ' * That is what figlet looked like, and it cost two wrong diagnoses before someone read',
+        ' * the FIRST error instead of the last.',
+        ' *',
+        ' * Measured, before this file existed:',
+        ' *     make CC="cc -D__BEGIN_DECLS= -D__END_DECLS="',
+        ' *       -> rc 0, 0 errors, a 175,488-byte figlet that runs.',
+        ' *',
+        ' * These wrap declarations for C++ linkage, so the definitions are the standard ones.',
+        ' * NOT a package patch: the OS is supplying a header a Linux userland is expected to have.',
+        ' */',
+        '#ifndef _SYS_CDEFS_H',
+        '#define _SYS_CDEFS_H',
+        '',
+        '#ifndef __BEGIN_DECLS',
+        '# ifdef __cplusplus',
+        '#  define __BEGIN_DECLS extern "C" {',
+        '#  define __END_DECLS   }',
+        '# else',
+        '#  define __BEGIN_DECLS',
+        '#  define __END_DECLS',
+        '# endif',
+        '#endif',
+        '',
+        '/* The two that travel with them in glibc headers: __P brackets a pre-ANSI prototype and',
+        '   __THROW is a no-op outside glibc. The same packages use both. */',
+        '#ifndef __P',
+        '# define __P(args) args',
+        '#endif',
+        '#ifndef __THROW',
+        '# define __THROW',
+        '#endif',
+        '',
+        '#endif /* _SYS_CDEFS_H */',
+        ''
+      ].join(String.fromCharCode(10))).buffer;
       // Applet links. Real busybox is installed with `busybox --install -s`, one symlink per
       // applet in /bin and /usr/bin. We never did that, so /bin/sed and friends did not EXIST
       // as files. Running them was fine (resolveExecKey falls back to busybox by name), but
