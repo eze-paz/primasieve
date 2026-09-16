@@ -79,7 +79,15 @@ function hostCall(idx, args) {
         for (let k = 0; k < MAXARGS; k++) i64[(ARGS >> 3) + k] = saved[k];
         Atomics.store(i32, 2, sArgc);
         Atomics.store(i32, 1, sIdx);
-        Atomics.store(i32, 0, ST_SIGDONE);
+        // The handler may not RETURN at all: busybox ping's SIGINT handler prints its
+        // statistics and calls exit(), and the kernel answers that exit with DIE, which
+        // unwinds us through here. Storing SIGDONE over it told the kernel the handler
+        // had simply come back, so the process's death was lost -- the kernel went on
+        // serving a guest that was already unwinding, the parent's wait4 was never
+        // satisfied, and an interactive shell never printed another prompt after ^C.
+        // `sleep` hid it: with no handler the signal takes the default action and never
+        // comes through this path at all.
+        if (Atomics.load(i32, 0) !== ST_DIE) Atomics.store(i32, 0, ST_SIGDONE);
         Atomics.notify(i32, 0);
       }
       continue;
