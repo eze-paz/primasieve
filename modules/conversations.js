@@ -1015,7 +1015,18 @@ function reflectFileDeletes(paths) {
       if (stream.artifactThumbs) {
         for (const k of Object.keys(stream.artifactThumbs)) { if (match(k)) { delete stream.artifactThumbs[k]; changed = true; } }
       }
-      if (changed) saveConv(cid, { touchUpdated: false });
+      if (changed) {
+        saveConv(cid, { touchUpdated: false });
+        // Repaint the dock if this conversation is mounted in a pane.
+        try {
+          const st2 = _dockState.get('' + cid);
+          const pane = stream.host && stream.host.closest && stream.host.closest('#messages, #messagesSide');
+          if (pane && stream.host.isConnected) {
+            const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
+            _paintDockChip(slot, stream);
+          }
+        } catch (_) {}
+      }
     }
   } catch (_) {}
 }
