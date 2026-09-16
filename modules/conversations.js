@@ -1726,11 +1726,14 @@ function _dockFilesLanded(stream, files, partial) {
 function _dockTurnStart(stream) {
   if (!stream) return;
   const convId = '' + (stream.id || '');
-  const st = _dockState.get(convId);
-  if (st) st.manual = false;
+  // New round → the drawer ALWAYS closes (Enter starts a round: collapse is
+  // unconditional — a manually-opened drawer does not survive the send).
+  const st = _dockState.get(convId) || { open: false, manual: false };
+  _dockState.set(convId, st);
+  st.open = false; st.manual = false;
   const pane = _dockPane(stream);
   if (pane) {
-    if (!st || !st.open) pane.classList.remove('open');
+    pane.classList.remove('open');
     const chip = pane.querySelector(':scope > .msg-timer-slot .dock');
     if (chip) chip.classList.add('busy');
   }
