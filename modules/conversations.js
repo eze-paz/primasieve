@@ -881,6 +881,10 @@ function renderConversation(msgs, compaction, host = null) {
   // 'artifact:' results earlier in the replay are deduped away here.
   if (s && Array.isArray(s.filesTouched) && s.filesTouched.length) {
     try { renderFilesTouched(target, s.filesTouched); } catch (_) {}
+    // Artifact dock: repopulate from the persisted list (closed by default).
+    try { const _pane = target.closest('#messages, #messagesSide');
+      if (_pane) { const _slot = _pane.querySelector(':scope > .msg-timer-slot .msg-timer'); _paintDockChip(_slot, s); }
+    } catch (_) {}
   }
   // A caller that wiped the host (clearActiveConvUI — rewind / compaction
   // re-render) destroyed the settled .msg-timer line, and nothing re-creates it:
@@ -1140,14 +1144,6 @@ function applyGridFolding(grid) {
   applyGridOverflow(grid);
 }
 function renderFilesTouched(host, files, opts) {
-  // Cards are a TURN-END thing. Partial emits fire mid-turn as files first
-  // appear; rendering them then dropped a card into the middle of the reply,
-  // and a run that writes a scratch file, a rewrite and then the real thing
-  // left the deliverable buried under its own dead ends. Nothing is lost by
-  // ignoring them: the turn-end emit re-sends the FULL list for the turn (see
-  // the non-partial emit in sandpie-worker.js), and mergeFilesTouched has
-  // already recorded the paths for persistence.
-  if (opts && opts.partial) return;
   if (!Array.isArray(files) || !files.length) return;
   const partial = !!(opts && opts.partial);
   // Parentage guard: fall back to the ACTIVE stream's host only when it is the
@@ -1522,6 +1518,146 @@ function _timerNnBtn(svg) {
 }
 // Tick mark shown in place of the ripple icon once a turn settles (done/stopped).
 const TICK_SVG_INLINE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
+// ── Artifact dock (drawer variant) ──────────────────────────────────────────
+// Collapsed = a chip in the timer row (right-aligned, the old project-chip
+// spot). Open = a grid of the EXISTING artifact cards (renderArtifact →
+// buildArtifactCard, thumbnails via SandpieArtifactThumbs) dropping down
+// between the timer slot and the composer. Data source is the conversation's
+// deduped filesTouched list — the dock is a new SURFACE for it, not a new
+// store. Replaces the inline transcript artifact grid (option a, 2026-09-16).
+const DOCK_CAP = 12;                       // items shown before the "+N older" chip
+const _dockState = new Map();              // convId -> { open, manual }  per-conversation drawer state
+function _dockPane(stream) {
+  // The pane whose timer slot this stream owns — never activeStream(): a side-
+  // pane stream must paint its own dock (same parentage trap as renderArtifact).
+  if (!stream || !stream.host) return null;
+  return stream.host.closest('#messages, #messagesSide');
+}
+function _dockBodyFor(pane) {
+  return pane ? pane.querySelector(':scope > .dock-body') : null;
+}
+function _dockEnsureBody(pane) {
+  if (!pane) return null;
+  let body = _dockBodyFor(pane);
+  if (!body) {
+    body = document.createElement('div');
+    body.className = 'dock-body';
+    body.innerHTML = '<div class="inner"><div class="dock-in"><div class="grid"></div></div></div>';
+    const slotWrap = pane.querySelector(':scope > .msg-timer-slot');
+    if (slotWrap && slotWrap.nextSibling) pane.insertBefore(body, slotWrap.nextSibling);
+    else if (slotWrap) slotWrap.after(body);
+    else pane.appendChild(body);
+  }
+  return body;
+}
+// Stamp the chip into the timer row (called after EVERY timer-row rebuild —
+// the row is one persistent element repainted wholesale, same as _paintProjChip).
+function _paintDockChip(slot, stream) {
+  if (!slot) return;
+  const pane = slot.closest('#messages, #messagesSide');
+  if (!pane) return;
+  const convId = '' + ((stream && stream.id) || slot.dataset.convId || '');
+  const files = (stream && Array.isArray(stream.filesTouched)) ? stream.filesTouched : [];
+  const stale = pane.querySelector(':scope > .msg-timer-slot .dock');
+  if (stale) stale.remove();
+  if (!files.length) {
+    const body = _dockBodyFor(pane);
+    if (body) body.remove();
+    return;
+  }
+  const st = _dockState.get(convId) || { open: false, manual: false };
+  _dockState.set(convId, st);
+  const chip = document.createElement('span');
+  chip.className = 'dock' + (stream && stream.generating ? ' busy' : '');
+  chip.innerHTML = '<span class="dock-hd"><span class="caret">▸</span>' +
+    '<span><span class="n"></span> files</span>' +
+    '<span class="live"><i></i>writing</span></span>';
+  chip.querySelector('.n').textContent = files.length;
+  chip.querySelector('.dock-hd').addEventListener('click', (e) => {
+    e.stopPropagation();
+    st.open = !st.open; st.manual = true;
+    pane.classList.toggle('dock-slot', true);
+    pane.classList.toggle('open', st.open);
+  });
+  slot.appendChild(chip);
+  pane.classList.toggle('dock-slot', true);
+  pane.classList.toggle('open', st.open);
+  _dockRenderItems(pane, stream, st);
+}
+// Fill the drawer grid with the conversation's deliverable cards. Reuses
+// renderArtifact (existing card + thumbnail system) — the dock grid is just
+// another host. Bundle files (code/data) fold into one muted "N files" row.
+function _dockRenderItems(pane, stream, st) {
+  const body = _dockEnsureBody(pane);
+  if (!body) return;
+  const grid = body.querySelector('.grid');
+  grid.innerHTML = '';
+  const files = (stream && Array.isArray(stream.filesTouched)) ? stream.filesTouched.slice() : [];
+  const individual = [], bundle = [];
+  for (const f of files) {
+    const clean = String((f && f.path) || '').replace(/^\/+/, '');
+    if (!clean) continue;
+    const ext = clean.split('.').pop().toLowerCase();
+    if (_ftIndividual(ext)) individual.push(clean); else bundle.push(clean);
+  }
+  const shown = individual.slice(-DOCK_CAP);
+  const older = individual.length - shown.length;
+  if (older > 0) {
+    const more = document.createElement('div');
+    more.className = 'dock-more';
+    more.textContent = '+' + older + ' older';
+    grid.appendChild(more);
+  }
+  for (const clean of shown) {
+    try { renderArtifact(grid, clean); } catch (_) {}
+  }
+  if (bundle.length) {
+    const row = document.createElement('div');
+    row.className = 'dock-more';
+    row.style.cursor = 'default';
+    row.textContent = bundle.length + (bundle.length === 1 ? ' other file' : ' other files');
+    grid.appendChild(row);
+  }
+}
+// Hook: files landed mid-turn (partial) or at turn end. Adds items + ticks the
+// count; the drawer stays collapsed while generating unless already open.
+function _dockFilesLanded(stream, files, partial) {
+  if (!stream || !Array.isArray(files) || !files.length) return;
+  const pane = _dockPane(stream);
+  if (!pane) return;
+  const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
+  _paintDockChip(slot, stream);
+}
+// Hook: turn starts → collapse + busy (unless the user manually opened it).
+function _dockTurnStart(stream) {
+  if (!stream) return;
+  const convId = '' + (stream.id || '');
+  const st = _dockState.get(convId);
+  if (st) st.manual = false;
+  const pane = _dockPane(stream);
+  if (pane) {
+    if (!st || !st.open) pane.classList.remove('open');
+    const chip = pane.querySelector(':scope > .msg-timer-slot .dock');
+    if (chip) chip.classList.add('busy');
+  }
+}
+// Hook: turn ends (natural, error, or abort — hangs off the turn-end teardown,
+// not respond()) → consolidate + auto-open unless the user toggled mid-turn.
+function _dockTurnEnd(stream) {
+  if (!stream) return;
+  const convId = '' + (stream.id || '');
+  const st = _dockState.get(convId) || { open: false, manual: false };
+  _dockState.set(convId, st);
+  const pane = _dockPane(stream);
+  if (!pane) return;
+  const chip = pane.querySelector(':scope > .msg-timer-slot .dock');
+  if (chip) chip.classList.remove('busy');
+  if (!st.manual) { st.open = true; pane.classList.add('open'); }
+  const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
+  _paintDockChip(slot, stream);
+}
+window._paintDockChip = _paintDockChip;   // debug/test handle
+
 // Resting placeholder for a slot with no live/finished turn to show. Mirrors the
 // settled timer's shape (nn icon · idle · 0s · – ctx) and dims via .done, so an
 // idle conversation shows a real-looking bar — never a bare "· idle ·".
@@ -1536,6 +1672,7 @@ function _fillPlaceholderTimer(slot, convId) {
     '<span class="mt-sep">·</span><span class="mt-ctx">– ctx</span>';
   _wireCtxCounter(slot, convId);
   _paintProjChip(slot, convId);
+  _paintDockChip(slot, convStreams.get('' + (convId == null ? '' : convId)));
 }
 // Seed both pane timer slots with the resting placeholder when empty, so the bar
 // is present in the DOM from first paint — not only once a conversation mounts.
@@ -1592,6 +1729,7 @@ function rebuildSettledTimer(target, s) {
   slot.innerHTML = parts.join('');
   _wireCtxCounter(slot, s.id);
   _paintProjChip(slot, s.id);
+  _paintDockChip(slot, s);
   _wireRateClick(slot, s.id);
   if (s.todos && s.todos.length) {
     const badge = slot.querySelector('.mt-todos');
@@ -8446,6 +8584,7 @@ function endTotalTimer(stream, label) {
   slot.dataset.convId = '' + (stream.id || '');
   _wireCtxCounter(slot, stream.id);
   _paintProjChip(slot, stream.id);
+  _paintDockChip(slot, stream);
   _wireRateClick(slot, stream.id);
   if (stream.todos && stream.todos.length) {
     const badge = slot.querySelector('.mt-todos');
