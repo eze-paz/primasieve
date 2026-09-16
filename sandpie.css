@@ -4812,6 +4812,22 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 }
 .dock-more:hover { color: var(--sp-text); }
 /* the drawer's 0-files placeholder (chip always renders, even at 0 files) */
+
+/* Last-round markers: accent border + notification dot on cards touched in the current round */
+.artifact-wrap.dock-new {
+  border-color: var(--sp-accent) !important;
+}
+.artifact-wrap.dock-new::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sp-accent);
+  z-index: 2;
+}
 .dock-empty {
   grid-column: 1 / -1;
   text-align: center; padding: 16px 0 6px;

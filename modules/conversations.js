@@ -431,6 +431,8 @@ async function _saveConv(convId, { touchUpdated = true } = {}) {
   if (s && s._rsnDirty) { rsnLvl = s.reasoningLevel || null; s._rsnDirty = false; }
   else rsnLvl = (prevMeta && prevMeta.reasoningLevel) || (s && s.reasoningLevel) || null;
   if (rsnLvl) meta.reasoningLevel = rsnLvl;
+  // Artifact-dock round watermark: carried forward like reasoningLevel.
+  if (s && s.dockRoundStart) meta.dockRoundStart = s.dockRoundStart;
   // Paths touched by tools in this conversation (from augmentations.js)
   const convPaths = (typeof SandpieAugmentations !== 'undefined' && SandpieAugmentations.getConvPaths)
     ? SandpieAugmentations.getConvPaths(convId)
@@ -1636,9 +1638,22 @@ function _dockRenderItems(pane, stream, st) {
   // to the top. The cap now hides the OLDEST files, so the '+N older' chip sits
   // at the BOTTOM of the grid.
   const shown = (st.expanded ? individual : individual.slice(-DOCK_CAP)).slice().reverse();
+  // LAST-ROUND MARKERS: a file is 'new this round' when its touch ts is at or
+  // after the round watermark stamped at turn start. ts is stamped in
+  // mergeFilesTouched at the moment the touch lands, so the comparison is
+  // exact for everything the dock tracks.
+  const roundStart = (stream && stream.dockRoundStart) || 0;
+  const tsByPath = new Map();
+  for (const f of files) { if (f && f.path) tsByPath.set(String(f.path).replace(/^\/+/, ''), f.ts || 0); }
   const older = individual.length - shown.length;
   for (const clean of shown) {
-    try { renderArtifact(grid, clean); } catch (_) {}
+    try {
+      renderArtifact(grid, clean);
+      if (roundStart && (tsByPath.get(clean) || 0) >= roundStart) {
+        const wrap = grid.lastElementChild;
+        if (wrap && wrap.classList && wrap.classList.contains('artifact-wrap')) wrap.classList.add('dock-new');
+      }
+    } catch (_) {}
   }
   if (older > 0) {
     const more = document.createElement('div');
@@ -1745,6 +1760,10 @@ function _dockFilesLanded(stream, files, partial) {
 // Hook: turn starts → collapse the drawer (unconditional on a new round).
 function _dockTurnStart(stream) {
   if (!stream) return;
+  // Round watermark: files touched at/after this instant are 'this round'
+  // (accent border + dot). Persisted via meta.dockRoundStart so a reload
+  // mid-round keeps the markers stable.
+  stream.dockRoundStart = Date.now();
   const convId = '' + (stream.id || '');
   // New round → the drawer ALWAYS closes (Enter starts a round: collapse is
   // unconditional — a manually-opened drawer does not survive the send).
@@ -2474,6 +2493,7 @@ async function loadConv(id) {
       s.projectId = meta.projectId || null;
       s.providerId = meta.providerId || null;
       s.reasoningLevel = meta.reasoningLevel || null;
+      s.dockRoundStart = meta.dockRoundStart || null;
 
       if (!fileSize) {
         // Empty conversation (no messages yet)
