@@ -3325,8 +3325,6 @@ body.sp-decoding *::after {
 /* Sits inside the pane directly above the composer (which has its own border-top),
    so no border-bottom here — that would read as a double rule. */
 .cmd-output {
-  background: var(--sp-bg);
-  border-top: 1px solid var(--sp-border);
   font: 0.82rem 'JetBrains Mono', Consolas, monospace;
   line-height: 1.5;
   /* Same horizontal cap as the chat column (--sp-chat-max-w, set by
@@ -3355,8 +3353,9 @@ body.sp-decoding *::after {
 }
 .cmd-close:hover { color: var(--sp-text); }
 .cmd-body {
-  margin: 0;
+  margin: 0 0 1rem 0;
   padding: 0.5rem 0.7rem;
+  background: var(--sp-bg);
   color: var(--sp-text);
   max-height: 220px;
   overflow-y: auto;
