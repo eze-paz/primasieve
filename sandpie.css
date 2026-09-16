@@ -4777,6 +4777,11 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
   max-height: 0; overflow: hidden;
   transition: max-height .22s cubic-bezier(.4,0,.2,1);
   padding-inline: max(1.5rem, calc((100% - var(--sp-chat-max-w)) / 2));
+  /* flex:none is LOAD-BEARING: as a flex child of the pane it would otherwise
+     be squeezed by flex-shrink when it expands (sliver under the sticky
+     composer). With it, the drawer keeps its height and the transcript
+     (conv-host, flex:1 1 auto + min-height:0) absorbs the push-up instead. */
+  flex: none;
 }
 .dock-slot.open .dock-body { max-height: 420px; }
 .dock-in {
