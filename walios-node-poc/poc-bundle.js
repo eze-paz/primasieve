@@ -1831,7 +1831,8 @@ module.exports = { makeProcessWrap };
 // and the walios tool do not mount the same program set.
 
 const LOCAL_LO = 20000, LOCAL_HI = 60000;
-const CONNECT_TRIES = 60, CONNECT_DELAY_MS = 25;
+// tlswrap binds in well under this; the cost is paid once per connection.
+const BIND_DELAY_MS = 400;
 
 function makeTls(deps) {
   const { require: R, pending, trace } = deps;
@@ -1879,37 +1880,27 @@ function makeTls(deps) {
     if (child.stderr) child.stderr.on('data', (d) => { childErr += d; });
 
     const socket = new (net().Socket)();
-    // The socket must not be considered connected until tlswrap is actually listening,
-    // and tlswrap needs a moment to bind. Retry rather than race it.
-    let tries = 0;
-    const attempt = () => {
+    // NO readiness probe. The first version opened a throwaway connection to check
+    // whether tlswrap was listening and then destroyed it -- but tlswrap accepts a
+    // connection by opening a TLS session to the remote for it, so the probe consumed
+    // exactly the thing it was testing and the real connection got nothing back.
+    // Verified separately that tlswrap is fine: `nc` through it returns HTTP/1.1 200 OK.
+    //
+    // So: give it a moment to bind, then make ONE connection -- the one the caller
+    // actually wanted.
+    if (pending) pending.n++;
+    setTimeout(() => {
+      if (pending) pending.n--;
       if (socket.destroyed) { try { child.kill(); } catch (_) {} return; }
-      const probe = net().connect({ port: localPort, host: '127.0.0.1' });
-      probe.once('connect', () => {
-        T('tlswrap ready on ' + localPort + ' after ' + tries + ' tries');
-        probe.destroy();
-        socket.connect({ port: localPort, host: '127.0.0.1' }, () => {
-          // node's https waits for 'secureConnect'. The TLS handshake happened inside
-          // tlswrap, so by the time the forwarded connection is up it has completed.
-          socket.authorized = true;
-          socket.encrypted = true;
-          socket.emit('secureConnect');
-          if (cb) cb();
-        });
+      socket.connect({ port: localPort, host: '127.0.0.1' }, () => {
+        // The handshake happens inside tlswrap, so a forwarded connection that is up
+        // means the TLS session to the remote is up too.
+        socket.authorized = true;
+        socket.encrypted = true;
+        socket.emit('secureConnect');
+        if (cb) cb();
       });
-      probe.once('error', () => {
-        probe.destroy();
-        if (++tries >= CONNECT_TRIES) {
-          try { child.kill(); } catch (_) {}
-          socket.destroy(new Error('tls.connect: tlswrap did not start listening on '
-            + localPort + (childErr ? ': ' + childErr.trim() : '')));
-          return;
-        }
-        if (pending) pending.n++;
-        setTimeout(() => { if (pending) pending.n--; attempt(); }, CONNECT_DELAY_MS);
-      });
-    };
-    attempt();
+    }, BIND_DELAY_MS);
 
     // tlswrap self-closes after 120s idle, but a finished request should not wait for
     // that -- one process per connection adds up.
