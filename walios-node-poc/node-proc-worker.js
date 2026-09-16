@@ -177,14 +177,34 @@ self.onmessage = async (ev) => {
       // with work still to come. That is what made async child_process and ESM output
       // appear in some runs and not others, and why adding a console.log "fixed" it.
       // Requiring sustained quiet turns a knife-edge race into a stable condition.
+      // The cap is on being STUCK, not on taking a while. It used to be a flat
+      // 10s from the moment main() returned, which silently truncated any job that
+      // simply took longer: `npm-lite express` installs ~70 packages over ~30s, so it
+      // was cut off mid-package at 9.8s, wrote a partial tree, and exited 0. The
+      // failure then surfaced much later as "Cannot find module" from a package that
+      // looked installed -- and the count varied run to run with the network, which
+      // is what made it look like a race rather than a timeout.
+      //
+      // Node's own rule is simply "run until the loop is empty", so progress must not
+      // be penalised. The deadline now resets whenever the pending count CHANGES,
+      // i.e. whenever anything at all completes or is scheduled; only a process that
+      // has made no progress whatsoever for STUCK_MS is abandoned. A runaway interval
+      // still keeps the process alive, exactly as it would in node -- the walios tool
+      // has its own run deadline for that, which suspends rather than truncates.
       const QUIET_MS = 120;
-      const deadline = Date.now() + 10000;
+      const STUCK_MS = 120000;
       let quietSince = null;
+      let lastN = pending.n;
+      let lastChange = Date.now();
       for (;;) {
+        if (pending.n !== lastN) { lastN = pending.n; lastChange = Date.now(); }
         if (pending.n > 0) quietSince = null;
         else if (quietSince === null) quietSince = Date.now();
         else if (Date.now() - quietSince >= QUIET_MS) break;
-        if (Date.now() >= deadline) break;
+        if (Date.now() - lastChange >= STUCK_MS) {
+          self.postMessage({ t: 'warn', s: 'node: no progress for ' + (STUCK_MS / 1000) + 's, giving up on the event loop' });
+          break;
+        }
         await new Promise((r) => setTimeout(r, 1));
       }
       const rt = runNode.rt;
