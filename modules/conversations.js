@@ -1386,8 +1386,17 @@ function _projChipHtml(convId) {
 // Append (or refresh) the project chip on a timer slot. The timer row is ONE
 // persistent element per pane, rebuilt wholesale by every paint path - so the
 // chip is re-stamped after each rebuild instead of being a separate node.
+// HIDDEN (2026-09-16): the project chip has no user-facing behavior yet, so it
+// is removed from the timer row. The project SYSTEM underneath (bindings,
+// registry, panel) is untouched; flip _PROJ_CHIP_HIDDEN to false to restore.
+const _PROJ_CHIP_HIDDEN = true;
 function _paintProjChip(slot, convId) {
   if (!slot) return;
+  if (_PROJ_CHIP_HIDDEN) {
+    const stale = slot.querySelector('.mt-proj');
+    if (stale) stale.remove();
+    return;
+  }
   if (convId == null || convId === '') convId = activeConvId;
   let chip = slot.querySelector('.mt-proj');
   const html = _projChipHtml(convId);
