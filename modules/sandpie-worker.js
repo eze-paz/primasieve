@@ -3082,6 +3082,7 @@ function _waliosWireOpfs(ow, k) {
     // pool uses). A kernel serves one conversation, so the owner is unambiguous; the
     // flush-on-exit guarantees a late batch never lands after the run has resolved.
     if (d.t === 'opfs-changed' && Array.isArray(d.rels) && d.rels.length) {
+      if (k.onChanged) { try { k.onChanged(d.rels); } catch (_) {} }
       try { self.postMessage({ type: 'forward-to-page', payload: { type: 'sw-opfs-changed', paths: d.rels, owner: k.owner } }); } catch (_) {}
       return;
     }
@@ -3193,6 +3194,16 @@ async function tool_walios({ script, timeout, resume }, ctx) {
   let k, w;
   try { k = _waliosEnsure(_waliosKey(ctx)); w = k.w; } catch (e) { return { result: 'Error: cannot start the walios worker: ' + ((e && e.message) || e) }; }
   k.owner = (ctx && ctx.agentId != null) ? ctx.agentId : null; k.busy = true; k.last = Date.now();
+  // Direct-stamp fallback (same as run_python above): an ownerless kernel's writes
+  // were dropped by the strict owner routing — file synced, no dock card.
+  k.onChanged = (rels) => {
+    try {
+      if (ctx && ctx._filesTouched) for (const x of rels) {
+        const rel = _toOpfsRel(x);
+        if (rel && !_ftExcluded(rel)) ctx._filesTouched.set(rel, Date.now());
+      }
+    } catch (_) {}
+  };
   await _waliosFreshDbx(k.ow);   // current Dropbox token into the bridge before the run (asks the page if there is none)
   const pkgs = await _waliosPkgIndex();
   // ONE boot, shared with the terminal and the REPL (WB.runMessage). Only argv and the
@@ -3526,7 +3537,10 @@ async function _wpyEnsure() {
   _wpy = st;
   try {   // OPFS bridge: /root is the workspace (same namespace as /files)
     const sab = new SharedArrayBuffer(32 + (1 << 20));
-    const ow = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V));
+    const bridge = { owner: null, flushResolve: null, onChanged: null, ow: null };
+    st.bridge = bridge;
+    const ow = _waliosWireOpfs(new Worker(WALIOS_BASE + 'opfs-worker.js?v=' + WALIOS_WORKER_V), bridge);
+    bridge.ow = ow;
     st.ow = ow;   // killed together with the kernel (see _wpyKill): an orphaned bridge keeps its file locks
     ow.postMessage({ t: 'sab', sab }); w.postMessage({ t: 'opfs-sab', sab });
   } catch (_) {}
@@ -3573,13 +3587,22 @@ function waliosPythonRun({ code, timeout, cwd, signal, file, argv }) {
     try { st = await _wpyEnsure(); }
     catch (e) { _wpyKill('boot failed'); return { ok: false, err: 'Error: could not start the walios Python interpreter: ' + ((e && e.message) || e) }; }
     const id = ++st.seq;
+    // Collect this run's writes DIRECTLY off the bridge. The REPL bridge is
+    // ownerless (owner: null), so the strict owner routing in the postMessage
+    // interceptor dropped every write — the file synced to Dropbox but never
+    // reached ctx._filesTouched and no dock card appeared (izb5fpqv, 2026-09-16).
+    st.written = new Set();
+    if (st.bridge) st.bridge.onChanged = (rels) => { for (const x of rels) st.written.add(x); };
     let onAbort = null;
     try {
       if (signal) { onAbort = () => _wpyKill('run aborted (turn stopped)'); signal.addEventListener('abort', onAbort, { once: true }); }
       _wpySend(st, { t: 'run', id, code: String(code || ''), cwd: cwd || '/root', timeout: t,
                      file: file || null, argv: Array.isArray(argv) ? argv.map(String) : [] });
       const f = await _wpyWait(st, x => x.t === 'done' && x.id === id, t * 1000 + WPY_GRACE_MS);
-      return { ok: !!f.ok, out: f.out || '', err: f.err || '' };
+      // Drain the bridge's pending write batch (250ms debounce) so files written
+      // late in the run are collected too, then hand the list to the caller.
+      if (st.bridge) { try { await _waliosFlush(st.bridge, 500); } catch (_) {} }
+      return { ok: !!f.ok, out: f.out || '', err: f.err || '', written: [...(st.written || [])] };
     } catch (e) {
       // No frame came back in time (or the worker died): the interpreter is gone
       // or wedged, so drop it — the next call boots a fresh one.
@@ -3617,6 +3640,18 @@ async function tool_run_python_walios({ path, code, args, timeout }, ctx) {
   }
   const r = await waliosPythonRun({ code: src, timeout, cwd, signal: ctx && ctx.signal,
                                    file: guestFile, argv: Array.isArray(args) ? args : [] });
+  // Direct-stamp this run's writes into the conversation's touched-files list —
+  // the same stamp the write_file path does inline. The owner-routed postMessage
+  // path stays for cross-conversation attribution; this is the fallback that
+  // cannot miss (an ownerless/mismatched owner used to drop the touch silently).
+  try {
+    if (ctx && ctx._filesTouched && Array.isArray(r.written)) {
+      for (const p of r.written) {
+        const rel = _toOpfsRel(p);
+        if (rel && !_ftExcluded(rel)) ctx._filesTouched.set(rel, Date.now());
+      }
+    }
+  } catch (_) {}
   let text = (r.out || '') + (r.err ? (r.out ? '\n' : '') + r.err : '');
   text = text.replace(/\n+$/, '');
   if (!text) text = r.ok ? '[no output]' : '[failed with no output]';
