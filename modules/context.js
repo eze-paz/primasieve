@@ -152,17 +152,13 @@ const SandpieContext = (() => {
   const NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
   const listeners = new Set();
 
-  // Enable/disable (global, localStorage). A disabled skill is omitted from the
-  // prompt's skill table so the model can't see or load it; the file stays on disk.
+  // Skills are ALWAYS active (toggle removed 2026-09-16): an installed skill is
+  // always listed in the prompt's skill table. The old per-skill enable/disable
+  // flag lived in localStorage under 'sandpie-skills-disabled' — that key is now
+  // inert; clear it so stale disabled lists can't linger on any device.
   const SKILLS_DISABLED_KEY = 'sandpie-skills-disabled';
-  function disabledSkills() { try { const a = JSON.parse(localStorage.getItem(SKILLS_DISABLED_KEY) || '[]'); return new Set(Array.isArray(a) ? a : []); } catch { return new Set(); } }
-  function isSkillEnabled(name) { return !disabledSkills().has(name); }
-  function setSkillEnabled(name, on) {
-    const s = disabledSkills();
-    if (on) s.delete(name); else s.add(name);
-    localStorage.setItem(SKILLS_DISABLED_KEY, JSON.stringify([...s]));
-    notify();
-  }
+  function isSkillEnabled() { return true; }
+  try { localStorage.removeItem(SKILLS_DISABLED_KEY); } catch (_) {}
   // Save an edited SKILL.md back to OPFS (the settings inline editor uses this).
   async function saveSkill(file, text) {
     await opfs.write(file, text);
@@ -337,7 +333,7 @@ const SandpieContext = (() => {
       `To add a skill, create \`${SKILLS_DIR}/<name>/${SKILL_FILE}\` with frontmatter (a "---" block holding name + description) — it's discovered automatically, no registry to update.`,
     );
     lines.push('', '| Skill | When to use |', '|---|---|');
-    const activeSkills = idx.skills.filter(s => s.enabled);   // disabled skills are hidden from the model
+    const activeSkills = idx.skills;   // all installed skills are always active (toggle removed 2026-09-16)
     for (const s of activeSkills) {
       const mark = loaded.has(s.name) ? ' _(already loaded above)_' : '';
       lines.push(`| ${s.name} | ${clip(s.desc)}${mark} |`);
@@ -383,7 +379,7 @@ returned to the model when it calls load_skill on this skill.
 
   return {
     SKILLS_DIR, skillBlock, inspect, scaffold, subscribe,
-    isSkillEnabled, setSkillEnabled, saveSkill,
+    isSkillEnabled, saveSkill,
     parseFrontmatter, cleanDescription, descAlnum,
     lastState: () => last,
   };
