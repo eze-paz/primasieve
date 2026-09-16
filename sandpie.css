@@ -4793,6 +4793,11 @@ html[data-theme="clear"] .msg-timer { font-size: 10.5px; }
 /* expanded content (all files / bundle cards) scrolls inside the drawer:
    the body keeps its 420px animation cap, the in-box scrolls beyond it */
 .dock-slot.open .dock-in { max-height: 396px; overflow-y: auto; }
+/* the reused file-bundle TABLE inside the dock: spans the grid, no outer
+   chrome (.dock-in is the frame); rows keep their fb-row styling */
+.dock-in .grid .file-bundle.dock-fb { grid-column: 1 / -1; margin-top: 0; border: none; border-radius: 8px; width: auto; }
+.dock-in .grid .file-bundle.dock-fb .fb-list { border-top: 1px solid var(--sp-border); }
+.dock-in .grid .file-bundle.dock-fb .fb-row { padding: 8px 11px; }
 .dock-in .grid { width: 100%; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 11px; }
 /* artifact cards live inside the dock grid: neutralize the transcript card's
    outer margins so the grid controls spacing */

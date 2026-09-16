@@ -1645,9 +1645,18 @@ function _dockRenderItems(pane, stream, st) {
   }
   if (bundle.length) {
     if (st.bundleOpen) {
-      for (const clean of bundle) {
-        try { renderArtifact(grid, clean); } catch (_) {}
+      // The old file-bundle TABLE (ext icon · name · size · ↗), reused verbatim
+      // via the .fb-* styles — not compact cards.
+      const table = document.createElement('div');
+      table.className = 'file-bundle dock-fb';
+      const list = document.createElement('div');
+      list.className = 'fb-list';
+      table.appendChild(list);
+      for (const f of bundle) {
+        const clean = String((f && f.path) || '').replace(/^\/+/, '');
+        if (clean) list.appendChild(_fbRowFor(clean, f && f.ts));
       }
+      grid.appendChild(table);
     }
     const row = document.createElement('div');
     row.className = 'dock-more';
@@ -1662,6 +1671,48 @@ function _dockRenderItems(pane, stream, st) {
     grid.appendChild(row);
   }
 }
+// One file-bundle table row (the old fb-row: ext icon · name · size · ↗).
+// Shared by the dock's "+N other files" table; same async size fetch + open
+// behaviour the transcript bundle card used.
+function _fbRowFor(clean, ts) {
+  const ext = clean.split('.').pop().toLowerCase();
+  const name = clean.split('/').pop();
+  const labelUC = ext.toUpperCase().slice(0, 4);
+  const row = document.createElement('div');
+  row.className = 'fb-row';
+  row.dataset.artifactPath = clean;
+  row.dataset.artifactCreated = String(ts || Date.now());
+  row.innerHTML =
+    '<span class="fb-row-icon">' + labelUC + '</span>' +
+    '<span class="fb-row-name"></span>' +
+    '<span class="fb-row-size"></span>' +
+    '<button class="fb-row-expand" title="Open">\u2197</button>';
+  row.querySelector('.fb-row-name').textContent = name;
+  (async () => {
+    try {
+      const { parts, name: fname } = splitPath(await resolveArtifactPath(clean));
+      const dir = await opfs.resolveDir(parts);
+      const file = await (await dir.getFileHandle(fname)).getFile();
+      const szEl = row.querySelector('.fb-row-size');
+      if (szEl && file.size > 0) szEl.textContent = formatArtifactBytes(file.size);
+    } catch (_) {}
+  })();
+  const expandBtn = row.querySelector('.fb-row-expand');
+  expandBtn.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      const resolved = await resolveArtifactPath(clean);
+      const bytes = await opfs.readBytes(resolved);
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'text/plain' }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (_) {}
+  };
+  row.onclick = (e) => { if (e.target !== expandBtn) expandBtn.click(); };
+  row.style.cursor = 'pointer';
+  return row;
+}
+
 // Hook: files landed mid-turn (partial) or at turn end. Adds items + ticks the
 // count; the drawer stays collapsed while generating unless already open.
 function _dockFilesLanded(stream, files, partial) {
