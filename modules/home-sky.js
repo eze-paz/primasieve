@@ -34,6 +34,7 @@
     'olive':        { mode: 'clouds', tint: 'dim',  reach: .2576, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
     'electric':     { mode: 'clouds', tint: 'dim',  reach: .2464, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
     'olive-bold':   { mode: 'clouds', tint: 'dim',  reach: .2576, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
+    'forest':       { mode: 'clouds', tint: 'dim',  reach: .2576, size: 1.0,  cover: .53, tempo: 3, speed: .06 },
     'classic-light':{ mode: 'sky',    tint: 'text', reach: .204, size: 1.15, cover: .51, tempo: 3, speed: .06 },
     'clear':        { mode: 'sky',    tint: 'text', reach: .144, size: 1.2,  cover: .53, tempo: 4, speed: .05 },
   };
