@@ -116,7 +116,15 @@
 // devexec36: posix_spawn landed in the kernel (ef751c3) without a bump, so any browser
 // holding ?v=devexec35 kept running the kernel from BEFORE it -- node's child_process
 // broken, and no way to tell from the page that it was serving a stale worker.
-WORKER_V = 'devexec36';
+// devexec37: the SAME miss, with teeth. protectedDelete() -- the gate that stops a guest
+// deleting /root/sandpie (the app's own conversations, memory, secrets, skills) -- shipped
+// in d0fb1d5 WITHOUT a bump, so every browser kept the pre-guard kernel at ?v=devexec36.
+// A day later a model ran `rm -rf sandpie && git clone ...` 8 times and the ungated cached
+// worker let it through, costing one user ~100 conversations (and, via sync, on every
+// device they owned). This bump carries that gate AND its WASI-ABI half (path_unlink_file /
+// path_remove_directory / path_rename went straight to rmEntry with no check).
+// A security gate is not deployed until this line moves.
+WORKER_V = 'devexec37';
 
   // The main CPython. Reactor exec model: its exports are not wrapped in thunks that
   // re-run __wasm_call_ctors, which is what made every cross-module call re-initialise
