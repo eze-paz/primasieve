@@ -234,7 +234,7 @@ function onPaletteInput(e) {
 }
 
 function saveThemeColors() {
-  var name = getThemeName() || 'classic-dark';
+  var name = getThemeName() || 'olive';
   var palette = {};
   var rows = $('themePaletteRows').querySelectorAll('.palette-row');
   for (var i = 0; i < rows.length; i++) {
@@ -253,7 +253,7 @@ function saveThemeColors() {
 }
 
 function resetThemeColors() {
-  var name = getThemeName() || 'classic-dark';
+  var name = getThemeName() || 'olive';
   clearPalette(name);
   applyThemePalette(name);
   buildPaletteUI(name);
@@ -264,7 +264,7 @@ function resetThemeColors() {
 }
 
 function updateThemeButtons() {
-  var name = getThemeName() || 'classic-dark';
+  var name = getThemeName() || 'olive';
   document.querySelectorAll('.theme-btn[data-t]').forEach(function (b) {
     b.classList.toggle('active', b.dataset.t === name);
   });
@@ -433,7 +433,7 @@ function _setupBackgroundPicker() {
 function _setupAppearancePanel() {
   applyChatWidth();   // highlight the active width button
   _setupBackgroundPicker();   // home-screen background animation picker
-  var saved = getThemeName() || 'classic-dark';
+  var saved = getThemeName() || 'olive';
   if (_themePalettes[saved]) {
     updateThemeButtons();
     buildPaletteUI(saved);
