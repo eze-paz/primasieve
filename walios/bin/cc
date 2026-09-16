@@ -46,9 +46,21 @@ for _a in "$@"; do
 ' "$_n"; exit 0 ;;
   esac
 done
-here=$(pwd)
+# PROCESS COUNT IS THE COST MODEL HERE. Every `$(...)` is a fork, and in wasm a fork is a
+# fresh worker + instantiate (~30-40ms measured), not the sub-millisecond fork Linux does.
+# This script used to spawn ~18 processes per compile -- one per ARGUMENT for abs(), plus
+# mktemp, plus grep|sed|sed to parse the plan -- of which exactly two did any work
+# (cc1 and wasm-ld). Measured: ~1.3s per compile, ~700ms of it in those helpers.
+# So: no command substitution on any hot path. abs() assigns to $_abs instead of echoing,
+# the plan is parsed with builtins, and the plan itself is CACHED because configure asks
+# for the same flag set hundreds of times in a row.
+here=${PWD:-/}
+[ -d "$here" ] || here=/
 ccout=; wantflag=
-abs() { case "$1" in /*|'') printf %s "$1" ;; *) printf %s "$here/$1" ;; esac; }
+NL='
+'
+# assigns $_abs -- NOT an echo, so callers need no subshell
+abs() { case "$1" in /*|'') _abs=$1 ;; *) _abs=$here/$1 ;; esac; }
 n=$#; i=0; want=0
 while [ $i -lt $n ]; do
   a=$1; shift; i=$((i+1))
@@ -63,21 +75,20 @@ while [ $i -lt $n ]; do
     # and as bin/ld uses. The other flags here take DIRECTORIES (-I/-L/-isystem/-iquote/
     # -idirafter) or OUTPUT paths (-o/-MF), which are cwd-relative by definition.
     if [ "$wantflag" = "-include" ] && [ ! -e "$a" ]; then set -- "$@" "$a"; want=0; continue; fi
-    _p=$(abs "$a"); [ "$wantflag" = "-o" ] && ccout=$_p; set -- "$@" "$_p"; want=0; continue
+    abs "$a"; [ "$wantflag" = "-o" ] && ccout=$_abs; set -- "$@" "$_abs"; want=0; continue
   fi
   case "$a" in
     # flags whose NEXT argument is a path. -MT/-MQ are make target names, not paths.
     -o|-I|-L|-isystem|-include|-iquote|-idirafter|-MF) set -- "$@" "$a"; wantflag=$a; want=1 ;;
-    -I?*)  set -- "$@" "-I$(abs "${a#-I}")" ;;
-    -L?*)  set -- "$@" "-L$(abs "${a#-L}")" ;;
-    -MF?*) set -- "$@" "-MF$(abs "${a#-MF}")" ;;
+    -I?*)  abs "${a#-I}";  set -- "$@" "-I$_abs" ;;
+    -L?*)  abs "${a#-L}";  set -- "$@" "-L$_abs" ;;
+    -MF?*) abs "${a#-MF}"; set -- "$@" "-MF$_abs" ;;
     -*)    set -- "$@" "$a" ;;
     # an input file. Absolutise only what actually exists: a non-existent name is left
     # alone so clang reports it by the name the caller used.
-    *)     if [ -e "$a" ]; then set -- "$@" "$(abs "$a")"; else set -- "$@" "$a"; fi ;;
+    *)     if [ -e "$a" ]; then abs "$a"; set -- "$@" "$_abs"; else set -- "$@" "$a"; fi ;;
   esac
 done
-
 hastarget=0; linking=1; inputs=0
 for a in "$@"; do
   case "$a" in
@@ -88,37 +99,94 @@ for a in "$@"; do
   esac
 done
 [ $inputs = 1 ] || linking=0
+# -include sys/cdefs.h: glibc pulls that header into essentially every libc header via
+# features.h, so packages use __BEGIN_DECLS/__END_DECLS without ever including it directly.
+# musl has no such file, so those packages fail on their FIRST header --
+#     utf8.h:30:1: error: unknown type name '__BEGIN_DECLS'
+# -- and, worse, the parser desyncs and fills the rest of the log with "expected function
+# body after function declarator" on perfectly good K&R definitions, so the tail of the
+# errors blames something else entirely. Measured on figlet: 20 errors before, 0 after.
+# The header is seeded by walios-backend.js toolBlobs and every macro in it is #ifndef
+# guarded, so a package that defines its own still wins.
 if [ $hastarget = 0 ]; then
   set -- --target=wasm32-unknown-linux-muslwali --sysroot=/sysroot \
     -nostdlibinc -isystem /sysroot/include -I/opt/wali/include -L/opt/wali/lib -D_GNU_SOURCE \
+    -include sys/cdefs.h \
     -O2 -mllvm -wasm-enable-sjlj -fwasm-exceptions -matomics -mbulk-memory -mexception-handling \
     -L/sysroot/lib -nodefaultlibs -Wl,--shared-memory,--export-memory,--max-memory=2147483648,-z,stack-size=8388608 \
     "$@"
   [ $linking = 1 ] && set -- "$@" -lc /sysroot/lib/libclang_rt.builtins.a
   set -- "$@" -w
 fi
-plan=$(mktemp) || exit 1
-clang -### "$@" 2>"$plan"; rc=$?
-if [ $rc -ne 0 ]; then grep -v '^clang version\|^Target:\|^Thread model\|^InstalledDir\|^Build config' "$plan" >&2; rm -f "$plan"; exit $rc; fi
-# Every command line the driver would have spawned: ` "" "clang" "-cc1" ...` / ` "wasm-ld" ...`.
-# The leading "" is the (empty) InstalledDir; the tools resolve by name on PATH.
-# ...and the same for every OUTPUT the driver chose for us. With no -o, clang defaults to a
-# RELATIVE name -- `a.out` when linking, `conftest.o` for -c -- which the WASI steps would
-# write to / instead of here. autoconf's ac_compile is literally `$CC -c conftest.c`, with no
-# -o at all, so this case is not exotic. Rewriting -o in the PLAN catches all of them at once
-# (default names, one -o per input for a multi-input -c) instead of guessing in the argv pass.
-# The [^/] guard leaves paths that are already absolute alone.
-cmds=$(grep '^ *"' "$plan" | sed 's/^ *"" //' | sed -e 's|"-o" "\([^/"][^"]*\)"|"-o" "@CCHERE@/\1"|g' -e "s|@CCHERE@|$here|g")
-rm -f "$plan"
-if [ -z "$cmds" ]; then exec clang "$@"; fi        # nothing to spawn (--version, -print-*, ...): the driver did the work
-# A pipeline's exit status is its LAST element's, and the while loop IS that element, so
-# `exit $?` inside the subshell does propagate out of cc. I briefly believed otherwise and
-# rewrote this as a heredoc loop; that was wrong. Verified both ways: a compile STEP that
-# fails (absolute paths, so the plan stage succeeds and cc1 is what dies) gives cc exit 1.
-echo "$cmds" | while IFS= read -r line; do
-  [ -n "$line" ] || continue
-  eval "$line" || exit $?
-done || exit $?
+# THE PLAN. `clang -###` is a full 75MB clang start (~190ms measured) that only PRINTS the
+# command lines; configure then asks for the identical flag set hundreds of times. So the
+# plan is cached under /tmp, keyed by the exact argv + cwd. /tmp does not survive a session,
+# which is the staleness bound we want: a rebuilt sysroot can never be served a stale plan.
+ccdir=/tmp/.ccplan
+[ -d "$ccdir" ] || mkdir -p "$ccdir" 2>/dev/null
+# A key without forking a hash: the exact argv plus cwd. The FILENAME is only a bucket
+# (argc + key length); the full key lives in <bucket>.key and is compared on read, so a
+# bucket collision costs a recompute, never a wrong plan.
+key=$here
+for a in "$@"; do key=$key@$a; done
+fn=$ccdir/p$#.${#key}
+# THE CACHED PLAN IS A SOURCEABLE SCRIPT, and that shape is the point. The obvious version
+# -- read the plan back and walk it with parameter expansion -- MEASURED WORSE than the
+# grep|sed|sed it replaced: busybox `read` takes one read(2) per BYTE (3,879 syscalls for
+# one compile) and ${var%%...} over a multi-KB string is quadratic. 343ms of shell compute
+# to avoid 150ms of helper processes. Sourcing hands the whole job to ash's own buffered
+# script reader instead: no per-byte reads, no string walking, and `.` is not a fork.
+ran=
+if [ -f "$fn.key" ] && [ -f "$fn.sh" ]; then
+  IFS= read -r ckey < "$fn.key"
+  [ "$ckey" = "$key" ] && { . "$fn.sh"; ran=1; }
+fi
+if [ -z "$ran" ]; then
+  plan=/tmp/ccplan.$$
+  clang -### "$@" 2>"$plan"; rc=$?
+  if [ $rc -ne 0 ]; then
+    # the driver itself refused (bad flag, missing input): show its complaint, minus the banner
+    while IFS= read -r line; do
+      case "$line" in
+        'clang version'*|'Target:'*|'Thread model'*|'InstalledDir'*|'Build config'*) ;;
+        *) printf '%s\n' "$line" >&2 ;;
+      esac
+    done < "$plan"
+    rm -f "$plan"; exit $rc
+  fi
+  # Every command line the driver would have spawned: ` "" "clang" "-cc1" ...` / ` "wasm-ld" ...`.
+  # The leading "" is the (empty) InstalledDir; the tools resolve by name on PATH.
+  # ...and the same for every OUTPUT the driver chose for us. With no -o, clang defaults to a
+  # RELATIVE name -- `a.out` when linking, `conftest.o` for -c -- which the WASI steps would
+  # write to / instead of here. autoconf's ac_compile is literally `$CC -c conftest.c`, with no
+  # -o at all, so this case is not exotic. Rewriting -o in the PLAN catches all of them at once
+  # (default names, one -o per input for a multi-input -c) instead of guessing in the argv pass.
+  # The [^/] guard leaves paths that are already absolute alone.
+  : > "$fn.sh.tmp"
+  steps=0
+  while IFS= read -r line; do
+    while [ "${line# }" != "$line" ]; do line=${line# }; done      # strip leading spaces
+    case "$line" in '"'*) ;; *) continue ;; esac                   # only quoted command lines
+    line=${line#'"" '}                                             # drop the empty InstalledDir
+    out=; rest=$line                                               # absolutise every RELATIVE -o
+    while :; do
+      case "$rest" in *'"-o" "'*) ;; *) out=$out$rest; break ;; esac
+      pre=${rest%%'"-o" "'*}; post=${rest#*'"-o" "'}
+      case "$post" in
+        /*) out=$out$pre'"-o" "' ;;
+        *)  out=$out$pre'"-o" "'$here/ ;;
+      esac
+      rest=$post
+    done
+    printf '%s || exit $?\n' "$out" >> "$fn.sh.tmp"
+    steps=$((steps+1))
+  done < "$plan"
+  rm -f "$plan"
+  if [ $steps = 0 ]; then rm -f "$fn.sh.tmp"; exec clang "$@"; fi   # nothing to spawn (--version, -print-*): the driver did the work
+  # .key last: a reader that sees a valid key is guaranteed a complete .sh
+  mv "$fn.sh.tmp" "$fn.sh" 2>/dev/null && printf '%s\n' "$key" > "$fn.key" 2>/dev/null
+  . "$fn.sh"
+fi
 
 # A linker leaves its output EXECUTABLE. wasm-ld's lands 0644 here, and walios does not
 # enforce the x-bit on exec -- so `./a.out` ran fine and nothing looked wrong. autoconf
