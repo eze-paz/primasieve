@@ -155,6 +155,12 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
     'model produced only reasoning tokens (' + think.length + ' chars' +
     (finish ? ', finish_reason=' + finish : '') + ') and no content — max_tokens was spent thinking, raise it');
 
+  // Usage capture: the request already sends stream_options.include_usage, so the
+  // final SSE chunk (or the buffered JSON) carries the provider's authoritative
+  // token counts. One-shot utility calls (retitle, compactor, memory agents) are
+  // billed exactly like chat turns, so their usage must reach /admin too — the
+  // caller reports it via _reportUsage below.
+  let _usage = null;
   async function readStreamText(res) {
     if (!res.body || !res.body.getReader) {   // buffering proxy: whole JSON despite stream:true
       const data = await res.json();
@@ -162,6 +168,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
       const m = data?.choices?.[0]?.message || {};
       const think = String(m.reasoning || m.reasoning_content || '');
       if (!m.content && think) throw _emptyErr(think, data?.choices?.[0]?.finish_reason);
+      _usage = data.usage || null;
       return m.content || '';
     }
     const reader = res.body.getReader(), dec = new TextDecoder();
@@ -185,6 +192,7 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
         if (typeof d.reasoning === 'string') think += d.reasoning;
         else if (typeof d.reasoning_content === 'string') think += d.reasoning_content;
         if (ch.finish_reason) finish = ch.finish_reason;
+        if (j.usage) _usage = j.usage;   // final chunk (stream_options.include_usage)
       }
     }
     if (!out && think) throw _emptyErr(think, finish);
@@ -196,6 +204,47 @@ async function completeOnce({ system = '', user = '', model = '', maxTokens = nu
   // fire again on their next trigger; a non-retryable error (4xx) surfaces at once.
   const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
   const BACKOFF_MS = [1000, 2000, 5000, 10000];
+
+  // Report the one-shot call's usage to the admin analytics panel. These calls
+  // (retitle, compaction, memory agents) are billed on the managed provider
+  // exactly like chat turns, so they must be counted — but they run OUTSIDE the
+  // conversation stream, so no `usage` event fires and reportTurnUsage (which
+  // lives in conversations.js and hangs off that event) never sees them. Report
+  // here instead, same endpoint/payload shape, attributed via the same-origin
+  // session cookie. sessionId is the parent-session marker ("Retitle:<sid>",
+  // "Compact:<sid>"…) — sent as conversation_id so /admin can group the spend
+  // under the conversation that caused it. Best-effort + fire-and-forget: a
+  // failure never affects the utility call itself, and anonymous (/guest)
+  // sessions just get a silent 401.
+  function _reportUsage() {
+    try {
+      if (!_usage || typeof _usage.prompt_tokens !== 'number' || !sessionId) return;
+      const details = _usage.completion_tokens_details || {};
+      const reasoning = details.reasoning_tokens != null ? details.reasoning_tokens
+                      : (_usage.reasoning_tokens != null ? _usage.reasoning_tokens : undefined);
+      fetch(new URL('/api/usage/turn', location.href).href, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: sessionId,
+          turn_index: 0,
+          model: mdl,
+          provider_type: active ? (active.managed ? 'managed' : (active.type || 'personal')) : null,
+          usage: {
+            prompt_tokens: _usage.prompt_tokens || 0,
+            completion_tokens: _usage.completion_tokens || 0,
+            total_tokens: _usage.total_tokens != null ? _usage.total_tokens
+                          : ((_usage.prompt_tokens || 0) + (_usage.completion_tokens || 0)),
+            reasoning_tokens: reasoning,
+            cost: (typeof _usage.cost === 'number' && isFinite(_usage.cost)) ? _usage.cost : null,
+          },
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (_) { /* analytics must never break the utility call */ }
+  }
+
   // The reasoning switches above are non-standard: OpenAI-spec servers reject an
   // unrecognized body parameter with a 400 rather than ignoring it. Rather than
   // maintain a per-provider allowlist, drop them and retry ONCE on the first 4xx —
