@@ -241,6 +241,7 @@ const SandpieLanguage = (() => {
       if (typeof SandpieConfig !== 'undefined' && SandpieConfig.set) SandpieConfig.set(CONFIG_NS, val);
       localStorage.setItem(LS_KEY, val);
     } catch (_) {}
+    try { applyUi(); } catch (_) {}
   }
 
   function browserTags() {
@@ -303,6 +304,38 @@ const SandpieLanguage = (() => {
     return { auto: { value: 'auto', label: 'System default — ' + nativeName(det) }, items: all, detected: det };
   }
 
-  return { detect, effective, isAuto, stored, set, name, nativeName, options, LANGUAGES, VARIANTS };
+  // ---- Localized UI strings --------------------------------------------------
+  // The few hard-coded UI strings that must follow the reply language. Composer
+  // placeholder: English default; es/ca translated; any other language falls
+  // back to English. Adding one string = one entry here; applyUi() repaints.
+  const UI_STRINGS = {
+    composerPlaceholder: {
+      en: 'Ask sandpie\u2026',
+      es: 'Pregunta a sandpie\u2026',
+      ca: 'Pregunta a sandpie\u2026',
+    },
+  };
+  function uiString(key) {
+    const t = UI_STRINGS[key];
+    if (!t) return '';
+    const code = String(effective() || 'en').split(/[-_]/)[0].toLowerCase();
+    return t[code] || t.en;
+  }
+  function applyUi() {
+    const ph = uiString('composerPlaceholder');
+    if (!ph) return;
+    for (const id of ['input', 'inputSide']) {
+      const el = document.getElementById(id);
+      if (el) el.setAttribute('placeholder', ph);
+    }
+  }
+  // Paint once the composer exists (this script loads in <head>, before the DOM).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { try { applyUi(); } catch (_) {} }, { once: true });
+  } else {
+    try { applyUi(); } catch (_) {}
+  }
+
+  return { detect, effective, isAuto, stored, set, name, nativeName, options, applyUi, uiString, LANGUAGES, VARIANTS };
 })();
 window.SandpieLanguage = SandpieLanguage;
