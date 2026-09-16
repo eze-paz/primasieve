@@ -353,32 +353,11 @@ const SandpieContext = (() => {
     return last;
   }
 
-  // Scaffold one well-formed example skill so the frontmatter format is obvious.
-  const EXAMPLE_NAME = 'example_skill';
-  const EXAMPLE = `---
-name: ${EXAMPLE_NAME}
-description: Describe in plain language when this skill applies — the task it handles. The model reads this to decide when to load the skill, so write it the way you'd brief a teammate (e.g. "Deploying the app to production: bump version, commit, push, verify CI").
----
-
-# ${EXAMPLE_NAME}
-
-Replace this with the step-by-step instructions for the task. The whole file is
-returned to the model when it calls load_skill on this skill.
-`;
-
-  async function scaffold() {
-    const file = `${SKILLS_DIR}/${EXAMPLE_NAME}/${SKILL_FILE}`;
-    if (await opfs.exists(file)) return;
-    await opfs.write(file, EXAMPLE);
-    if (typeof Sandpie !== 'undefined' && Sandpie.events) Sandpie.events.emit('file:changed', file);
-    try { Sandpie.refreshFiles(); } catch {}
-  }
-
   function subscribe(cb) { listeners.add(cb); return () => listeners.delete(cb); }
   function notify() { for (const cb of listeners) { try { cb(); } catch (e) { console.warn(e); } } }
 
   return {
-    SKILLS_DIR, skillBlock, inspect, scaffold, subscribe,
+    SKILLS_DIR, skillBlock, inspect, subscribe,
     isSkillEnabled, saveSkill,
     parseFrontmatter, cleanDescription, descAlnum,
     lastState: () => last,

@@ -41,7 +41,7 @@
      the same theme-derived ramp; 'none' disables the animation entirely. */
   let mode = 'clouds';
   const MODES = {
-    'clouds':      { label: 'Clouds' },
+    'clouds':      { label: 'Nimbus' },
     'water-open':  { label: 'Selune' },
     'none':        { label: 'None' },
   };

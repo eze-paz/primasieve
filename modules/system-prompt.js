@@ -219,7 +219,6 @@ those respond() calls together (one per language) as that final step.`;
           <div class="sp-block-head">Skills <span class="sp-count" id="spSkillsCount"></span></div>
           <div id="spSkillsErrors"></div>
           <div id="spSkillsList"></div>
-          <button type="button" class="ghost" id="spSkillCreate" style="font-size:0.72rem; padding:0.2rem 0.55rem; margin-top:0.4rem;">Create example skill</button>
         </div>
 
         <div class="sp-block">
@@ -336,11 +335,6 @@ those respond() calls together (one per language) as that final step.`;
     if (resetBtn) resetBtn.addEventListener('click', () => { set(''); if (ta) ta.value = ''; flashMsg('Reset to default'); });
     renderTools(panel);
     renderSkills(panel);
-    const createBtn = panel.querySelector('#spSkillCreate');
-    if (createBtn) createBtn.addEventListener('click', async () => {
-      try { if (typeof SandpieContext !== 'undefined' && SandpieContext.scaffold) { await SandpieContext.scaffold(); flashMsg('Created example skill'); renderSkills(panel); } }
-      catch (_) { flashMsg('Could not create'); }
-    });
   }
 
   let _retry = 0;
