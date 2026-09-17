@@ -126,7 +126,7 @@ const SandpieNotifications = (function() {
    * @param {string} convId
    * @param {string} [knownTitle]
    */
-  async function notifyComplete(convId, knownTitle) {
+  async function notifyComplete(convId, knownTitle, data) {
     if (!effectivelyOn()) return;
     if (!document.hidden) return;
     let title = 'Conversation complete';
@@ -138,8 +138,24 @@ const SandpieNotifications = (function() {
     } catch (e) {
       console.warn('[sandpie] notify: title read failed:', e);
     }
+    // Customizable banner: template from Settings > Notifications. Placeholders
+    // {title} {sec} {tokens} {rate} are substituted with this turn's data.
+    let body = title;
+    try {
+      const c = window.SandpieConfig;
+      const tpl = c && c.get('notiftemplate');
+      const t = tpl && typeof tpl.text === 'string' ? tpl.text : '';
+      if (t.trim()) {
+        const fmtSec = (p.sec && p.sec > 0) ? (p.sec >= 90 ? Math.round(p.sec / 60) + ' min' : Math.round(p.sec) + ' s') : '';
+        const fmtTok = p.completionTokens ? p.completionTokens.toLocaleString() : '';
+        const fmtRate = p.rate ? p.rate.toFixed(1) + ' tok/s' : '';
+        body = t.replaceAll('{title}', title).replaceAll('{sec}', fmtSec)
+                .replaceAll('{tokens}', fmtTok).replaceAll('{rate}', fmtRate)
+                .replace(/\s+\n/g, '\n').trim() || title;
+      }
+    } catch (_) {}
     const opts = {
-      body: title,
+      body,
       icon: 'icon-192.png',
       tag: 'sandpie-conv-' + convId,
     };
@@ -165,7 +181,7 @@ const SandpieNotifications = (function() {
     if (_wired || !(window.Sandpie && window.Sandpie.events)) return;
     _wired = true;
     Sandpie.events.on('generation:complete', (p) => {
-      if (p && !p.aborted) notifyComplete(p.convId, p.title);
+      if (p && !p.aborted) notifyComplete(p.convId, p.title, p);
     });
   }
 
@@ -173,9 +189,18 @@ const SandpieNotifications = (function() {
         <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
         <button type="button" class="ghost" id="notifEnableBtn">Enable notifications</button>
         <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
+      <label style="display:block; margin-top:0.75rem; font-size:0.8rem;">
+        <span>Notification text <span style="color:var(--sp-text-dim); font-size:0.7rem;">placeholders: {title} {sec} {tokens} {rate}</span></span>
+        <input type="text" id="notifTemplateInput" placeholder="{title} — {sec}, {tokens} ({rate})"
+               style="width:100%; margin-top:0.35rem; background:var(--sp-panel); color:var(--sp-text); border:1px solid var(--sp-border); border-radius:6px; padding:0.4rem 0.5rem; font-size:0.8rem;">
+      </label>
       <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.75rem; font-size:0.8rem; cursor:pointer;">
         <input type="checkbox" id="keepaliveToggle">
         <span>Keep generating when screen is locked <span style="color:var(--sp-text-dim); font-size:0.7rem;">(Android, silent audio)</span></span>
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.5rem; font-size:0.8rem; cursor:pointer;">
+        <input type="checkbox" id="turnSoundToggle">
+        <span>Play a chime when a turn ends</span>
       </label>
       `;
   function wireNotifPanel(bodyEl) {
@@ -183,6 +208,18 @@ const SandpieNotifications = (function() {
     statusEl = bodyEl.querySelector('#notifStatus');
     if (btnEl) btnEl.addEventListener('click', toggle);
     const kaEl = bodyEl.querySelector('#keepaliveToggle');
+    const tplEl = bodyEl.querySelector('#notifTemplateInput');
+    if (tplEl) {
+      try { const c = window.SandpieConfig; const t = c && c.get('notiftemplate'); tplEl.value = (t && t.text) || ''; } catch (_) {}
+      tplEl.addEventListener('change', () => {
+        try { const c = window.SandpieConfig; if (c) c.set('notiftemplate', { text: tplEl.value }); } catch (_) {}
+      });
+    }
+    const tsEl = bodyEl.querySelector('#turnSoundToggle');
+    if (tsEl && window.SandpieKeepAlive) {
+      tsEl.checked = SandpieKeepAlive.soundEnabled();
+      tsEl.addEventListener('change', () => SandpieKeepAlive.setSoundEnabled(tsEl.checked));
+    }
     if (kaEl && window.SandpieKeepAlive) {
       kaEl.checked = SandpieKeepAlive.prefEnabled();
       kaEl.addEventListener('change', () => SandpieKeepAlive.setPrefEnabled(kaEl.checked));

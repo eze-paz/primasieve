@@ -89,12 +89,58 @@ const SandpieKeepAlive = (function () {
     } catch (_) {}
   }
 
-  // Generation started (any conversation). Idempotent.
-  function start() { wantOn = true; playAudio(); }
+  // Multi-conv aware: caller passes whether ANY conversation is still
+  // generating (anyStreamGenerating()). Idempotent — safe to call on every
+  // turn start/end regardless of how many convs are active.
+  function refresh(on) { wantOn = !!on; if (wantOn) playAudio(); else pauseAudio(); }
 
-  // Generation ended (natural, Stop, or error). Idempotent.
-  function stop() { wantOn = false; pauseAudio(); }
+  // Back-compat single-conv helpers.
+  function start() { refresh(true); }
+  function stop() { refresh(false); }
 
-  return { start, stop, prefEnabled, setPrefEnabled, isAndroid };
+  // ---- Turn-end chime -------------------------------------------------
+  const SOUND_KEY = 'sandpie-turnsound';
+  function soundEnabled() {
+    try {
+      const c = window.SandpieConfig;
+      if (c) {
+        const t = c.get('turnsound');
+        if (t && typeof t.enabled === 'boolean') return t.enabled;
+      }
+    } catch (_) {}
+    return localStorage.getItem(SOUND_KEY) !== '0'; // default ON
+  }
+  function setSoundEnabled(on) {
+    try {
+      const c = window.SandpieConfig;
+      if (c) c.set('turnsound', Object.assign({}, c.get('turnsound', {}) || {}, { enabled: !!on }));
+    } catch (_) {}
+    if (on) localStorage.removeItem(SOUND_KEY);
+    else localStorage.setItem(SOUND_KEY, '0');
+  }
+  let actx = null;
+  // Short two-tone chime. Works while hidden as long as the keep-alive audio
+  // is holding the renderer alive (which is exactly the turn-end case).
+  function chime() {
+    try {
+      if (!soundEnabled()) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!actx) actx = new AC();
+      if (actx.state === 'suspended') actx.resume();
+      const t0 = actx.currentTime;
+      [[880, 0, 0.12], [1318.5, 0.13, 0.2]].forEach(([f, at, dur]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0 + at);
+        g.gain.exponentialRampToValueAtTime(0.18, t0 + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+        o.connect(g); g.connect(actx.destination);
+        o.start(t0 + at); o.stop(t0 + at + dur + 0.05);
+      });
+    } catch (e) { console.warn('[sandpie] keepalive: chime failed:', e); }
+  }
+
+  return { start, stop, refresh, prefEnabled, setPrefEnabled, isAndroid, chime, soundEnabled, setSoundEnabled };
 })();
 window.SandpieKeepAlive = SandpieKeepAlive;

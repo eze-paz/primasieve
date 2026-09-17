@@ -3439,7 +3439,7 @@ function setStreamSending(stream, sending, opts) {
     // Artifact dock: collapse the drawer for the new turn.
     try { _dockTurnStart(stream); } catch (_) {}
     // Keep-alive: silent audio so Android keeps JS alive on lock screen (settings-gated).
-    try { SandpieKeepAlive.start(); } catch (_) {}
+    try { SandpieKeepAlive.refresh(anyStreamGenerating()); } catch (_) {}
   } else {
     stream.abort = null;
     stream.generating = false;
@@ -3447,7 +3447,7 @@ function setStreamSending(stream, sending, opts) {
     // list; auto-open EXCEPT on an explicit Stop (the user interrupted the round
     // on purpose — opening the drawer over their action reads as noise).
     try { _dockTurnEnd(stream, opts); } catch (_) {}
-    try { SandpieKeepAlive.stop(); } catch (_) {}
+    try { SandpieKeepAlive.refresh(anyStreamGenerating()); } catch (_) {}
     // Ends off-screen (including an abort — the work stopped either way, and
     // there is something to come back to) → it becomes a badge on the toggle.
     try {
@@ -4463,6 +4463,9 @@ async function sendSingle(text, stream, opts = {}) {
     // popup) now the provider has reported this turn's authoritative usage.
     try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.notify) SandpieTokens.notify(); } catch (_) {}
     setStreamSending(stream, false, { aborted: wasAborted });
+    // Turn-end chime (settings-gated) — audible even when the page is hidden,
+    // since the keep-alive audio holds the renderer alive on Android.
+    try { if (!wasAborted && window.SandpieKeepAlive) SandpieKeepAlive.chime(); } catch (_) {}
     flushIncrementalSave(convId);
     await saveConv(convId);
 
@@ -4477,7 +4480,9 @@ async function sendSingle(text, stream, opts = {}) {
     // Optional capability: notifications.js (if loaded) listens for this and
     // fires a system toast. No listener ⇒ no-op. saveConv ran first so the
     // listener can read the canonical (possibly renamed) conv title.
-    Sandpie.events.emit('generation:complete', { convId, aborted: wasAborted, title: _newTitle || undefined });
+    const _lt = stream.lastTurn || {};
+    Sandpie.events.emit('generation:complete', { convId, aborted: wasAborted, title: _newTitle || undefined,
+      sec: _lt.sec, completionTokens: _lt.completionTokens, rate: _lt.rate });
     try { await Sandpie.sync(); } catch (e) { console.warn('sync failed:', e); }
   }
 }
