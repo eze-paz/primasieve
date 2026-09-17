@@ -1557,7 +1557,8 @@
   // deployment provides a Dropbox app key (GET /config), start the OAuth flow
   // automatically — seamless when Dropbox is federated to the same IdP. The
   // per-session AUTOCONN_TRIED guard stops a cancelled/failed bounce from looping.
-  async function maybeAutoConnect() {
+  async function maybeAutoConnect(user) {
+    if (user && String(user.sub || "").startsWith("local:")) return;   // local (non-SSO) accounts: no Dropbox auto-connect
     if (tokens()) return;                                 // already connected
     if (localStorage.getItem(AUTOCONN_OPTOUT)) return;    // user opted out via Disconnect
     if (sessionStorage.getItem(AUTOCONN_TRIED)) return;   // already tried this session
