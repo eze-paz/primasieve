@@ -1775,17 +1775,26 @@ function _dockTurnStart(stream) {
 }
 // Hook: turn ends (natural, error, or abort — hangs off the turn-end teardown,
 // not respond()) → consolidate + auto-open unless the user toggled mid-turn.
-function _dockTurnEnd(stream) {
+function _dockTurnEnd(stream, opts) {
   if (!stream) return;
   const convId = '' + (stream.id || '');
   const st = _dockState.get(convId) || { open: false, manual: false };
   _dockState.set(convId, st);
   const pane = _dockPane(stream);
   if (!pane) return;
-  // ALWAYS open at end of round — the drawer shows the round's new files
-  // (or the 'empty' placeholder). No manual-condition gate.
-  st.open = true;
-  pane.classList.add('open');
+  // Auto-open gate (singular): the round must have created or edited a
+  // deliverable — a file whose touch ts is at/after the round watermark — AND
+  // the turn must have ended in respond(). An explicit Stop never reaches
+  // respond(), so an aborted round never opens the drawer (the chip still
+  // repaints; the drawer keeps whatever open/closed state it had). A round
+  // that touched no files (pure Q&A) stays closed too.
+  const roundStart = stream.dockRoundStart || 0;
+  const touchedThisRound = !!(roundStart && (stream.filesTouched || []).some(
+    (f) => f && f.path && (f.ts || 0) >= roundStart));
+  if (!(opts && opts.aborted) && touchedThisRound) {
+    st.open = true;
+    pane.classList.add('open');
+  }
   const slot = pane.querySelector(':scope > .msg-timer-slot .msg-timer');
   _paintDockChip(slot, stream);
 }
@@ -3415,7 +3424,7 @@ function refreshSendButtonFor(which) {
     btn.disabled = false;
   }
 }
-function setStreamSending(stream, sending) {
+function setStreamSending(stream, sending, opts) {
   if (!stream) return;
   if (sending) {
     stream.abort = new AbortController();
@@ -3433,8 +3442,9 @@ function setStreamSending(stream, sending) {
     stream.abort = null;
     stream.generating = false;
     // Artifact dock: turn ended (natural, error, or abort) → consolidate the
-    // list and auto-open unless the user toggled the drawer mid-turn.
-    try { _dockTurnEnd(stream); } catch (_) {}
+    // list; auto-open EXCEPT on an explicit Stop (the user interrupted the round
+    // on purpose — opening the drawer over their action reads as noise).
+    try { _dockTurnEnd(stream, opts); } catch (_) {}
     // Ends off-screen (including an abort — the work stopped either way, and
     // there is something to come back to) → it becomes a badge on the toggle.
     try {
@@ -4449,7 +4459,7 @@ async function sendSingle(text, stream, opts = {}) {
     // Refresh the context readouts (sidebar week total + badge, and any open ctx
     // popup) now the provider has reported this turn's authoritative usage.
     try { if (typeof SandpieTokens !== 'undefined' && SandpieTokens.notify) SandpieTokens.notify(); } catch (_) {}
-    setStreamSending(stream, false);
+    setStreamSending(stream, false, { aborted: wasAborted });
     flushIncrementalSave(convId);
     await saveConv(convId);
 
