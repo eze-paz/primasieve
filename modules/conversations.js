@@ -5917,13 +5917,16 @@ const TC_LABELS = {
   write_todos:       { doing: 'Planning',            done: 'Planned' },
   ask:               { doing: 'Asking you',          done: 'Asked you' },
   web_search:        { doing: 'Searching the web',   done: 'Searched the web', target: 'query' },
+  read_url:          { doing: 'Reading a page',      done: 'Read the page',  target: 'url' },
+  delete_file:       { doing: 'Deleting',            done: 'Deleted',        target: 'path' },
+  scratch:           { doing: 'Taking notes',        done: 'Noted' },
 };
 // Localized verbs, keyed by base language code, mapping the canonical English
 // phrase (from TC_LABELS) → its translation. The tool-call label sits inline in
 // the message stream next to the model's own reply, so it should follow the
 // conversation language (SandpieLanguage), not stay English like the static
 // chrome. English is the fallback: any phrase or language not listed here shows
-// the canonical English. Adding a language = one object of the ~38 phrases.
+// the canonical English. Adding a language = one object of the phrases.
 const TC_I18N = {
   es: {
     'Running code': 'Ejecutando código',      'Ran code': 'Código ejecutado',
@@ -5947,6 +5950,9 @@ const TC_I18N = {
     'Planning': 'Planificando',                'Planned': 'Planificado',
     'Asking you': 'Preguntándote',             'Asked you': 'Te preguntó',
     'Searching the web': 'Buscando en la web', 'Searched the web': 'Búsqueda web completada',
+    'Reading a page': 'Leyendo una página',    'Read the page': 'Página leída',
+    'Deleting': 'Eliminando',                  'Deleted': 'Eliminado',
+    'Taking notes': 'Tomando notas',           'Noted': 'Anotado',
   },
   ca: {
     'Running code': 'Executant codi',          'Ran code': 'Codi executat',
@@ -5970,6 +5976,9 @@ const TC_I18N = {
     'Planning': 'Planificant',                 'Planned': 'Planificat',
     'Asking you': 'Preguntant-te',             'Asked you': "T'ha preguntat",
     'Searching the web': 'Cercant al web',     'Searched the web': 'Cerca web completada',
+    'Reading a page': 'Llegint una pàgina',    'Read the page': 'Pàgina llegida',
+    'Deleting': 'Eliminant',                   'Deleted': 'Eliminat',
+    'Taking notes': 'Prenent notes',           'Noted': 'Anotat',
   },
 };
 // Base language code the conversation is in (e.g. 'es' from 'es'/'es-419').
