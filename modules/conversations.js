@@ -3438,6 +3438,8 @@ function setStreamSending(stream, sending, opts) {
     _askingConvs.delete(activeConvId);
     // Artifact dock: collapse the drawer for the new turn.
     try { _dockTurnStart(stream); } catch (_) {}
+    // Keep-alive: silent audio so Android keeps JS alive on lock screen (settings-gated).
+    try { SandpieKeepAlive.start(); } catch (_) {}
   } else {
     stream.abort = null;
     stream.generating = false;
@@ -3445,6 +3447,7 @@ function setStreamSending(stream, sending, opts) {
     // list; auto-open EXCEPT on an explicit Stop (the user interrupted the round
     // on purpose — opening the drawer over their action reads as noise).
     try { _dockTurnEnd(stream, opts); } catch (_) {}
+    try { SandpieKeepAlive.stop(); } catch (_) {}
     // Ends off-screen (including an abort — the work stopped either way, and
     // there is something to come back to) → it becomes a badge on the toggle.
     try {

@@ -173,11 +173,20 @@ const SandpieNotifications = (function() {
         <p style="font-size:0.75rem; color:var(--sp-text-dim); margin:0 0 0.5rem;">Get a system notification when a conversation finishes.</p>
         <button type="button" class="ghost" id="notifEnableBtn">Enable notifications</button>
         <p id="notifStatus" style="font-size:0.7rem; color:var(--sp-text-dim); margin:0.5rem 0 0;"></p>
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-top:0.75rem; font-size:0.8rem; cursor:pointer;">
+        <input type="checkbox" id="keepaliveToggle">
+        <span>Keep generating when screen is locked <span style="color:var(--sp-text-dim); font-size:0.7rem;">(Android, silent audio)</span></span>
+      </label>
       `;
   function wireNotifPanel(bodyEl) {
     btnEl = bodyEl.querySelector('#notifEnableBtn');
     statusEl = bodyEl.querySelector('#notifStatus');
     if (btnEl) btnEl.addEventListener('click', toggle);
+    const kaEl = bodyEl.querySelector('#keepaliveToggle');
+    if (kaEl && window.SandpieKeepAlive) {
+      kaEl.checked = SandpieKeepAlive.prefEnabled();
+      kaEl.addEventListener('change', () => SandpieKeepAlive.setPrefEnabled(kaEl.checked));
+    }
     refreshStatus();
   }
 
