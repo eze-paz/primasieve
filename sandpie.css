@@ -1645,7 +1645,7 @@ ul.conv-list li.active {
     .msg-timer { padding-left: 1.25rem; padding-right: 1.75rem; }
     /* Chat width cap is desktop-only: pin every capped element back to its
        fixed mobile padding so --sp-chat-max-w has no effect on phones. */
-    .conv-host, form.composer { padding-inline: 1rem; }
+    .conv-host, form.composer, .dock-body { padding-inline: 1rem; }
     .msg { max-width: 95%; }
 
     /* Settings modal — the desktop two-column (150px nav | panels) layout leaves
