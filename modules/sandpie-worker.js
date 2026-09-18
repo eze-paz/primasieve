@@ -2949,7 +2949,7 @@ async function tool_copy_to_workspace({ src, dest }, ctx) {
   return { result: `Copied into your workspace as ${finalRel}${meta.size != null ? ' (' + meta.size + ' bytes)' : ''} — ready to use now, and uploaded to your Dropbox on the next sync. Use read_file or run_python on "${finalRel}".` };
 }
 
-const KNOWN_TOOLS = ['run_python','pyodide','shell','run_walios','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
+const KNOWN_TOOLS = ['gasn2cloud','run_python','pyodide','shell','run_walios','walios','write_file','edit_file','read_file','list_files','search','web_search','read_url','copy_to_workspace','show_artifact','load_skill','load_image','write_todos','scratch','spawn_subagent','share','html_console','screenshot','ask','respond'];
 
 // ============================================================
 // shell — a real terminal on the relay host, straight from the worker (no Pyodide).
@@ -2994,6 +2994,52 @@ async function tool_shell({ command, stdin, cwd, timeout }, ctx) {
   if (data.stderr) out += (out ? '\n' : '') + '--- stderr ---\n' + String(data.stderr).replace(/\n+$/, '');
   out += (out ? '\n' : '') + '[exit ' + (data.code != null ? data.code : '?') + (data.signal ? ' signal=' + data.signal : '') + ']';
   return { result: out };
+}
+
+
+// gasn2cloud — org-scoped machine telemetry via the server proxy (/api/gasn2cloud/*).
+// The real upstream token lives ONLY on the server; the proxy filters machines by the
+// caller's org machine_types, so a machine outside the org can never be read. Auth is
+// the same-origin session cookie; on 401 the managed token is re-minted once (same
+// mechanism as the chat proxy).
+async function tool_gasn2cloud({ action, machine, date }, ctx) {
+  const base = location.origin;
+  async function call(url) {
+    let r = await fetch(url, { credentials: 'same-origin' });
+    if (r.status === 401 && ctx && ctx._authRefreshUrl) {
+      const tok = await _refreshAuthToken(ctx._authRefreshUrl);
+      if (tok) r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
+    }
+    return r;
+  }
+  try {
+    if (action === 'machines') {
+      const r = await call(base + '/api/gasn2cloud/machines');
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) return { result: 'Error: HTTP ' + r.status + ((j && j.error) ? ' — ' + j.error : '') };
+      return { result: JSON.stringify(j.machines, null, 1) };
+    }
+    if (action === 'variables' || action === 'data') {
+      if (!machine || typeof machine !== 'string') return { result: 'Error: "machine" is required (use action:"machines" to list valid names).' };
+      const m = encodeURIComponent(machine.trim());
+      if (action === 'variables') {
+        const r = await call(base + '/api/gasn2cloud/variables/' + m);
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j) return { result: 'Error: HTTP ' + r.status + ((j && j.error) ? ' — ' + j.error : '') };
+        return { result: JSON.stringify(j.variables, null, 1) };
+      }
+      const d = (/^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? '?date=' + date : '');
+      const r = await call(base + '/api/gasn2cloud/data/' + m + d);
+      if (!r.ok) { const j = await r.json().catch(() => null); return { result: 'Error: HTTP ' + r.status + ((j && j.error) ? ' — ' + j.error : '') }; }
+      const text = await r.text();
+      const MAX = 60000;
+      const body = text.length > MAX ? text.slice(0, MAX) + '\n…[truncated ' + (text.length - MAX) + ' chars — fetch a narrower date or summarize]' : text;
+      return { result: body };
+    }
+    return { result: 'Error: unknown action "' + action + '" — use machines | variables | data.' };
+  } catch (e) {
+    return { result: 'Error: gasn2cloud request failed: ' + ((e && e.message) || e) };
+  }
 }
 
 // ── walios headless tool ────────────────────────────────────────────────────
@@ -3743,6 +3789,7 @@ async function runTool(name, args, ctx) {
     case 'search':        return tool_search(args, ctx);
     case 'search_dropbox':return tool_search(args, ctx);   // legacy alias → unified search
     case 'web_search':    return tool_web_search(args, ctx);
+    case 'gasn2cloud':    return tool_gasn2cloud(args, ctx);
     case 'read_url':      return tool_read_url(args, ctx);
     case 'copy_to_workspace': return tool_copy_to_workspace(args, ctx);
     case 'pyodide':       return tool_run_python(args, ctx);          // former wire name of run_python (older conversations)
