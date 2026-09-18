@@ -8849,6 +8849,15 @@ function _rateRows(p) {
   rows.push(row('Tool execution', tool, 'rp-tool'));
   if (cx > 0) rows.push(row('Compaction', cx, 'rp-cx'));
   rows.push(row('Other / idle', idle));
+  // Suspension (worker timer stalls / freezes). suspend_hidden_ms is the slice
+  // that happened while the tab was hidden — the keep-alive diagnostic number:
+  // a big hidden suspension on Android means the tool loop WAS throttled.
+  const susp = P(p.suspend_ms), suspH = P(p.suspend_hidden_ms);
+  if (susp > 0) {
+    rows.push(row('Suspension (frozen/stalled)', susp, 'rp-susp'));
+    if (suspH > 0) rows.push(row('&nbsp;&nbsp;\u2514 while hidden', suspH));
+    if (p.suspend_max_ms > 0) rows.push(`<div class="ctx-popup-note">Worst single gap ${fmt(P(p.suspend_max_ms))} · ${p.suspend_events || 0} event(s)</div>`);
+  }
   if (p.completion_tokens > 0 && dec > 0) rows.push(`<div class="ctx-popup-note">Decode rate ${RATE_FMT(p.completion_tokens / (dec / 1000))} · ${p.completion_tokens.toLocaleString('en-US')} tokens over ${p.rounds || '?'} round(s)</div>`);
   return rows.join('');
 }
