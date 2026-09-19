@@ -1826,16 +1826,14 @@ opfs.pruneScriptsDir = async function() {
 // Sandbox allowlist: /files/sandpie/ may contain ONLY these system folders (app data,
 // hub-installed packages, share inbox). No loose files, no stray folders — anything
 // else (created by a tool that slipped) is deleted wholesale via the canonical delete
-// path, so it propagates to Dropbox through the delete handshake. sandpie/artifacts is
-// deferred while the one-time migrateArtifactsOut() (dropbox.js, 'dbxfull-artifacts-out'
-// flag) hasn't run — deleting it first would lose real deliverables.
+// path, so it propagates to Dropbox through the delete handshake. (sandpie/artifacts
+// was a legacy location, migrated out and retired 2026-09-18 — no deferral needed.)
 const SANDBOX_ALLOW = new Set(['config', 'conversations', 'fonts', 'memory', 'scripts', 'secrets', 'shared-installed', 'skills', 'agents', 'shared-incoming']);
 opfs.pruneSandboxFolders = async function() {
   const prefix = 'sandpie/';
   const _sp = (window.Sandpie && Sandpie.syncProvider) ? Sandpie.syncProvider() : null;
   const state = (_sp && _sp.getState) ? (_sp.getState() || {}) : {};
   const cidx = (_sp && _sp.cloudIndex) ? (_sp.cloudIndex() || {}) : null;
-  const pendingMigration = !localStorage.getItem('dbxfull-artifacts-out');
   const del = async (fullKey) => {
     try { await opfs.remove(fullKey); } catch (_) {}   // cloud-only → NotFound is fine
     if (window.Sandpie) Sandpie.events.emit('file:deleted', fullKey);
@@ -1855,7 +1853,6 @@ opfs.pruneSandboxFolders = async function() {
   let changed = false;
   for (const name of byName.keys()) {
     if (SANDBOX_ALLOW.has(name)) continue;
-    if (pendingMigration && name === 'artifacts') continue;   // let migrateArtifactsOut() move it first
     await del(prefix + name);
     changed = true;
   }

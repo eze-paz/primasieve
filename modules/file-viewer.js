@@ -457,7 +457,8 @@
     if (!fullKey.startsWith('sandpie/')) candidates.push('sandpie/' + fullKey);
     else candidates.push(fullKey.slice('sandpie/'.length));
     // Legacy-path fallback: sandpie/artifacts/ was migrated OUT to artifacts/
-    // (migrateArtifactsOut) and the boot prune deletes anything recreated there.
+    // (one-time migration, retired 2026-09-18) and the boot prune deletes anything
+    // recreated there.
     // Add the migrated location as a last candidate so stored paths under the
     // dead prefix still open. Literal stored path always stays FIRST (no
     // old/new name-collision surprises).

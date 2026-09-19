@@ -17,8 +17,8 @@
      the member's personal folder (what shows as /<Member Name>/sandpie from the
      team root), so each user's workspace is physically private to them. That
      folder is the ONLY place the sync engine ever writes.
-     (Was: <teamParent>/<email-local-part>/ under the team-space root namespace.
-      See maybeMigrateToHome() — one-time import of the old team workspace.)
+     (Was: <teamParent>/<email-local-part>/ under the team-space root namespace;
+      that legacy layout was imported into each member's personal folder long ago.)
    - The TEAM path-root is still used, but ONLY for the sharing hub and for
      cloud browse/search (`team: true` on the transport helpers). Sync never
      touches it. Everything team-scoped hangs off teamParent(), default
@@ -42,10 +42,6 @@
   const INDEX_KEY  = 'dbxfull-cloud-index';
   const CURSOR_KEY = 'dbxfull-cursor';
   const APPKEY_CFG = 'dbxfull-appkey';
-  // LEGACY (pre-home-namespace): the team parent the workspace used to hang off,
-  // with <email-local> appended. Still read — by legacyTeamRoot(), to locate the
-  // old workspace for the one-time import — but no longer drives the sync target.
-  const PARENT_KEY = 'dbxfull-parent';
   // ---- FIXED LAYOUT. Deliberately not configurable ------------------------
   // Both roots are part of the org's agreed structure, not a per-user preference:
   // a workspace somewhere unexpected is invisible to nobody but its owner, and a
@@ -53,7 +49,6 @@
   // them here, not in the UI.
   const DEFAULT_WSROOT = '/sandpie';            // personal workspace, in the user's own Dropbox
   const DEFAULT_TEAM_PARENT = '/IA';            // team-folders root; one folder per department (IA/R+D+I, …)
-  const LEGACY_TEAM_PARENT = '/R+D+I/sandpie';  // where workspaces lived before the move to personal folders
   const HUB_DIR = 'shared-hub';                 // per-department hub dir name (lowercase; must match sharing.js)
   const MAX_TEAM_FOLDERS = 50;                  // sanity bound on a misconfigured team root
   const AUTOCONN_OPTOUT = 'dbxfull-no-autoconnect';   // localStorage: set on explicit Disconnect
@@ -373,15 +368,6 @@
     }
     return out;
   }
-  // Where this user's workspace USED to live: <old team parent>/<email-local>, under
-  // the team path-root. Only used to locate data for the one-time import; '' if we
-  // never knew the email (nothing to import from).
-  function legacyTeamRoot() {
-    const email = localStorage.getItem(EMAIL_KEY);
-    if (!email) return '';
-    const parent = normPath(localStorage.getItem(PARENT_KEY) || LEGACY_TEAM_PARENT, LEGACY_TEAM_PARENT);
-    return parent + '/' + sanitizeSeg(String(email).split('@')[0]);
-  }
   async function ensureWorkingRoot() {
     // Account fetched once (cached): the team-space root namespace (team accounts
     // only) + the home namespace id + the account email (sharing identity).
@@ -588,112 +574,11 @@
     return { purged, kept };
   }
 
-  // One-time: stage 1 wrote a worker manifest (_dehydrated_cache.json) at the OPFS
-  // root which the push could leak to Dropbox. We no longer create it — remove any
-  // leftover copy locally and remotely (best-effort, guarded once; it's our own
-  // internal file, never user data, so del() here is safe).
-  async function cleanupStaleArtifacts() {
-    if (localStorage.getItem('dbxfull-artifacts-cleaned') !== '1') {
-      localStorage.setItem('dbxfull-artifacts-cleaned', '1');
-      try { await Sandpie.opfs.remove('_dehydrated_cache.json'); } catch (_) {}
-      try { if (tokens()) await del(relToCloud('_dehydrated_cache.json')); } catch (_) {}
-    }
-    // Subscriptions feature removed — delete any leftover read-only mirror data
-    // locally (OPFS only; opfs.remove never emits file:deleted, so the source
-    // folders in Dropbox are untouched). One-time.
-    if (localStorage.getItem('dbxfull-subs-removed') !== '1') {
-      localStorage.setItem('dbxfull-subs-removed', '1');
-      try { await Sandpie.opfs.remove('_subs'); } catch (_) {}
-      localStorage.removeItem('dbxfull-subscriptions');
-      localStorage.removeItem('dbxfull-subs-state');
-    }
-    // Worker provenance/usage index files are no longer written — remove any
-    // leftovers locally + from Dropbox (root-level files that used to sync). Once.
-    if (localStorage.getItem('dbxfull-index-files-cleaned') !== '1') {
-      localStorage.setItem('dbxfull-index-files-cleaned', '1');
-      for (const f of ['conv2file_index.json', 'script_usage_index.json']) {
-        try { await Sandpie.opfs.remove(f); } catch (_) {}
-        try { if (tokens()) await del(relToCloud(f)); } catch (_) {}
-      }
-    }
-  }
+  // (One-time housekeeping retired 2026-09-18: cleanupStaleArtifacts /
+  // migrateExemptToSandpie / migrateArtifactsOut + their guards dbxfull-artifacts-cleaned,
+  // dbxfull-subs-removed, dbxfull-index-files-cleaned, dbxfull-sandpie-migrated-v2,
+  // dbxfull-artifacts-out. All devices had already migrated.)
 
-  // One-time move of the app folders under a single sandpie/ folder:
-  //   _conversations -> sandpie/conversations,  agents -> sandpie/agents,  skills -> sandpie/skills,
-  //   scripts -> sandpie/scripts,  artifacts -> sandpie/artifacts,  memory -> sandpie/memory.
-  // (conversations/agents/skills/memory are exempt = eager; scripts/artifacts stay
-  // dehydratable — they're just relocated.)
-  // Dropbox side uses move_v2 (ATOMIC — the source is preserved if it fails), and
-  // if it can't complete we abort WITHOUT touching local, so local and Dropbox
-  // never diverge (no data loss, no duplication); we retry next boot. Only after
-  // Dropbox reflects the new layout (or we're offline) do we move OPFS + set the
-  // guard. Runs before dehydratePurge so the moved files are seen at their new path.
-  // Guard bumped to -v2 when scripts/artifacts/memory were added: users who ran the
-  // 3-folder v1 re-run once (already-moved folders no-op via not_found/conflict).
-  const SANDPIE_MOVES = [['_conversations', 'sandpie/conversations'], ['agents', 'sandpie/agents'], ['skills', 'sandpie/skills'], ['scripts', 'sandpie/scripts'], ['artifacts', 'sandpie/artifacts'], ['memory', 'sandpie/memory']];
-  async function opfsMoveDir(oldRel, newRel) {
-    const opfs = Sandpie.opfs;
-    let files = [];
-    try { files = await opfs.list(oldRel); } catch { return; }   // nothing to move
-    for (const f of files) {
-      const sub = f.slice(oldRel.length).replace(/^\/+/, '');
-      try { await opfs.write(newRel + '/' + sub, await opfs.readBytes(f)); }
-      catch (e) { console.warn('[dropbox] move file failed:', f, e && e.message); }
-    }
-    try { await opfs.remove(oldRel); } catch (_) {}
-  }
-  async function migrateExemptToSandpie() {
-    if (localStorage.getItem('dbxfull-sandpie-migrated-v2') === '1') return;
-    if (tokens()) {
-      let wr = '';
-      try { await ensureWorkingRoot(); wr = (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''); } catch (_) {}
-      if (!wr) return;   // root not resolved yet → retry next boot
-      for (const [oldName, newRel] of SANDPIE_MOVES) {
-        try { await api('/2/files/move_v2', { from_path: wr + '/' + oldName, to_path: wr + '/' + newRel, autorename: false }); }
-        catch (e) {
-          const m = String((e && e.message) || '').toLowerCase();
-          // not_found = source already moved/never existed; conflict/duplicate = dest already there → fine.
-          if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox] sandpie migration deferred:', oldName, m); return; }
-        }
-      }
-      // Dropbox now reflects the new layout — reset sync state so the next sync
-      // reconciles it cleanly (the existing target-change reset path).
-      localStorage.removeItem(STATE_KEY); clearCloudIndex(); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
-    }
-    for (const [oldName, newRel] of SANDPIE_MOVES) {
-      try { await opfsMoveDir(oldName, newRel); } catch (e) { console.warn('[dropbox] local move failed:', oldName, e && e.message); }
-    }
-    localStorage.setItem('dbxfull-sandpie-migrated-v2', '1');
-    try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
-    try { if (window.refreshConversationList) window.refreshConversationList(); } catch (_) {}
-  }
-  /* One-time move of sandpie/artifacts/ OUT of the sandbox to the workspace
-  root /artifacts (visible to the user). The sandbox allowlist
-  (config/conversations/fonts/memory/scripts/secrets/shared-installed/skills +
-  agents + shared-incoming) excludes artifacts — LLM deliverables now live in
-  the user's area. Same move_v2-then-local pattern as migrateExemptToSandpie;
-  the sync-state reset makes the next sync reconcile the new layout. Runs in
-  dropbox boot BEFORE the boot-time sandbox allowlist prune (which defers
-  sandpie/artifacts while this flag is unset), so a raced prune can never
-  delete deliverables mid-migration.
-  */
-  async function migrateArtifactsOut() {
-    if (localStorage.getItem('dbxfull-artifacts-out') === '1') return;
-    if (tokens()) {
-      let wr = '';
-      try { await ensureWorkingRoot(); wr = (localStorage.getItem(ROOT_KEY) || '').replace(/\/+$/, ''); } catch (_) {}
-      if (!wr) return;   // root not resolved yet -> retry next boot
-      try { await api('/2/files/move_v2', { from_path: wr + '/sandpie/artifacts', to_path: wr + '/artifacts', autorename: false }); }
-      catch (e) {
-        const m = String((e && e.message) || '').toLowerCase();
-        if (!/not_found|malformed_path|conflict|duplicate/.test(m)) { console.warn('[dropbox] artifacts migration deferred:', m); return; }
-      }
-      localStorage.removeItem(STATE_KEY); clearCloudIndex(); localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
-    }
-    try { await opfsMoveDir('sandpie/artifacts', 'artifacts'); } catch (e) { console.warn('[dropbox] local artifacts move failed:', e && e.message); }
-    localStorage.setItem('dbxfull-artifacts-out', '1');
-    try { if (window.refreshFileList) window.refreshFileList(); } catch (_) {}
-  }
   function cursor() { return localStorage.getItem(CURSOR_KEY) || null; }
   function setCursor(c) { if (c) localStorage.setItem(CURSOR_KEY, c); else localStorage.removeItem(CURSOR_KEY); }
 
@@ -1376,8 +1261,8 @@
   async function hydrateRel(rel) {
     const r0 = String(rel).replace(/^\/+/, '');
     // Legacy-path fallback: sandpie/artifacts/ was migrated OUT to artifacts/
-    // (migrateArtifactsOut). A stored path under the dead prefix can never be in
-    // the cloud index — retry against the migrated location before giving up.
+    // (one-time migration, retired 2026-09-18). A stored path under the dead
+    // prefix can never be in the cloud index — retry before giving up.
     let r = r0;
     if (r0.startsWith('sandpie/artifacts/') && !cloudIndex()[r0]) r = r0.slice('sandpie/'.length);
     if (!dehydrated() || isExemptRel(r)) return false;
@@ -1544,8 +1429,7 @@
     // Explicit disconnect opts out of auto-connect (see maybeAutoConnect) so a
     // managed-login user who disconnects isn't silently reconnected on reload.
     localStorage.setItem(AUTOCONN_OPTOUT, '1');
-    // Keep PARENT_KEY + APPKEY_CFG so a reconnect reuses the key, and so PARENT_KEY
-    // can still locate the legacy team workspace if the import hasn't happened yet.
+    // Keep APPKEY_CFG so a reconnect reuses the key.
     // Drop the local sync state (stale once disconnected; re-pulled on reconnect).
     [TOKENS_KEY, STATE_KEY, CURSOR_KEY, ROOT_KEY, NS_KEY, HOMENS_KEY, NS_VER_KEY, EMAIL_KEY, SIG_KEY, PENDING_KEY].forEach(k => localStorage.removeItem(k)); clearCloudIndex();
     dbxStatus('Not connected', 'disconnected');
@@ -1666,122 +1550,9 @@
     }
   }
 
-  // ===========================================================================
-  //  ⚠️  ONE-TIME MIGRATION — team workspace → personal (home-namespace) workspace.
-  //
-  //  Old:  <teamParent>/<email-local>/…   e.g. /R+D+I/sandpie/ezequiel/…  (team path-root)
-  //  New:  /sandpie/…                     in the user's own Dropbox      (home namespace)
-  //
-  //  Guarded (skips once the new root exists / once the guard key is set),
-  //  NON-DESTRUCTIVE (copies — the old team folder is left completely untouched,
-  //  so a rollback is just flipping the root back), and best-effort: any failure
-  //  is logged and retried next boot rather than blocking sync.
-  //
-  //  Two strategies, in order:
-  //    1. Server-side folder copy. The two roots live in DIFFERENT namespaces, so
-  //       the destination is written as a namespace-relative path
-  //       ("ns:<home_namespace_id>/sandpie") while the request carries the team
-  //       path-root. One call, no bytes through the browser.
-  //    2. Fallback — pull-then-push. List the old folder, download every file into
-  //       OPFS, and let the normal dirty-push upload it to the new root. Slower and
-  //       it pulls everything local for one boot (dehydratePurge trims it later),
-  //       but it only uses transport paths that are already proven in daily sync.
-  //
-  //  TO REMOVE LATER (once every user has migrated): delete this block, the
-  //  maybeMigrateToHome() calls in boot(), PARENT_KEY, and legacyTeamRoot().
-  //  Grep token: MIGRATE_TO_HOME
-  // ===========================================================================
-  const MIGRATE_TO_HOME  = true;                        // master switch
-  const MIGRATED_KEY     = 'dbxfull-home-migrated-v1';  // set once the import is settled
-  let _migrationChecked  = false;
-  // Strategy 1: one server-side copy_v2. `to` may be an "ns:<id>/…" path so the
-  // copy can cross from the team namespace into the user's home namespace.
-  async function copyAcrossNamespaces(from, to, team) {
-    await api('/2/files/copy_v2', { from_path: from, to_path: to, autorename: false }, { team });
-  }
-  // Strategy 2: download the old workspace into OPFS. The sync-state reset that
-  // ensureWorkingRoot() already performed on the root change means every local
-  // file counts as dirty, so the next sync() pushes all of this to the new root.
-  // Never overwrites a local file that already exists — local wins, so nothing the
-  // user has since edited on this device is clobbered by a stale cloud copy.
-  async function pullOldWorkspace(oldRoot, team) {
-    const opfs = Sandpie.opfs;
-    const { entries } = await listFolder(oldRoot, { recursive: true, team });
-    const prefix = oldRoot.replace(/^\/+/, '').toLowerCase() + '/';
-    const files = [];
-    for (const e of entries) {
-      if (e.kind !== 'file' || !e.path) continue;
-      const s = String(e.path).replace(/^\/+/, '');
-      if (!s.toLowerCase().startsWith(prefix)) continue;
-      files.push({ rel: s.slice(prefix.length), path: e.path });
-    }
-    if (!files.length) return 0;
-    let i = 0, done = 0, failed = 0;
-    const worker = async () => {
-      while (i < files.length) {
-        const f = files[i++];
-        try {
-          if (!(await opfs.exists(f.rel))) {
-            await opfs.write(f.rel, await download(f.path, undefined, { team }));
-          }
-          onFileChanged(f.rel);   // mark dirty ⇒ next sync uploads it to the new root
-        } catch (err) { failed++; console.warn('[migrate:home] pull failed:', f.rel, err && err.message); }
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(DL_CONCURRENCY, files.length) }, worker));
-    if (failed) throw new Error(failed + ' of ' + files.length + ' files could not be pulled');
-    return files.length;
-  }
-  async function maybeMigrateToHome() {
-    if (!MIGRATE_TO_HOME || _migrationChecked) return;
-    if (localStorage.getItem(MIGRATED_KEY) === '1') return;
-    if (!tokens()) return;
-    _migrationChecked = true;
-    const newRoot = workingRoot();
-    if (!newRoot) { _migrationChecked = false; return; }   // root unresolved → retry next boot
-    try {
-      // Already have a personal workspace? Then either we've migrated before or the
-      // user started fresh here — either way, importing on top would collide.
-      if (await dbxMeta(newRoot, false)) {
-        console.info('[migrate:home]', newRoot, 'already exists — nothing to import');
-        localStorage.setItem(MIGRATED_KEY, '1');
-        return;
-      }
-      const teamNs = localStorage.getItem(NS_KEY) || '';
-      const oldRoot = legacyTeamRoot();
-      if (!oldRoot || !(await dbxMeta(oldRoot, !!teamNs))) {
-        console.info('[migrate:home] no old workspace at', oldRoot || '(unknown)', '— nothing to import');
-        localStorage.setItem(MIGRATED_KEY, '1');
-        return;
-      }
-      // 1) server-side copy (cross-namespace via ns: when there's a team space)
-      const homeNs = localStorage.getItem(HOMENS_KEY) || '';
-      const dest = (teamNs && homeNs) ? ('ns:' + homeNs + newRoot) : newRoot;
-      try {
-        await copyAcrossNamespaces(oldRoot, dest, !!teamNs);
-        console.info('[migrate:home] server-side copied', oldRoot, '→', dest);
-        localStorage.setItem(MIGRATED_KEY, '1');
-        // The copy landed outside anything the local sync state knows about; drop
-        // it so the next sync does a clean full listing of the new root.
-        localStorage.removeItem(STATE_KEY); clearCloudIndex();
-        localStorage.removeItem(CURSOR_KEY); localStorage.removeItem(PENDING_KEY);
-        return;
-      } catch (e) {
-        console.warn('[migrate:home] server-side copy unavailable (' + (e && e.message) + ') — falling back to download+re-upload');
-      }
-      // 2) pull-then-push
-      dbxStatus('Moving your files to your own Dropbox…', '');
-      const n = await pullOldWorkspace(oldRoot, !!teamNs);
-      console.info('[migrate:home] pulled', n, 'file(s) from', oldRoot, '— sync will push them to', newRoot);
-      localStorage.setItem(MIGRATED_KEY, '1');
-      dbxStatus('', 'connected');
-      try { await Sandpie.refreshFiles(); await Sandpie.refreshConversations(); } catch (_) {}
-    } catch (e) {
-      // Leave the guard UNSET so the next boot retries. The old folder is untouched.
-      _migrationChecked = false;
-      console.warn('[migrate:home] failed (non-fatal, will retry):', e && e.message);
-    }
-  }
+  // (One-time team-to-home workspace import retired 2026-09-18: MIGRATE_TO_HOME /
+  // maybeMigrateToHome, flag dbxfull-home-migrated-v1, PARENT_KEY + legacyTeamRoot.
+  // Every workspace had already migrated; see git history if ever needed.)
 
   // ===========================================================================
   //  Dropbox sharing API — 1:1 delivery addressed by EMAIL, no team folder
@@ -2186,27 +1957,17 @@
         history.replaceState({}, '', location.pathname);
         await ensureWorkingRoot();
         pushDbxTokenToSW();   // worker may have missed the first-login push; deliver now
-        await maybeMigrateToHome();   // MIGRATE_TO_HOME (temporary) — must precede the first sync
         dbxStatus('', 'connected');
-        await cleanupStaleArtifacts();
-        await migrateExemptToSandpie();
-        await migrateArtifactsOut();
         sync();
       }).catch(e => dbxStatus('Auth failed: ' + e.message, 'error'));
     } else if (tokens()) {
       (async () => {
-        try { await ensureWorkingRoot(); await maybeMigrateToHome(); }   // MIGRATE_TO_HOME (temporary)
+        try { await ensureWorkingRoot(); }
         catch (e) { console.warn('[dropbox] pre-sync:', e && e.message); }
         dbxStatus('', 'connected');
-        await cleanupStaleArtifacts();
-        await migrateExemptToSandpie();
-        await migrateArtifactsOut();
         // On-demand mode is now default; ephemeral purge happens in sync cycle
         sync();
       })();
-    } else {
-      migrateExemptToSandpie().catch(() => {});   // offline: local-only move under sandpie/
-      migrateArtifactsOut().catch(() => {});   // offline: local-only move of sandbox/artifacts to /artifacts
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

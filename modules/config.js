@@ -81,13 +81,12 @@ const SandpieConfig = (() => {
   // can safely run their own one-time migrations against the loaded config.
   function ready() { return _ready; }
 
-  // ── one-time migration off the old OPFS file ──
+  // ── legacy OPFS-file adoption (idempotent; flag 'sandpie-config-migrated' retired 2026-09-18) ──
   // Adopt any namespaces the local mirror is missing (so another device's
   // settings carried in the old synced file aren't lost), then remove the file
   // locally and from Dropbox (via the standard file:deleted event — its listener
   // is registered by dropbox's boot, which runs before this async resumes).
   async function migrateOffOpfs() {
-    if (localStorage.getItem('sandpie-config-migrated') === '1') return;
     if (window.opfs) {
       try {
         let text = null;
@@ -114,7 +113,6 @@ const SandpieConfig = (() => {
         if (existed && window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', OPFS_PATH);
       } catch (_) {}
     }
-    localStorage.setItem('sandpie-config-migrated', '1');
   }
 
   function boot() {

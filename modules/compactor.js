@@ -20,7 +20,6 @@ const SandpieCompactor = (function () {
   const K_PCT      = 'sandpie-compactor-pct';         // integer %
   const K_KEEPTAIL = 'sandpie-compactor-keeptail';    // integer messages
   const K_PROMPT   = 'sandpie-compactor-prompt';       // '' = built-in
-  const MIGRATED   = 'sandpie-compactor-migrated';     // one-time flag
 
   const DEFAULTS = { enabled: true, pct: 70, keepTail: 10 };
 
@@ -70,42 +69,8 @@ const SandpieCompactor = (function () {
     };
   }
 
-  // ---- one-time migration off the old agents/compactor.md -------------------
-  // Preserve anyone who had customized or enabled the old agent: pull its config
-  // + prompt into localStorage, then delete the file locally AND from Dropbox.
-  const FM_RE = /^﻿?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-  async function migrate() {
-    if (localStorage.getItem(MIGRATED) === '1') return;
-    if (typeof opfs === 'undefined') return;
-    const path = 'sandpie/agents/compactor.md';
-    try {
-      let text = null;
-      try { text = await opfs.read(path); } catch (_) {}
-      if (text) {
-        const m = FM_RE.exec(text);
-        if (m) {
-          const fm = {};
-          for (const line of m[1].split(/\r?\n/)) {
-            const kv = /^([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*(.*)$/.exec(line);
-            if (kv) { let v = kv[2].trim(); if ((v[0] === '"' && v.endsWith('"')) || (v[0] === "'" && v.endsWith("'"))) v = v.slice(1, -1); fm[kv[1].toLowerCase()] = v; }
-          }
-          // Only seed a key the user hasn't already set natively.
-          if (localStorage.getItem(K_ENABLED) == null && fm.enabled != null)
-            localStorage.setItem(K_ENABLED, /^(true|yes|on|1)$/i.test(fm.enabled) ? '1' : '0');
-          if (localStorage.getItem(K_PCT) == null && fm.at_context_pct != null)
-            localStorage.setItem(K_PCT, String(parseInt(fm.at_context_pct, 10) || DEFAULTS.pct));
-          if (localStorage.getItem(K_KEEPTAIL) == null && fm.keep_tail != null)
-            localStorage.setItem(K_KEEPTAIL, String(parseInt(fm.keep_tail, 10) || DEFAULTS.keepTail));
-          const body = text.replace(FM_RE, '').trim();
-          if (localStorage.getItem(K_PROMPT) == null && body && body !== BUILT_IN_PROMPT) localStorage.setItem(K_PROMPT, body);
-        }
-        let existed = false; try { existed = await opfs.exists(path); } catch (_) {}
-        try { await opfs.remove(path); } catch (_) {}
-        if (existed && window.Sandpie && Sandpie.events) Sandpie.events.emit('file:deleted', path);
-      }
-      localStorage.setItem(MIGRATED, '1');
-    } catch (_) { /* leave flag unset → retry next load */ }
-  }
+  // (One-time migration off the old agents/compactor.md removed 2026-09-18 —
+  // flag 'sandpie-compactor-migrated' retired; every device long since migrated.)
 
   // ---- Settings section -----------------------------------------------------
   const HTML = `
@@ -153,7 +118,7 @@ const SandpieCompactor = (function () {
 
   let _retry = 0;
   function init() {
-    migrate();   // legacy agents/compactor.md cleanup still runs — housekeeping, not a lever
+    // (legacy agents/compactor.md migration removed 2026-09-18)
     // Compaction settings tab commented out 2026-08-07 (product decision): the
     // enabled/pct/keepTail/prompt levers are removed from the UI and the config
     // is hardcoded (see isEnabled/getPrompt/config above). HTML/wire are kept
@@ -165,6 +130,6 @@ const SandpieCompactor = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  return { config, isEnabled, getPrompt, BUILT_IN_PROMPT, migrate, init };
+  return { config, isEnabled, getPrompt, BUILT_IN_PROMPT, init };
 })();
 window.SandpieCompactor = SandpieCompactor;
