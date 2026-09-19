@@ -556,7 +556,7 @@ function rewindToUserMessage(div) {
   messages.length = idx;
   if (s.compaction && idx <= s.compaction.boundary) s.compaction = null;
   clearActiveConvUI();
-  renderConversation(messages, s.compaction);
+  renderConversation(messages, s.compaction, s.host);
   const messagesEl = paneScrollEl($('messages'));
   if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
   saveActiveConv().catch(() => {});
@@ -2385,7 +2385,7 @@ function registerRewindCommand() {
       messages.length = idx;
       if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
       clearActiveConvUI();
-      renderConversation(messages, s ? s.compaction : null);
+      renderConversation(messages, s ? s.compaction : null, s ? s.host : null);
 
       const messagesEl = paneScrollEl($('messages'));
       if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -7415,7 +7415,7 @@ async function compactConversation(convId, { keepTail = 10, summary = '' } = {})
   // or cold conv has no live UI to refresh (it re-reads compaction on next open).
   if (convId === activeConvId) {
     clearActiveConvUI();
-    renderConversation(messages, compaction);
+    renderConversation(messages, compaction, activeStream()?.host || null);
     const el = paneScrollEl($('messages'));
     if (el && shouldAutoScroll(el)) el.scrollTop = el.scrollHeight;
   }
