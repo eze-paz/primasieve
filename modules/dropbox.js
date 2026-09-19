@@ -1441,7 +1441,11 @@
   // deployment provides a Dropbox app key (GET /config), start the OAuth flow
   // automatically — seamless when Dropbox is federated to the same IdP. The
   // per-session AUTOCONN_TRIED guard stops a cancelled/failed bounce from looping.
-  async function maybeAutoConnect() {
+  async function maybeAutoConnect(user) {
+    // Per-org sync policy from /auth/me (user.sync): autoconnect flag + allowed
+    // providers. Generic — today dropbox, tomorrow other sync systems.
+    if (!user || !user.sync || !user.sync.autoconnect) return;
+    if (!(user.sync.providers || []).includes("dropbox")) return;
     if (tokens()) return;                                 // already connected
     if (localStorage.getItem(AUTOCONN_OPTOUT)) return;    // user opted out via Disconnect
     if (sessionStorage.getItem(AUTOCONN_TRIED)) return;   // already tried this session

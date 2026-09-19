@@ -134,6 +134,23 @@ This searches the public web — it is NOT for the user's files (use search / li
       required: ['query'],
     },
   },
+  gasn2cloud: {
+    description: `Access the user's industrial machine telemetry from GasN2Cloud (gasn2cloud.com), scoped to their organization — only machines belonging to the caller's org are visible; anything else is rejected server-side.
+Actions:
+- "machines": list the org's machines ({id, name, type, online}).
+- "variables": list a machine's variables ({id, name, desc}) — action:"variables", machine:"<name>".
+- "data": raw CSV telemetry for a machine (Time,Ids,Values; Time = unix ms; ~10s sampling) — action:"data", machine:"<name>", optional date:"YYYY-MM-DD" (default today).
+Use machines first to discover valid names. Do NOT guess machine names.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        action:  { type: 'string', enum: ['machines', 'variables', 'data'], description: 'What to fetch.' },
+        machine: { type: 'string', description: 'Machine NAME exactly as returned by action:"machines" (required for variables/data).' },
+        date:    { type: 'string', description: 'For action:"data": day to fetch, YYYY-MM-DD (default today).' },
+      },
+      required: ['action'],
+    }
+  },
   read_url: {
     description: `Fetch a web page and return its main readable text (nav/scripts/ads/boilerplate stripped) plus the page title. Use it to READ a result from web_search, or any URL the user gives you, when you need the actual content rather than just the snippet.
 Returns up to max_chars characters and reports the total length; if the page is longer than you got, call again with a larger max_chars.`,
@@ -653,6 +670,7 @@ const SHORT_DESC = {
   list_files: 'List files and folders (with size + modified time) under /files. Use it to see what exists and to verify a write. scope:"dropbox" lists the connected Dropbox by absolute path.',
   search: 'Find files by content or name (regex) in your workspace. scope:"dropbox" runs a keyword search over file names + contents across the connected Dropbox; an absolute `path` scopes it.',
   web_search: 'Search the web; returns a ranked list of {title, url, snippet}.',
+  gasn2cloud: 'Fetch the org\'s GasN2Cloud machine data: machines, variables, and CSV telemetry (org-scoped server-side).',
   read_url: 'Fetch a web page and return its main readable text plus the title.',
   load_skill: 'Load a skill\'s full instructions by name (skills and when to use each are listed in the Skills section).',
   load_image: 'Load an image under /files so you can see its pixels — it\'s visible on your next step. Do NOT call it if the image is already attached to the user\'s message (you already see it). You can only see it during this turn; reload the same path in a later turn if you need it again. JPEG/PNG/GIF/WEBP; images over ~5 MB are refused — downscale first (pyodide + Pillow).',
