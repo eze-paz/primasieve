@@ -546,12 +546,18 @@ function rewindToUserMessage(div) {
   if (!s || !messages.length) return;
   const host = div.closest('.conv-host') || s.host;
   if (!host || !host.contains(div)) return;
-  let idx = -1, seen = 0;
-  const hostDivs = [...host.querySelectorAll(':scope > .msg.user')];
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role !== 'user') continue;
-    if (hostDivs[hostDivs.length - 1 - seen] === div) { idx = i; break; }
-    seen++;
+  // Map the clicked div to its message via the _msg ref bindBubble stamped on
+  // every rendered bubble — NOT by counting user divs in the DOM: tool-only
+  // turns, hidden images and skipped renders make the DOM order diverge from
+  // the messages array, and a miscount truncated the WRONG end (chat wiped).
+  let idx = -1;
+  const ref = div._msg;
+  if (ref) { idx = messages.indexOf(ref); }
+  if (idx < 0) {
+    // Fallback: last user message (same end state as >>> rewind from the bottom).
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { idx = i; break; }
+    }
   }
   if (idx < 0) return;
   const m = messages[idx];
@@ -563,6 +569,7 @@ function rewindToUserMessage(div) {
   if (!confirm(`Remove the last ${removed} message(s)?`)) return;
   if (s.abort) s.abort.abort();
   messages.length = idx;
+  if (s.messages !== messages) s.messages.length = Math.min(s.messages.length, idx);
   if (s.compaction && idx <= s.compaction.boundary) s.compaction = null;
   clearActiveConvUI();
   renderConversation(messages, s.compaction, s.host);
@@ -859,8 +866,13 @@ function renderConversation(msgs, compaction, host = null) {
     _placeHome();
   }
   const comp = (compaction && compaction.boundary > 0 && compaction.boundary < msgs.length) ? compaction : null;
-  if (!comp) { for (const m of msgs) renderHistoricalMessage(m, host); }
-  else { renderCompactionBlock(comp, msgs, host); for (let i = comp.boundary; i < msgs.length; i++) renderHistoricalMessage(msgs[i], host); }
+  // Resilient replay: the host was ALREADY wiped above, so a throw mid-replay
+  // (one malformed message, a renderer edge case) would leave the conversation
+  // visually empty — the "rewind wiped the chat" bug. Skip the offending
+  // message and keep painting the rest.
+  const _replay = (m) => { try { renderHistoricalMessage(m, host); } catch (e) { console.warn('[sandpie] replay skipped a message:', e); } };
+  if (!comp) { for (const m of msgs) _replay(m); }
+  else { renderCompactionBlock(comp, msgs, host); for (let i = comp.boundary; i < msgs.length; i++) _replay(msgs[i]); }
   // If the stream carries saved todos that never attached to a tool-call box
   // (orphaned by tcId mismatch on replay), append them as a standalone card.
   // Resolve the stream from the conversation being RENDERED (its host carries
@@ -2350,7 +2362,11 @@ function registerRewindCommand() {
       }
 
       const s = activeStream();
-      if (!s || !messages.length) return 'Nothing to rewind.';
+      // Operate on the STREAM's own array: renderConversation + saveConv read
+      // s.messages, so truncating the global `messages` while the stream holds a
+      // different reference left disk/DOM diverging from the visible chat.
+      const msgs = (s && Array.isArray(s.messages) && s.messages.length) ? s.messages : messages;
+      if (!s || !msgs.length) return 'Nothing to rewind.';
 
       // The rewound conversation lives in whichever pane its stream host is
       // mounted in (#messages left / #messagesSide right). Capture it BEFORE
@@ -2359,21 +2375,21 @@ function registerRewindCommand() {
       const rewindPane = s.host ? s.host.parentNode : null;
 
       let userCount = 0;
-      let idx = messages.length;
+      let idx = msgs.length;
       while (idx > 0 && userCount < n) {
         idx--;
-        if (messages[idx].role === 'user') userCount++;
+        if (msgs[idx].role === 'user') userCount++;
       }
       if (userCount === 0) return 'No user messages found to rewind.';
 
-      const removed = messages.length - idx;
+      const removed = msgs.length - idx;
       if (!confirm(`Remove the last ${removed} message(s)?`)) return '(cancelled)';
 
       // Collect user messages that are about to be removed for restoration
       const rewindTexts = [];
-      if (idx < messages.length) {
-        for (let i = messages.length - 1; i >= idx; i--) {
-          const m = messages[i];
+      if (idx < msgs.length) {
+        for (let i = msgs.length - 1; i >= idx; i--) {
+          const m = msgs[i];
           if (m.role !== 'user' || !m.content) continue;
           let txt = '';
           if (typeof m.content === 'string') {
@@ -2391,10 +2407,11 @@ function registerRewindCommand() {
       if (s) {
         if (s.abort) { s.abort.abort(); }
       }
-      messages.length = idx;
+      msgs.length = idx;
+      if (msgs !== messages) messages.length = Math.min(messages.length, idx);
       if (s && s.compaction && idx <= s.compaction.boundary) s.compaction = null;
       clearActiveConvUI();
-      renderConversation(messages, s ? s.compaction : null, s ? s.host : null);
+      renderConversation(msgs, s ? s.compaction : null, s ? s.host : null);
 
       const messagesEl = paneScrollEl($('messages'));
       if (messagesEl && shouldAutoScroll(messagesEl)) messagesEl.scrollTop = messagesEl.scrollHeight;
