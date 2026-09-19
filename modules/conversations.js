@@ -180,18 +180,27 @@ function newSessionId(convId) {
 }
 async function ensureSessionId(convId) {
   if (!convId) return null;
-  const loc = await convLocation(convId);
-  const mp = metaPath(convId, loc.archived);
-  let meta = null;
-  try { meta = JSON.parse(await opfs.read(mp)); } catch {}
-  if (meta && meta.session_id) return meta.session_id;
-  const sid = newSessionId(convId);
-  const updated = Object.assign({}, meta || {}, { id: convId, session_id: sid });
-  // A >>> lite toggle on a brand-new conversation (no meta yet) is honored here:
-  if (liteMetaCache.get(convId) === true) updated.lite = true;
-  await opfs.write(mp, JSON.stringify(updated));
-  Sandpie.events.emit('file:changed', mp);
-  return sid;
+  // OPFS can be BLOCKED by the browser (Firefox SecurityError on getDirectory
+  // with strict cookie/tracking settings). session_id is only the OpenRouter
+  // prompt-cache key - losing its persistence must never kill the send, so any
+  // storage failure degrades to an in-memory sid for this session.
+  try {
+    const loc = await convLocation(convId);
+    const mp = metaPath(convId, loc.archived);
+    let meta = null;
+    try { meta = JSON.parse(await opfs.read(mp)); } catch {}
+    if (meta && meta.session_id) return meta.session_id;
+    const sid = newSessionId(convId);
+    const updated = Object.assign({}, meta || {}, { id: convId, session_id: sid });
+    // A >>> lite toggle on a brand-new conversation (no meta yet) is honored here:
+    if (liteMetaCache.get(convId) === true) updated.lite = true;
+    await opfs.write(mp, JSON.stringify(updated));
+    Sandpie.events.emit('file:changed', mp);
+    return sid;
+  } catch (e) {
+    console.warn('[sandpie] OPFS unavailable for session_id (storage blocked?):', e && e.name, e && e.message);
+    return newSessionId(convId);
+  }
 }
 
 // Lightweight list row. New format → read only the tiny meta file. Legacy → read
