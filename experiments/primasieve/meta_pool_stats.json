@@ -1,9 +1,0 @@
-{
- "n_train": 109,
- "n_holdout": 26,
- "by_class": {
-  "s1": 40,
-  "compose": 28,
-  "s0": 41
- }
-}
