@@ -1,0 +1,32 @@
+﻿bitcount                   hand Y(   12)  ucb Y(   12)
+bucketsort                 hand Y(   97)  ucb Y(   97)
+find_first_in_sorted       hand Y(    9)  ucb Y(    9)
+find_in_sorted             hand Y(  484)  ucb Y(  328)
+flatten                    hand Y(    1)  ucb Y(    1)
+gcd                        hand Y(    1)  ucb Y(    1)
+get_factors                hand Y(   25)  ucb Y(   25)
+hanoi                      hand Y(   53)  ucb Y(   53)
+is_valid_parenthesization  hand Y(   23)  ucb Y(   23)
+kheapsort                  hand Y(  366)  ucb Y(  616)
+kth                        hand n( 5190)  ucb Y( 1785)
+lcs_length                 hand n( 4502)  ucb Y( 6856)
+lis                        hand Y( 5128)  ucb Y(  574)
+max_sublist_sum            hand Y(  756)  ucb Y(  296)
+mergesort                  hand Y(  124)  ucb Y( 1894)
+next_palindrome            hand Y(  174)  ucb Y(  174)
+next_permutation           hand Y(  102)  ucb Y(  102)
+pascal                     hand Y(  670)  ucb Y(  600)
+powerset                   hand n(  585)  ucb Y(  297)
+quicksort                  hand Y(   66)  ucb Y(   66)
+rpn_eval                   hand Y(    9)  ucb Y(    9)
+shunting_yard              hand Y( 1496)  ucb Y(  446)
+sieve                      hand Y(    2)  ucb Y(    2)
+sqrt                       hand Y(  549)  ucb n(  560)
+to_base                    hand Y(   57)  ucb Y(   57)
+wrap                       hand Y( 1358)  ucb Y(  488)
+
+=== META-CONTROLLER KNOCKOUT (26 programs) — equal-energy, ZERO LLM ===
+HAND-CODED escalation : 23/26 solved, total energy 21839
+UCB over forms        : 25/26 solved, total energy 15371
+energy ratio ucb/hand : 0.70x  (<=1.0 = learned policy matches-or-beats hand-coded at equal solves)
+total 221s

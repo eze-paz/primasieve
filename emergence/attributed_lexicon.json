@@ -1,0 +1,357 @@
+{
+"source": "WordNet 3.1 adjectives (offline, _nldata/dict)",
+"reading_rule": "synset lemma list vouches for exactly one predicate; chained <= 3",
+"words": {
+"bluish": {
+"pred": "blue",
+"depth": 1,
+"anchor": "blue",
+"span": "blue bluish blueish",
+"chain": [
+"blue"
+],
+"source": "WORDNET-adj"
+},
+"blueish": {
+"pred": "blue",
+"depth": 1,
+"anchor": "blue",
+"span": "blue bluish blueish",
+"chain": [
+"blue"
+],
+"source": "WORDNET-adj"
+},
+"greenish": {
+"pred": "green",
+"depth": 1,
+"anchor": "green",
+"span": "green greenish light-green dark-green",
+"chain": [
+"green"
+],
+"source": "WORDNET-adj"
+},
+"orangish": {
+"pred": "orange",
+"depth": 1,
+"anchor": "orange",
+"span": "orange orangish",
+"chain": [
+"orange"
+],
+"source": "WORDNET-adj"
+},
+"violet": {
+"pred": "purple",
+"depth": 1,
+"anchor": "purple",
+"span": "purple violet purplish",
+"chain": [
+"purple"
+],
+"source": "WORDNET-adj"
+},
+"purplish": {
+"pred": "purple",
+"depth": 1,
+"anchor": "purple",
+"span": "purple violet purplish",
+"chain": [
+"purple"
+],
+"source": "WORDNET-adj"
+},
+"reddish": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"ruddy": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"carmine": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"cerise": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"cherry": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"crimson": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"ruby": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"scarlet": {
+"pred": "red",
+"depth": 1,
+"anchor": "red",
+"span": "red reddish ruddy blood-red carmine cerise cherry cherry-red crimson ruby ruby-red scarlet",
+"chain": [
+"red"
+],
+"source": "WORDNET-adj"
+},
+"yellowish": {
+"pred": "yellow",
+"depth": 1,
+"anchor": "yellow",
+"span": "yellow yellowish xanthous",
+"chain": [
+"yellow"
+],
+"source": "WORDNET-adj"
+},
+"xanthous": {
+"pred": "yellow",
+"depth": 1,
+"anchor": "yellow",
+"span": "yellow yellowish xanthous",
+"chain": [
+"yellow"
+],
+"source": "WORDNET-adj"
+},
+"mediate": {
+"pred": "middle",
+"depth": 1,
+"anchor": "middle",
+"span": "in-between mediate middle",
+"chain": [
+"middle"
+],
+"source": "WORDNET-adj"
+},
+"large": {
+"pred": "big",
+"depth": 1,
+"anchor": "big",
+"span": "large big",
+"chain": [
+"big"
+],
+"source": "WORDNET-adj"
+},
+"little": {
+"pred": "small",
+"depth": 1,
+"anchor": "small",
+"span": "small little",
+"chain": [
+"small"
+],
+"source": "WORDNET-adj"
+},
+"bantam": {
+"pred": "tiny",
+"depth": 1,
+"anchor": "tiny",
+"span": "bantam diminutive lilliputian midget petite tiny flyspeck",
+"chain": [
+"tiny"
+],
+"source": "WORDNET-adj"
+},
+"diminutive": {
+"pred": "tiny",
+"depth": 1,
+"anchor": "tiny",
+"span": "bantam diminutive lilliputian midget petite tiny flyspeck",
+"chain": [
+"tiny"
+],
+"source": "WORDNET-adj"
+},
+"lilliputian": {
+"pred": "tiny",
+"depth": 1,
+"anchor": "tiny",
+"span": "bantam diminutive lilliputian midget petite tiny flyspeck",
+"chain": [
+"tiny"
+],
+"source": "WORDNET-adj"
+},
+"midget": {
+"pred": "tiny",
+"depth": 1,
+"anchor": "tiny",
+"span": "bantam diminutive lilliputian midget petite tiny flyspeck",
+"chain": [
+"tiny"
+],
+"source": "WORDNET-adj"
+},
+"petite": {
+"pred": "tiny",
+"depth": 1,
+"anchor": "tiny",
+"span": "bantam diminutive lilliputian midget petite tiny flyspeck",
+"chain": [
+"tiny"
+],
+"source": "WORDNET-adj"
+},
+"flyspeck": {
+"pred": "tiny",
+"depth": 1,
+"anchor": "tiny",
+"span": "bantam diminutive lilliputian midget petite tiny flyspeck",
+"chain": [
+"tiny"
+],
+"source": "WORDNET-adj"
+},
+"broad": {
+"pred": "wide",
+"depth": 1,
+"anchor": "wide",
+"span": "wide broad",
+"chain": [
+"wide"
+],
+"source": "WORDNET-adj"
+},
+"rubicund": {
+"pred": "red",
+"depth": 2,
+"anchor": "ruddy",
+"span": "rubicund ruddy florid sanguine",
+"chain": [
+"red",
+"ruddy"
+],
+"source": "WORDNET-adj"
+},
+"florid": {
+"pred": "red",
+"depth": 2,
+"anchor": "ruddy",
+"span": "rubicund ruddy florid sanguine",
+"chain": [
+"red",
+"ruddy"
+],
+"source": "WORDNET-adj"
+},
+"sanguine": {
+"pred": "red",
+"depth": 2,
+"anchor": "ruddy",
+"span": "rubicund ruddy florid sanguine",
+"chain": [
+"red",
+"ruddy"
+],
+"source": "WORDNET-adj"
+},
+"sanguineous": {
+"pred": "red",
+"depth": 3,
+"anchor": "sanguine",
+"span": "sanguine sanguineous",
+"chain": [
+"red",
+"ruddy",
+"sanguine"
+],
+"source": "WORDNET-adj"
+},
+"aureate": {
+"pred": "red",
+"depth": 3,
+"anchor": "florid",
+"span": "aureate florid flamboyant",
+"chain": [
+"red",
+"ruddy",
+"florid"
+],
+"source": "WORDNET-adj"
+},
+"flamboyant": {
+"pred": "red",
+"depth": 3,
+"anchor": "florid",
+"span": "aureate florid flamboyant",
+"chain": [
+"red",
+"ruddy",
+"florid"
+],
+"source": "WORDNET-adj"
+}
+},
+"n_all": 38,
+"stats": {
+"passes": [
+{
+"depth": 1,
+"admitted": 32
+},
+{
+"depth": 2,
+"admitted": 3
+},
+{
+"depth": 3,
+"admitted": 3
+}
+],
+"refused": 0,
+"contested_synsets": 0,
+"contested_words": 0,
+"synsets": 18185,
+"rule": "first-sense"
+}
+}

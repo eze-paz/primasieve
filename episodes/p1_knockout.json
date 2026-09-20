@@ -1,0 +1,1960 @@
+[
+ {
+  "name": "bitcount",
+  "handcoded": {
+   "solved": true,
+   "energy": 12
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 21
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 9,
+    "after": 9,
+    "spent": 9,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 9,
+    "after": 0,
+    "spent": 12,
+    "reward": 23.75,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "bucketsort",
+  "handcoded": {
+   "solved": true,
+   "energy": 97
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 106
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 6,
+    "after": 6,
+    "spent": 9,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 6,
+    "after": 0,
+    "spent": 97,
+    "reward": 6.933,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "find_first_in_sorted",
+  "handcoded": {
+   "solved": true,
+   "energy": 9
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 51
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 3,
+    "after": 3,
+    "spent": 42,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 0,
+    "spent": 9,
+    "reward": 15.4167,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "find_in_sorted",
+  "handcoded": {
+   "solved": true,
+   "energy": 484
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 526
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 2,
+    "after": 2,
+    "spent": 42,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 2,
+    "after": 1,
+    "spent": 173,
+    "reward": 0.1806,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 156,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 2,
+    "spent": 1,
+    "reward": -31.25,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 0,
+    "spent": 155,
+    "reward": 5.4032,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "flatten",
+  "handcoded": {
+   "solved": true,
+   "energy": 1
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 1
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 6,
+    "after": 6,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 6,
+    "after": 0,
+    "spent": 1,
+    "reward": 192.5,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "gcd",
+  "handcoded": {
+   "solved": true,
+   "energy": 1
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 15
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 5,
+    "after": 5,
+    "spent": 14,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 0,
+    "spent": 1,
+    "reward": 183.5714,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "get_factors",
+  "handcoded": {
+   "solved": true,
+   "energy": 25
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 33
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 10,
+    "after": 0,
+    "spent": 33,
+    "reward": 11.3131,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "hanoi",
+  "handcoded": {
+   "solved": true,
+   "energy": 53
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 67
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 7,
+    "after": 7,
+    "spent": 14,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 7,
+    "after": 0,
+    "spent": 53,
+    "reward": 8.6688,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "is_valid_parenthesization",
+  "handcoded": {
+   "solved": true,
+   "energy": 23
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 33
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 1,
+    "after": 1,
+    "spent": 10,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 22,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 0,
+    "spent": 1,
+    "reward": 67.5,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "kheapsort",
+  "handcoded": {
+   "solved": true,
+   "energy": 366
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 616
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 3,
+    "after": 3,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 45,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 3,
+    "after": 3,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 0,
+    "spent": 71,
+    "reward": 7.1127,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "kth",
+  "handcoded": {
+   "solved": false,
+   "energy": 5190
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 5983
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 4,
+    "after": 4,
+    "spent": 24,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.25,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 2,
+    "after": 1,
+    "spent": 243,
+    "reward": 0.1286,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 4,
+    "spent": 1,
+    "reward": -93.75,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.125,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.125,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 2,
+    "after": 2,
+    "spent": 14,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 2,
+    "after": 2,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 2,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.125,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 1,
+    "after": 1,
+    "spent": 33,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 52,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 1,
+    "after": 1,
+    "spent": 14,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 1,
+    "after": 1,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 1,
+    "after": 1,
+    "spent": 140,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 106,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 1,
+    "after": 4,
+    "spent": 1,
+    "reward": -93.75,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 12,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 4,
+    "after": 4,
+    "spent": 14,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 0,
+    "spent": 81,
+    "reward": 6.5432,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "lcs_length",
+  "handcoded": {
+   "solved": false,
+   "energy": 4502
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 10141
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 8,
+    "after": 8,
+    "spent": 23,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 8,
+    "after": 5,
+    "spent": 178,
+    "reward": 0.4213,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 5,
+    "spent": 178,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 5,
+    "after": 8,
+    "spent": 1,
+    "reward": -75.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 8,
+    "after": 8,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 8,
+    "after": 5,
+    "spent": 42,
+    "reward": 1.7857,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "REPEAT",
+    "before": 5,
+    "after": 3,
+    "spent": 42,
+    "reward": 1.1905,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 3,
+    "after": 3,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 3,
+    "after": 3,
+    "spent": 23,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 178,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 3,
+    "after": 3,
+    "spent": 42,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 76,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 3,
+    "after": 3,
+    "spent": 70,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 3,
+    "after": 8,
+    "spent": 1,
+    "reward": -125.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 8,
+    "after": 8,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 8,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.3,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 5,
+    "after": 5,
+    "spent": 32,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 5,
+    "spent": 190,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 5,
+    "after": 5,
+    "spent": 56,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 5,
+    "after": 5,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 76,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 5,
+    "spent": 120,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 5,
+    "after": 8,
+    "spent": 1,
+    "reward": -75.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 8,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.5,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 3,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 3,
+    "after": 3,
+    "spent": 23,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 169,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 3,
+    "after": 3,
+    "spent": 28,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 3,
+    "after": 3,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 3,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.2,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 1,
+    "after": 1,
+    "spent": 23,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 0,
+    "spent": 72,
+    "reward": 5.3472,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "lis",
+  "handcoded": {
+   "solved": true,
+   "energy": 5128
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 843
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 4,
+    "after": 4,
+    "spent": 19,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.1538,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 2,
+    "after": 2,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 2,
+    "after": 4,
+    "spent": 1,
+    "reward": -38.4615,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 74,
+    "reward": 6.0395,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "max_sublist_sum",
+  "handcoded": {
+   "solved": true,
+   "energy": 756
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 343
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 4,
+    "after": 4,
+    "spent": 9,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 3,
+    "spent": 38,
+    "reward": 0.9398,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 38,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 3,
+    "after": 4,
+    "spent": 1,
+    "reward": -35.7143,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 8,
+    "reward": 22.8571,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "mergesort",
+  "handcoded": {
+   "solved": true,
+   "energy": 124
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 148
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 13,
+    "after": 13,
+    "spent": 24,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 13,
+    "after": 1,
+    "spent": 122,
+    "reward": 1.6393,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 0,
+    "spent": 2,
+    "reward": 13.3333,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "next_palindrome",
+  "handcoded": {
+   "solved": true,
+   "energy": 174
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 230
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 1,
+    "after": 1,
+    "spent": 56,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 1,
+    "after": 1,
+    "spent": 170,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 0,
+    "spent": 4,
+    "reward": 15.4167,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "next_permutation",
+  "handcoded": {
+   "solved": true,
+   "energy": 102
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 125
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 8,
+    "after": 8,
+    "spent": 23,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 8,
+    "after": 0,
+    "spent": 102,
+    "reward": 7.1786,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "pascal",
+  "handcoded": {
+   "solved": true,
+   "energy": 670
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 957
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 4,
+    "after": 4,
+    "spent": 28,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 3,
+    "spent": 203,
+    "reward": 0.2053,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 3,
+    "spent": 203,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "RESET",
+    "before": 3,
+    "after": 4,
+    "spent": 1,
+    "reward": -41.6667,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "REPEAT",
+    "before": 4,
+    "after": 4,
+    "spent": 126,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 147,
+    "reward": 6.1338,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "powerset",
+  "handcoded": {
+   "solved": false,
+   "energy": 585
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 306
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 4,
+    "after": 4,
+    "spent": 9,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 46,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 0,
+    "spent": 1,
+    "reward": 171.6667,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "quicksort",
+  "handcoded": {
+   "solved": true,
+   "energy": 66
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 13
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 1,
+    "after": 0,
+    "spent": 13,
+    "reward": 6.3736,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "rpn_eval",
+  "handcoded": {
+   "solved": true,
+   "energy": 9
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 45
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 3,
+    "after": 3,
+    "spent": 36,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 3,
+    "after": 0,
+    "spent": 9,
+    "reward": 16.9048,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "shunting_yard",
+  "handcoded": {
+   "solved": true,
+   "energy": 1496
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 451
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 4,
+    "after": 4,
+    "spent": 5,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 4,
+    "after": 4,
+    "spent": 95,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 4,
+    "after": 4,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 4,
+    "after": 4,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 4,
+    "after": 0,
+    "spent": 101,
+    "reward": 6.4144,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "sieve",
+  "handcoded": {
+   "solved": true,
+   "energy": 2
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 25
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 5,
+    "after": 5,
+    "spent": 23,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 0,
+    "spent": 2,
+    "reward": 94.2857,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "sqrt",
+  "handcoded": {
+   "solved": true,
+   "energy": 549
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 590
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 6,
+    "after": 6,
+    "spent": 41,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 6,
+    "after": 6,
+    "spent": 82,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 6,
+    "after": 1,
+    "spent": 250,
+    "reward": 0.625,
+    "solved": false,
+    "improved": true
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 1,
+    "after": 0,
+    "spent": 217,
+    "reward": 5.144,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "to_base",
+  "handcoded": {
+   "solved": true,
+   "energy": 57
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 89
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 7,
+    "after": 7,
+    "spent": 32,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 7,
+    "after": 0,
+    "spent": 57,
+    "reward": 7.7911,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ },
+ {
+  "name": "wrap",
+  "handcoded": {
+   "solved": true,
+   "energy": 1358
+  },
+  "ucb": {
+   "solved": true,
+   "energy": 507
+  },
+  "trace": [
+   {
+    "form": "GLOBAL_APPLY",
+    "before": 5,
+    "after": 5,
+    "spent": 19,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(0)",
+    "before": 5,
+    "after": 5,
+    "spent": 93,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(1)",
+    "before": 5,
+    "after": 5,
+    "spent": 250,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "INTERPOLATE",
+    "before": 5,
+    "after": 5,
+    "spent": 1,
+    "reward": 0.0,
+    "solved": false,
+    "improved": false
+   },
+   {
+    "form": "ENUMERATE(2)",
+    "before": 5,
+    "after": 0,
+    "spent": 145,
+    "reward": 6.4368,
+    "solved": true,
+    "improved": true
+   }
+  ]
+ }
+]

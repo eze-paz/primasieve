@@ -1,0 +1,1972 @@
+{
+ "_updated": "2026-09-04T20:14:43",
+ "dialog_s1_scaling": {
+  "n_obj": 3,
+  "rows": [
+   {
+    "binary": 12,
+    "concepts": 24,
+    "mean_survivors_at_full_coverage": 2.29,
+    "sentences": 200,
+    "unary": 12,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 33,
+    "mean_survivors_at_full_coverage": 1.18,
+    "sentences": null,
+    "unary": 21,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 45,
+    "mean_survivors_at_full_coverage": 1.22,
+    "sentences": null,
+    "unary": 33,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 65,
+    "mean_survivors_at_full_coverage": null,
+    "sentences": null,
+    "unary": 53,
+    "wrong": 0
+   },
+   {
+    "binary": 12,
+    "concepts": 101,
+    "mean_survivors_at_full_coverage": null,
+    "sentences": null,
+    "unary": 89,
+    "wrong": 0
+   }
+  ],
+  "verdict": "partial/unsound",
+  "wrong_total": 0
+ },
+ "dialog_s2_subset_problem": {
+  "all_learned_after_asking": true,
+  "all_uncommitted_are_subset_cases": true,
+  "control": {
+   "active_questions": 2,
+   "active_words": 64,
+   "random_questions": 2,
+   "random_words": 64
+  },
+  "reading": "learning from POSITIVE examples alone cannot separate a predicate from any SUPERSET of it; this is the classic subset / no-negative-evidence problem. The engine abstains (correct), then obtains NEGATIVE evidence by asking about an object where its surviving meanings disagree. Sound throughout.",
+  "rows": [
+   {
+    "after_asking": 33,
+    "after_elimination": 32,
+    "concepts": 33,
+    "never_spoken": 0,
+    "questions": 1,
+    "spoken": 33,
+    "subset_cases": 1,
+    "uncommitted": 1,
+    "wrong": 0
+   },
+   {
+    "after_asking": 45,
+    "after_elimination": 43,
+    "concepts": 45,
+    "never_spoken": 0,
+    "questions": 2,
+    "spoken": 45,
+    "subset_cases": 2,
+    "uncommitted": 2,
+    "wrong": 0
+   },
+   {
+    "after_asking": 64,
+    "after_elimination": 62,
+    "concepts": 65,
+    "never_spoken": 1,
+    "questions": 2,
+    "spoken": 64,
+    "subset_cases": 2,
+    "uncommitted": 2,
+    "wrong": 0
+   },
+   {
+    "after_asking": 98,
+    "after_elimination": 96,
+    "concepts": 101,
+    "never_spoken": 3,
+    "questions": 2,
+    "spoken": 98,
+    "subset_cases": 2,
+    "uncommitted": 2,
+    "wrong": 0
+   }
+  ],
+  "wrong_after_probing": 0
+ },
+ "dialog_s3_conversation": {
+  "ambiguous_reference_test": {
+   "abstained": 300,
+   "answered": 0,
+   "n": 300,
+   "reading": "when the question describes MORE THAN ONE object the engine refuses to answer rather than picking one. The 100% coverage in the main test came from questions whose target description was unique; this exercises the abstention path that the main test did not."
+  },
+  "committed_discourse_fn": "LAST_SUBJECT",
+  "concepts": 45,
+  "dialogues_to_learn_rule": 5,
+  "heldout": {
+   "abstained": 0,
+   "accuracy": 1.0,
+   "answered": 400,
+   "confabulations": 0,
+   "correct": 400,
+   "coverage": 1.0,
+   "n": 400
+  },
+  "knockout_survivors": [],
+  "true_discourse_fn": "LAST_SUBJECT",
+  "verdict": "CONVERSATION WORKS",
+  "vocab_learned": 45
+ },
+ "end_state_verification": {
+  "checks": [
+   {
+    "claim": "120-cell matrix solved from L0 with ZERO authored vocabulary",
+    "pass": true,
+    "value": "60/60 (N=10) vs primitives 7/60"
+   },
+   {
+    "claim": "26 QuixBugs",
+    "pass": true,
+    "value": "ucb 26/26 @E22265 (hand 23/26, ratio 1.02x)"
+   },
+   {
+    "claim": "br-phono segmentation vs Zhikov 0.7542",
+    "pass": true,
+    "value": "token F 0.7411 (gap 0.0131)"
+   },
+   {
+    "claim": "grounded-language held-out COMPOSITIONS",
+    "pass": true,
+    "value": "1.000 acc @ 1.000 cov, lexicon 10/10"
+   },
+   {
+    "claim": "search cost within 10x of authored-grammar efficiency",
+    "pass": true,
+    "value": "L0 8561 vs authored ~5400 candidate checks = 1.59x"
+   },
+   {
+    "claim": "ZERO confabulations across all phases",
+    "pass": true,
+    "value": "0 (phases 3,5,6 all report 0)"
+   }
+  ],
+  "gates": {
+   "KILL 1 (L0 expressiveness)": "PASSES",
+   "KILL 2 (DECISIVE: library from L0)": "PASSES",
+   "KILL 3 (proposer)": "FIRED",
+   "KILL 4 (compression rejector)": "PASSES",
+   "KILL 5 (grounded language)": "PASSES",
+   "KILL 6 (noise tolerance sets)": "PASSES",
+   "measure (d) reuse": "DEMONSTRATED"
+  },
+  "l0_vs_authored_discovery_cost": {
+   "authored_est": 5400,
+   "l0": 8561,
+   "ratio": 1.585
+  },
+  "passed": 6,
+  "total": 6
+ },
+ "env": {
+  "interpreters": {
+   "default_python": {
+    "exe": "C:\\Users\\aezequiel\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe",
+    "numpy": null,
+    "torch": null,
+    "version": "3.11.15"
+   },
+   "system_py312": {
+    "exe": "C:/Users/aezequiel/AppData/Local/Programs/Python/Python312/python.exe",
+    "numpy": "2.5.1",
+    "torch": "2.13.0+cpu",
+    "version": "3.12.10"
+   }
+  },
+  "torch_capable": [
+   "system_py312"
+  ]
+ },
+ "l0_phase1": {
+  "audit": {
+   "CODE_PARAM": {
+    "authored": "CODE_PARAM[off'=(coeff+1)]",
+    "blind_energy": 23,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "(c+1)",
+     "e": "e"
+    }
+   },
+   "CODE_STRUCT_PARAM": {
+    "authored": "CODE_STRUCT_PARAM[w'=coeff+exp]",
+    "blind_energy": 18,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "(c+e)",
+     "e": "e"
+    }
+   },
+   "NEGATE": {
+    "authored": "NEGATE (c -> -c)",
+    "blind_energy": 10,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "neg(c)",
+     "e": "e"
+    }
+   },
+   "STRUCT_GLOBAL": {
+    "authored": "STRUCT_GLOBAL[x->Pow2]",
+    "blind_energy": 5,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "c",
+     "e": "2"
+    }
+   },
+   "STRUCT_PARAM_diff": {
+    "authored": "STRUCT_PARAM[c'=coeff*exp,e'=exp-1]",
+    "blind_energy": 56,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "(c*e)",
+     "e": "(e-1)"
+    }
+   },
+   "STRUCT_PARAM_integ": {
+    "authored": "STRUCT_PARAM[c'=coeff/(exp+1),e'=exp+1]",
+    "blind_energy": 11915,
+    "combinator": "MAP_SITES",
+    "expressible": true,
+    "frame": {
+     "c": "neg((neg(c)/(e+1)))",
+     "e": "(e+1)"
+    }
+   }
+  },
+  "combinators": [
+   "AT_SITE",
+   "MAP_SITES",
+   "COMPOSE"
+  ],
+  "depth3": ">=400000 (cap-saturated lower bound)",
+  "frame_space_depth2": 125574436,
+  "globalapply": "MAP_SITES(discrete node-kind swap) -- combinator layer, not an arithmetic frame",
+  "kill1": "PASSES",
+  "primitive_growth": {
+   "/": "integ frame c'=c/(e+1) needs exact rational division; ast.Div IS an object-grammar node type"
+  },
+  "sizes_by_depth": {
+   "1": 73,
+   "2": 11206
+  },
+  "unreachable_on_e8_base": [
+   "STRUCT_PARAM_integ"
+  ]
+ },
+ "ledger_recorded": {
+  "e8_authored_vs_blind": {
+   "comment": "authored shortlist buys ~1e4-1e5x search efficiency = the factor Phase 3's proposer must recover from L0",
+   "signmod": "unreachable at depth<=3",
+   "trunc": 36401
+  },
+  "matrix_disc_solved": 120,
+  "matrix_prim_solved": 25,
+  "matrix_total": 120,
+  "note": "numbers recorded in the project ledger BEFORE this plan; re-measured by the components above",
+  "quixbugs_energy_ratio": 0.83,
+  "quixbugs_ucb_solved": 26,
+  "seg_token_f": 0.741,
+  "zhikov_token_f": 0.7542
+ },
+ "matrix": {
+  "cells": {
+   "code": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "CODE_PARAM[off'=(coeff+1)]",
+    "prim_evals": [
+     591,
+     683,
+     531,
+     683,
+     591,
+     591,
+     1332,
+     531,
+     1359,
+     683,
+     531,
+     531,
+     531,
+     531,
+     1083,
+     1359,
+     591,
+     543,
+     1412,
+     1083
+    ],
+    "prim_med_evals": 591,
+    "prim_solved": 10
+   },
+   "codeparam": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "CODE_STRUCT_PARAM[w'=coeff+exp]",
+    "prim_evals": [
+     566,
+     566,
+     660,
+     752,
+     754,
+     911,
+     565,
+     754,
+     754,
+     565,
+     1486,
+     911,
+     939,
+     754,
+     660,
+     939,
+     1201,
+     939,
+     754,
+     754
+    ],
+    "prim_med_evals": 754,
+    "prim_solved": 0
+   },
+   "diff": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "STRUCT_PARAM[c'=coeff*exp,e'=(exp-1)]",
+    "prim_evals": [
+     967,
+     668,
+     876,
+     967,
+     876,
+     341,
+     668,
+     967,
+     667,
+     876,
+     340,
+     340,
+     967,
+     667,
+     331,
+     339,
+     876,
+     967,
+     331,
+     876
+    ],
+    "prim_med_evals": 772,
+    "prim_solved": 0
+   },
+   "integ": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "STRUCT_PARAM[c'=coeff/(exp+1),e'=(exp+1)]",
+    "prim_evals": [
+     967,
+     950,
+     876,
+     876,
+     668,
+     967,
+     876,
+     876,
+     876,
+     876,
+     668,
+     340,
+     967,
+     647,
+     967,
+     340,
+     341,
+     967,
+     876,
+     967
+    ],
+    "prim_med_evals": 876,
+    "prim_solved": 0
+   },
+   "negate": {
+    "disc_evals": [
+     29,
+     294,
+     59,
+     39,
+     29,
+     29,
+     127,
+     201,
+     59,
+     39,
+     39,
+     29,
+     92,
+     92,
+     164,
+     39,
+     90,
+     29,
+     59,
+     90
+    ],
+    "disc_med_evals": 59,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "NEGATE",
+    "prim_evals": [
+     29,
+     882,
+     59,
+     39,
+     29,
+     29,
+     201,
+     327,
+     59,
+     39,
+     39,
+     29,
+     92,
+     92,
+     264,
+     39,
+     138,
+     29,
+     59,
+     138
+    ],
+    "prim_med_evals": 59,
+    "prim_solved": 14
+   },
+   "struct": {
+    "disc_evals": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "disc_med_evals": 1,
+    "disc_solved": 20,
+    "n": 20,
+    "op": "STRUCT_GLOBAL[x->Pow2]",
+    "prim_evals": [
+     420,
+     418,
+     615,
+     216,
+     420,
+     216,
+     148,
+     418,
+     812,
+     615,
+     284,
+     352,
+     1700,
+     352,
+     1754,
+     216,
+     420,
+     352,
+     216,
+     420
+    ],
+    "prim_med_evals": 418,
+    "prim_solved": 0
+   }
+  },
+  "disc_solved": 120,
+  "n_per_class": 20,
+  "ops": {
+   "code": "CODE_PARAM[off'=(coeff+1)]",
+   "codeparam": "CODE_STRUCT_PARAM[w'=coeff+exp]",
+   "diff": "STRUCT_PARAM[c'=coeff*exp,e'=(exp-1)]",
+   "integ": "STRUCT_PARAM[c'=coeff/(exp+1),e'=(exp+1)]",
+   "negate": "NEGATE",
+   "struct": "STRUCT_GLOBAL[x->Pow2]"
+  },
+  "prim_solved": 24,
+  "secs": 201.8,
+  "total": 120,
+  "vocab_added": 0
+ },
+ "phase2_equivalence": {
+  "code": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "codeparam": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "diff": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "integ": {
+   "c": {
+    "eq_general": false,
+    "eq_graded": true,
+    "note": "exact-Fraction equality; the earlier False was a float-coercion artifact of _wrap, not a frame difference"
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "negate": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  },
+  "struct": {
+   "c": {
+    "eq_general": true,
+    "eq_graded": true
+   },
+   "e": {
+    "eq_general": true,
+    "eq_graded": true
+   }
+  }
+ },
+ "phase2_knockouts": {
+  "knockout_shuffled_frames": 0,
+  "spurious_without_verify": 0
+ },
+ "phase2_matrix": {
+  "cells": {
+   "code": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "CODE_PARAM[off'=(c+1)]",
+    "prim_med_evals": 531,
+    "prim_solved": 3
+   },
+   "codeparam": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "CODE_STRUCT_PARAM[w'=(c+e)]",
+    "prim_med_evals": 753,
+    "prim_solved": 0
+   },
+   "diff": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "STRUCT_PARAM[c'=(c*e),e'=(e-1)]",
+    "prim_med_evals": 772,
+    "prim_solved": 0
+   },
+   "integ": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "STRUCT_PARAM[c'=abs((neg(c)/(e+1))),e'=(e+1)]",
+    "prim_med_evals": 657,
+    "prim_solved": 0
+   },
+   "negate": {
+    "disc_med_evals": 90,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "NEGATE",
+    "prim_med_evals": 138,
+    "prim_solved": 4
+   },
+   "struct": {
+    "disc_med_evals": 1,
+    "disc_solved": 10,
+    "n": 10,
+    "op": "STRUCT_GLOBAL[x->Pow2]",
+    "prim_med_evals": 417,
+    "prim_solved": 0
+   }
+  },
+  "disc_solved": 60,
+  "kill2": "PASSES",
+  "l0_calls": 6,
+  "l0_candidates_total": 8561,
+  "n_per_class": 10,
+  "ops": {
+   "code": "CODE_PARAM[off'=(c+1)]",
+   "codeparam": "CODE_STRUCT_PARAM[w'=(c+e)]",
+   "diff": "STRUCT_PARAM[c'=(c*e),e'=(e-1)]",
+   "integ": "STRUCT_PARAM[c'=abs((neg(c)/(e+1))),e'=(e+1)]",
+   "negate": "NEGATE",
+   "struct": "STRUCT_GLOBAL[x->Pow2]"
+  },
+  "prim_solved": 7,
+  "total": 60,
+  "unsolved": []
+ },
+ "phase2_reuse": {
+  "arm_A_cumulative": {
+   "compositions": {
+    "diff o diff": 12
+   },
+   "median_pair_evals": 5,
+   "n": 12,
+   "solved": 12
+  },
+  "arm_B_no_reuse_l0_direct": {
+   "candidates": 1863,
+   "frame": [
+    "((c*e)*(e-1))",
+    "(e-2)"
+   ],
+   "solved_once_discovered": 12
+  },
+  "arm_C_delete_diff": {
+   "library": [
+    "integ",
+    "double",
+    "raise"
+   ],
+   "n": 12,
+   "solved": 0
+  },
+  "arm_D_shuffled_tests": {
+   "n": 12,
+   "solved": 0
+  },
+  "library": {
+   "diff": "c'=(c*e),e'=(e-1)",
+   "double": "c'=(c+c),e'=e",
+   "integ": "c'=abs((neg(c)/(e+1))),e'=(e+1)",
+   "raise": "c'=c,e'=(e+1)"
+  },
+  "measure_d": "DEMONSTRATED",
+  "reuse_speedup_vs_rediscovery": 372.6
+ },
+ "phase2_summary": {
+  "bug_fixed": "sleep_l0._wrap -- L0 ev() works in Fraction for exactness but consumers write results into ast.Constant (CodeStructParam), where a Fraction is not a valid literal -> codeparam scored 0/10 until normalised to int/float.",
+  "equivalence": "5/6 L0 frames authored-equivalent GENERALLY; integ equivalent on the evidence/graded regime (c>0) but WRONG for c<0 (L0 gives +5/2 where truth is -5/2)",
+  "integ_caveat": "FitTemplate cannot solve negative-coefficient seeds, so no negative-c traces exist -> abs(neg(c)/(e+1)) is indistinguishable from c/(e+1) on the available evidence. This is an ACTIVE-PROBING (COLLECT) gap, not a grammar gap.",
+  "kill2": "PASSES (0 of 6 classes short)",
+  "knockout_i_shuffled_traces": "PASSES -- both components abstain after 200000 candidates; grounding is real",
+  "knockout_ii_heldout_verify": "NULL -- verification removed 0 spurious frames; the >=3-trace consistency + varying-attribute guards already reject shuffled data. Verify split is redundant on this evidence, NOT load-bearing. Reported, not tuned.",
+  "l0_discovery_cost": {
+   "calls": 6,
+   "candidates_total": 8561,
+   "comment": "trace-based signatures are coarser than Phase-1 sample-based ones, so cheaper",
+   "max": 8447,
+   "median": 25,
+   "phase1_blind_estimate": 12027
+  },
+  "measure_d_reuse": "NOT DEMONSTRATED -- each class crystallises its own frame from its own traces; no entry is reused by a later class. What IS shown is MACHINERY generality (one L0 + one discovery routine covers all 6 incl. 2 cross-domain code classes, zero authored vocab), which the ledger distinguishes from operator REUSE. Open.",
+  "phase0_authored_reference": "120/120 at N=20 (same 100% rate)",
+  "primitives_baseline": "7/60 at N=10",
+  "result": "60/60 held-out (6 classes x N=10) using ONLY L0-crystallised operators, authored 450-relation frame_grammar DELETED (never consulted)",
+  "wake_evidence_growth": "seeds 5 -> 12: L0 frame space (~1.3e8 at depth2) UNDERDETERMINES where the deleted 450-item menu did not (integ ABSTAINED at 5 seeds). Remedy = more evidence, NOT a smaller space. The authored menu was partly a REGULARISER, not only a search shortcut."
+ },
+ "phase2e_active_probing": {
+  "active_correct_general": true,
+  "active_frame": "neg((neg(c)/(e+1)))",
+  "active_probes": [
+   [
+    -9,
+    1
+   ]
+  ],
+  "active_survivors": 1,
+  "active_vs_random_HONEST": "WEAK/NULL: active 1 probe vs random 1.4 probes = 1.4x, and random reached the correct frame 20/20. This is NOT the 7-12x E6 measured for active design. Reason: 6 of the 10 coefficient values in the probe pool are negative, so almost any random probe discriminates. The task is too easy to demonstrate active superiority. Reported, not spun -- the CLOSURE of the gap is the result here, not COLLECT beating random.",
+  "correct_in_general_before": 1,
+  "methodological_finding": "LOAD-BEARING and general: enum_trees dedupes candidates by SIGNATURE. If the signature is computed over the OBSERVED data only, every hypothesis that agrees on the evidence collapses to ONE representative -- the survivor set becomes a singleton BY CONSTRUCTION and the alternatives active probing needs are silently destroyed (first run: 1 survivor, gap looked unclosable). The hypothesis space must be INDIVIDUATED AT THE RESOLUTION YOU INTEND TO PROBE: dedup over traces + probe pool, consistency checked only on traces. Then 6 survivors appear and one probe settles it. Any survivor-set/abstention machinery built on signature dedup inherits this trap.",
+  "random_control": {
+   "mean_probes": 1.45,
+   "mean_survivors_left": 1.0,
+   "n": 20,
+   "solved": 20
+  },
+  "reading": "the underdetermination Phase 2 reported was an ACTIVE-PROBING gap, not a grammar gap, and the engine closes it itself: detect a non-singleton survivor set, choose the maximally splitting input, answer it with the execution oracle, reject the losers. COLLECT at the frame layer. A probe requires only TESTING, so FitTemplate's inability to SEARCH c<0 never blocks it.",
+  "survivor_set_before": 6,
+  "verdict": "GAP CLOSED",
+  "wake_traces": 10
+ },
+ "phase3_final_reading": "KILL 3 FIRED and STANDS for the general claim: the proposer does not recover E8's factor, and on random deep frames it gives 1.27x. My regime excuse was REFUTED by its own pre-registered test (Phase 3b). But the narrow home is real and now characterised with n=21 and a knockout at 1.00x: on DEEP frames that are COMPOSITIONS OF KNOWN OPERATORS the median speedup is 2.52x. So amortization pays for predicting RE-USE OF LEARNED STRUCTURE -- which is exactly what a recognition model is for -- and nowhere else here.",
+ "phase3_proposer": {
+  "bce": 0.3318,
+  "bce_knockout": 0.3944,
+  "cap": 60000,
+  "depth": 3,
+  "kill3": "FIRED: median held-out speedup 0.8x < 2x",
+  "knockout_speedup": 0.2,
+  "median_speedup": 0.76,
+  "n_train": 600,
+  "per_target": {
+   "code": {
+    "c": {
+     "bfs": 19,
+     "frame_bfs": "(c+1)",
+     "frame_prior": "(c+1)",
+     "ko": 60,
+     "prior": 33,
+     "speedup": 0.58
+    },
+    "e": {
+     "bfs": 2,
+     "frame_bfs": "e",
+     "frame_prior": "e",
+     "ko": 2,
+     "prior": 2,
+     "speedup": 1.0
+    }
+   },
+   "codeparam": {
+    "c": {
+     "bfs": 14,
+     "frame_bfs": "(c+e)",
+     "frame_prior": "(c+e)",
+     "ko": 11,
+     "prior": 9,
+     "speedup": 1.56
+    },
+    "e": {
+     "bfs": 2,
+     "frame_bfs": "e",
+     "frame_prior": "e",
+     "ko": 2,
+     "prior": 2,
+     "speedup": 1.0
+    }
+   },
+   "d2": {
+    "c": {
+     "bfs": 1858,
+     "frame_bfs": "((c*e)*(e-1))",
+     "frame_prior": "((c*e)*(e-1))",
+     "ko": 31921,
+     "prior": 311,
+     "speedup": 5.97
+    },
+    "e": {
+     "bfs": 38,
+     "frame_bfs": "(e-2)",
+     "frame_prior": "(e-2)",
+     "ko": 41,
+     "prior": 53,
+     "speedup": 0.72
+    }
+   },
+   "diff": {
+    "c": {
+     "bfs": 16,
+     "frame_bfs": "(c*e)",
+     "frame_prior": "(c*e)",
+     "ko": 17,
+     "prior": 11,
+     "speedup": 1.45
+    },
+    "e": {
+     "bfs": 36,
+     "frame_bfs": "(e-1)",
+     "frame_prior": "(e-1)",
+     "ko": 201,
+     "prior": 57,
+     "speedup": 0.63
+    }
+   },
+   "integ": {
+    "c": {
+     "bfs": 8545,
+     "frame_bfs": "abs((neg(c)/(e+1)))",
+     "frame_prior": "abs((neg(c)/(e+1)))",
+     "ko": 21795,
+     "prior": 13614,
+     "speedup": 0.63
+    },
+    "e": {
+     "bfs": 35,
+     "frame_bfs": "(e+1)",
+     "frame_prior": "(e+1)",
+     "ko": 39,
+     "prior": 26,
+     "speedup": 1.35
+    }
+   },
+   "negate": {
+    "c": {
+     "bfs": 6,
+     "frame_bfs": "neg(c)",
+     "frame_prior": "neg(c)",
+     "ko": 4,
+     "prior": 4,
+     "speedup": 1.5
+    },
+    "e": {
+     "bfs": 2,
+     "frame_bfs": "e",
+     "frame_prior": "e",
+     "ko": 2,
+     "prior": 2,
+     "speedup": 1.0
+    }
+   },
+   "struct": {
+    "c": {
+     "bfs": 1,
+     "frame_bfs": "c",
+     "frame_prior": "c",
+     "ko": 1,
+     "prior": 1,
+     "speedup": 1.0
+    },
+    "e": {
+     "bfs": 4,
+     "frame_bfs": "2",
+     "frame_prior": "2",
+     "ko": 4,
+     "prior": 8,
+     "speedup": 0.5
+    }
+   }
+  },
+  "pool": 60000,
+  "regressions_over_3x": [],
+  "total_bfs_energy": 10578,
+  "total_knockout_energy": 54100,
+  "total_prior_energy": 14133,
+  "total_speedup": 0.75
+ },
+ "phase3_summary": {
+  "confabulation": "0 -- the prior only REORDERS; every accepted frame is the same correct frame BFS accepts (consistency + varying-attribute guards still decide). Soundness untouched by construction and verified in the run.",
+  "indicated_next": "amortization pays only on DEEP frame discovery. Either (a) raise the depth/complexity of the target families so blind cost dominates, or (b) drop the proposer and accept Occam-over-L0 as near-optimal here. Do NOT tune this model further.",
+  "kill3": "FIRED -- median held-out speedup 0.8x < 2x (pre-registered threshold)",
+  "plan_premise_not_met": "Phase 3 aimed to recover E8s 1e4-1e5x authored-vs-blind factor. NOT achieved: the L0 frames that actually matter are shallow enough that Occam finds them in <60 candidates, so there is no 1e4x to recover at this depth. The factor reappears only for deeper frames.",
+  "replicates": "the ledger meta_ledger A/B null and the S2 collateral-damage finding, re-instantiated at the L0 layer: learned ordering == default cost-ordering where the default is already near-optimal. The null is a COMPLIMENT to Occam enumeration, not a failure of the recognition model.",
+  "signal_is_real": "the trained model beats the shuffled-label knockout in nearly every cell (total 0.7x vs 0.2x; d2 5.2x vs 0.1x) -> it learns something, the knockout confirms it is not an artifact",
+  "variants_in_order_run": [
+   {
+    "desc": "JOINT multi-hot label over both c- and e-components (BUG)",
+    "median_speedup": 0.1,
+    "note": "reranking for e'=(e-1) under a prior carrying c'-components boosted * and c and buried the true frame; fixed, not tuned",
+    "v": 1
+   },
+   {
+    "best_cell": "d2 c-frame 1858 -> 50 = 37x",
+    "desc": "per-attribute conditioned label, pure component prior",
+    "median_speedup": 0.4,
+    "note": "helps a lot on DEEP frames, hurts trivial ones -- charges nothing for program STRUCTURE",
+    "regressions": [
+     "struct",
+     "diff",
+     "code"
+    ],
+    "v": 2
+   },
+   {
+    "best_cell": "d2 5.2x",
+    "desc": "two-part MDL: structural (Occam/BFS rank) bits + learned component bits, equal weight, no free parameter",
+    "knockout_total": "0.2x",
+    "median_speedup": 0.8,
+    "regressions": "none",
+    "total": "10578 -> 14133 (0.7x)",
+    "v": 3
+   }
+  ],
+  "verdict": "HONEST NULL with real structure. The proposer learns genuine signal but does NOT deliver a net speedup, because BFS/Occam ordering over L0 is ALREADY near-optimal for the frames that matter.",
+  "why_it_fails": "the 5 shallow targets sit at BFS ranks 2-52, so there is NO HEADROOM to win and reranking can only add noise; only the deep frames (d2 1896, integ 8580) have room, and they are rare in this task set"
+ },
+ "phase3b_regime_test": {
+  "buckets": {
+   "EXPENSIVE (>500)": {
+    "median_bfs": 56966.0,
+    "median_ko_speedup": 0.957,
+    "median_prior": 41390.0,
+    "median_speedup": 1.27,
+    "n": 60
+   }
+  },
+  "honest_reading": "I ADVANCED an explanation for Phase 3's null ('the proposer pays only where blind search is expensive; the task set had no headroom'), pre-registered a test of it, and the test REFUTED me: on 60 held-out frames all of which land in the expensive bucket (median BFS rank 56966), the median speedup is 1.27x, well under the 2x bar. The learned signal is real but weak (1.27x vs knockout 0.96x). Phase 3 is simply a NULL; there is no regime that rescues it. Note also that these are RANDOM deep frames -- d2's 5.2x may be specific to STRUCTURED frames (d2 is a composition of a learned entry), but that is n=1 and is NOT claimed.",
+  "n_eval": 60,
+  "n_train": 600,
+  "prereg": "expensive bucket (BFS rank > 500) median speedup must be >= 2.0x for the regime explanation to stand; reported either way, no tuning after seeing buckets",
+  "verdict": "EXPLANATION REFUTED (expensive-bucket median 1.27x < 2x)",
+  "what_would_settle_it": "a set of STRUCTURED deep frames (compositions of library entries) large enough to test whether the proposer's advantage is structure-specific rather than depth-specific. Not run; stated as open."
+ },
+ "phase3c_structured": {
+  "median_knockout": 1.0,
+  "median_speedup": 1.23,
+  "median_speedup_deep": 2.519,
+  "n_deep": 21,
+  "n_structured": 46,
+  "pattern": "legible split: EVERY diff-composition wins big (diff o diff 5.21x, o code 5.76x, o codeparam 4.91x, o double 4.11x, o raise 6.38x) while EVERY integ-composition does not (0.40-1.21x). The recognition model learned to recognise the MULTIPLICATIVE structure (diff's c*e) and not the DIVISION structure (integ's c/(e+1)) -- consistent with integ being the single hardest frame throughout this project (blind cost 11915 in Phase 1, the only class to ABSTAIN in Phase 2, and the underdetermined one in Phase 2(e)).",
+  "random_deep_reference": 1.27,
+  "top": [
+   {
+    "bfs": 1345,
+    "comp": "codeparam o codeparam",
+    "ko": 294,
+    "prior": 184,
+    "speedup": 7.309782608695652
+   },
+   {
+    "bfs": 1774,
+    "comp": "diff o raise",
+    "ko": 719,
+    "prior": 278,
+    "speedup": 6.381294964028777
+   },
+   {
+    "bfs": 1809,
+    "comp": "diff o code",
+    "ko": 1056,
+    "prior": 314,
+    "speedup": 5.761146496815287
+   },
+   {
+    "bfs": 984,
+    "comp": "double o codeparam",
+    "ko": 273,
+    "prior": 183,
+    "speedup": 5.377049180327869
+   },
+   {
+    "bfs": 910,
+    "comp": "codeparam o double",
+    "ko": 208,
+    "prior": 170,
+    "speedup": 5.352941176470588
+   },
+   {
+    "bfs": 1896,
+    "comp": "diff o diff",
+    "ko": 31962,
+    "prior": 364,
+    "speedup": 5.208791208791209
+   }
+  ],
+  "verdict": "STRUCTURE-SPECIFIC (structured median 2.52x vs random-deep 1.27x)"
+ },
+ "phase4_compression_oracle": {
+  "corpus": "br-phono",
+  "correction_to_prereg": "I pre-registered that false-ACCEPTANCE (C) would be LARGE. MEASURED 0.42% -- it is NOT. Around gold the two-part DL is locally near-optimal (only 0.44% of all 86k single-gap moves improve it). The unsound-acceptance is therefore a GLOBAL/search phenomenon (other basins compress better), not a local one. Sharper than the prereg.",
+  "descend_from_gold": {
+   "MDLZ k=1.0": {
+    "dl_after": 295699,
+    "dl_gold": 300187,
+    "token_f_after": 0.9849
+   },
+   "MDLZ k=1.5": {
+    "dl_after": 300469,
+    "dl_gold": 305648,
+    "token_f_after": 0.9849
+   },
+   "OLD MDL (no param term)": {
+    "dl_after": 287236,
+    "dl_gold": 290396,
+    "token_f_after": 0.9842
+   }
+  },
+  "descend_from_gold_reading": "Greedy DL-descent STARTED AT GOLD still lowers DL while token F falls below 1.0, under BOTH the full Zhikov DL and the old parameter-free MDL. So gold is NOT a DL optimum and compression IS an unsound acceptor -- but the damage is small and local (0.44% of moves), not the wholesale collapse the earlier session inferred.",
+  "dl_gold": 305648,
+  "dl_nulls": {
+   "all-chars (every gap)": 490773,
+   "merged (1 token/utterance)": 562532,
+   "random @gold density": 725993
+  },
+  "false_acceptance_rate": 0.0042,
+  "false_rejection_bound": 0.05,
+  "false_rejection_rate": 0.005,
+  "gaps": 86019,
+  "global_acceptor_test": {
+   "dl_chased": 321614,
+   "dl_gold": 305648,
+   "lower_dl_than_gold": false,
+   "reading": "this search did not find a lower-DL-than-gold solution",
+   "token_f_chased": 0.7095
+  },
+  "gold_beats_all_nulls": true,
+  "kill4": "PASSES",
+  "mean_delta_removing_true_boundary": 42.377,
+  "reading": "compression is safe as a REJECTOR (filter) but must never DECIDE; the acceptor half is quantified and large, which is why grounding/active probing keeps acceptance.",
+  "true_boundaries": 23609
+ },
+ "phase5_grounded_language": {
+  "T1_committed": 10,
+  "T1_lexicon_recovered": "10/10",
+  "T1_wrong_commitments": 0,
+  "T2_in_distribution": {
+   "acc": 1.0,
+   "confab": 0,
+   "coverage": 1.0,
+   "n": 120
+  },
+  "T3_novel_composition": {
+   "acc": 1.0,
+   "confab": 0,
+   "copy_fraction": 0.075,
+   "coverage": 1.0,
+   "n": 80,
+   "retrieval_baseline": 0.5625
+  },
+  "T4_unknown_word": {
+   "confab": 0,
+   "coverage": 0.0,
+   "n": 20
+  },
+  "held_out_pair": {
+   "preds": [
+    "C3",
+    "ABOVE"
+   ],
+   "words": [
+    "vorp",
+    "traz"
+   ]
+  },
+  "honest_limits": "The compositional generalisation (T3 = 100%) comes CHEAP because the semantics is compositional BY CONSTRUCTION: each word denotes an independent predicate, so holding out a word PAIR cannot block learning either word from other contexts. This is genuine systematic generalisation but it is the easy kind. Harder, untested: context-dependent or non-compositional meanings, gradable adjectives, quantifiers, and reference resolution with more than 2 objects -- the last being where the NL/SVAMP arc actually died. Syntax is SUPPLIED (5-slot schema); only semantics is learned. World is a 6x6 closed micro-world with 10 words.",
+  "kill5": "PASSES",
+  "knockout_shuffled_scenes": {
+   "acc": 0.0,
+   "committed": 0,
+   "coverage": 0.0,
+   "exact": 0
+  },
+  "learning_curve": [
+   {
+    "N": 2,
+    "committed": 3,
+    "confab": 0,
+    "exact": 3,
+    "mean_survivors": 1.57,
+    "t3_acc": 0.0,
+    "t3_cov": 0.0,
+    "wrong": 0
+   },
+   {
+    "N": 3,
+    "committed": 4,
+    "confab": 0,
+    "exact": 4,
+    "mean_survivors": 1.5,
+    "t3_acc": 0.0,
+    "t3_cov": 0.0,
+    "wrong": 0
+   },
+   {
+    "N": 5,
+    "committed": 7,
+    "confab": 0,
+    "exact": 7,
+    "mean_survivors": 1.12,
+    "t3_acc": 0.0,
+    "t3_cov": 0.0,
+    "wrong": 0
+   },
+   {
+    "N": 8,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 12,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 35,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   },
+   {
+    "N": 120,
+    "committed": 10,
+    "confab": 0,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "t3_acc": 1.0,
+    "t3_cov": 1.0,
+    "wrong": 0
+   }
+  ],
+  "n_train": 120,
+  "soundness_across_data_sizes": {
+   "full_lexicon_at_N": 8,
+   "max_wrong_commitments": 0,
+   "reading": "at every data size the learner either commits CORRECTLY or abstains with survivors>1 -- wrong commitment never occurs, which is the sound-rejection property carried into language",
+   "total_confabulations": 0
+  }
+ },
+ "phase5b_referential_uncertainty": {
+  "ambiguity_irreducible": "every abstention checked also has >1 assignment under the TRUE hidden lexicon, so the residual ambiguity is a property of the UTTERANCE+WORLD, not a learning failure. The engine reports exactly what is unknowable and commits everywhere else -- the UNKNOWN vs UNKNOWABLE split from p8, now at the reference layer. Resolving it needs more information (a follow-up utterance / active probe), not better inference.",
+  "grid": "8x8",
+  "learning_curve_3obj": [
+   {
+    "N": 3,
+    "committed": 0,
+    "exact": 0,
+    "wrong": 0
+   },
+   {
+    "N": 5,
+    "committed": 3,
+    "exact": 3,
+    "wrong": 0
+   },
+   {
+    "N": 8,
+    "committed": 7,
+    "exact": 7,
+    "wrong": 0
+   },
+   {
+    "N": 12,
+    "committed": 8,
+    "exact": 8,
+    "wrong": 0
+   },
+   {
+    "N": 16,
+    "committed": 10,
+    "exact": 10,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "wrong": 0
+   },
+   {
+    "N": 30,
+    "committed": 10,
+    "exact": 10,
+    "wrong": 0
+   }
+  ],
+  "method": "arc consistency to a fixpoint: a meaning survives for w iff for EVERY observation there EXISTS an object assignment under which all five words can hold with surviving meanings. The true lexicon is viable under the true assignment, so the true meaning is never removed -- soundness is a theorem. Ambiguity costs COVERAGE, never correctness.",
+  "min_N_full_lexicon": 16,
+  "phase5_reference_given_N": 8,
+  "rows": [
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 3,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.9333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 3,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.9333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 150,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 3,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.9333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 4,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.7333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 4,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.7333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 150,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 4,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.7333333333333333,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 20,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 5,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.6666666666666666,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 60,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 5,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.6666666666666666,
+    "ref_wrong": 0,
+    "wrong": 0
+   },
+   {
+    "N": 150,
+    "committed": 10,
+    "exact": 10,
+    "mean_survivors": 1.0,
+    "objects": 5,
+    "ref_coverage": 1.0,
+    "ref_unique": 0.6666666666666666,
+    "ref_wrong": 0,
+    "wrong": 0
+   }
+  ],
+  "verdict": "SOUND",
+  "wrong_lexicon_commitments": 0,
+  "wrong_referent_commitments": 0
+ },
+ "phase5c_clarifying_questions": {
+  "active_advantage": 3.276,
+  "active_questions": 1.05,
+  "active_resolved": 1.0,
+  "note": "questions are generic (slot x predicate [x object]); asking 'is it pair (i,j)?' is forbidden as that would be guessing dressed as a query.",
+  "random_questions": 3.44,
+  "random_resolved": 0.79,
+  "rows": [
+   {
+    "active_q": 1.0,
+    "active_resolved": 1.0,
+    "ambiguous": 16,
+    "objects": 3,
+    "random_q": 2.4375,
+    "random_resolved": 1.0,
+    "wrong": 0
+   },
+   {
+    "active_q": 1.0731707317073171,
+    "active_resolved": 1.0,
+    "ambiguous": 41,
+    "objects": 4,
+    "random_q": 3.3902439024390243,
+    "random_resolved": 0.7804878048780488,
+    "wrong": 0
+   },
+   {
+    "active_q": 1.0465116279069768,
+    "active_resolved": 1.0,
+    "ambiguous": 43,
+    "objects": 5,
+    "random_q": 3.86046511627907,
+    "random_resolved": 0.7209302325581395,
+    "wrong": 0
+   }
+  ],
+  "verdict": "LOOP CLOSED",
+  "wrong_referent_commitments": 0
+ },
+ "phase6_noise_tolerance_sets": {
+  "cliff_exact_match_under_noise": [
+   {
+    "eps_px": 0,
+    "q": 0.06,
+    "truth_excluded": 0.9
+   },
+   {
+    "eps_px": 0,
+    "q": 0.12,
+    "truth_excluded": 0.975
+   }
+  ],
+  "collect": [
+   {
+    "confab": 0,
+    "k": 1,
+    "mean_set": 56.4,
+    "mode": "NAIVE intersect",
+    "singleton": 0.125,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 2,
+    "mean_set": 56.7,
+    "mode": "NAIVE intersect",
+    "singleton": 0.05,
+    "truth_in_set": 0.975
+   },
+   {
+    "confab": 0,
+    "k": 3,
+    "mean_set": 16.1,
+    "mode": "NAIVE intersect",
+    "singleton": 0.325,
+    "truth_in_set": 0.925
+   },
+   {
+    "confab": 0,
+    "k": 5,
+    "mean_set": 23.2,
+    "mode": "NAIVE intersect",
+    "singleton": 0.25,
+    "truth_in_set": 0.875
+   },
+   {
+    "confab": 0,
+    "k": 1,
+    "mean_set": 82.6,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.025,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 2,
+    "mean_set": 175.5,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.05,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 3,
+    "mean_set": 190.1,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "k": 5,
+    "mean_set": 225.6,
+    "mode": "CORRECTED majority-vote",
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   }
+  ],
+  "collect_eps_tracking": [
+   {
+    "confab": 0,
+    "eps": 5,
+    "k": 1,
+    "mean_agg_corruption": 1.87,
+    "mean_set": 53.3,
+    "singleton": 0.18333333333333332,
+    "truth_in_set": 0.9833333333333333
+   },
+   {
+    "confab": 0,
+    "eps": 7,
+    "k": 2,
+    "mean_agg_corruption": 0.77,
+    "mean_set": 354.6,
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps": 1,
+    "k": 3,
+    "mean_agg_corruption": 0.05,
+    "mean_set": 2.6,
+    "singleton": 0.48333333333333334,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps": 1,
+    "k": 5,
+    "mean_agg_corruption": 0.02,
+    "mean_set": 2.6,
+    "singleton": 0.5166666666666667,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps": 0,
+    "k": 7,
+    "mean_agg_corruption": 0,
+    "mean_set": 1,
+    "singleton": 1.0,
+    "truth_in_set": 1.0
+   }
+  ],
+  "collect_findings": {
+   "complete_mechanism": "aggregation lowers the EFFECTIVE corruption, so eps can shrink with k; only then does the survivor set actually shrink (a FIXED eps over a cleaner grid admits MORE latents, 82.6 -> 225.6). COLLECT therefore buys precision only when eps tracks the noise it removes.",
+   "corrected": "DENOISE FIRST by per-pixel majority vote, then apply ONE tolerance bound to the aggregate. Truth-in-set stays 1.000 at every k (0/4 exclusions).",
+   "naive_intersect": "UNSOUND -- intersecting per-observation eps-constraints is a CONJUNCTION, so P(truth survives k observations)=p^k and DECAYS: truth-in-set fell 1.000 -> 0.875 as k went 1 -> 5. More evidence made the engine reject the truth more often. Documented, not hidden.",
+   "precondition": "eps is a MODELLING INPUT (an assumed/measured bound on corruption), not an output. The OUTPUT is always a set, never a probability. Underestimate eps and the truth is rejected -- the E1 cliff."
+  },
+  "confabulations_at_honest_eps": 0,
+  "grid": "6x6",
+  "kill6": "PASSES",
+  "kill6_final": "PASSES on its stated criterion (0 confabulations anywhere). Sharper result: the mechanism is sound iff eps is a genuine bound; the OUTPUT stays a SET, never a probability; and COLLECT+aggregation reduces the noisy problem to the exact one (eps -> 0), which is the principled route across the E1 gate.",
+  "latents": 1323,
+  "mechanism": "acceptance within a SOUND tolerance bound eps, output = the eps-consistent SET (never a probability), shrunk by COLLECTing independent observations. Soundness is a theorem given eps >= corruption; the cost is abstention. Precondition: eps must bound the noise.",
+  "soundness_precision": {
+   "confabulation_committing_a_wrong_answer": "0 in EVERY cell of every arm -- the engine never lies",
+   "reading": "the two failure modes are distinct and must be scored separately. Committing a lie never happened. REJECTING THE TRUTH happens exactly when the tolerance precondition is violated -- by underestimating eps (the cliff: 90-98% exclusion at eps=0 under noise) or by estimating eps empirically (1.7%). So the rung-2 mechanism is sound ONLY with a genuine bound; empirical calibration reintroduces the E1 cliff in miniature.",
+   "truth_exclusion_rejecting_the_truth": "0 whenever eps is a GENUINE upper bound (240/240 theorem-qualifying trials). But 1.7% at k=1 when eps was ESTIMATED as the empirical max corruption of a separate sample and then applied to fresh trials: a finite-sample estimate is NOT a bound, and one fresh trial exceeded it.",
+   "why_it_still_works_at_scale": "majority-vote aggregation drives effective corruption to 0 (1.87 -> 0.00 px by k=7), at which point eps=0 is trivially a true bound: set size 1.0, singleton rate 1.00, truth always in. COLLECT converts the noise problem back into the exact rung-1 problem."
+  },
+  "sweep": [
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 1,
+    "q": 0.0,
+    "singleton": 1.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 2.7,
+    "q": 0.0,
+    "singleton": 0.55,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 49.4,
+    "q": 0.0,
+    "singleton": 0.1,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 227.6,
+    "q": 0.0,
+    "singleton": 0.0,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.325,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 0.3,
+    "q": 0.03,
+    "singleton": 0.325,
+    "truth_in_set": 0.325
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.725,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 1.1,
+    "q": 0.03,
+    "singleton": 0.6,
+    "truth_in_set": 0.725
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 23.1,
+    "q": 0.03,
+    "singleton": 0.225,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 1.0,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 118.7,
+    "q": 0.03,
+    "singleton": 0.025,
+    "truth_in_set": 1.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.125,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 0.1,
+    "q": 0.06,
+    "singleton": 0.125,
+    "truth_in_set": 0.125
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.375,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 0.8,
+    "q": 0.06,
+    "singleton": 0.225,
+    "truth_in_set": 0.375
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.9,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 8.6,
+    "q": 0.06,
+    "singleton": 0.375,
+    "truth_in_set": 0.9
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.95,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 119.8,
+    "q": 0.06,
+    "singleton": 0.0,
+    "truth_in_set": 0.95
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.0,
+    "eps_frac": 0.0,
+    "eps_px": 0,
+    "mean_set": 0,
+    "q": 0.12,
+    "singleton": 0.0,
+    "truth_in_set": 0.0
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.025,
+    "eps_frac": 0.03,
+    "eps_px": 1,
+    "mean_set": 0.0,
+    "q": 0.12,
+    "singleton": 0.025,
+    "truth_in_set": 0.025
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.525,
+    "eps_frac": 0.08,
+    "eps_px": 3,
+    "mean_set": 6.3,
+    "q": 0.12,
+    "singleton": 0.275,
+    "truth_in_set": 0.525
+   },
+   {
+    "confab": 0,
+    "eps_covers_noise": 0.775,
+    "eps_frac": 0.15,
+    "eps_px": 5,
+    "mean_set": 19.3,
+    "q": 0.12,
+    "singleton": 0.225,
+    "truth_in_set": 0.775
+   }
+  ],
+  "theorem_qualifying_trials": 240,
+  "theorem_violations": 0,
+  "trials_per_cell": 40
+ },
+ "quixbugs": {
+  "energy_ratio": 1.02,
+  "hand_energy": 21839,
+  "hand_solved": 23,
+  "n": 26,
+  "per_bug": {
+   "bitcount": {
+    "hand_evals": 12,
+    "hand_solved": true,
+    "ucb_evals": 21,
+    "ucb_solved": true
+   },
+   "bucketsort": {
+    "hand_evals": 97,
+    "hand_solved": true,
+    "ucb_evals": 106,
+    "ucb_solved": true
+   },
+   "find_first_in_sorted": {
+    "hand_evals": 9,
+    "hand_solved": true,
+    "ucb_evals": 51,
+    "ucb_solved": true
+   },
+   "find_in_sorted": {
+    "hand_evals": 484,
+    "hand_solved": true,
+    "ucb_evals": 526,
+    "ucb_solved": true
+   },
+   "flatten": {
+    "hand_evals": 1,
+    "hand_solved": true,
+    "ucb_evals": 1,
+    "ucb_solved": true
+   },
+   "gcd": {
+    "hand_evals": 1,
+    "hand_solved": true,
+    "ucb_evals": 15,
+    "ucb_solved": true
+   },
+   "get_factors": {
+    "hand_evals": 25,
+    "hand_solved": true,
+    "ucb_evals": 33,
+    "ucb_solved": true
+   },
+   "hanoi": {
+    "hand_evals": 53,
+    "hand_solved": true,
+    "ucb_evals": 67,
+    "ucb_solved": true
+   },
+   "is_valid_parenthesization": {
+    "hand_evals": 23,
+    "hand_solved": true,
+    "ucb_evals": 33,
+    "ucb_solved": true
+   },
+   "kheapsort": {
+    "hand_evals": 366,
+    "hand_solved": true,
+    "ucb_evals": 616,
+    "ucb_solved": true
+   },
+   "kth": {
+    "hand_evals": 5190,
+    "hand_solved": false,
+    "ucb_evals": 5983,
+    "ucb_solved": true
+   },
+   "lcs_length": {
+    "hand_evals": 4502,
+    "hand_solved": false,
+    "ucb_evals": 10141,
+    "ucb_solved": true
+   },
+   "lis": {
+    "hand_evals": 5128,
+    "hand_solved": true,
+    "ucb_evals": 843,
+    "ucb_solved": true
+   },
+   "max_sublist_sum": {
+    "hand_evals": 756,
+    "hand_solved": true,
+    "ucb_evals": 343,
+    "ucb_solved": true
+   },
+   "mergesort": {
+    "hand_evals": 124,
+    "hand_solved": true,
+    "ucb_evals": 148,
+    "ucb_solved": true
+   },
+   "next_palindrome": {
+    "hand_evals": 174,
+    "hand_solved": true,
+    "ucb_evals": 230,
+    "ucb_solved": true
+   },
+   "next_permutation": {
+    "hand_evals": 102,
+    "hand_solved": true,
+    "ucb_evals": 125,
+    "ucb_solved": true
+   },
+   "pascal": {
+    "hand_evals": 670,
+    "hand_solved": true,
+    "ucb_evals": 957,
+    "ucb_solved": true
+   },
+   "powerset": {
+    "hand_evals": 585,
+    "hand_solved": false,
+    "ucb_evals": 306,
+    "ucb_solved": true
+   },
+   "quicksort": {
+    "hand_evals": 66,
+    "hand_solved": true,
+    "ucb_evals": 13,
+    "ucb_solved": true
+   },
+   "rpn_eval": {
+    "hand_evals": 9,
+    "hand_solved": true,
+    "ucb_evals": 45,
+    "ucb_solved": true
+   },
+   "shunting_yard": {
+    "hand_evals": 1496,
+    "hand_solved": true,
+    "ucb_evals": 451,
+    "ucb_solved": true
+   },
+   "sieve": {
+    "hand_evals": 2,
+    "hand_solved": true,
+    "ucb_evals": 25,
+    "ucb_solved": true
+   },
+   "sqrt": {
+    "hand_evals": 549,
+    "hand_solved": true,
+    "ucb_evals": 590,
+    "ucb_solved": true
+   },
+   "to_base": {
+    "hand_evals": 57,
+    "hand_solved": true,
+    "ucb_evals": 89,
+    "ucb_solved": true
+   },
+   "wrap": {
+    "hand_evals": 1358,
+    "hand_solved": true,
+    "ucb_evals": 507,
+    "ucb_solved": true
+   }
+  },
+  "secs": 50.0,
+  "ucb_energy": 22265,
+  "ucb_solved": 26
+ },
+ "segmentation": {
+  "boundary_f": 0.857,
+  "corpus": "br-phono",
+  "gap": 0.0131,
+  "lexicon_types": 925,
+  "secs": 30.6,
+  "token_f": 0.7411,
+  "token_p": 0.7048,
+  "token_r": 0.7814,
+  "tokens": 33399,
+  "utts": 9790,
+  "zhikov_token_f": 0.7542
+ }
+}
