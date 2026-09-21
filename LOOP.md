@@ -36,7 +36,8 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 4 | ZERO-BIT OOV: an unknown word's class is a deterministic function of its own induced suffix signature and the previous class (no choice bits); the class model then gains on OOV sentences too | below | NULL (confounded): OOV effect -0.033 at 30k even with 0 choice bits; suffix ablation does not bite; BUT exchange SPENT before rare-word assignment -> ~24k once-seen words left in rank-mod-K random classes | classes unconverged -> it.5 convergence via resumable background build, then re-test OOV + F1 |
 | 5 | CONVERGENCE: a converged exchange class map (K=128, 30k sentences, built to convergence across resumable runs) raises the known-only gain to >= +0.08 and makes the OOV effect non-negative; F1 measured on it | below | SETTLED map (22 passes, 588 s, 21223 rare words placed): known-only +0.026 (FAIL), OOV effect -0.035 (FAIL), F1 +0.010 (FAIL), purity 0.750; classes are REAL (det/prep/copula/pronoun/conj cleanly separated). Post-hoc: TRAIN gain +0.100 vs held-out +0.026; sentences of 20+-count words +0.076; I(Cprev;C) 1.56 train / 1.43 held-out -> structure generalizes, ESTIMATION overfits rare words | rare words memorized from one context each -> it.6 learned UNK symbol + Witten-Bell |
 | 6 | ESTIMATION: once-seen train words collapse to one learned UNK symbol (the model learns where unknown words go, 0 choice bits, no poisoned fillers) + Witten-Bell transitions; known-only >= +0.06, OOV effect >= 0, F1 measured | below | OOV effect +0.012 = FIRST POSITIVE (learned UNK works); known-only +0.034 (FAIL); F1 +0.018 (FAIL); purity 0.820; Witten-Bell adds nothing (-0.004). CALIBRATION: a Witten-Bell WORD bigram gains -0.005 / +0.020 / +0.046 vs unigram at 30k / 100k / 300k -> the 10% bar is unreachable for ANY bigram on Wiktionary examples (independent sentences, lexical bits dominate) | corpus, not method: move to a redundant register (child-directed speech, narrative) -> it.7 |
-| 7 | REGISTER: on child-directed speech (CHILDES Brent, on disk) and narrative (Alice) the class bigram's held-out gain vs unigram reaches F1 (>= 0.10) AND beats the Witten-Bell word bigram; on Wiktionary it cannot | below | | |
+| 7 | REGISTER: on child-directed speech (CHILDES Brent, on disk) and narrative (Alice) the class bigram's held-out gain vs unigram reaches F1 (>= 0.10) AND beats the Witten-Bell word bigram; on Wiktionary it cannot | below | **PASS: Brent K=64 +0.108 vs unigram, word bigram +0.085; Alice +0.069 / +0.050; order Brent > Alice > Wiktionary holds for both models; shuffled order -0.033** | F1 MET on the acquisition register -> it.8 = F2 coverage + F3 generation judged by an independent grammar |
+| 8 | F2 + F3 on Brent: >= 0.5 held-out utterances COMMIT; realized utterances (attested skeleton, RNG over class fillers) are no more surprising to an INDEPENDENT grammar than real held-out utterances | below | | |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -308,3 +309,40 @@ Gates.
 Predictions. Brent +0.15 to +0.30 (child-directed speech is highly formulaic), word bigram +0.10 to +0.25, class
 model > word bigram by 0.02-0.08 at best K. Alice +0.04 to +0.08. If I7-a fails, the register hypothesis dies and
 the ledger's remaining candidates are context order (class trigram) and units over classes, on Brent.
+
+## ITERATION 7 -- RESULT (loop_it7_register.py, 45 s)
+Brent (7832 train / 1958 held-out utterances, V=811, UNK sentences 0.158): class bigram vs unigram K=16 +0.059,
+K=32 +0.085, **K=64 +0.108**; Witten-Bell word bigram +0.085. Alice (1110/376, UNK sentences 0.723): K=32 +0.061,
+K=64 +0.069; word bigram +0.050. **I7-a PASS (F1 reached AND class model beats the word bigram). I7-b as predicted.
+I7-c order holds for both models: class +0.108 > +0.069 > +0.018, word +0.085 > +0.050 > -0.005. I7-d shuffled order
+-0.033: collapses.** Alice purity 0.818. Brent classes (phonemic): {yu wi mam} = you/we/mom; {D&t DIs nEkst} =
+that/this/next; {D6} = the; {6 6n} = a/an; {bUk blak g3l kIti c* bebi dAk k&t &pL kQ} = book block girl kitty car
+baby duck cat apple cow; {dOgi dr&g~ d% b7 dOg bAni tEl6fon fon m(R} = doggie dragon door boy dog bunny telephone
+phone mirror; {D&ts Its D*z W*z h(z} = that's it's there's where's here's; {WAt W* hu} = what where who.
+Reading: the same mechanism that gains 1.8% on Wiktionary gains 10.8% on what a child hears. Form's compressibility
+is a property of the register; the mechanism is not the wall. The Wiktionary work stands as the negative register
+and as the place where the estimation lessons (learned UNK, zero choice bits, convergence audit) were paid for.
+
+## ITERATION 8 -- F2 coverage and F3 generation on Brent (committed before the run)
+
+F2. Fraction of held-out Brent utterances whose derivation COMMITS (every word known -> class sequence determined,
+unique by construction of a hard class map) >= 0.50. Predicted 0.84 (= 1 - UNK-sentence fraction); F2 as written is
+weak on this register and is reported as such -- it will bite when derivations are structural, not class sequences.
+F3. Generation without probabilistic output: a realized utterance = an ATTESTED skeleton (the class sequence of a
+random training utterance under grammar A) with each slot filled by RNG UNIFORMLY over that class's member types
+(form-preserving choice, the Stage 8 principle: the RNG never chooses a form the grammar has not verified). No class
+sequence is sampled from a probability model. Judge = grammar B induced on a DISJOINT part of the corpus.
+Three-way split by order: A trains on part 1 (utterances 0-40%), reference = part 2 (40-60%), B trains on part 3
+(60-100%). Score under B (class bigram + learned UNK, identity bits as before): median bits/token of 1000 realized
+utterances vs median bits/token of the part-2 reference; gate: realized median <= reference median (realized text is
+no more surprising to an independent judge than real unseen text). Also the frequency-weighted filler variant is
+reported (RNG over member types weighted by training count) since uniform-over-types deliberately favours rare
+words. Round trip: every realized utterance parses back under A to its generating class sequence (by construction
+with a hard class map; printed, not claimed as a discovery). CONFAB 0.
+Controls. (i) SHUFFLED realization: the same fillers in random order -> B's median must rise clearly above the
+reference (the judge can tell form from its absence); (ii) B applied to the same realizations must rank them above
+a RANDOM-WORD baseline of matched length.
+Audit. 15 realized Brent utterances printed with a hand transliteration key for the reader; the same procedure on
+Alice (A = ch I-V, reference VI-VII, B = VIII-XII) with 15 realized sentences printed in plain English.
+Predictions. F2 0.84. F3 uniform-filler median ABOVE the reference (rare fillers), frequency-weighted median at or
+below the reference -> gate met only in the weighted variant; recorded as such. Shuffled control clearly worse.
