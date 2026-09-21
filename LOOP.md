@@ -32,7 +32,9 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 0b | phrase-level units compress (Stage 9b) | cogs_stage9b_prereg.md | NULL: gain -0.003; units real (0.35 tokens), 64% held-out OOV, uniform code loses on known | size first -> it 1 |
 | 1 | CORPUS SIZE: OOV is a size effect; held-out gain rises with training size under the SAME code | below | NULL (confounded): OOV 0.918->0.550 monotone, gain -0.005->-0.105; budget SPENT at every size, merges=0 at 10k/30k | search does not scale (compute-bound, not data-bound); OOV still 0.55 at 30k -> it.2 factorial on code x OOV; it.3 scalable search |
 | 2 | 2x2: {uniform, adaptive} code x {OOV-neutral, OOV-by-class-conjecture}; which factor moves the held-out gain | below | LEVERS MEASURED: CODE +0.043/+0.019, OOV CONJECTURE -0.052/-0.051 (survivor sets 6-512, the choice cost eats the gain); best cell +0.027 | code has NO sequential structure -> it.3 class-bigram code + exchange induction (scales) |
-| 3 | SEQUENTIAL FORM: classes induced by the exchange algorithm under a class-bigram code; held-out code beats unigram by >= 0.10 AND beats a word-bigram control at 30k | below | | |
+| 3 | SEQUENTIAL FORM: classes induced by the exchange algorithm under a class-bigram code; held-out code beats unigram by >= 0.10 AND beats a word-bigram control at 30k | below | F1 FAIL: vs unigram -0.096 WITH conjecture, +0.012 WITHOUT; word bigram itself is -0.32 vs unigram (add-one on sparse data), so I3-c PASS is weak; exchange under-converged at 30k (SPENT, 1.3 passes) | OOV choice cost (log2 K per unknown word) is the killer again -> it.4 deterministic zero-bit OOV rule from induced suffix signature |
+| 4 | ZERO-BIT OOV: an unknown word's class is a deterministic function of its own induced suffix signature and the previous class (no choice bits); the class model then gains on OOV sentences too | below | NULL (confounded): OOV effect -0.033 at 30k even with 0 choice bits; suffix ablation does not bite; BUT exchange SPENT before rare-word assignment -> ~24k once-seen words left in rank-mod-K random classes | classes unconverged -> it.5 convergence via resumable background build, then re-test OOV + F1 |
+| 5 | CONVERGENCE: a converged exchange class map (K=128, 30k sentences, built to convergence across resumable runs) raises the known-only gain to >= +0.08 and makes the OOV effect non-negative; F1 measured on it | below | | |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -147,3 +149,78 @@ predicted narrowly PASS at K=256 with 30k sentences because word-bigram counts a
 below +0.03. I3-e 0.75-0.85. I3-f conjecture now helps (+0.01 to +0.03) because the choice costs log2 K, not
 log2(product). If I3-c fails: class-bigram generalization is not enough and the next hypothesis is class-TRIGRAM /
 units over classes, both registered here as the it.4 candidates.
+
+## ITERATION 3 -- RESULT (loop_it3_seq.py, cut by the cap at 283 s before I3-d/e/f printed; the table is complete)
+I3-a: K=V == word bigram exactly (0.0); K=1 differs from unigram by up to 5.3 bits/sentence -- an add-one smoothing
+mismatch (P(w|c) over |c| vs V+1), noted, not a bug in the gate direction. Results (gain vs unigram / vs word bigram):
+alice K=64 -0.124 with conjecture, +0.018 WITHOUT; wikt-3000 K=64 -0.195 / -0.002 without; K=256 -0.293 / -0.003;
+wikt-30000 K=64 -0.077 / +0.004 without; K=256 -0.096 / +0.012 without. **I3-b FAIL.** I3-c PASS (+0.17 to +0.19)
+but WEAK: the add-one word bigram is itself 0.20-0.32 WORSE than unigram on this held-out, so beating it says
+little; the control as registered was too easy and is recorded as such. Exchange: 3000 converges (6156 moves,
+21 s); 30000 SPENT after pass 0 + part of pass 1 (11420 + 409 moves), so the 30k classes are under-converged.
+**Third OOV null, now diagnosed exactly: the conjecture pays log2 K = 6-8 bits PER unknown word for its class
+choice; with 0.55-0.82 of held-out sentences carrying 1-3 unknown words this alone is -10% to -30%.** Sequential
+form on known sentences is real but small (+0.01 to +0.02 overall, i.e. roughly +0.03 on the known 45%).
+
+## ITERATION 4 -- ZERO-BIT OOV by induced suffix signature (committed before the run)
+
+Hypothesis. The class of an unknown word can be a DETERMINISTIC function of information the decoder already has --
+the word's own letters and the previous class -- so it costs 0 bits of choice, and the class model then extends its
+sequential gain to OOV sentences instead of paying for them. The function is INDUCED from train: for each suffix of
+length 1..4 that occurs on >= 5 distinct train word types, the class distribution of those types; an unknown word
+takes argmax over classes of P(c | longest attested suffix) * P(c | prev class); no attested suffix -> argmax
+P(c | prev) alone. No suffix, class or word is authored; the table is read off the induced classes.
+
+Mechanism. core.seqform.ClassBigram + a SuffixTable built from (word type, class) pairs on train; `sentence(...,
+oov='suffix')`. Classes induced as in it.3 with K=64 (converges inside the budget at 30k: 79 s) -- K=64 is chosen
+for convergence, declared. The unknown word's identity is still paid at the unigram-unknown cost (as the unigram
+baseline pays it): only the CHOICE cost changes, from log2 K to 0.
+Gates.
+  I4-a  OOV effect: gain(suffix rule) - gain(no conjecture) >= 0 on wikt-30000 (the it.2/it.3 nulls must not
+        repeat); reported per corpus.
+  I4-b  F1 at wikt-30000 K=64: gain vs unigram >= +0.10.
+  I4-c  KNOWN-ONLY gain (sentences with every word known) reported beside the total, so the sequential gain is
+        visible independent of OOV.
+  I4-d  suffix ablation: the same rule with the suffix table SHUFFLED across suffixes (K1-style) must lose the
+        suffix contribution (gain falls toward the prev-only rule).
+  I4-e  K1 shuffled word order at 3000 (from it.3, unprinted): reported.
+Predictions. I4-a +0.02 to +0.05 (the choice cost is gone; suffix classes for -ly/-ed/-ing/-s type words are
+cheap transitions). I4-b still FAIL (predicted total +0.03 to +0.06): the honest expectation is that F1 at 10%
+needs a converged K=256 model AND a longer context (class trigram or units), which are it.5 candidates. Known-only
+gain +0.03 to +0.05.
+
+## ITERATION 4 -- RESULT (loop_it4_oov.py, 179 s)
+alice: no-conj +0.018, prev-only -0.034, suffix -0.034, KNOWN-ONLY +0.061. wikt-3000: -0.002 / -0.085 / -0.084,
+known-only -0.016. wikt-30000: no-conj +0.004, prev-only -0.028, SUFFIX -0.029, shuffled table -0.029, known-only
++0.010. **I4-a FAIL (fourth OOV null), I4-b FAIL, I4-d ablation does NOT bite.** Diagnosis from the audit, not
+from the gates: the suffix table's top class for "-s" holds only 640 of 7110 types and the same class 37 tops
+"-s", "-e", "-n", "-y" -- the class map is near-random over rare words. Cause: at 30k the exchange budget was SPENT
+(104 s) inside the frequent-word passes, so the rare-word assignment step never ran and ~24k once-seen words stayed
+at their initialization (frequency rank mod K = arbitrary). That poisons P(w|c) for every class, the suffix table,
+and the transitions around unknown words. So it.3 and it.4 both measured an UNCONVERGED class map at 30k; alice
+(converged, 5 s) is the only clean point and there the known-only gain is +0.061. The OOV rule is untested until
+the classes are converged. Zero choice bits was correct and stays.
+
+## ITERATION 5 -- CONVERGENCE (committed before the run)
+
+Hypothesis. The exchange objective is right and the budget was the wall: a class map run to CONVERGENCE at 30k
+(K=128; all frequent words exchanged until no move, all rare words assigned) raises the known-only gain to at least
++0.08, and with converged classes the zero-bit OOV rule stops hurting (effect >= 0), so the total gain approaches F1.
+
+Engineering, declared. Induction is a resumable BUILD: `loop_it5_build.py` loads the class map from
+_nldata/classes_wikt30k_K128.json if present, runs exchange passes, checkpoints after every pass, and exits at
+convergence or after its own time slice. It is invoked as many times as needed in the background (each slice under
+the 10-minute tool cap; the standing rule allows backgrounded builds -- walios precedent). The TEST (`loop_it5_eval.py`)
+loads the converged map and runs inside the 5-minute cap. Convergence = a pass with 0 moves among words with count
+>= 2, then one assignment pass over count-1 words. Number of passes and total build seconds are printed.
+Gates.
+  I5-a  convergence reached (0-move pass) -- printed with pass count; if not reached within 6 slices, the map is
+        used as-is and the run is marked UNCONVERGED.
+  I5-b  KNOWN-ONLY gain vs unigram on wikt held-out >= +0.08.
+  I5-c  OOV effect (prev-only rule - no-conjecture) >= 0; suffix rule reported beside it, with the shuffled-table
+        ablation, which must now bite (real > shuffled by >= 0.005) or the suffix signal is null for this K.
+  I5-d  F1: total gain vs unigram >= +0.10 -> PASS; else the number is the honest ceiling of a class BIGRAM at 30k
+        and it.6 is a longer context (class trigram) or units over classes, both already named.
+  I5-e  POS purity vs WordNet on the converged map (report; predicted 0.80+ now that rare words are placed).
+Predictions. I5-a in 4-8 passes. I5-b +0.08 to +0.14. I5-c prev-only effect +0.00 to +0.03; suffix adds +0.005 to
++0.02 and the ablation bites. I5-d total +0.05 to +0.10: borderline. Purity 0.80-0.88.
