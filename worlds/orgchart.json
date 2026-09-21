@@ -1,0 +1,30 @@
+{
+  "collections": {
+    "employees": {
+      "headers": ["employee", "department", "manager", "salary", "start"],
+      "rows": [
+        ["alice", "engineering", "bob", 120, 2015],
+        ["bob", "engineering", "carol", 150, 2010],
+        ["carol", "research", "dave", 200, 2008],
+        ["dave", "research", "dave", 300, 2005],
+        ["erin", "sales", "frank", 90, 2018],
+        ["frank", "sales", "dave", 130, 2009],
+        ["grace", "marketing", "frank", 95, 2016],
+        ["heidi", "support", "grace", 70, 2019],
+        ["ivan", "support", "grace", 75, 2020],
+        ["judy", "research", "dave", 140, 2012],
+        ["ken", "engineering", "bob", 110, 2017]
+      ]
+    },
+    "departments": {
+      "headers": ["department", "floor", "city"],
+      "rows": [
+        ["engineering", 3, "paris"],
+        ["sales", 1, "rome"],
+        ["marketing", 2, "madrid"],
+        ["support", 1, "lisbon"],
+        ["research", 4, "berlin"]
+      ]
+    }
+  }
+}

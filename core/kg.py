@@ -63,8 +63,9 @@ class KGWorld:
     content_kinds = {"P"}          # a property word the answer did not use -> PARTIAL (A8)
     attributed = True
 
-    def __init__(self, source, df=None, max_ent=8):
-        self.source, self.df, self.max_ent = source, df, max_ent
+    def __init__(self, source, df=None, max_ent=8, name=None):
+        self.source, self.df, self.max_ent = source, df, max_ent; self.name = name or "kg"; self.rank = {}
+        self._ent, self._prop = {}, {}                  # per-span memo over the source (the source parses JSON on every call)
 
     def readings(self, syms):
         df, source = self.df, self.source
@@ -75,11 +76,23 @@ class KGWorld:
         for i, j, text in spans(syms):
             hi = lambda k: med is not None and df(syms[k]) > med
             edged = med is not None and (hi(i) or hi(j - 1))
-            props = [] if (edged and j - i == 1) else list(source.properties(text))
+            if text not in self._prop: self._prop[text] = list(source.properties(text))
+            props = [] if (edged and j - i == 1) else self._prop[text]
             for pid, lab, *_ in props: out.append((i, j, "P", pid, lab))
             if edged or props: continue
-            for qid, lab, desc in source.entities(text)[:self.max_ent]: out.append((i, j, "E", qid, lab))
+            if text not in self._ent: self._ent[text] = source.entities(text)[:self.max_ent]
+            for pos, (qid, lab, desc) in enumerate(self._ent[text]):
+                out.append((i, j, "E", qid, lab)); self.rank.setdefault(qid, pos)
         return out
+
+    def rank_key(self, st):
+        """at equal coverage, the source's own search order decides between same-named entities (its ordering, not ours)."""
+        return -sum(self.rank.get(r[3], 0) for r in st[1])
+
+    def value_reading(self, v):
+        return ("E", v) if isinstance(v, str) and v[:1] == "Q" and self.source.label(v) != v else None
+
+    def owns(self, r): return r[2] in ("E", "P")
 
     def structures(self, rd):
         ents = [r for r in rd if r[2] == "E"]; props = [r for r in rd if r[2] == "P"]
@@ -104,6 +117,8 @@ class KGWorld:
     def spans_of(self, st): return [(r[0], r[1]) for r in st[1] + st[2]]
 
     def key(self, st): return (st[0], tuple(r[3] for r in st[1]), tuple(r[3] for r in st[2]))
+
+    def shape(self, st): return (st[0], tuple(r[3] for r in st[2]))          # the structure with its entities abstracted
 
     def _result(self, st):
         kind, es, ps = st; src = self.source; e = es[0][3]
@@ -140,6 +155,8 @@ class KGWorld:
         return (w[-1][2], w) if w else None
 
     def label(self, v): return self.source.label(v)
+
+    def labelled(self, v): return self.source.label(v) != v
 
     def consulted(self): return self.source.consulted()
 

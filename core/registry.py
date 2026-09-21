@@ -62,6 +62,8 @@ PUBLISHED = {
     "tables_numbers": ["TABLES AND NUMBERS: PASS", "CONFAB on held-out: 0"],
     # ---- F4: replies realized from epistemic frames over the unified loop (f4_prereg.md); uses the offline Wikidata cache
     "f4_dialogue": ["F4 EPISTEMIC FRAMES: PASS", "BARE ABSTAIN: 0"],
+    # ---- general (general_prereg.md): worlds as data, composition across worlds, library in the loop, turns, research
+    "worlds_general": ["GENERAL WORLDS: PASS", "TOTAL CONFAB: 0"],
 }
 
 

@@ -482,3 +482,24 @@ loop iterations and Stages 9/9b are recorded nulls in LOOP.md and their preregs;
 Rules that paid for themselves today: audit convergence before reading a gate; a control that also fails is
 uninformative; every OOV path costs zero choice bits; a word naming a relation is not a thing; relations need direct
 edges; an unused reading is PARTIAL, never a sub-answer; a teaching example that does not discriminate does not teach.
+
+## 2026-09-22 -- worlds as data, composition across worlds, the library in the loop, turns, research (general_prereg.md)
+`core/reason.py` takes a LIST of worlds: every world reads the same symbols, each structure is evaluated by the world
+that afforded it, and one PIPE step substitutes a survivor's label into the question for one more pass over the OTHER
+worlds (a composite's spans map back, its certificates are the union, its support lists both halves). Ranking:
+distinct coverage, a computed value over a quoted text, fewer explicit spans, specificity, the world's own structural
+key, recency of context. `core/table.py` is now RECORDS: collections whose reference fields are induced from the data
+(a field is a reference iff all its values are keys elsewhere), hops in both nesting orders, a collection-name reading,
+the flat table as the no-reference case (tables_numbers 30/30 unchanged). The fourth domain `worlds/orgchart.json` is
+one JSON file plus teaching pairs and no code (W1-c). `core/exec.py` is the executable world: numbers, operator words
+bound by elimination (`core/induce.py`, shared with tables) or by SEARCH over primitives + a LIBRARY of learned
+compositions (wake), with `compress_recurring` as sleep; the blind arm exhausts the cap on the tier-3 word, the library
+arm binds it in 308 evaluations. `core/session.py`: context = the previous turns' answer values and used readings,
+offered as virtual readings at zero coverage (a world gets its own readings back verbatim); a READINGS choice binds a
+SHAPE; teaching accumulates. `core/gloss.py` emits an UNKNOWN reading for a symbol no dictionary has, so ignoring it
+is PARTIAL; `frames.py` holds `to_frame` (moved out of f4_dialogue) and renders a quoted-only PARTIAL as PROPOSE
+naming every world's sources. Gate: `worlds_general.py` (W1 20/20, W2 10/10, W3, W4 12/12, W5 4 sources, CONFAB 0),
+every gate carrying the arm that reproduces HEAD's behaviour, loaded from git. Rules that paid for themselves: count
+distinct positions; a question one world answers by coincidence does not test composition; a name for an operator is
+a function (inconsistent examples are never searched); purity is over ALL teaching or a filler gets bound; hand a
+world its own readings back, never a label to re-search.

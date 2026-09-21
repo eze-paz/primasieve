@@ -12,7 +12,7 @@ from core.table import TableWorld
 from core.gloss import GlossWorld
 from core.verdict import ATTRIBUTED, COMMIT
 from core.registry import selfcheck
-from frames import realize, parse, canonical, ANSWER, READ, PART, FOUND, PROPOSE
+from frames import realize, parse, canonical, to_frame, ANSWER, READ, PART, FOUND, PROPOSE
 from kb_wikidata import Wikidata
 import kg_multihop as KG
 import tables_numbers as TN
@@ -21,41 +21,6 @@ T0 = time.time()
 
 
 def say(s=""): print(s.encode("ascii", "replace").decode(), flush=True)
-
-
-def to_frame(fr, world, kind_hint):
-    """core result -> one of the five frames (the chat layer's decision, deterministic)."""
-    k = fr["kind"]
-    lab = world.label if hasattr(world, "label") else str
-
-    def sup_str(sup):
-        if isinstance(sup, list) and sup and isinstance(sup[0], tuple) and len(sup[0]) == 3 and all(isinstance(x, str) and x[:1] in "QP" for x in sup[0]):
-            return " -> ".join(f"{lab(s)} -{lab(p)}-> {lab(o)}" for s, p, o in sup)
-        if isinstance(sup, list) and sup and isinstance(sup[0], tuple) and len(sup[0]) == 3:
-            return ", ".join(f"row {r} {h}={v}" for r, h, v in sup[:6]) + (f", +{len(sup)-6} cells" if len(sup) > 6 else "")
-        if isinstance(sup, list) and sup and isinstance(sup[0], tuple) and len(sup[0]) == 2:
-            return ", ".join(f"{a} in {b}" for a, b in sup)
-        return str(sup)
-
-    if k in (ATTRIBUTED, COMMIT):
-        if kind_hint == "gloss":
-            return dict(kind=FOUND, quotes=[(str(v), str(sups[0][0][1]) if sups and sups[0] else "source") for v, l, sups, certs, st in fr["answers"]])
-        sources = ["Wikidata"] if kind_hint == "kg" else ["the table"]      # provenance label for the reader; certificates stay in the frame's support
-        return dict(kind=ANSWER, values=[str(l) for _, l, _, _, _ in fr["answers"]],
-                    supports=[sup_str(s) for _, _, sups, _, _ in fr["answers"] for s in sups[:1]], sources=sources)
-    if k == READINGS:
-        opts = [(str(l), sup_str(sups[0])) for _, l, sups, _, _ in fr["answers"]]
-        return dict(kind=READ, options=opts, split="one of: " + " / ".join(o[0] for o in opts))
-    if k == PARTIAL:
-        return dict(kind=PART, values=[str(l) for _, l, _, _, _ in fr["answers"]],
-                    supports=[sup_str(s) for _, _, sups, _, _ in fr["answers"] for s in sups[:1]], missing=[str(m) for m in fr["missing"]])
-    if k == WEAK:
-        v, l, w = fr["weak"]
-        return dict(kind=PROPOSE, consulted=[f"weak connection {sup_str(w)}"], action="confirm that a 2-step connection counts as the relation you meant")
-    ents = sorted({r[4] for r in fr["readings"] if r[2] in ("E", "C", "F", "G")})[:5]; props = sorted({r[4] for r in fr["readings"] if r[2] in ("P", "O")})[:5]
-    consulted = [f"readings {', '.join(ents) or 'none'}"] + ([f"relations {', '.join(props)}"] if props else [])
-    action = "name the thing you mean, or give a source that has it" if not ents else "check the name, or supply a table or source holding it"
-    return dict(kind=PROPOSE, consulted=consulted, action=action)
 
 
 class DictSources:
