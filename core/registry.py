@@ -54,6 +54,8 @@ PUBLISHED = {
                     "collision under ablation: none", "held-out truth accuracy WITH the extension: 1.000"],
     "cogs_stage7": ["STAGE 7 COMPOSED GROWTH LOOP: PASS", "first-growth collision"],
     "cogs_stage8": ["STAGE 8 MEANING-FIRST FLUENT REALIZATION: PASS", "CONFABULATION 0/1800"],
+    # ---- Stage 9: FORM from raw text -- registered NULL (whole-sentence skeletons memorize; see cogs_stage9_prereg.md)
+    "cogs_stage9": ["STAGE 9 FORM FROM RAW TEXT: NULL", "CONTROL DISCRIMINATES"],
 }
 
 

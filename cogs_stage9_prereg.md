@@ -114,3 +114,22 @@ A pass means the REALIZATION side of Stage 8 no longer depends on paired supervi
 markers and synonym classes come from text plus attributed dictionaries. The engine can then verbalize a
 structure using forms it read, not forms it was given. It does NOT mean the engine can parse an arbitrary prompt
 to meaning; that needs the provenance store and a grounded domain, which are the next two pre-registrations.
+
+## RESULT (2026-09-21, run after registration; numbers from `python cogs_stage9.py`, 13 s)
+
+**NULL, as pre-committed in "What would make this a KILL".** G9a 782/782 reproduced; G9b held-out MDL gain +0.002
+vs unigram (gate +0.100), grammar 17772 bits vs memory 17769: the grammar IS memory. Coverage 0.011 (predicted
+0.25-0.50: a miss). 744 skeletons for 782 train sentences; MDL merging took K 1042 -> 773 and stopped: with
+whole-sentence skeletons a merge almost never collapses two skeletons, so the filler cost always wins.
+G9c 1000/1000, G9d 200/200 -- BY CONSTRUCTION under a hard class map; the predicted agreement failure was wrong
+about this design (recorded as a miss, not a pass). G9e POS purity 0.900 (bar 0.70 met): the classes that did
+form are real word classes. G9f 13 dictionary candidates, 0 accepted (every pair split across classes -- the
+form test is not vacuous, but classes are too fine to accept any synonym). K1 shuffled order also fails G9b
+(+0.001) -- but a control that fails when the treatment also fails proves nothing about discrimination; K4
+noted. K2 shuffled dictionary 0 candidates. K3: RANDOM merge order reached LOWER DL (66999) than similar-first
+(72263) -- the similarity ranking restricted the search more than it guided it.
+
+**Diagnosis (named, not patched):** a whole-sentence skeleton is the wrong unit. Form compresses a corpus only
+when sub-sentence units (phrases) recur across sentences and compose; here nothing recurs at sentence length.
+The next degree is COMPOSITIONAL skeletons -- recurring class sub-sequences adopted as units under the same MDL
+code, so one merge saves bits in many sentences. That needs its own pre-registration; this one is closed NULL.
