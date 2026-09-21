@@ -38,7 +38,7 @@ if __name__ == "__main__":
         meta["passes"] += 1; meta["secs"] += time.time() - tp; meta["moves"].append(moves)
         save_classes(m, PATH); json.dump(meta, open(META, "w"))
         print(f"  pass {meta['passes']}: {moves} moves of {len(words)} frequent words ({time.time()-tp:.0f}s)", flush=True)
-        if moves == 0:
+        if moves <= 0.01 * len(words):        # settled: < 1% of frequent words still moving (amended, LOOP.md it.5)
             tp = time.time(); assigned = 0
             for w in rare:
                 a = m.cls[w]; best = (1e-9, a)
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             meta["secs"] += time.time() - tp; meta["converged"] = True; meta["rare_assigned"] = assigned
             save_classes(m, PATH); json.dump(meta, open(META, "w"))
             print(f"  rare words: {assigned} of {len(rare)} moved ({time.time()-tp:.0f}s)")
-            print(f"CONVERGED after {meta['passes']} passes, {meta['secs']:.0f}s total build time")
+            print(f"CONVERGED (settled, last pass {moves} moves) after {meta['passes']} passes, {meta['secs']:.0f}s total build time")
             break
     else:
         print(f"slice over after {meta['passes']} passes ({meta['secs']:.0f}s total); re-invoke to continue")

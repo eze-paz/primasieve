@@ -240,3 +240,53 @@ def load_classes(m, path):
     m.cls = {w: int(c) for w, c in d["cls"].items()}
     m._rebuild()
     return True
+
+
+# ================================================================ it.6: learned UNK symbol + Witten-Bell transitions
+UNK = "\x00unk"      # a symbol no corpus word can equal (contains a control character)
+
+
+def unkify(train, min_count=2):
+    """collapse every word with corpus count < min_count into UNK. -> (train', vocabulary set of kept words,
+    number of rare TYPES collapsed). The same map must be applied to held-out text (unseen words -> UNK)."""
+    wc = collections.Counter(w for s in train for w in s)
+    keep = {w for w, n in wc.items() if n >= min_count}
+    out = [[w if w in keep else UNK for w in s] for s in train]
+    return out, keep, len(wc) - len(keep)
+
+
+def apply_unk(sents, keep): return [[w if w in keep else UNK for w in s] for s in sents]
+
+
+class ClassBigramWB(ClassBigram):
+    """ClassBigram with Witten-Bell smoothing on transitions: P(c|a) = (N(a,c) + T(a) * P_bg(c)) / (N(a) + T(a)),
+    T(a) = number of distinct classes seen after a, P_bg(c) = (N(c)+1)/(N+K+1). Fillers stay add-one.
+    `identity_bits` = the cost of naming which unseen word an UNK token is; paid identically by the unigram baseline."""
+
+    def __init__(self, train, K, identity_bits=0.0):
+        super().__init__(train, K)
+        self.identity_bits = identity_bits
+        self._wb_ready = False
+
+    def _wb_tables(self):
+        self.T = collections.Counter()
+        for (a, c), n in self.cb.items():
+            if n > 0: self.T[a] += 1
+        tot = sum(self.nr.values())
+        self.bg = {c: (self.nr[c] + 1) / (tot + self.K + 1) for c in list(range(self.K)) + [B]}
+        self._wb_ready = True
+
+    def p_cc(self, a, b):
+        if not self._wb_ready: self._wb_tables()
+        Ta = self.T[a]
+        return (self.cb[(a, b)] + Ta * self.bg.get(b, 1 / (self.K + 1))) / (self.nl[a] + Ta) if (self.nl[a] + Ta) > 0 else 1 / (self.K + 1)
+
+    def sentence(self, s, conjecture=True):
+        """UNK is an ordinary word here; every UNK token additionally pays identity_bits (as the baseline does)."""
+        s = tuple(s)
+        bits, state = super().sentence(s, conjecture=True)
+        n_unk = sum(1 for w in s if w == UNK)
+        return bits + n_unk * self.identity_bits, (CONJECTURED if n_unk else COMMIT)
+
+    def unigram(self, s):
+        return super().unigram(s) + sum(1 for w in s if w == UNK) * self.identity_bits

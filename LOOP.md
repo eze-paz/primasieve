@@ -34,7 +34,8 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 2 | 2x2: {uniform, adaptive} code x {OOV-neutral, OOV-by-class-conjecture}; which factor moves the held-out gain | below | LEVERS MEASURED: CODE +0.043/+0.019, OOV CONJECTURE -0.052/-0.051 (survivor sets 6-512, the choice cost eats the gain); best cell +0.027 | code has NO sequential structure -> it.3 class-bigram code + exchange induction (scales) |
 | 3 | SEQUENTIAL FORM: classes induced by the exchange algorithm under a class-bigram code; held-out code beats unigram by >= 0.10 AND beats a word-bigram control at 30k | below | F1 FAIL: vs unigram -0.096 WITH conjecture, +0.012 WITHOUT; word bigram itself is -0.32 vs unigram (add-one on sparse data), so I3-c PASS is weak; exchange under-converged at 30k (SPENT, 1.3 passes) | OOV choice cost (log2 K per unknown word) is the killer again -> it.4 deterministic zero-bit OOV rule from induced suffix signature |
 | 4 | ZERO-BIT OOV: an unknown word's class is a deterministic function of its own induced suffix signature and the previous class (no choice bits); the class model then gains on OOV sentences too | below | NULL (confounded): OOV effect -0.033 at 30k even with 0 choice bits; suffix ablation does not bite; BUT exchange SPENT before rare-word assignment -> ~24k once-seen words left in rank-mod-K random classes | classes unconverged -> it.5 convergence via resumable background build, then re-test OOV + F1 |
-| 5 | CONVERGENCE: a converged exchange class map (K=128, 30k sentences, built to convergence across resumable runs) raises the known-only gain to >= +0.08 and makes the OOV effect non-negative; F1 measured on it | below | | |
+| 5 | CONVERGENCE: a converged exchange class map (K=128, 30k sentences, built to convergence across resumable runs) raises the known-only gain to >= +0.08 and makes the OOV effect non-negative; F1 measured on it | below | SETTLED map (22 passes, 588 s, 21223 rare words placed): known-only +0.026 (FAIL), OOV effect -0.035 (FAIL), F1 +0.010 (FAIL), purity 0.750; classes are REAL (det/prep/copula/pronoun/conj cleanly separated). Post-hoc: TRAIN gain +0.100 vs held-out +0.026; sentences of 20+-count words +0.076; I(Cprev;C) 1.56 train / 1.43 held-out -> structure generalizes, ESTIMATION overfits rare words | rare words memorized from one context each -> it.6 learned UNK symbol + Witten-Bell |
+| 6 | ESTIMATION: once-seen train words collapse to one learned UNK symbol (the model learns where unknown words go, 0 choice bits, no poisoned fillers) + Witten-Bell transitions; known-only >= +0.06, OOV effect >= 0, F1 measured | below | | |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -224,3 +225,46 @@ Gates.
   I5-e  POS purity vs WordNet on the converged map (report; predicted 0.80+ now that rare words are placed).
 Predictions. I5-a in 4-8 passes. I5-b +0.08 to +0.14. I5-c prev-only effect +0.00 to +0.03; suffix adds +0.005 to
 +0.02 and the ablation bites. I5-d total +0.05 to +0.10: borderline. Purity 0.80-0.88.
+
+it.5 AMENDMENT (during the build, before the registered evaluation): the exchange move count plateaus at ~250-300
+of 12k frequent words (passes 9-11: 328, 244, 291) -- greedy exchange oscillates and may never reach exactly 0.
+Convergence is redefined as SETTLED: a pass moving <= 1% of frequent words, after which the rare-word assignment
+runs once. Engineering, not a gate. Interim read at pass 5 (unregistered, rare words UNPLACED): known-only +0.028,
+total +0.011, purity 0.722, OOV effect -0.035.
+
+## ITERATION 5 -- RESULT (loop_it5_build.py x2 + loop_it5_eval.py; build 588 s in two slices, eval 167 s)
+Settled at pass 22 (24 moves of 11962), 21223 of 24495 once-seen words placed. **I5-b FAIL known-only +0.026;
+I5-c FAIL OOV effect -0.035, suffix ablation does not bite (top-class share per suffix 0.03-0.06: suffixes do not
+predict class at K=128 when rare words are placed by one context each); I5-d FAIL F1 +0.010; I5-e purity 0.750.**
+The classes are the best evidence so far that form IS being learned: class 21 = the his my your their our these
+its thy every; 16 = in for with on from at by about into after; 12 = is s was has does makes looks hath became; 35 =
+it he she there who someone everyone; 15 = and or than thou nor; 58 = but so when now if then how why where.
+POST-HOC (diagnostic): train-sample gain +0.100 vs held-out known-only +0.026 -- OVERFIT; by minimum word count in
+the sentence: [1,2) +0.007, [2,5) +0.019, [5,20) +0.027, [20,inf) +0.076. I(Cprev;C) = 1.56 bits/token on train,
+1.43 on held-out: the sequential structure generalizes almost fully. Bits/token on known held-out: unigram 11.41;
+class bigram 11.12 = transitions 6.16 + fillers 4.37. Implied H(C) = 7.04, so the ideal H(C|Cprev) = 5.61 and the
+transition estimate loses 0.55 bits/token to add-one smoothing over K; the ceiling of THIS K is I/H(W) = 12.5%,
+reached only with perfect estimation. Two estimation faults, both fixable without touching the structure:
+(1) once-seen words are placed from ONE context and then coded as if their class were known -- memorization;
+(2) add-one over K on sparse transition rows.
+
+## ITERATION 6 -- ESTIMATION: learned UNK + Witten-Bell (committed before the run)
+
+Hypothesis. The it.5 gap is estimation, not structure. (U) Collapsing every training word with count < 2 into ONE
+symbol lets the exchange learn the CLASS BEHAVIOUR of rare words from ~24k contexts instead of memorizing each; an
+unseen held-out word maps to that symbol, so its transitions are learned, its choice costs 0 bits, and only its
+identity is paid (as the unigram baseline pays it). (W) Witten-Bell smoothing on P(c|prev) recovers most of the
+0.55 bits/token lost to add-one over K. Declared: both models (class and unigram baseline) use the SAME alphabet
+(rare train words -> UNK, unknown identity = log2(#rare types + 1) bits paid by both); the unigram baseline keeps
+add-one; the class model uses Witten-Bell on transitions only, add-one on fillers. Structure unchanged: class
+bigram, K=128, exchange to settled, 30k sentences.
+Gates.
+  I6-a  KNOWN-ONLY gain (sentences with no UNK) >= +0.06.
+  I6-b  OOV EFFECT: gain on UNK-bearing held-out sentences vs the unigram baseline on the same sentences >= 0
+        (fifth attempt at OOV, first with a LEARNED unknown class).
+  I6-c  F1 total >= +0.10; else the total is the class-bigram ceiling at this K and it.7 is the class TRIGRAM on
+        the same map (already named).
+  I6-d  ablations: (i) UNK without Witten-Bell, (ii) Witten-Bell without UNK -- each factor's contribution printed.
+  I6-e  purity on frequent words (report).
+Predictions. I6-a +0.06 to +0.09. I6-b +0.01 to +0.04 (flips positive). I6-c total +0.04 to +0.08: FAIL predicted,
+with the class trigram registered as the structural step that follows.
