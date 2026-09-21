@@ -61,6 +61,8 @@ PUBLISHED = {
     # ---- the fluency loop (LOOP.md): F1 met on child-directed speech; form-only generation closed at the novelty frontier
     "loop_it7_register": ["LOOP IT.7 REGISTER: PASS", "[holds]"],
     "loop_it11_trigram": ["LOOP IT.11 TRIGRAM CONSTRAINT: PARTIAL"],
+    # ---- KG multi-hop over Wikidata with cited edges (kg_multihop_prereg.md): run 4, CONFAB 0, 25/40 (needs network or cache)
+    "kg_multihop": ["CONFAB (wrong value answered): 0", "certificates on emitted answers: 26/26"],
 }
 
 
