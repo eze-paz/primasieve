@@ -291,3 +291,43 @@ class ClassBigramWB(ClassBigram):
 
     def unigram(self, s):
         return super().unigram(s) + sum(1 for w in s if w == UNK) * self.identity_bits
+
+# ================================================================ raw-text SEGMENTATION and context SIGNATURES (from the
+# retired core/form.py; the Stage 9/9b MDL grammars were registered nulls and live in their preregs, not here)
+import unicodedata
+from .resolve import segment
+
+BOUND = ("<",)      # boundary pseudo-symbol in signatures; a tuple so it can never equal a corpus word
+
+
+def sentences(text, lo=2, hi=12):
+    """raw text -> list of sentences (lists of lower-cased letter symbols) with lo <= len <= hi.
+    Boundary rule: after a punctuation symbol (category P*), when the next letter symbol starts with Lu."""
+    syms = segment(text)
+    out, cur, pend = [], [], False
+    for s in syms:
+        cat = unicodedata.category(s[0])
+        if cat[0] == "L":
+            if pend and cat == "Lu" and cur:
+                out.append(cur); cur = []
+            pend = False
+            cur.append(s.lower())
+        elif cat[0] == "P":
+            pend = True
+    if cur: out.append(cur)
+    return [s for s in out if lo <= len(s) <= hi]
+
+
+
+
+def signatures(train):
+    """word -> Counter of (side, neighbour) over the corpus, boundary included."""
+    sig = collections.defaultdict(collections.Counter)
+    for s in train:
+        padded = (BOUND,) + tuple(s) + (BOUND,)
+        for i in range(1, len(padded) - 1):
+            sig[padded[i]][(0, padded[i - 1])] += 1
+            sig[padded[i]][(1, padded[i + 1])] += 1
+    return sig
+
+

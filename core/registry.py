@@ -54,13 +54,8 @@ PUBLISHED = {
                     "collision under ablation: none", "held-out truth accuracy WITH the extension: 1.000"],
     "cogs_stage7": ["STAGE 7 COMPOSED GROWTH LOOP: PASS", "first-growth collision"],
     "cogs_stage8": ["STAGE 8 MEANING-FIRST FLUENT REALIZATION: PASS", "CONFABULATION 0/1800"],
-    # ---- Stage 9: FORM from raw text -- registered NULL (whole-sentence skeletons memorize; see cogs_stage9_prereg.md)
-    "cogs_stage9": ["STAGE 9 FORM FROM RAW TEXT: NULL", "CONTROL DISCRIMINATES"],
-    # ---- Stage 9b: compositional form -- registered NULL (64% held-out OOV; uniform symbol code loses to unigram on known)
-    "cogs_stage9b": ["STAGE 9b COMPOSITIONAL FORM: NULL", "CONFAB 0"],
-    # ---- the fluency loop (LOOP.md): F1 met on child-directed speech; form-only generation closed at the novelty frontier
-    "loop_it7_register": ["LOOP IT.7 REGISTER: PASS", "[holds]"],
-    "loop_it11_trigram": ["LOOP IT.11 TRIGRAM CONSTRAINT: PARTIAL"],
+    # ---- the fluency loop's FORM line (LOOP.md): F1 met on child-directed speech; realization closed at the novelty frontier
+    "fluency_form": ["LOOP IT.7 REGISTER: PASS", "[holds]", "LOOP IT.11 TRIGRAM CONSTRAINT: PARTIAL"],
     # ---- KG multi-hop over Wikidata with cited edges (kg_multihop_prereg.md): run 4, CONFAB 0, 25/40 (needs network or cache)
     "kg_multihop": ["CONFAB (wrong value answered): 0", "KG MULTI-HOP: PASS"],
     # ---- tables and numbers (tables_numbers_prereg.md): induced operator lexicon, exact arithmetic, run 6

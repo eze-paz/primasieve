@@ -1,10 +1,10 @@
 """Build the raw-text corpus for the fluency loop from Wiktionary usage examples already on disk.
-kaikki_all.sqlite `ex` -> one sentence per line, segmented by core.form.sentences (2..12 symbols), shuffled with a
+kaikki_all.sqlite `ex` -> one sentence per line, segmented by core.seqform.sentences (2..12 symbols), shuffled with a
 fixed seed. Output _nldata/wikt_sents.txt (git-ignored like the rest of _nldata). Idempotent."""
 import os, sys, json, sqlite3, random, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from core.form import sentences
+from core.seqform import sentences
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "_nldata", "wikt_sents.txt")

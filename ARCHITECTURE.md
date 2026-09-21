@@ -465,3 +465,20 @@ proposed here rather than done unilaterally.
 A new experiment may add **one** file plus a pre-registration. If it needs a mechanism, it imports `core/`;
 if the mechanism is new and general, it goes *into* `core/` with its measurement in the docstring and
 `core_selftest.py` gains a C2 row. That is the whole process, and it is what stops 94 islands recurring.
+
+
+## 2026-09-21 -- the ONE LOOP, three worlds, five frames, and the form line (see LOOP.md, f4_prereg.md)
+`core/reason.py` is the loop every question goes through: SEGMENT -> READINGS (what a world reads a span as) ->
+STRUCTURES (affordances of the reading counts) -> SURVIVORS (what the world supports) -> RANK (coverage, simplicity,
+specificity) -> VERDICT (unique with certificates | READINGS | PARTIAL on an unused content reading | WEAK | NOT FOUND).
+Worlds: `core/kg.py` (Wikidata through `emergence/kb_wikidata.py`; gate `kg_multihop.py`, 40 fixed questions, CONFAB 0),
+`core/table.py` (a table + an operator lexicon INDUCED from confirmed examples by intersection, discriminating teaching
+and minimal cover; gate `tables_numbers.py`, 30/30), `core/gloss.py` (the E-10 resolver as a world). `frames.py` is the
+chat layer: five epistemic frames (ANSWER / READINGS / PARTIAL / FOUND / PROPOSE) realized with RNG over
+meaning-preserving surfaces and inverted exactly (gate `f4_dialogue.py`, 375/375 round trip, bare abstain 0).
+The FORM line: `core/seqform.py` (exchange-algorithm class bigram, learned UNK, raw-text segmentation and context
+signatures) with gate `fluency_form.py` (F1 on CHILDES Brent; realization at the novelty/typicality frontier). Eleven
+loop iterations and Stages 9/9b are recorded nulls in LOOP.md and their preregs; their runners were deleted here.
+Rules that paid for themselves today: audit convergence before reading a gate; a control that also fails is
+uninformative; every OOV path costs zero choice bits; a word naming a relation is not a thing; relations need direct
+edges; an unused reading is PARTIAL, never a sub-answer; a teaching example that does not discriminate does not teach.
