@@ -38,7 +38,8 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 6 | ESTIMATION: once-seen train words collapse to one learned UNK symbol (the model learns where unknown words go, 0 choice bits, no poisoned fillers) + Witten-Bell transitions; known-only >= +0.06, OOV effect >= 0, F1 measured | below | OOV effect +0.012 = FIRST POSITIVE (learned UNK works); known-only +0.034 (FAIL); F1 +0.018 (FAIL); purity 0.820; Witten-Bell adds nothing (-0.004). CALIBRATION: a Witten-Bell WORD bigram gains -0.005 / +0.020 / +0.046 vs unigram at 30k / 100k / 300k -> the 10% bar is unreachable for ANY bigram on Wiktionary examples (independent sentences, lexical bits dominate) | corpus, not method: move to a redundant register (child-directed speech, narrative) -> it.7 |
 | 7 | REGISTER: on child-directed speech (CHILDES Brent, on disk) and narrative (Alice) the class bigram's held-out gain vs unigram reaches F1 (>= 0.10) AND beats the Witten-Bell word bigram; on Wiktionary it cannot | below | **PASS: Brent K=64 +0.108 vs unigram, word bigram +0.085; Alice +0.069 / +0.050; order Brent > Alice > Wiktionary holds for both models; shuffled order -0.033** | F1 MET on the acquisition register -> it.8 = F2 coverage + F3 generation judged by an independent grammar |
 | 8 | F2 + F3 on Brent: >= 0.5 held-out utterances COMMIT; realized utterances (attested skeleton, RNG over class fillers) are no more surprising to an INDEPENDENT grammar than real held-out utterances | below | F2 PASS 0.842 (weak). F3 FAIL narrowly: Brent weighted fillers 9.39 vs reference 8.99 bits/token (shuffled 10.88, random 14.48); uniform 12.44; Alice 9.59 vs 8.72; CONFAB 0 | independent fillers = 'the pool', 'a arm' -> it.9 attested-adjacency CONSTRAINT on fillers (a constraint, not a distribution) |
-| 9 | CONSTRAINED REALIZATION: RNG ranges only over filler assignments whose every adjacent word pair is attested in training (constraint satisfaction over the attested skeleton, uniform among solutions); realized median <= reference under the independent judge, with a reported novelty rate | below | | |
+| 9 | CONSTRAINED REALIZATION: RNG ranges only over filler assignments whose every adjacent word pair is attested in training (constraint satisfaction over the attested skeleton, uniform among solutions); realized median <= reference under the independent judge, with a reported novelty rate | below | bit gate FAIL (Brent 9.58 vs 8.99; Alice 9.40 vs 8.72), novelty 0.58/0.65, abstain 0, CONFAB 0 -- but the novel realizations READ fluent ('dinah was the duchess', 'i didn t explain myself', 'do you like a spoon', 'who is peter'); the judge charges lexical RARITY (uniform choice picks rare attested continuations), not form | the metric conflates rarity with form -> it.10 form-only judge (transition bits + pair attestation under B) |
+| 10 | FORM-ONLY JUDGE: under the independent grammar B, realized utterances match real ones on TRANSITION bits/token (class-sequence surprise, filler bits excluded) and on the fraction of adjacent pairs attested in B's corpus | below | | |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -380,3 +381,38 @@ Gates.
   I9-e  CONFAB 0 (round trip by construction, printed).
 Predictions. Brent realized median 8.6-9.1 (gate met), novelty 0.55-0.75, abstain 0.05-0.15. Alice median 9.0-9.5
 vs 8.72 (gate likely missed: 556 training sentences give too few attested pairs), novelty > 0.9.
+
+## ITERATION 9 -- RESULT (loop_it9_constrained.py, 15 s)
+Brent: 4301 attested pairs; realized median 9.58 bits/token vs reference 8.99 (FAIL), shuffled 11.44, random 14.41,
+ABSTAIN 0.000, NOVEL 0.580, CONFAB 0. Alice: 9.40 vs 8.72 (FAIL), shuffled 10.57, random 12.65, NOVEL 0.645.
+The constraint made the bit score WORSE than it.8's weighted independent fillers (9.39) while making the text read
+far better -- Alice: "you are not said the youth as i mentioned before", "dinah was the duchess", "bill s got the
+earth", "i didn t explain myself", "we won t see said the subject", "in an end said his father", "well be off then
+said the cat in a sulky tone"; Brent: "do you like a spoon", "who is peter", "want me to open it", "where's a
+balloon", "who is it", "can let her the colors of the roses". Diagnosis: with uniform choice among attested
+continuations the RNG picks rare words as often as common ones, and B's per-token bits are dominated by the FILLER
+term -log P(w|c), i.e. lexical rarity, which is not form. The registered F3 metric measures typicality of word
+choice more than fluency of form; it.8's weighted variant scored better in bits and read worse, which is the same
+fact from the other side. Recorded as a metric limit, not tuned around: it.10 registers a form-only judge in
+advance and predicts its outcome before running.
+
+## ITERATION 10 -- FORM-ONLY JUDGE (committed before the run)
+
+Hypothesis. Separating form from lexical choice under the independent judge B shows the it.9 realizations at or
+below real text in form surprise: (T) TRANSITION bits/token = sum of -log2 P(c_i | c_{i-1}) under B over the
+utterance (B's own class map applied to the realized words, UNK for words B does not know), filler bits excluded;
+(P) PAIR ATTESTATION = fraction of adjacent word pairs (boundaries included) that occur in B's training corpus,
+which A never saw. Both are computed identically for realized, reference, shuffled and random text.
+Gates.
+  I10-a  Brent: realized median T <= reference median T.
+  I10-b  Brent: realized mean P >= reference mean P (real held-out text sets the bar; shuffled and random must be
+         clearly below both).
+  I10-c  the same two numbers for it.8's weighted-independent realizations, so the two methods are ranked on form
+         by the same judge (prediction: constrained > weighted on both T and P).
+  I10-d  Alice reported (predicted: T met, P near the bar).
+  I10-e  NOVELTY and CONFAB as in it.9.
+If I10-a and I10-b pass on Brent, F3 is met on the register where F1 and F2 are met, with the registered metric
+limit stated; F4 (meaning: replies from epistemic frames) then opens and needs a GROUNDED domain, which is an
+owner decision (data + world), not a form experiment.
+Predictions. Brent T realized 3.3-3.9 vs reference 3.6-4.2; P realized 0.75-0.90 vs reference 0.70-0.85; shuffled
+P < 0.4. Alice T met; P realized 0.6-0.75 vs reference 0.65-0.8.
