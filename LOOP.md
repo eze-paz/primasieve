@@ -37,7 +37,8 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 5 | CONVERGENCE: a converged exchange class map (K=128, 30k sentences, built to convergence across resumable runs) raises the known-only gain to >= +0.08 and makes the OOV effect non-negative; F1 measured on it | below | SETTLED map (22 passes, 588 s, 21223 rare words placed): known-only +0.026 (FAIL), OOV effect -0.035 (FAIL), F1 +0.010 (FAIL), purity 0.750; classes are REAL (det/prep/copula/pronoun/conj cleanly separated). Post-hoc: TRAIN gain +0.100 vs held-out +0.026; sentences of 20+-count words +0.076; I(Cprev;C) 1.56 train / 1.43 held-out -> structure generalizes, ESTIMATION overfits rare words | rare words memorized from one context each -> it.6 learned UNK symbol + Witten-Bell |
 | 6 | ESTIMATION: once-seen train words collapse to one learned UNK symbol (the model learns where unknown words go, 0 choice bits, no poisoned fillers) + Witten-Bell transitions; known-only >= +0.06, OOV effect >= 0, F1 measured | below | OOV effect +0.012 = FIRST POSITIVE (learned UNK works); known-only +0.034 (FAIL); F1 +0.018 (FAIL); purity 0.820; Witten-Bell adds nothing (-0.004). CALIBRATION: a Witten-Bell WORD bigram gains -0.005 / +0.020 / +0.046 vs unigram at 30k / 100k / 300k -> the 10% bar is unreachable for ANY bigram on Wiktionary examples (independent sentences, lexical bits dominate) | corpus, not method: move to a redundant register (child-directed speech, narrative) -> it.7 |
 | 7 | REGISTER: on child-directed speech (CHILDES Brent, on disk) and narrative (Alice) the class bigram's held-out gain vs unigram reaches F1 (>= 0.10) AND beats the Witten-Bell word bigram; on Wiktionary it cannot | below | **PASS: Brent K=64 +0.108 vs unigram, word bigram +0.085; Alice +0.069 / +0.050; order Brent > Alice > Wiktionary holds for both models; shuffled order -0.033** | F1 MET on the acquisition register -> it.8 = F2 coverage + F3 generation judged by an independent grammar |
-| 8 | F2 + F3 on Brent: >= 0.5 held-out utterances COMMIT; realized utterances (attested skeleton, RNG over class fillers) are no more surprising to an INDEPENDENT grammar than real held-out utterances | below | | |
+| 8 | F2 + F3 on Brent: >= 0.5 held-out utterances COMMIT; realized utterances (attested skeleton, RNG over class fillers) are no more surprising to an INDEPENDENT grammar than real held-out utterances | below | F2 PASS 0.842 (weak). F3 FAIL narrowly: Brent weighted fillers 9.39 vs reference 8.99 bits/token (shuffled 10.88, random 14.48); uniform 12.44; Alice 9.59 vs 8.72; CONFAB 0 | independent fillers = 'the pool', 'a arm' -> it.9 attested-adjacency CONSTRAINT on fillers (a constraint, not a distribution) |
+| 9 | CONSTRAINED REALIZATION: RNG ranges only over filler assignments whose every adjacent word pair is attested in training (constraint satisfaction over the attested skeleton, uniform among solutions); realized median <= reference under the independent judge, with a reported novelty rate | below | | |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -346,3 +347,36 @@ Audit. 15 realized Brent utterances printed with a hand transliteration key for 
 Alice (A = ch I-V, reference VI-VII, B = VIII-XII) with 15 realized sentences printed in plain English.
 Predictions. F2 0.84. F3 uniform-filler median ABOVE the reference (rare fillers), frequency-weighted median at or
 below the reference -> gate met only in the weighted variant; recorded as such. Shuffled control clearly worse.
+
+## ITERATION 8 -- RESULT (loop_it8_generate.py, 20 s)
+F2 Brent held-out COMMIT 0.842 (PASS; weak, as registered). F3 under the independent judge B (three-way split by
+order): Brent reference median 8.99 bits/token; realized UNIFORM fillers 12.44 (FAIL), WEIGHTED fillers 9.39 (FAIL by
+0.40); shuffled realizations 10.88 and random words 14.48, so the judge orders real < realized < shuffled < random:
+it sees form, and the gap is real. Alice: reference 8.72, weighted 9.59, uniform 11.55, shuffled 10.62, random 12.58.
+Round trip CONFAB 0 in all cells (by construction, printed). Human read (weighted): Brent "there he is", "look",
+"door", "it's right", "see what's on the rabbit"; Alice "i won t like that", "pardon show me", "feel down or i d see
+you down here" -- beside "ma is such a arm question", "what do you grow at that said the pool". Diagnosis: each
+slot's filler is chosen independently of its neighbours, so agreement and selection between adjacent words is lost.
+In Stage 8 that compatibility came from the MEANING. Without meaning, the sound form-only lever is a CONSTRAINT.
+
+## ITERATION 9 -- CONSTRAINED REALIZATION (committed before the run)
+
+Hypothesis. If the RNG ranges only over filler assignments in which EVERY adjacent word pair (including the
+boundary pairs) is attested in grammar A's training text, realized utterances are no more surprising to the
+independent judge than real held-out text (F3), while remaining NOVEL (not copies of training utterances). This is
+constraint satisfaction over an attested skeleton -- the set of verified forms shrinks, the choice among them stays
+uniform -- not sampling from a distribution: no probability leaves the engine, per the standing rule.
+Mechanism. Skeleton = class sequence of a random training utterance under A. Depth-first assignment left to right:
+at each slot the candidates are the class's member types w such that (prev, w) is an attested pair; the RNG picks
+uniformly among candidates; backtrack on a dead end; budget 200 expansions per utterance, else ABSTAIN (counted).
+The final pair (w, boundary) must be attested too. Everything else as it.8 (judge B, split, identity bits).
+Gates.
+  I9-a  F3: realized median bits/token <= reference median under B, on Brent. Alice reported.
+  I9-b  NOVELTY: fraction of realized utterances NOT verbatim in A's training text >= 0.50 (else the constraint
+        collapsed realization into copying, and F3 passes vacuously -- reported as such).
+  I9-c  ABSTAIN rate (no consistent assignment inside budget) reported; must be < 0.20 or the constraint is too
+        tight for this K.
+  I9-d  controls: shuffled realizations and random words as before; both must score clearly worse than realized.
+  I9-e  CONFAB 0 (round trip by construction, printed).
+Predictions. Brent realized median 8.6-9.1 (gate met), novelty 0.55-0.75, abstain 0.05-0.15. Alice median 9.0-9.5
+vs 8.72 (gate likely missed: 556 training sentences give too few attested pairs), novelty > 0.9.
