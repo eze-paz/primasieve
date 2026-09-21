@@ -39,7 +39,8 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 7 | REGISTER: on child-directed speech (CHILDES Brent, on disk) and narrative (Alice) the class bigram's held-out gain vs unigram reaches F1 (>= 0.10) AND beats the Witten-Bell word bigram; on Wiktionary it cannot | below | **PASS: Brent K=64 +0.108 vs unigram, word bigram +0.085; Alice +0.069 / +0.050; order Brent > Alice > Wiktionary holds for both models; shuffled order -0.033** | F1 MET on the acquisition register -> it.8 = F2 coverage + F3 generation judged by an independent grammar |
 | 8 | F2 + F3 on Brent: >= 0.5 held-out utterances COMMIT; realized utterances (attested skeleton, RNG over class fillers) are no more surprising to an INDEPENDENT grammar than real held-out utterances | below | F2 PASS 0.842 (weak). F3 FAIL narrowly: Brent weighted fillers 9.39 vs reference 8.99 bits/token (shuffled 10.88, random 14.48); uniform 12.44; Alice 9.59 vs 8.72; CONFAB 0 | independent fillers = 'the pool', 'a arm' -> it.9 attested-adjacency CONSTRAINT on fillers (a constraint, not a distribution) |
 | 9 | CONSTRAINED REALIZATION: RNG ranges only over filler assignments whose every adjacent word pair is attested in training (constraint satisfaction over the attested skeleton, uniform among solutions); realized median <= reference under the independent judge, with a reported novelty rate | below | bit gate FAIL (Brent 9.58 vs 8.99; Alice 9.40 vs 8.72), novelty 0.58/0.65, abstain 0, CONFAB 0 -- but the novel realizations READ fluent ('dinah was the duchess', 'i didn t explain myself', 'do you like a spoon', 'who is peter'); the judge charges lexical RARITY (uniform choice picks rare attested continuations), not form | the metric conflates rarity with form -> it.10 form-only judge (transition bits + pair attestation under B) |
-| 10 | FORM-ONLY JUDGE: under the independent grammar B, realized utterances match real ones on TRANSITION bits/token (class-sequence surprise, filler bits excluded) and on the fraction of adjacent pairs attested in B's corpus | below | | |
+| 10 | FORM-ONLY JUDGE: under the independent grammar B, realized utterances match real ones on TRANSITION bits/token (class-sequence surprise, filler bits excluded) and on the fraction of adjacent pairs attested in B's corpus | below | FAIL, prediction wrong: Brent transition 5.68 vs reference 5.25 (shuffled 7.48, random 7.64); pair attestation 0.710 vs 0.786 (shuffled 0.536, random 0.289); constrained beats independent on Alice, not on Brent; novelty 0.60/0.67 | realized text is ~70-85% of the way from shuffled to real on form; residual = beyond-pair selection -> it.11 attested TRIGRAM constraint |
+| 11 | LONGER-RANGE FORM: attested trigram constraint (pair fallback) closes at least half the it.10 form gap on Brent while novelty stays >= 0.40 | below | PARTIAL: form gates MET (transition 5.46 <= 5.47, pairs 0.762 >= 0.748) but novelty 0.109 = COPYING | form-only line CLOSED as pre-committed; the novelty/typicality frontier is the measure of what meaning must add |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -416,3 +417,58 @@ limit stated; F4 (meaning: replies from epistemic frames) then opens and needs a
 owner decision (data + world), not a form experiment.
 Predictions. Brent T realized 3.3-3.9 vs reference 3.6-4.2; P realized 0.75-0.90 vs reference 0.70-0.85; shuffled
 P < 0.4. Alice T met; P realized 0.6-0.75 vs reference 0.65-0.8.
+
+## ITERATION 10 -- RESULT (loop_it10_formjudge.py, 15 s)
+Brent under B (K=64, 4623 B pairs): transition bits/token reference 5.25, constrained 5.68, weighted-independent
+5.61, shuffled 7.48, random 7.64; pair attestation 0.786 / 0.710 / 0.743 / 0.536 / 0.289. Alice: 5.17 / 5.36 / 5.62
+/ 6.65 / 6.36; pairs 0.485 / 0.412 / 0.364 / 0.227 / 0.091. **I10-a FAIL, I10-b FAIL, I10-c constrained is better
+than independent on Alice on both measures and worse on Brent on both; predictions wrong on Brent.** Reading: the
+judge orders real < realized < shuffled < random on every measure, so the realizations carry most of the form of the
+register (Brent: 81% of the shuffled-to-real distance on transition bits, 70% on pair attestation) and not all of it.
+Attested pairs from A's half of the corpus are a local constraint; real utterances also satisfy selection between
+non-adjacent words and between word choice and situation, which no form-only mechanism over this data supplies.
+The residual is the honest measure of what MEANING would add. Novelty 0.596 / 0.671, CONFAB 0.
+
+## ITERATION 11 -- LONGER-RANGE FORM: attested trigram constraint (committed before the run)
+
+Hypothesis. Requiring each filler to be attested in A's training text with its TWO predecessors (trigram
+attestation) where any such continuation exists, falling back to pair attestation otherwise, closes at least half of
+the it.10 form gap on Brent (transition bits from 5.68 toward 5.25, i.e. <= 5.47; pair attestation from 0.710 toward
+0.786, i.e. >= 0.748) while novelty stays >= 0.40 -- the constraint tightens toward copying, and novelty is the
+number that says how far. Same mechanism otherwise (uniform among solutions, backtracking, budget, judge B).
+Gates. I11-a transition <= 5.47 on Brent; I11-b pair attestation >= 0.748; I11-c novelty >= 0.40; I11-d abstain <
+0.20; I11-e Alice reported. Predictions: I11-a and I11-b met, novelty 0.40-0.50 (borderline), abstain < 0.05.
+If novelty falls under 0.40 while the gates pass, the pass is recorded as partial copying and the form-only line is
+closed at that point: further tightening is memorization, and the remaining gap is meaning's.
+
+## ITERATION 11 -- RESULT (loop_it11_trigram.py, 15 s)
+Brent: transition 5.46 (gate <= 5.47) PASS, pair attestation 0.762 (gate >= 0.748) PASS, abstain 0, **novelty 0.109
+FAIL**. Alice: 5.36 / 0.405, novelty 0.106. The realizations read well ("this is the boy", "do you wanna see this
+book", "okay it's a mouse", "keep your temper said the pigeon", "speak english said the rabbit") because nine in ten
+are training utterances. Recorded as PARTIAL = copying, and the form-only line is closed here as the prereg said.
+
+## LOOP STATUS after 11 iterations (2026-09-21) -- where fluency stands, in the terminal criterion's own terms
+
+  F1  MET on child-directed speech (it.7): class bigram +0.108 vs unigram, beats the Witten-Bell word bigram
+      (+0.085); shuffled order collapses it (-0.033). NOT met on Wiktionary examples (+0.018), where NO bigram of any
+      kind reaches the bar at any size we can process (calibration, it.6): the bar measures the register, not the
+      method. Alice in between (+0.069). Zero LLM, zero probabilities out, CONFAB 0 throughout.
+  F2  MET on Brent (0.842), weak by construction: derivation = class sequence.
+  F3  NOT MET by form alone, and the gap is now a measured FRONTIER rather than a bug: with pair constraints the
+      engine realizes utterances that are 58-65% novel and carry 70-85% of the register's form under an independent
+      judge (it.9/it.10); with trigram constraints 90% of the form and 11% novelty (it.11). Every tightening of the
+      form constraint trades novelty for typicality. Real utterances have both because their words are selected by
+      a SITUATION, not by their neighbours. That is the Stage 8 principle measured from the outside: form from
+      text, meaning from grounding.
+  F4  OPEN. It is the meaning stage and cannot start on Brent, Alice or Wiktionary: none has a world to bind to.
+      It needs a grounded domain -- data plus a checkable world -- which is the owner's call. The candidates named
+      earlier stand: the plant/Modbus telemetry, the Catalan reports, or a synthetic world the owner accepts.
+
+  What the loop bought beyond the gates: real word classes from raw text (purity 0.75-0.82 vs WordNet; Brent
+  classes readable in phonemic transcription), a learned unknown class that turned OOV from a cost into a gain
+  (it.6), an exact incremental MDL engine and an exact exchange engine in core/, a Wiktionary sentence corpus of
+  371k lines, and eleven pre-registered results with their nulls. Lessons paid for: audit convergence before reading
+  a gate; a control that also fails is uninformative; every OOV path must cost zero choice bits; random candidates
+  beat similarity ranking in greedy MDL; a bits-per-token judge conflates rarity with form.
+
+  Next step is not another form iteration. It is the grounded domain for F4.

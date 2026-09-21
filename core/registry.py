@@ -58,6 +58,9 @@ PUBLISHED = {
     "cogs_stage9": ["STAGE 9 FORM FROM RAW TEXT: NULL", "CONTROL DISCRIMINATES"],
     # ---- Stage 9b: compositional form -- registered NULL (64% held-out OOV; uniform symbol code loses to unigram on known)
     "cogs_stage9b": ["STAGE 9b COMPOSITIONAL FORM: NULL", "CONFAB 0"],
+    # ---- the fluency loop (LOOP.md): F1 met on child-directed speech; form-only generation closed at the novelty frontier
+    "loop_it7_register": ["LOOP IT.7 REGISTER: PASS", "[holds]"],
+    "loop_it11_trigram": ["LOOP IT.11 TRIGRAM CONSTRAINT: PARTIAL"],
 }
 
 
