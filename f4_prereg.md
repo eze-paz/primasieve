@@ -49,3 +49,23 @@ Predictions. U1-U4 pass (refactor). F4-a 375/375 by construction of the inverse 
 F4-d >= 0.98; F4-e ~65/75 (10 PROPOSE: KG NOT FOUND/WEAK cases and the unknown gloss word).
 Declared limit. This is single-turn: the READINGS split question and the PROPOSE action are asked, not yet bound
 to a follow-up turn; multi-turn binding is the next pre-registration.
+
+## RESULT (2026-09-21)
+Part 1 -- UNIFY. core/reason.py holds the loop; core/kg.py, core/table.py are Worlds; core/gloss.py adapts the E-10
+resolver (core/resolve.py untouched). U1 kg_multihop on the unified loop: CONFAB 0, correct 27/40, certificates 30/30,
+no-source 40/40 (run 4 had 25/40 and 26/26: the live cache grew across runs, two more entities resolve; the registry
+needle is now the computed "CONFAB 0" + "PASS" lines, not a count that depends on cache state). U2 tables_numbers:
+PASS 30/30 CONFAB 0 (one refactor bug on the way: a structure key with a list inside a set, fixed). U3 zero islands,
+132 files, core imported by 60 modules. U4 "what is a dog" -> FOUND with the WordNet gloss quoted; unknown word ->
+PROPOSE naming what was consulted. PASS.
+Part 2 -- F4. 75 prompts (40 KG, 30 table, 5 gloss): F4-a round trip 375/375; F4-b bare abstain 0; F4-c variety 3.68
+surfaces per frame; F4-d corrupted replies caught 225/225; F4-e frames ANSWER 53, READINGS 10, PARTIAL 2, FOUND 4,
+PROPOSE 6 = 69/75 content frames; F4-f no literal in core/reason.py shares a token with any prompt. PASS.
+Sample replies: "Answer: Paris (per Wikidata). evidence: France -capital-> Paris" / "Several readings survive: Edo
+[via Tokugawa shogunate -capital-> Edo] ; Tokyo [via Japan -capital-> Tokyo]. Which did you mean? one of: Tokyo / Edo"
+/ "Partial: resolved Ajaccio (support: Napoleon -place of birth-> Ajaccio) but did not use continent" / "Answer: 4805
+(per the table). evidence: row 3 revenue=175, ..., +6 cells" / "Found: 'a domesticated carnivorous mammal' (per
+WordNet)" / "Nothing found. Consulted: weak connection Related -composer-> ... Next step: confirm that a 2-step
+connection counts as the relation you meant".
+Declared limit stands: single-turn; the READINGS split and the PROPOSE action are asked, not yet bound to a follow-up
+turn. Next pre-registration: multi-turn binding (the user's reply selects a reading / supplies the missing source).

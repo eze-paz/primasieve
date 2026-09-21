@@ -472,3 +472,10 @@ are training utterances. Recorded as PARTIAL = copying, and the form-only line i
   beat similarity ranking in greedy MDL; a bits-per-token judge conflates rarity with form.
 
   Next step is not another form iteration. It is the grounded domain for F4.
+
+## F4 -- MET, single-turn (2026-09-21, f4_prereg.md): every reply over three worlds (Wikidata KG, a table with an induced
+operator lexicon, a dictionary) is one of five frames -- ANSWER / READINGS / PARTIAL / FOUND / PROPOSE -- realized with RNG
+over meaning-preserving surfaces, round-tripping 375/375, bare abstain 0, 69/75 content frames. One reasoning loop
+(core/reason.py) under all three worlds. Fluency status: F1 met on the acquisition register, F2 met (weak), F3 form-only
+closed at the novelty/typicality frontier, F4 met single-turn. Open: multi-turn binding; a grounded domain of the
+owner's own (the plant telemetry as a table world is now a data-loading step, not research).

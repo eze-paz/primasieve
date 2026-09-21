@@ -30,10 +30,8 @@ def gold(t, op, col=None, filters=(), target=None, filters_b=None):
     return res[0] if res is not None else None                      # None = tie / incomputable: the engine must NOT commit
 
 
-if __name__ == "__main__":
-    selfcheck(__file__)
-    t = make_table()
-    say(f"TABLES AND NUMBERS -- {len(t.rows)} rows x {len(t.headers)} columns; operator words induced from teaching, exact arithmetic.\n")
+def prepare(t, say=lambda *a, **k: None):
+    """teaching set -> induced lexicon (B1-B7) and the held-out spec; shared with f4_dialogue.py."""
     # ---- teaching set: (question, intended operator, confirmed answer computed from the table)
     teach_spec = [
         ("what is the total revenue", SUM, dict(col="revenue")),
@@ -148,6 +146,14 @@ if __name__ == "__main__":
         ("which region has the lowest price", ARGMIN, dict(col="price", target="region")),
         ("mean quantity in the south in march", MEAN, dict(col="quantity", filters=[("region", "south"), ("month", "march")])),
     ]
+    return dict(lexicon=lexicon, order=order, held_spec=held_spec, teaching=teaching, contested=contested, wrong=wrong)
+
+
+if __name__ == "__main__":
+    selfcheck(__file__)
+    t = make_table()
+    say(f"TABLES AND NUMBERS -- {len(t.rows)} rows x {len(t.headers)} columns; operator words induced from teaching, exact arithmetic.\n")
+    P = prepare(t, say); lexicon, order, held_spec, wrong = P["lexicon"], P["order"], P["held_spec"], P["wrong"]
     tally = collections.Counter(); cert_ok = cert_n = 0
     for q, op, kw in held_spec:
         g = gold(t, op, **kw); res = answer(q, t, lexicon, order)
