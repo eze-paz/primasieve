@@ -63,6 +63,8 @@ PUBLISHED = {
     "loop_it11_trigram": ["LOOP IT.11 TRIGRAM CONSTRAINT: PARTIAL"],
     # ---- KG multi-hop over Wikidata with cited edges (kg_multihop_prereg.md): run 4, CONFAB 0, 25/40 (needs network or cache)
     "kg_multihop": ["CONFAB (wrong value answered): 0", "certificates on emitted answers: 26/26"],
+    # ---- tables and numbers (tables_numbers_prereg.md): induced operator lexicon, exact arithmetic, run 6
+    "tables_numbers": ["TABLES AND NUMBERS: PASS", "CONFAB on held-out: 0"],
 }
 
 
