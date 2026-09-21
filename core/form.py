@@ -29,7 +29,7 @@ import unicodedata
 
 from .generate import SignatureBank
 from .resolve import segment
-from .verdict import COMMIT, ABSTAIN
+from .verdict import COMMIT, ABSTAIN, CONJECTURED
 
 BOUND = ("<",)      # the boundary pseudo-symbol in signatures; a tuple so it can never equal a corpus word
 
@@ -343,7 +343,8 @@ class PhraseGrammar:
         return [u for u, c in cnt.most_common() if c >= 2 and u not in self.units]
 
 
-def grow_phrases(g, sig, budget_s, use_units=True, cand_similar=40, cand_random=40, rng=None, log=None):
+def grow_phrases(g, sig, budget_s, use_units=True, cand_similar=40, cand_random=40, rng=None, log=None,
+                 pair_classes=1500, pair_cap=20000):
     """alternate class-merge rounds and unit adoption until a full cycle adopts nothing or the budget is spent.
     -> dict(rounds, merges, units, evaluated, spent: bool, dl)."""
     import time
@@ -355,6 +356,7 @@ def grow_phrases(g, sig, budget_s, use_units=True, cand_similar=40, cand_random=
         # ---- class merges: most-similar pairs + random pairs, exact full-DL evaluation
         csig = class_signatures(g, sig)
         ids = [c for c in g.members if sum(csig[c].values()) >= 2]
+        ids = sorted(ids, key=lambda c: -g.ctok[c])[:pair_classes]          # declared cap on candidate classes
         by_key = collections.defaultdict(list)
         for c in ids:
             for k in csig[c]: by_key[k].append(c)
@@ -364,6 +366,7 @@ def grow_phrases(g, sig, budget_s, use_units=True, cand_similar=40, cand_random=
             for i in range(len(cs)):
                 for j in range(i + 1, len(cs)): pairs.add((min(cs[i], cs[j]), max(cs[i], cs[j])))
         pairs = list(pairs)
+        if len(pairs) > pair_cap: pairs = rng.sample(pairs, pair_cap)           # declared cap on scored pairs
         scored = sorted(((_cosine(csig[a], csig[b]), a, b) for a, b in pairs), reverse=True)[:cand_similar]
         cands = [(a, b) for _, a, b in scored]
         if cand_random and pairs: cands += rng.sample(pairs, min(cand_random, len(pairs)))
@@ -406,3 +409,157 @@ def realize_phrase(g, rng, synonyms=None):
             if synonyms and w in synonyms and rng.random() < 0.5: w = rng.choice(sorted(synonyms[w]))
             out.append(w)
     return seg, out
+
+
+# ================================================================ loop it.1: INCREMENTAL description length (exact)
+class IncPhraseGrammar(PhraseGrammar):
+    """PhraseGrammar with the two-part code maintained incrementally: per-sentence symbol counts are cached and
+    only the sentences a merge or a unit can touch are re-segmented. The code itself is unchanged and the total is
+    verified equal to PhraseGrammar.dl_total on a small run (LOOP.md I1-a)."""
+
+    def __init__(self, train):
+        super().__init__(train)
+        self.seqs = [self.seq(s) for s in self.train]
+        self.nsym = [len(q) for q in self.seqs]                       # no units yet: one symbol per token
+        self.total_syms = sum(self.nsym)
+        self.cls_sents = collections.defaultdict(set)
+        for i, q in enumerate(self.seqs):
+            for c in set(q): self.cls_sents[c].add(i)
+        self.fill_bits = 0.0                                          # every class is a singleton: log2(1) = 0
+
+    def dl_train(self):
+        return self.N * math.log2(self.lmax) + self.total_syms * self.sym_bits() + self.fill_bits
+
+    def _reseg(self, idxs):
+        for i in idxs:
+            n, _ = self.segment(self.seqs[i])
+            self.total_syms += n - self.nsym[i]; self.nsym[i] = n
+
+    def snapshot(self):
+        return (dict(self.cls), {k: set(v) for k, v in self.members.items()}, collections.Counter(self.ctok),
+                set(self.units), set(self.ulen), list(self.nsym), self.total_syms, self.fill_bits,
+                {k: set(v) for k, v in self.cls_sents.items()}, self.seqs)
+
+    def restore(self, snap):
+        (self.cls, self.members, self.ctok, self.units, self.ulen, self.nsym, self.total_syms, self.fill_bits,
+         self.cls_sents, seqs) = snap
+        if seqs is not self.seqs: self.seqs = seqs
+        self._seg_cache = {}
+
+    def merge(self, a, b):
+        na, nb = len(self.members[a]), len(self.members[b])
+        self.fill_bits += (self.ctok[a] + self.ctok[b]) * math.log2(na + nb) - self.ctok[a] * math.log2(na) - self.ctok[b] * math.log2(nb)
+        for w in self.members[b]: self.cls[w] = a
+        self.members[a] |= self.members.pop(b)
+        self.ctok[a] += self.ctok.pop(b)
+        self.units = {tuple(a if c == b else c for c in u) for u in self.units}
+        affected = self.cls_sents[a] | self.cls_sents.pop(b)
+        self.cls_sents[a] = affected
+        seqs = list(self.seqs)
+        for i in self.cls_sents[a]:
+            seqs[i] = tuple(a if c == b else c for c in seqs[i])
+        self.seqs = seqs
+        self._seg_cache = {}                                          # units changed: cached segmentations may be stale
+        self._reseg(affected)
+
+    def add_unit(self, flat):
+        self.units.add(flat); self.ulen.add(len(flat)); self._seg_cache = {}
+        L = len(flat)
+        cand = self.cls_sents[flat[0]]
+        affected = [i for i in cand if any(self.seqs[i][j:j + L] == flat for j in range(len(self.seqs[i]) - L + 1))]
+        self._reseg(affected)
+
+    def unit_candidates(self):
+        cnt = collections.Counter()
+        for q in self.seqs:
+            n, segs = self.segment(q)
+            seg = sorted(segs)[0]
+            for i in range(len(seg) - 1): cnt[seg[i] + seg[i + 1]] += 1
+        return [u for u, c in cnt.most_common() if c >= 2 and u not in self.units]
+
+
+# ================================================================ loop it.2: scoring levers -- ADAPTIVE code, OOV by class CONJECTURE
+class AdaptiveCode:
+    """frequency code fitted on the train segmentation: symbol and filler costs with add-one smoothing.
+    Count tables are uncharged (declared in LOOP.md it.2; the unigram baseline is a fitted table too)."""
+
+    def __init__(self, g):
+        self.g = g
+        self.sym = collections.Counter(); self.fill = collections.Counter(); self.ctot = collections.Counter()
+        seqs = getattr(g, "seqs", None) or [g.seq(s) for s in g.train]
+        for s, q in zip(g.train, seqs):
+            n, segs = g.segment(q)
+            for x in sorted(segs)[0]: self.sym[x] += 1
+            for w in s: c = g.cls[w]; self.fill[(c, w)] += 1; self.ctot[c] += 1
+        self.nsym_total = sum(self.sym.values())
+        self.nsyms = g.K + len(g.units)
+
+    def sym_cost(self, x): return -math.log2((self.sym[x] + 1) / (self.nsym_total + self.nsyms))
+
+    def fill_cost(self, c, w):
+        if w is None: return self.g.uni_unk                                  # unknown word: identity paid as unigram-unknown
+        return -math.log2((self.fill[(c, w)] + 1) / (self.ctot[c] + len(self.g.members[c])))
+
+
+def oov_survivors(g, s, ctx):
+    """for each unknown word position: the classes attested in train with the same LEFT or RIGHT neighbour class.
+    `ctx` = (left: class -> set(classes), right: class -> set(classes)) built once from the train seqs.
+    -> list of (position, survivor set); an empty survivor set means neutral scoring for the sentence."""
+    left, right = ctx
+    out = []
+    for i, w in enumerate(s):
+        if w in g.cls: continue
+        surv = set()
+        if i > 0 and s[i - 1] in g.cls: surv |= right.get(g.cls[s[i - 1]], set())
+        if i + 1 < len(s) and s[i + 1] in g.cls: surv |= left.get(g.cls[s[i + 1]], set())
+        out.append((i, surv))
+    return out
+
+
+def neighbour_context(g):
+    left, right = collections.defaultdict(set), collections.defaultdict(set)     # left[c] = classes seen BEFORE c
+    seqs = getattr(g, "seqs", None) or [g.seq(s) for s in g.train]
+    for q in seqs:
+        for i in range(1, len(q)):
+            left[q[i]].add(q[i - 1]); right[q[i - 1]].add(q[i])
+    return left, right
+
+
+def sentence_cost(g, s, code=None, ctx=None, max_survivors=None):
+    """held-out code length of one sentence under the chosen levers.
+    code=None -> the registered uniform code; ctx=None -> OOV neutral (escape + unigram).
+    -> (bits, state, n_survivor_product)  state in {COMMIT, ABSTAIN, CONJECTURED, None}"""
+    unknown = [i for i, w in enumerate(s) if w not in g.cls]
+    if unknown and ctx is None:
+        return 1 + g.unigram(s), None, 0
+    slots = []
+    if unknown:
+        surv = dict(oov_survivors(g, s, ctx))
+        if any(not surv[i] for i in unknown):
+            return 1 + g.unigram(s), None, 0
+        prod = 1
+        for i in unknown: prod *= len(surv[i])
+        if prod > 512:                                                          # too many assignments to enumerate: guess -> neutral
+            return 1 + g.unigram(s), None, prod
+        import itertools
+        combos = list(itertools.product(*[sorted(surv[i]) for i in unknown]))
+    else:
+        combos = [()]; prod = 1
+    best = None; best_segs = None
+    for combo in combos:
+        q = list(g.cls.get(w, -1) for w in s)
+        for i, c in zip(unknown, combo): q[i] = c
+        q = tuple(q)
+        n, segs = g.segment(q)
+        seg = sorted(segs)[0]
+        if code is None:
+            bits = math.log2(g.lmax) + n * g.sym_bits() + sum(
+                (g.uni_unk if s[i] not in g.cls else math.log2(len(g.members[q[i]]))) for i in range(len(s)))
+        else:
+            bits = math.log2(g.lmax) + sum(code.sym_cost(x) for x in seg) + sum(
+                code.fill_cost(q[i], s[i] if s[i] in g.cls else None) for i in range(len(s)))
+        if unknown: bits += math.log2(prod)                                     # the conjecture's choice must be paid
+        if best is None or bits < best: best, best_segs = bits, segs
+    if unknown: state = CONJECTURED
+    else: state = COMMIT if len(best_segs) == 1 else ABSTAIN
+    return best, state, prod
