@@ -284,7 +284,8 @@ class ClassBigramWB(ClassBigram):
     def sentence(self, s, conjecture=True):
         """UNK is an ordinary word here; every UNK token additionally pays identity_bits (as the baseline does)."""
         s = tuple(s)
-        bits, state = super().sentence(s, conjecture=True)
+        bits, state = super().sentence(s, conjecture=conjecture)
+        if state is None: return bits, None                      # no-conjecture path with an unknown word
         n_unk = sum(1 for w in s if w == UNK)
         return bits + n_unk * self.identity_bits, (CONJECTURED if n_unk else COMMIT)
 

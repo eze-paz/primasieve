@@ -35,7 +35,8 @@ WALL (the same null under every remaining hypothesis in the ledger) does, and is
 | 3 | SEQUENTIAL FORM: classes induced by the exchange algorithm under a class-bigram code; held-out code beats unigram by >= 0.10 AND beats a word-bigram control at 30k | below | F1 FAIL: vs unigram -0.096 WITH conjecture, +0.012 WITHOUT; word bigram itself is -0.32 vs unigram (add-one on sparse data), so I3-c PASS is weak; exchange under-converged at 30k (SPENT, 1.3 passes) | OOV choice cost (log2 K per unknown word) is the killer again -> it.4 deterministic zero-bit OOV rule from induced suffix signature |
 | 4 | ZERO-BIT OOV: an unknown word's class is a deterministic function of its own induced suffix signature and the previous class (no choice bits); the class model then gains on OOV sentences too | below | NULL (confounded): OOV effect -0.033 at 30k even with 0 choice bits; suffix ablation does not bite; BUT exchange SPENT before rare-word assignment -> ~24k once-seen words left in rank-mod-K random classes | classes unconverged -> it.5 convergence via resumable background build, then re-test OOV + F1 |
 | 5 | CONVERGENCE: a converged exchange class map (K=128, 30k sentences, built to convergence across resumable runs) raises the known-only gain to >= +0.08 and makes the OOV effect non-negative; F1 measured on it | below | SETTLED map (22 passes, 588 s, 21223 rare words placed): known-only +0.026 (FAIL), OOV effect -0.035 (FAIL), F1 +0.010 (FAIL), purity 0.750; classes are REAL (det/prep/copula/pronoun/conj cleanly separated). Post-hoc: TRAIN gain +0.100 vs held-out +0.026; sentences of 20+-count words +0.076; I(Cprev;C) 1.56 train / 1.43 held-out -> structure generalizes, ESTIMATION overfits rare words | rare words memorized from one context each -> it.6 learned UNK symbol + Witten-Bell |
-| 6 | ESTIMATION: once-seen train words collapse to one learned UNK symbol (the model learns where unknown words go, 0 choice bits, no poisoned fillers) + Witten-Bell transitions; known-only >= +0.06, OOV effect >= 0, F1 measured | below | | |
+| 6 | ESTIMATION: once-seen train words collapse to one learned UNK symbol (the model learns where unknown words go, 0 choice bits, no poisoned fillers) + Witten-Bell transitions; known-only >= +0.06, OOV effect >= 0, F1 measured | below | OOV effect +0.012 = FIRST POSITIVE (learned UNK works); known-only +0.034 (FAIL); F1 +0.018 (FAIL); purity 0.820; Witten-Bell adds nothing (-0.004). CALIBRATION: a Witten-Bell WORD bigram gains -0.005 / +0.020 / +0.046 vs unigram at 30k / 100k / 300k -> the 10% bar is unreachable for ANY bigram on Wiktionary examples (independent sentences, lexical bits dominate) | corpus, not method: move to a redundant register (child-directed speech, narrative) -> it.7 |
+| 7 | REGISTER: on child-directed speech (CHILDES Brent, on disk) and narrative (Alice) the class bigram's held-out gain vs unigram reaches F1 (>= 0.10) AND beats the Witten-Bell word bigram; on Wiktionary it cannot | below | | |
 
 ## ITERATION 1 -- corpus size (committed before the run)
 
@@ -268,3 +269,42 @@ Gates.
   I6-e  purity on frequent words (report).
 Predictions. I6-a +0.06 to +0.09. I6-b +0.01 to +0.04 (flips positive). I6-c total +0.04 to +0.08: FAIL predicted,
 with the class trigram registered as the structural step that follows.
+
+## ITERATION 6 -- RESULT (loop_it6_unk.py build 371 s / eval 5 s)
+Settled at 17 passes (91 moves). V=11963 after collapsing 24495 once-seen types; identity 14.58 bits per UNK
+token, paid by both models. **I6-b PASS: gain on UNK-bearing sentences +0.012 -- the first non-negative OOV result
+in six attempts; the mechanism that works is a LEARNED unknown class (UNK sits in its own class 127 with 13
+words), not a rule.** I6-a FAIL known-only +0.034; I6-c FAIL total +0.018; I6-e purity 0.820 (frequent words).
+I6-d: UNK without Witten-Bell +0.022 > both +0.018: Witten-Bell contributes -0.004, dropped. Ablation (ii) as
+printed (-0.084) is INVALID: ClassBigramWB.sentence ignored conjecture=False and took the log2 K choice path;
+fixed after the run, recorded as a runner bug, not a result.
+**CALIBRATION (post-hoc, decisive for the loop's direction):** a Witten-Bell interpolated WORD bigram vs unigram
+on the same held-out: N=30k -0.005 (UNK sentences 0.66, identity bits 21% of the unigram total); N=100k +0.020;
+N=300k +0.046. No bigram of any kind reaches +0.10 on this corpus at any size we can process, and our class bigram
+at 30k (+0.018) already BEATS the word bigram (-0.005) by 2.3 points -- classes generalize where words cannot,
+which is the sequential-form claim, confirmed at small effect. The +0.10 bar (F1) is therefore a property of the
+CORPUS: Wiktionary usage examples are independent sentences chosen to illustrate rare headwords; their bits are
+lexical choice, not sequence. Fluency is a property of a REGISTER with sequential redundancy -- conversation,
+narrative -- and that is where a learner acquires it. Terminal criterion F1 is kept as written (>= 0.10 vs unigram)
+and gains a control clause: the class model must also beat the Witten-Bell word bigram on the same held-out
+(generalization), and the corpus must be one where fluency is a meaningful target. Recorded, not tuned: the
+Wiktionary numbers stay in the ledger as the negative register.
+
+## ITERATION 7 -- REGISTER: child-directed speech and narrative (committed before the run)
+
+Hypothesis. The same mechanism (exchange classes, class bigram, learned UNK) reaches F1 on registers with
+sequential redundancy: CHILDES Brent child-directed speech (`_nldata/brent_phono.txt`, 9790 phonemic utterances,
+the canonical acquisition corpus) and Alice (narrative). Prediction of DIRECTION across registers is the content:
+Brent >= 0.10, Alice 0.03-0.08, Wiktionary +0.02 (it.6).
+Mechanism unchanged; K in {16, 32, 64} for Brent (small vocabulary), {32, 64} for Alice; exchange to settled (seconds);
+UNK for count-1 words; unigram and Witten-Bell word-bigram controls, identity bits paid by all three.
+Data splits by ORDER (first 80% train, last 20% held-out) so held-out is genuinely later text.
+Gates.
+  I7-a  Brent: best-K class bigram gain vs unigram >= +0.10 (F1) AND > Witten-Bell word bigram gain.
+  I7-b  Alice: gain and control reported; F1 predicted not reached.
+  I7-c  ORDER across registers: Brent > Alice > Wiktionary (it.6 value), for both the class model and the word bigram.
+  I7-d  K1 shuffled order on Brent must collapse the class-bigram gain to < half.
+  I7-e  audit: Brent classes printed (phonemic symbols; no WordNet purity possible); Alice purity.
+Predictions. Brent +0.15 to +0.30 (child-directed speech is highly formulaic), word bigram +0.10 to +0.25, class
+model > word bigram by 0.02-0.08 at best K. Alice +0.04 to +0.08. If I7-a fails, the register hypothesis dies and
+the ledger's remaining candidates are context order (class trigram) and units over classes, on Brent.
