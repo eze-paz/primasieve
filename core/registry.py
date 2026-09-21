@@ -56,6 +56,8 @@ PUBLISHED = {
     "cogs_stage8": ["STAGE 8 MEANING-FIRST FLUENT REALIZATION: PASS", "CONFABULATION 0/1800"],
     # ---- Stage 9: FORM from raw text -- registered NULL (whole-sentence skeletons memorize; see cogs_stage9_prereg.md)
     "cogs_stage9": ["STAGE 9 FORM FROM RAW TEXT: NULL", "CONTROL DISCRIMINATES"],
+    # ---- Stage 9b: compositional form -- registered NULL (64% held-out OOV; uniform symbol code loses to unigram on known)
+    "cogs_stage9b": ["STAGE 9b COMPOSITIONAL FORM: NULL", "CONFAB 0"],
 }
 
 

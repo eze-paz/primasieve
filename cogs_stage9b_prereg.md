@@ -81,3 +81,32 @@ G9b-2 fails => NULL twice; the next hypothesis is not another unit type but that
 MDL floor for form, to be tested by corpus size before any mechanism change. G9b-2 passes but K5 shows units
 contribute under half the gain => the gain is from class merging alone, reported as such. G9b-3 confab > 0 =>
 the cheapest-segmentation rule is unsound as a commit rule and must give way to the SET.
+
+## RESULT (2026-09-21; `python cogs_stage9b.py`, 210 s under the cap)
+
+**NULL, the second time, as pre-committed.** G9b-1 782/782. **G9b-2 held-out gain -0.003 vs unigram (gate
++0.100), grammar 17866 bits vs memory 17769.** Train DL fell 74058 -> 58152 (439 class merges + 150 units, 5453
+exact evaluations, 47 rounds, 75 s budget SPENT), so the mechanism compresses what it saw and does not transfer.
+G9b-7 units 123, mean length 2.07, held-out TOKENS covered by multi-token units 0.352 (prediction 0.30-0.50 met);
+the units are real English chunks (i|dare/suppose/wonder, said|alice, said|the|caterpillar/dormouse/hatter, i|ll/
+shall/should, the|best/cat/door/duchess). G9b-3 unique parse == generating 923/1000, ABSTAIN (tie) 77, CONFAB 0 --
+not by construction this time; the tie count is the predicted honest abstain. G9b-4 200/200. G9b-5 POS purity
+0.799 (predicted 0.80-0.90). G9b-6 0/13 synonyms accepted, again. K5 units disabled: -0.043, so units ADD about
++0.04 to the held-out code -- but the total is still negative, so "units carry the gain" is undefined. K1 -0.048
+(uninformative: the real run fails too). K2 0 candidates. K3 similar+random DL 58152 vs similar-only 60304 (random
+candidates help, as in Stage 9).
+
+**Post-hoc decomposition (diagnostic, not a gate, run after the result):** 176 of 275 held-out sentences (64%)
+contain a word never seen in train and cost exactly the baseline by construction -- they cannot move the gate in
+either direction. On the 99 fully-known sentences the grammar LOSES 1.1%: symbol bits 4494 at a UNIFORM
+log2(K+|P|) = 9.21 bits per symbol, filler bits 534, length 355, vs unigram 5325. A frequency-adaptive symbol and
+filler code (train counts, add-one) would cost 4889 on the same sentences = +0.082 -- still under the bar, and
+post hoc, so it is a note for the next pre-registration, not a result.
+
+**Reading, committed here:** (1) the registered next hypothesis stands -- 782 training sentences leave 64% of
+held-out sentences out of vocabulary; that is a CORPUS-SIZE effect and it must be tested by corpus size before any
+mechanism change (a larger raw corpus under the same code; brent/tagged/other Gutenberg texts are on disk).
+(2) The fixed uniform symbol code handicaps the grammar against a frequency baseline by design; a future prereg
+may register an adaptive code, stated in advance. (3) What DID transfer: the class map (POS purity 0.80), the units
+(0.35 of held-out tokens), and a round trip with real ambiguity and zero confab. Form is being learned; it is not
+yet paying for itself in bits on this corpus.
