@@ -1,0 +1,57 @@
+{
+ "spain": {
+  "capital": [
+   "madrid"
+  ],
+  "official language": [
+   "spanish"
+  ],
+  "currency": [
+   "euro"
+  ]
+ },
+ "france": {
+  "capital": [
+   "paris"
+  ],
+  "official language": [
+   "occitan"
+  ],
+  "currency": [
+   "euro"
+  ]
+ },
+ "italy": {
+  "capital": [
+   "rome"
+  ],
+  "official language": [
+   "italian"
+  ],
+  "currency": [
+   "lira"
+  ]
+ },
+ "portugal": {
+  "capital": [
+   "porto"
+  ],
+  "official language": [
+   "portuguese"
+  ],
+  "currency": [
+   "euro"
+  ]
+ },
+ "germany": {
+  "capital": [
+   "berlin"
+  ],
+  "official language": [
+   "german"
+  ],
+  "currency": [
+   "euro"
+  ]
+ }
+}

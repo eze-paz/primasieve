@@ -503,3 +503,19 @@ every gate carrying the arm that reproduces HEAD's behaviour, loaded from git. R
 distinct positions; a question one world answers by coincidence does not test composition; a name for an operator is
 a function (inconsistent examples are never searched); purity is over ALL teaching or a filler gets bound; hand a
 world its own readings back, never a label to re-search.
+
+### 2026-09-22 -- W6 critical thinking (critical_prereg.md): contradictory claims and the record of a source
+`core/ledger.py`: per source NAME, counts of confirmed / contradicted certificate outcomes and the retracted claims,
+written only by an oracle (the confirmation channel `Session.teach`; an attached world with attributed=False, whose
+value stands over a quoted claim and contradicts its source). `core/reason.py`: a claim's identity includes its world
+(main had merged two sources' identical structure into one multi-valued ATTRIBUTED set holding the wrong value); a
+CONTEST between quoted values lists each option's sources and record; exactly one option with a strictly better record
+(its BEST source's: fewer contradictions, then more confirmations -- never a sum, a sum is a vote) -> CONJECTURED
+(core.verdict's fourth state), otherwise READINGS. `frames.py`: a sixth frame CONJECTURE ("Probably X (per A; record
+c confirmed, d contradicted) rather than Y (...). Correct me if wrong.") with exact inverse. `core/triples.py`: a JSON
+{entity: {property: [values]}} source with the Wikidata source's interface, so KGWorld is reused unchanged.
+Gate `critical.py` over three seeded local sources: PASS, CONFAB 0, one wrong conjecture corrected, permutation of
+source names invariant. Rules that paid: a claim is (structure, source); a record belongs to a name; corroboration
+is printed, never counted.
+Profile (owner, 2026-09-22): 304 of 424 s were the Wikidata source re-parsing cached JSON under the two-hop path
+search; parsed claims are now memoized per run (kb_wikidata.claims), runner 277 s -> 37 s, verdicts unchanged.

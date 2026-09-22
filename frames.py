@@ -12,9 +12,9 @@ Frame shapes (dicts):
 import re
 
 from core.reason import READINGS, PARTIAL, WEAK, NOT_FOUND, Composite
-from core.verdict import ATTRIBUTED, COMMIT
+from core.verdict import ATTRIBUTED, COMMIT, CONJECTURED
 
-ANSWER, READ, PART, FOUND, PROPOSE = "ANSWER", "READINGS", "PARTIAL", "FOUND", "PROPOSE"
+ANSWER, READ, PART, FOUND, PROPOSE, CONJ = "ANSWER", "READINGS", "PARTIAL", "FOUND", "PROPOSE", "CONJECTURE"
 SEP = " ; "
 
 # meaning-preserving variants (the RNG's whole range)
@@ -23,6 +23,8 @@ V_SUPPORT = ["support:", "evidence:", "derived from:"]
 V_ASK = ["Which did you mean?", "Which reading do you want?", "Say which one."]
 V_MISS = ["could not apply", "did not use", "found no way to apply"]
 V_NEXT = ["Next step:", "To resolve this:", "What would settle it:"]
+V_CORRECT = ["Correct me if wrong.", "Say so if that is wrong.", "Tell me if not."]
+V_RATHER = ["rather than", "over", "and not"]
 
 
 def realize(frame, rng):
@@ -45,6 +47,11 @@ def realize(frame, rng):
         s = "Found: " + SEP.join(f'"{t}" ({rng.choice(V_PER)} {src})' for t, src in qs)
     elif k == PROPOSE:
         s = f"Nothing found. Consulted: {SEP.join(frame['consulted']) or 'no source'}. {rng.choice(V_NEXT)} {frame['action']}"
+    elif k == CONJ:
+        v, src, c, d = frame["choice"]; riv = list(frame["rivals"])
+        if rng.random() < 0.5: riv = riv[::-1]
+        s = (f"Probably {v} (per {src}; record {c} confirmed, {d} contradicted) {rng.choice(V_RATHER)} "
+             + SEP.join(f"{v2} (per {s2}; record {c2} confirmed, {d2} contradicted)" for v2, s2, c2, d2 in riv) + f". {rng.choice(V_CORRECT)}")
     else:
         raise ValueError(k)
     return s
@@ -59,6 +66,8 @@ RX_PART = re.compile(rf"^Partial: resolved (.+?) \({_alt(V_SUPPORT)} (.*?)\) but
 RX_FOUND = re.compile(rf"^Found: (.*)$")
 RX_PROPOSE = re.compile(rf"^Nothing found\. Consulted: (.+?)\. {_alt(V_NEXT)} (.*)$")
 RX_QUOTE = re.compile(rf'^"(.*)" \({_alt(V_PER)} (.+)\)$')
+RX_REC = r"(.+?) \(per (.+?); record (\d+) confirmed, (\d+) contradicted\)"
+RX_CONJ = re.compile(rf"^Probably {RX_REC} {_alt(V_RATHER)} (.+)\. {_alt(V_CORRECT)}$")
 
 
 def parse(text):
@@ -88,6 +97,14 @@ def parse(text):
     m = RX_PROPOSE.match(text)
     if m:
         c = m.group(1); return dict(kind=PROPOSE, consulted=[] if c == "no source" else c.split(SEP), action=m.group(2))
+    m = RX_CONJ.match(text)
+    if m:
+        riv = []
+        for r in m.group(5).split(SEP):
+            mm = re.match("^" + RX_REC + "$", r)
+            if not mm: return None
+            riv.append((mm.group(1), mm.group(2), int(mm.group(3)), int(mm.group(4))))
+        return dict(kind=CONJ, choice=(m.group(1), m.group(2), int(m.group(3)), int(m.group(4))), rivals=sorted(riv))
     return None
 
 
@@ -97,6 +114,7 @@ def canonical(frame):
         if k in f: f[k] = sorted(f[k])
     if "options" in f: f["options"] = sorted(f["options"])
     if "quotes" in f: f["quotes"] = sorted(f["quotes"])
+    if "rivals" in f: f["rivals"] = sorted(f["rivals"])
     return f
 
 
@@ -132,8 +150,12 @@ def to_frame(fr, world=None, kind_hint=None):
         elif kind_hint == "table": sources = ["the table"]
         return dict(kind=ANSWER, values=[str(l) for _, l, _, _, _ in fr["answers"]],
                     supports=[sup_str(s, lab) for _, _, sups, _, _ in fr["answers"] for s in sups[:1]], sources=list(sources))
+    if k == CONJECTURED:
+        ct = fr["contest"]; choice = (str(ct[0][0]), "+".join(ct[0][1]), ct[0][2], ct[0][3])
+        return dict(kind=CONJ, choice=choice, rivals=[(str(v), "+".join(src), c, d) for v, src, c, d in ct[1:]])
     if k == READINGS:
-        opts = [(str(l), sup_str(sups[0], lab)) for _, l, sups, _, _ in fr["answers"]]
+        recs = {str(v): f" [{'+'.join(src)}: {c} confirmed, {d} contradicted]" for v, src, c, d in fr.get("contest", [])}
+        opts = [(str(l), sup_str(sups[0], lab) + recs.get(str(l), "")) for _, l, sups, _, _ in fr["answers"]]
         return dict(kind=READ, options=opts, split="one of: " + " / ".join(o[0] for o in opts))
     if k == PARTIAL and quotes:          # the dictionary alone spoke, and a symbol stayed unresolved: research, not an answer
         consulted = [f"readings {', '.join(str(l) for _, l, _, _, _ in fr['answers'])[:120]}"] + sources_of(fr)

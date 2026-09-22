@@ -23,6 +23,7 @@ from kb_sources import Lexica
 import kg_multihop as KG
 
 T0 = time.time()
+BASELINE = "9ab9ed3"     # main BEFORE general_prereg.md (the commit this work started from): the arms below reproduce it
 
 
 def say(s=""): print(str(s).encode("ascii", "replace").decode(), flush=True)
@@ -63,15 +64,15 @@ def score(fr, gold):
 
 
 def main_table_module():
-    """today's main core/table.py (git HEAD), loaded as a standalone module: the single-table arm."""
-    src = subprocess.run(["git", "show", "HEAD:experiments/primasieve/core/table.py"], capture_output=True, text=True, cwd=HERE, encoding="utf-8").stdout
+    """main BEFORE this work (git BASELINE) core/table.py, loaded as a standalone module: the single-table arm."""
+    src = subprocess.run(["git", "show", f"{BASELINE}:experiments/primasieve/core/table.py"], capture_output=True, text=True, cwd=HERE, encoding="utf-8").stdout
     src = src.replace("from .reason import", "from core.reason import")
     m = types.ModuleType("table_main"); exec(compile(src, "table_main", "exec"), m.__dict__); return m
 
 
 def main_to_frame():
-    """today's main to_frame (git HEAD f4_dialogue.py): the single-world PROPOSE of W5-a."""
-    src = subprocess.run(["git", "show", "HEAD:experiments/primasieve/f4_dialogue.py"], capture_output=True, text=True, cwd=HERE, encoding="utf-8").stdout
+    """to_frame of main BEFORE this work (git BASELINE f4_dialogue.py): the single-world PROPOSE of W5-a."""
+    src = subprocess.run(["git", "show", f"{BASELINE}:experiments/primasieve/f4_dialogue.py"], capture_output=True, text=True, cwd=HERE, encoding="utf-8").stdout
     body = src[src.index("def to_frame(fr, world, kind_hint):"):src.index("class DictSources:")]
     ns = dict(ATTRIBUTED=ATTRIBUTED, COMMIT=COMMIT, READINGS=READINGS, PARTIAL=PARTIAL, WEAK=WEAK, NOT_FOUND=NOT_FOUND,
               ANSWER=ANSWER, READ=READ, PART=PART, FOUND=FOUND, PROPOSE=PROPOSE)

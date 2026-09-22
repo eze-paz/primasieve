@@ -64,6 +64,8 @@ PUBLISHED = {
     "f4_dialogue": ["F4 EPISTEMIC FRAMES: PASS", "BARE ABSTAIN: 0"],
     # ---- general (general_prereg.md): worlds as data, composition across worlds, library in the loop, turns, research
     "worlds_general": ["GENERAL WORLDS: PASS", "TOTAL CONFAB: 0"],
+    # ---- W6 (critical_prereg.md): contradictory claims and the record of a source; conjecture, never a vote
+    "critical": ["W6 CRITICAL THINKING: PASS", "CONFAB: 0"],
 }
 
 

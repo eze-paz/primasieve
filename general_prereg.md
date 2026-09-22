@@ -159,3 +159,13 @@ contradictory claims and the quality of sources. Today a contest is READINGS and
 corroboration, not an oracle"; there is no per-source track record. Pre-registration to write: a source LEDGER of
 certificate outcomes (a claim later contradicted by an executable or attached world counts against its source, as
 counts, never probabilities), contradictions surfaced with each side's record, retraction when an oracle disagrees.
+
+## PROFILE (2026-09-22, owner's question "where is the 277 s spent?")
+cProfile over the whole runner (424 s under the profiler): 304 s in the Wikidata source's `claims()` re-parsing the
+same cached JSON on every call (163,534 json.loads = 246 s), called 480k times by the two-hop PATH search
+(`core/kg.py path/weak`, 349k calls) that the session's context readings multiply (session turns = 373 s of the 424).
+The exec world's search was 21 s; everything else under 15 s. Fix: parse each entity's claims once per run
+(kb_wikidata.claims memo, exact). Runner: 277 s -> 37 s, verdicts unchanged (GENERAL WORLDS: PASS, CONFAB 0).
+Side effect recorded: kg_multihop now 36/40 correct, ask 0 (was 27/40, ask 9), CONFAB 0 -- the source-order
+tie-break (KGWorld.rank_key, added for W4) settles same-named entities that used to be asked; the registry needles
+(CONFAB 0, PASS) are unchanged and the count is reported here, not claimed.

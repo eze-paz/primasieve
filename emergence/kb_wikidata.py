@@ -74,6 +74,14 @@ class Wikidata:
         return self._entity(qid) or ""
 
     def claims(self, qid):
+        """parsed once per entity: the profile of worlds_general.py showed 163k re-parses of the same cached JSON
+        (304 of 424 s) under the two-hop path search; the memo is exact (the cache text never changes in a run)."""
+        memo = self.__dict__.setdefault("_claims", {})
+        if qid in memo: return {p: list(v) for p, v in memo[qid].items()}
+        out = self._claims_parse(qid); memo[qid] = out
+        return {p: list(v) for p, v in out.items()}
+
+    def _claims_parse(self, qid):
         txt = self._entity(qid)
         if txt is None: return {}
         ent = json.loads(txt).get("entities", {}).get(qid, {})

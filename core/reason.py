@@ -29,7 +29,7 @@ import collections
 import unicodedata
 
 from .resolve import segment
-from .verdict import ATTRIBUTED, COMMIT
+from .verdict import ATTRIBUTED, COMMIT, CONJECTURED
 
 READINGS, PARTIAL, WEAK, NOT_FOUND = "READINGS", "PARTIAL", "WEAK", "NOT FOUND"
 
@@ -100,9 +100,11 @@ def _spans(w, st):
 
 
 def _key(w, st):
+    """the identity of a CLAIM: the structure AND the world that made it. Two sources asserting the same
+    structure with different values are two claims in contest, never one multi-valued claim."""
     if isinstance(st, Composite):
         return ("PIPE", _key(st.inner[0], st.inner[1]), _key(st.outer[0], st.outer[1]))
-    return w.key(st) if hasattr(w, "key") else id(st)
+    return (getattr(w, "name", type(w).__name__), w.key(st) if hasattr(w, "key") else id(st))
 
 
 def _label(w, v):
@@ -131,7 +133,7 @@ def _names(w, st):
     return [getattr(w, "name", type(w).__name__)]
 
 
-def reason(text, world, df=None, cats="L", context=(), pipe=None):
+def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None):
     """-> Frame dict: kind, answers [(value, label, supports, certs, structure)], missing, weak, readings, consulted,
     sources (the world names of the top survivors), syms."""
     worlds = list(world) if isinstance(world, (list, tuple)) else [world]
@@ -192,6 +194,7 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None):
     frame["answers"] = [(v, _label(lst[0][0], v), [x[2] for x in lst], set().union(*[set(x[3]) for x in lst]), lst[0][1])
                         for v, lst in values.items()]
     frame["answer_worlds"] = [lst[0][0] for lst in values.values()]          # the world of each answer, aligned
+    frame["answer_sources"] = [sorted({nm for w, st, _, _ in lst for nm in _names(w, st)}) for lst in values.values()]
     frame["sources"] = sorted({nm for lst in values.values() for w, st, _, _ in lst for nm in _names(w, st)})
     attributed = any(_attributed(w, st) for lst in values.values() for w, st, _, _ in lst)
     if unused:
@@ -202,5 +205,23 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None):
     kinds = {_key(w, st) for lst in values.values() for w, st, _, _ in lst}
     if len(kinds) == 1:
         frame.update(kind=ATTRIBUTED if attributed else COMMIT, multi=True); return frame
+    # a CONTEST between values. An attached world (attributed=False: the user's own data, an executable) is an
+    # oracle over quoted claims: its value stands, the quoted claims that differ are contradicted on the ledger.
+    quoted = [all(_attributed(w, st) for w, st, _, _ in lst) for lst in values.values()]
+    if ledger is not None and quoted.count(False) == 1:
+        k = quoted.index(False); keep = list(values)[k]
+        for i, (v, lst) in enumerate(values.items()):
+            if i != k: ledger.record(frame["answer_sources"][i], False, claim=(_label(lst[0][0], v), text))
+        frame["answers"] = [frame["answers"][k]]; frame["answer_worlds"] = [frame["answer_worlds"][k]]
+        frame["answer_sources"] = [frame["answer_sources"][k]]; frame["sources"] = frame["answer_sources"][0]
+        frame.update(kind=COMMIT, settled_by=frame["answer_sources"][0]); return frame
+    if ledger is not None and all(quoted):
+        recs = [ledger.of(src) for src in frame["answer_sources"]]
+        frame["contest"] = [(a[1], src, rec[1], rec[0]) for a, src, rec in zip(frame["answers"], frame["answer_sources"], recs)]
+        b = ledger.better(frame["answer_sources"])
+        if b is not None:                       # exactly one option's sources have a strictly better record: a guess with a correction channel
+            order = [b] + [i for i in range(len(recs)) if i != b]
+            for key in ("answers", "answer_worlds", "answer_sources", "contest"): frame[key] = [frame[key][i] for i in order]
+            frame.update(kind=CONJECTURED); return frame
     frame.update(kind=READINGS)
     return frame

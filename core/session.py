@@ -13,7 +13,13 @@ The only cues a Session uses are its own previous frame's values:
     (question, gold) pairs and retracts what the new example contradicts.
 No pronoun list, no speech-act taxonomy, no question-form classifier."""
 from .reason import reason, symbols, READINGS, PARTIAL, WEAK, NOT_FOUND
-from .verdict import ATTRIBUTED, COMMIT
+from .verdict import ATTRIBUTED, COMMIT, CONJECTURED
+from fractions import Fraction
+
+
+def _same(a, b):
+    try: return Fraction(str(a)) == Fraction(str(b))
+    except Exception: return str(a).lower() == str(b).lower()
 
 
 def _shape(w, st):
@@ -24,8 +30,8 @@ def _shape(w, st):
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3):
-        self.worlds = list(worlds); self.df = df; self.depth = depth
+    def __init__(self, worlds, df=None, depth=3, ledger=None):
+        self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
         self.history = []            # [(text, frame)]
         self.prefs = {}              # shape -> chosen structure key
         self.teaching = []           # [(question, gold)]
@@ -55,7 +61,7 @@ class Session:
                 fr = dict(prev, kind=prev.get("attributed_kind", COMMIT), answers=[hits[0]], chosen=True)
                 fr["used"] = _used(fr, w, st)
                 self.history.append((text, fr)); return fr
-        fr = reason(text, self.worlds, self.df, cats="LN", context=self.context())
+        fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger)
         if fr["kind"] == READINGS and self.prefs:
             keep = [(a, w) for a, w in zip(fr["answers"], fr["answer_worlds"]) if _shape(w, a[4]) in self.prefs]
             if len(keep) == 1:
@@ -70,6 +76,13 @@ class Session:
         """the confirmation channel: (question, confirmed answer) -> the world named (or every world that learns)
         re-induces from all its pairs; a binding the new pair contradicts is retracted by the world itself."""
         self.teaching.append((question, gold, world)); out = {}
+        if self.ledger is not None:                     # the oracle writes the record of every source that spoke on this question
+            for t, fr in reversed(self.history):
+                if t != question or not fr.get("answers"): continue
+                for a, src in zip(fr["answers"], fr.get("answer_sources", [])):
+                    ok = _same(a[1], gold)
+                    self.ledger.record(src, ok, claim=None if ok else (a[1], question))
+                out["ledger"] = self.ledger.snapshot(); break
         for w in self.worlds:
             if not hasattr(w, "induce_lexicon"): continue
             pairs = [(q, g) for q, g, ww in self.teaching if ww is None or ww is w]
