@@ -198,9 +198,10 @@ class Enumerator:
     """BOOL terms with typed holes, by number of atom applications, deduped by observational signature on probe
     situations. `lam=True` tables also contain the bound variable (bodies for SELECT)."""
 
-    def __init__(self, probes, elems, rels, sels, library=None, max_ops=None):
+    def __init__(self, probes, elems, rels, sels, library=None, max_ops=None, sig_mode="rotation"):
         self.library = library or {}                      # fragment term -> (type, has_var): extra LEAVES
         self.max_ops = max_ops if max_ops is not None else MAX_OPS
+        self.sig_mode = sig_mode                          # "rotation" (shipped) | "product" (compositional; nolf_sig_prereg.md)
         self.atoms = _atoms_by_sig()
         self.probes = probes; self.elems = sorted(elems, key=repr); self.rels = rels; self.sels = sels
         rng = random.Random(0)
@@ -218,8 +219,16 @@ class Enumerator:
         and are different terms -- the first version merged them and lost negation."""
         f = compile_term(term); hs = holes(term)
         out = [tuple(hs)]
-        for j in range(5):
-            env = tuple(self.envs[h][(j + q) % len(self.envs[h])] for q, h in enumerate(hs))   # distinct per hole
+        if self.sig_mode == "product":
+            # COMPOSITIONAL (nolf_sig_prereg.md): the term's value on EVERY combination of hole values from a fixed
+            # per-kind domain of two. Two terms equal here are equal as functions on those domains, so any composition
+            # over them is equal too -- the rotation signature below is not compositional (a hole's value depends on its
+            # index in the whole term), which is why an extended table could differ from a rebuilt one at depth 4.
+            envs = itertools.product(*[self.envs[h][:2] for h in hs])
+        else:
+            envs = [tuple(self.envs[h][(j + q) % len(self.envs[h])] for q, h in enumerate(hs)) for j in range(5)]   # distinct per hole
+        for env in envs:
+            env = tuple(env)
             for s in self.probes:
                 vs = self.vars if lam else [None]
                 for v in vs:

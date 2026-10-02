@@ -600,3 +600,28 @@ at this size); at max_ops=4 the sets differ by 11 and 2 of ~15,000 level-4 signa
 signature is approximate and not compositional (hole environments are indexed by position in the whole term), so
 representative choice matters there -- the gate as registered fails at 4 and says so; strings at max_ops=4 did not
 finish three full builds in 50 minutes and is reported as not run.
+
+### 2026-10-02 -- a compositional signature for the nolf enumerator (nolf_sig_prereg.md): a recorded null with one exact fact
+The rotation signature (`Enumerator._sig`: five hole environments indexed by the hole's position in the whole term) is
+not compositional, which is why an extended table differed from a rebuilt one by 11 of ~15,000 depth-4 signatures.
+`Enumerator(sig_mode="product")` is the compositional alternative -- a term's value on every combination of two values
+per hole kind -- and `nolf_sig.py` measured it: EQUIVALENT under extend() at depth 2 on both worlds (the library pass's
+setting, where rotation is already equivalent); at depth 4 the three records builds did not finish in 45 minutes
+against ~100 s each under rotation (> 9x; bar 2x), so the depth-4 case the gate named could not be measured and the
+default does not flip. Prediction miss recorded: the product signature with a two-value domain MERGES more than
+rotation (records level 2: 204 -> 197; strings 310 -> 295) -- coarser on INT holes compared against values above 1 --
+not fewer. Compositionality costs exponential-in-holes evaluations here; the rotation signature's defect is a bounded
+approximation the learner's library pass never meets. Nothing registered; the option stays as the exact one.
+
+### 2026-10-02 -- near-miss fragments, a target-aware selector for library growth (nolf_select_prereg.md): NULL
+The closure prereg left one question: the SELECTOR for promoted fragments. `nolf_select.py` tests the signal between
+recurrence (target-blind, dead) and a seeded schema (hand-given): at a stall, score the depth-4 candidates on the
+unsolved skeleton's own rows by max-SAT over one denotation assignment (balanced rows), promote the sub-terms of the
+closest misses into the two-application library table (`Enumerator.extend`), retry. Measured: strings `near` **0.7483**
+= `random` = `recur` = `once`, 6 constructions each, CONFAB 0 on every split of every arm; records 1.000; shuffled 6 vs 6.
+The landscape it was built to see is there -- balanced max-SAT is SPREAD (max 30/40, median 22, mode share 25 %), so
+inside a task there is a slope, as E9/E15 found and E-5 did not -- but in 25 s the probe reaches ~700 depth-4
+candidates, the top of them relation/count near-misses whose sub-terms unlock nothing, and the positions/successor
+near-miss is not reached. Four measurement confounders were found and fixed in order and are recorded in the prereg
+(reduced vs unreduced skeleton; per-row vs global score; which table to probe; unbalanced rows). The seventh strings
+construction still costs one seeded schema. Not registered.
