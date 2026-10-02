@@ -146,25 +146,31 @@ class ExecWorld:
         """expression trees over the read numbers: one or two operator applications, the operator words in either
         nesting order (nothing here knows how a language nests), the NUMBER leaves in textual order (an argument
         order is a fact about the text; permuting it would manufacture readings the text does not carry). A
-        CONTEXT number (a previous turn's value, marked by the loop) has no textual position: both orders."""
+        CONTEXT number (a previous turn's value, marked by the loop) has no textual position. With ONE explicit operand
+        it takes the operator's other side ("minus 4" after 34 -> 34 minus 4; "5 minus it" -> 5 minus it): the side
+        is read off the text, not off a word. Two context numbers under one operator keep both orders (nothing in the
+        text orders them). Measured before this rule: "minus 4" gave READINGS {-30, 30}, an ask where the text was
+        not ambiguous (turns prereg, T-b)."""
         nums = sorted((r for r in rd if r[2] == "N"), key=lambda r: r[0]); ops = [r for r in rd if r[2] == "O"]
         virt = lambda r: len(r) > 5
-        def pairs():
+        def pairs(o):
             for i in range(len(nums)):
                 for j in range(i + 1, len(nums)):
-                    yield nums[i], nums[j]
-                    if virt(nums[i]) or virt(nums[j]): yield nums[j], nums[i]
+                    a, b = nums[i], nums[j]                           # a precedes b; context numbers sit past the text
+                    if virt(a) and virt(b): yield a, b; yield b, a
+                    elif virt(b): yield (a, b) if a[0] < o[0] else (b, a)
+                    else: yield a, b
         out = []
         for o in ops:
             k = arity(o[3], self.lib)
             if k == 1: out += [((o, a),) for a in nums]
-            elif k == 2: out += [((o, a, b),) for a, b in pairs()]
+            elif k == 2: out += [((o, a, b),) for a, b in pairs(o)]
         for o1 in ops:
             for o2 in ops:
                 if o1 is o2: continue
                 k1, k2 = arity(o1[3], self.lib), arity(o2[3], self.lib)
                 if k2 == 1: inner = [(o2, a) for a in nums]
-                elif k2 == 2: inner = [(o2, a, b) for a, b in pairs()]
+                elif k2 == 2: inner = [(o2, a, b) for a, b in pairs(o2)]
                 else: inner = []
                 for inn in inner:
                     if k1 == 1: out.append(((o1, inn),)); continue
@@ -174,7 +180,12 @@ class ExecWorld:
                         if c in used: continue
                         if c[0] > hi or virt(c): out.append(((o1, inn, c),))
                         if c[0] < lo or virt(c): out.append(((o1, c, inn),))
-        return out
+        # a tree built from context alone reads nothing of the text: with three turns of numbers and operator words in
+        # context, such trees were most of the thousands evaluated per turn (turns prereg, runtime)
+        def explicit(node):
+            if not isinstance(node[0], tuple): return not virt(node)
+            return not virt(node[0]) or any(explicit(k) for k in node[1:])
+        return [st for st in out if explicit(st[0])]
 
     def _tree(self, node):
         """structure node -> (tree over ids, spans)"""

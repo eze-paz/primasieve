@@ -561,3 +561,39 @@ source names invariant. Rules that paid: a claim is (structure, source); a recor
 is printed, never counted.
 Profile (owner, 2026-09-22): 304 of 424 s were the Wikidata source re-parsing cached JSON under the two-hop path
 search; parsed claims are now memoized per run (kb_wikidata.claims), runner 277 s -> 37 s, verdicts unchanged.
+
+### 2026-10-02 -- turns over longer dialogues (turns_prereg.md): the context fills what the text leaves open
+Gate `turns.py` (registered: TURNS BIND: PASS, CONFAB 0): seven dialogues of 3-6 turns over the four worlds of
+worlds_general -- competing antecedents settled by recency, ellipsis of either argument ("and the official language" /
+"and of spain"), cross-world chains (a records city -> its Wikidata country -> its language; a count -> "double it"),
+an antecedent three turns back, "what is the difference" over two previous salaries, a person chain through records --
+**22/22 dependent turns, CONFAB 0 over all 29 turns**; controls with no antecedent or a wrong-kind antecedent answered
+by a quote or a proposal, never a value (0/4); the depth-1 knockout loses the three-turn antecedent without
+confabulating; 32/32 replies round-trip; 7 s. The main arm (fe0f26f2's core/, loaded from git) on the same dialogues:
+**confab 1** ("what is the capital of japan" as a second turn -> Japan), **crash 1** ("what is the difference"), and
+"times 2" at **29 s vs 0.1 s**. Four world-free, word-free changes: `core/reason.py` drops a survivor that reads nothing
+of the text, runs one pipe pass per distinct substitution, and applies the rule that names the arc -- a survivor using a
+context reading of kind K is dropped when the same world has a context-free survivor using an explicit kind-K reading
+it left unused; an inner that borrowed from context while an explicit same-kind reading sits unused is not composed
+further; `core/exec.py` puts a single context operand on the operator's other side (read off the text) and emits no
+context-only tree; `core/table.py` emits DIFF only for a collection holding the filters' header. Prediction miss
+recorded: the residual cost was the domination check and 216 pipe passes, not Wikidata. Not claimed: pronoun
+semantics (the pronouns are unread symbols), set antecedents, antecedents from the user's own statements; the
+dictionary's reading of "what" is what a PARTIAL shows when nothing binds, and rendering that is the next fix.
+
+### 2026-10-02 -- nolf incremental enumeration table (nolf_rebuild_prereg.md): `Enumerator.extend`
+The closure prereg's one transferable result was the cost of a library rebuild (24 promoted leaves: 4.6x the base
+table; a second round unaffordable) and its recommendation was to cache the base levels. Measured first: every library
+rebuild is a TWO-application table (`max_ops=2`), whose base costs 0.1-0.2 s, so caching it saves nothing (B4: 3 % at
+best, negative on strings -- the recommendation was wrong in its stated form). The recomputation is the previous round's
+library terms. `nolf_learn.Enumerator.extend(library)` adds fragments to a built table: signatures memoized across
+rounds, only compositions with a new argument enumerated, a shallower duplicate replaces a deeper representative.
+Gate `nolf_rebuild.py` on the real fragments of one fit per world (`nolf_fragments.json`): **at max_ops=2 the extended
+table is EQUIVALENT to a full build -- identical signature sets per (lam, level, type) -- on both worlds, from the base
+and from a half library** (registered needle); the learner's library pass now runs through it with records 1.000 /
+1.000 and strings 0.7483 unchanged at CONFAB 0. Recorded misses: round-2 speedup 1.4-2.9x against a 3x bar (with 4-6
+retained fragments the delta is most of the table; the saving grows with the retained library and could not be shown
+at this size); at max_ops=4 the sets differ by 11 and 2 of ~15,000 level-4 signatures because the observational
+signature is approximate and not compositional (hole environments are indexed by position in the whole term), so
+representative choice matters there -- the gate as registered fails at 4 and says so; strings at max_ops=4 did not
+finish three full builds in 50 minutes and is reported as not run.

@@ -208,6 +208,11 @@ class TableWorld:
                                         out.append((ARGMAX if op == MAX else ARGMIN, c[3], filters, tg[3], None, fs + (c, tg), owords, hs, A.name, tsp))
                             if op == DIFF and not hs:
                                 for fa, fb in itertools.permutations(fils, 2):
+                                    # the two filters share a header, so they are not in `fs` and A ranges over EVERY
+                                    # collection: a collection without that header cannot be selected on it (a
+                                    # session's context offered ('employee', bob) and ('employee', alice) against the
+                                    # departments collection and select() crashed -- found by the turns gate)
+                                    if fa[3][0] not in A.headers: continue
                                     if fa[3][0] == fb[3][0] and disjoint([fa, fb, c] + list(tsp) + owords):
                                         if self.order == "first" and fa[0] > fb[0]: continue
                                         out.append((op, c[3], [fa[3]], None, [fb[3]], (fa, fb, c), owords, (), A.name, tsp))

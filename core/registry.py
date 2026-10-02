@@ -66,6 +66,11 @@ PUBLISHED = {
     "worlds_general": ["GENERAL WORLDS: PASS", "TOTAL CONFAB: 0"],
     # ---- W6 (critical_prereg.md): contradictory claims and the record of a source; conjecture, never a vote
     "critical": ["W6 CRITICAL THINKING: PASS", "CONFAB: 0"],
+    # ---- turns over longer dialogues (turns_prereg.md): competing antecedents, ellipsis of either argument, cross-world chains, controls
+    "turns": ["TURNS BIND: PASS", "CONFAB: 0"],
+    # ---- nolf incremental enumeration table (nolf_rebuild_prereg.md): the library pass's table is equivalent to a full build;
+    #      the speedup missed its bar and is not registered
+    "nolf_rebuild": ["INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT"],
 }
 
 

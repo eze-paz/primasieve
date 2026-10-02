@@ -141,18 +141,56 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None):
     if len(worlds) > 1 and cats == "L": cats = "LN"
     syms = symbols(text, cats); n = len(syms)
     survivors, weaks, readings = _pass(syms, worlds, context)
+    # a structure that reads nothing of the TEXT answers nothing of it: context readings alone (two previous values
+    # under a previous operator word) built thousands of such survivors per turn, and every one was pipe-expanded
+    # (turns prereg: "minus 4" after three turns took 638 s and 5.0 million evaluations; the same pass was re-run
+    # for every tree that produced the same label, 721 passes for 2 distinct substitutions)
+    recs = [(w, st, res, _spans(w, st)) for w, st, res in survivors]
+    recs = [r for r in recs if any(i < n for i, _ in r[3])]
+    # context fills what the text leaves OPEN, nothing more: a survivor that reaches into context for a reading of
+    # kind K is dropped when the same world has a context-free survivor using an EXPLICIT reading of kind K that the
+    # first one does not use (turns prereg T-a: after "capital of france", "what is the capital of japan" answered
+    # Japan -- the three-symbol name reading "capital of Japan" plus the previous turn's property word outranked the
+    # text's own LOOKUP by coverage; the explicit property word was there and unused)
+    kinds_at = collections.defaultdict(set)
+    for w, r in readings: kinds_at[(w, r[0], r[1])].add(r[2])
+    free = collections.defaultdict(set)                       # world -> {(span, kind)} used by its context-free survivors
+    for w, st, res, sp in recs:
+        if all(i < n for i, _ in sp):
+            for i, j in sp:
+                for k in kinds_at[(w, i, j)]: free[w].add((i, j, k))
+    def virtual_kinds(w, sp):
+        return set().union(*[kinds_at[(w, i, j)] for i, j in sp if i >= n]) if any(i >= n for i, _ in sp) else set()
+    def dominated(w, sp):
+        vk = virtual_kinds(w, sp)
+        if not vk: return False
+        mine = set(sp)
+        return any((i, j) not in mine and k in vk for i, j, k in free[w])
+    recs = [r for r in recs if not dominated(r[0], r[3])]
+    survivors = [(w, st, res) for w, st, res, _ in recs]
+    explicit_kinds = collections.defaultdict(set)              # world -> {(span, kind)} of every explicit reading
+    for w, r in readings:
+        if r[0] < n: explicit_kinds[w].add((r[0], r[1], r[2]))
+    passes = {}
     if pipe and n > 1:
-        for wi, sti, resi in list(survivors):
+        for wi, sti, resi, sp in list(recs):
             if getattr(wi, "quotes", False): continue            # quoted text is not a value to compute with
             if hasattr(wi, "labelled") and not wi.labelled(resi[0]): continue     # a value the world cannot name is not substitutable
-            sp = _spans(wi, sti); real = [(i, j) for i, j in sp if i < n]
+            real = [(i, j) for i, j in sp if i < n]
             if not real: continue
+            # an inner that borrowed a kind-K reading from context while an explicit kind-K reading of the text
+            # sits unused is not composed further: the text's own reading comes first ("minus 4" with three turns
+            # of numbers in context built 216 distinct inner values from context operators over the explicit 4)
+            vk = virtual_kinds(wi, sp)
+            if vk and any((i, j) not in set(sp) and k in vk for i, j, k in explicit_kinds[wi]): continue
             a, b = min(i for i, _ in real), max(j for _, j in real)
             if b - a >= n: continue
             lab = symbols(_label(wi, resi[0]), "LN")
             if not lab: continue
             syms2 = syms[:a] + lab + syms[b:]
-            surv2, _, _ = _pass(syms2, worlds, context)
+            k2 = tuple(syms2)
+            if k2 not in passes: passes[k2] = _pass(syms2, worlds, context)[0]       # one pass per distinct substitution
+            surv2 = passes[k2]
             for wo, sto, reso in surv2:
                 if wo is wi: continue                            # composition is across worlds; a world's own chains are its own
                 if getattr(wo, "quotes", False): continue        # a gloss of a computed value is not a composition

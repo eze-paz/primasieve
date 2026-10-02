@@ -209,6 +209,9 @@ class Enumerator:
         for s in probes[:2]:
             for x in list(s)[:3]: self.vars.append(x)
         self.tables = {}                                          # (lam) -> {ops: {type: [terms]}}
+        self.banks = {}                                           # (lam) -> {type: SignatureBank}
+        self.where = {}                                           # (lam) -> {term: (ops, type, signature)}
+        self._memo = {}                                           # (term, lam) -> signature, for extend() across rounds
 
     def _sig(self, term, lam):
         """observational signature. The hole KINDS are part of it: not(_b) and 0 < _i agree on every probe value
@@ -226,7 +229,8 @@ class Enumerator:
 
     def table(self, lam):
         if lam in self.tables: return self.tables[lam]
-        banks = collections.defaultdict(lambda: SignatureBank(cap=BANK_CAP))
+        banks = self.banks[lam] = collections.defaultdict(lambda: SignatureBank(cap=BANK_CAP))
+        where = self.where[lam] = {}
         T = collections.defaultdict(lambda: collections.defaultdict(list))
         # an ELEM hole is a distinct kind only when the situations hold elements that are not integers; where every
         # element is an integer (records) it duplicates the INT hole and doubles the table for nothing -- data decides
@@ -236,11 +240,13 @@ class Enumerator:
         for lf in leaves:
             ts = [HOLE_TYPE[lf[1]]] if lf[0] == "H" else types_of[lf[0]]
             for ty in ts:
-                if banks[ty].add(lf, ("leaf", lf, ty)): T[0][ty].append(lf)
+                sig = ("leaf", lf, ty)
+                if banks[ty].add(lf, sig): T[0][ty].append(lf); where[lf] = (0, ty, sig)
         for frag, (ty, hv) in self.library.items():                  # library fragments are leaves: depth for free
             if hv and not lam: continue
             if len(holes(frag)) > MAX_HOLES: continue
-            if banks[ty].add(frag, self._sig(frag, lam)): T[0][ty].append(frag)
+            sig = self._sig(frag, lam)
+            if banks[ty].add(frag, sig): T[0][ty].append(frag); where[frag] = (0, ty, sig)
         for k in range(1, self.max_ops + 1):
             new = []
             for (args, res), pids in self.atoms.items():
@@ -264,9 +270,89 @@ class Enumerator:
                             new.append((BOOL, ("SK", "any", sq, body)))
             for res, term in new:
                 if len(holes(term)) > MAX_HOLES: continue
-                if banks[res].add(term, self._sig(term, lam)): T[k][res].append(term)
+                sig = self._sig(term, lam)
+                if banks[res].add(term, sig): T[k][res].append(term); where[term] = (k, res, sig)
         self.tables[lam] = T
         return T
+
+    # ---- INCREMENTAL GROWTH (nolf_rebuild_prereg.md): add fragments to a BUILT table instead of rebuilding ------------
+    def extend(self, library):
+        """Add library fragments to the built tables. Measured problem (nolf_closure_prereg.md section 6): every library
+        rebuild started from nothing, so round r+1 regenerated every term of round r and recomputed its signature; 24
+        promoted leaves cost 4.6x the base table and a second round was unaffordable. Here only compositions with at
+        least one NEW (delta) argument are enumerated; signatures of library-derived terms are memoized across rounds.
+        A fragment (or a composition over one) whose signature already exists at a STRICTLY DEEPER level replaces that
+        representative -- the full build would have kept the shallower term, which is what "depth for free" means --
+        and one that exists at the same or a shallower level is dropped, as the bank drops it in a full build. The set
+        of signatures per (lam, level, type) is identical to a full build's below the cap (gate B1/B2); within a level
+        the representative and the order may differ, and that is declared, not claimed equal."""
+        new = {f: tv for f, tv in library.items() if f not in self.library}
+        self.library.update(new)
+        if not new or not self.tables: return {}
+        report = {}
+        delta_lam = self._extend(True, new) if True in self.tables else set()
+        report[True] = len(delta_lam)
+        if False in self.tables: report[False] = len(self._extend(False, new, delta_lam))
+        return report
+
+    def _msig(self, term, lam):
+        key = (term, lam); s = self._memo.get(key)
+        if s is None: s = self._memo[key] = self._sig(term, lam)
+        return s
+
+    def _extend(self, lam, new, delta_lam=()):
+        T, banks, where = self.tables[lam], self.banks[lam], self.where[lam]
+        delta = set()
+
+        def place(term, k, ty):
+            sig = self._msig(term, lam); old = banks[ty].hit(sig)
+            if old is None:
+                if not banks[ty].add(term, sig): return False
+            else:
+                ok, oty, _ = where[old]
+                if ok <= k: return False                                   # the existing representative is as shallow
+                T[ok][oty].remove(old); del where[old]; banks[ty].seen[sig] = term      # the shallower term wins
+            T[k][ty].append(term); where[term] = (k, ty, sig); delta.add(term)
+            return True
+
+        for frag, (ty, hv) in new.items():
+            if hv and not lam: continue
+            if len(holes(frag)) > MAX_HOLES: continue
+            place(frag, 0, ty)
+        for k in range(1, self.max_ops + 1):
+            gen = []
+            for (args, res), pids in self.atoms.items():
+                for split in _splits(k - 1, len(args)):
+                    pools = [T[n][t] for n, t in zip(split, args)]
+                    if not any(x in delta for pool in pools for x in pool): continue
+                    for combo in itertools.product(*pools):
+                        if not any(x in delta for x in combo): continue
+                        for p in pids: gen.append((res, ("A", p) + combo))
+            for split in _splits(k - 1, 2):                                             # RELATE
+                for a in T[split[0]][INT]:
+                    for b in T[split[1]][INT]:
+                        if a in delta or b in delta: gen.append((BOOL, ("R", a, b)))
+            if lam and k == self.max_ops: break
+            if not lam:                                                                    # SELECT over the lam table
+                L = self.tables[True]
+                for split in _splits(k - 1, 2):
+                    for sq in T[split[0]][SEQ]:
+                        for body in L[split[1]][BOOL]:
+                            if sq in delta or body in delta_lam:
+                                gen.append((BOOL, ("S", sq, body)))
+                                gen.append((BOOL, ("SK", "all", sq, body)))
+                                gen.append((BOOL, ("SK", "any", sq, body)))
+            for res, term in gen:
+                if len(holes(term)) > MAX_HOLES: continue
+                place(term, k, res)
+        return delta
+
+    def signature_sets(self):
+        """-> {(lam, ops, type): frozenset of signatures}: the equivalence check of nolf_rebuild_prereg.md."""
+        out = collections.defaultdict(set)
+        for lam, where in self.where.items():
+            for term, (k, ty, sig) in where.items(): out[(lam, k, ty)].add(sig)
+        return {k: frozenset(v) for k, v in out.items()}
 
     def candidates(self, max_ops=None):
         T = self.table(False)
@@ -674,8 +760,11 @@ class Learner:
                 # fragments -- and give the unsolved skeletons one more round. Once.
                 if library_pass or not fragments(self.grammar): break
                 library_pass = True
-                enum = Enumerator(probes, elems, rels, sels, library=fragments(self.grammar), max_ops=2)
-                enum.table(False); self.library_seconds = time.time() - t0
+                # built as a two-application base EXTENDED by the fragments (nolf_rebuild_prereg.md): the same table as
+                # Enumerator(..., library=fragments, max_ops=2) below the cap, and a later round costs only what is new
+                t_lib = time.time()
+                enum = Enumerator(probes, elems, rels, sels, max_ops=2); enum.table(False); enum.extend(fragments(self.grammar))
+                self.library_seconds = time.time() - t0; self.library_build_seconds = time.time() - t_lib
                 tried = {}; continue
             key, rows = max(todo, key=lambda kr: (pinned_frac(*kr), -unknown_classes(kr[0]), len(kr[1])))
             tried[key] = npins
