@@ -328,6 +328,48 @@ and G5 is untested on this code state; strings misses G2.
 Earlier note, kept: the G2 bar is 0.80 on both worlds. The learner is correct; the budget and the 4-atom ceiling are what it
 misses. The next lever is the enumeration itself: the 4-atom level holds 4,663 boolean terms and the true one is
 found by order, not by guidance.
+**Phase 3 follow-ups (2026-09-07; committed 2026-10-02 from the uncommitted working tree). Two registered nulls, one
+registered lift, five diagnostics.** Each probe is read-only against `nolf_learn.py` (patched in memory, never edited);
+`nolf_fast.py` is a speed tool (pickled enumeration table per world/ops/cap/library, so a hypothesis costs seconds, not a
+240 s fit). Nothing here is in `core/registry.py`: a lift on one registered split is not a PASS to protect.
+- **`nolf_closure.py` + `nolf_closure_prereg.md` -- closure-scheduled library growth: NULL.** Rounds of
+  enumerate/adopt/harvest with `core.closure` promoting distance-1 fragments by sub-term recurrence on a stall. At the
+  registered 240 s the mechanism never fires (the plain and library rounds consume the budget); at 900 s it promotes 24
+  leaves, which unlock **zero** constructions, and reaches the identical grammar (strings 0.7483) in 2.4x the time of
+  the `--once` knockout (C4 FAIL, C1 vacuous). Cause: recurrence surfaces generic structural hubs, and
+  verified-useful and frequently-occurring are different signals. Transferable cost result: 24 promoted leaves make
+  the table rebuild 4.6x more expensive (~315 s vs 69 s), and the base levels are recomputed although invariant.
+  Defect found on the way: the rebuild was not deadline-checked (records_shuffled ran 683 s on a 240 s budget); fixed.
+- **`nolf_collide_probe.py`, `nolf_cap_probe.py`, `nolf_handterm_probe.py`, `nolf_gradient_probe.py`** -- in order:
+  0 representational collisions on both worlds (the ceiling is not degree 4 in `core/grow.py`'s sense); `BANK_CAP`
+  6000 truncates the strings 4-atom level (3,986 of 20,159 kept; "4,663 terms" in the Phase 3 note was itself a
+  truncated count) but lifting the cap alone changes no result; every ingredient of the unsolved skeleton exists as a
+  1-atom primitive, so the blocker is not a missing atom; the first-failing-row index `_verify` already computes is a
+  graded sound signal the search discards (the probe logs its distribution, no claim made).
+- **`nolf_reuse_probe.py` -> `nolf_reuse.py` + `nolf_seed.py` + `nolf_reuse_prereg.md` -- slot reuse REFUTED, two
+  learner defects and one seeded schema take strings 0.7483 -> 0.8733.** The probe showed the target truth condition
+  of 'every x followed y' binds one slot twice and FITS the real solver, and the prereg named non-injective slot
+  mappings as the headline. Measured: the `--no-reuse` knockout reaches the bar, no passing arm adopts a non-injective
+  term (R4/R6 refuted), and reuse ON costs two to seven constructions (17,517 admissible terms, 8 spurious
+  alternatives). Lesson recorded: finding a fitting term that needs a mechanism does not show the mechanism is needed.
+  What did move the number, isolated arm by arm in `nolf_seed_results.json`: (1) the prediction path reduced greedily
+  and discarded constructions its own `fit` could use; an unreduced fallback (disagreement ABSTAINS) is the whole
+  compositional lift, 0.7483 -> 0.8733 at confab 0 -- a defect fix, the shipped learner under-reported itself;
+  (2) `ordered()` grouped by ops while the enumerator yields in table-level order, so the novelty sort ran inside
+  accidental runs of a few terms; replaced by one global fragment-first sort; (3) one owner-approved seeded schema,
+  `eq(at(S, succ(x)), _e)` (a fact about sequences, naming no word), with cap 60000 and the ordering fix, is jointly
+  necessary for the 7th construction, worth +0.0976 iid EM (0.8705 -> 0.9681) and nothing compositional. Both fixes
+  live in `nolf_seed.SeedLearner` (a subclass by source transform); `nolf_learn.py` is unchanged. Records 1.000
+  unchanged; shuffled lexicon bit-identical (strings G5 can now be MADE, not deferred).
+- **`nolf_paired.py` narrows the claim:** same fit, same seed, fallback the only difference -- +0.1250 at seed 1,
+  exactly 0.0000 at seeds 2 and 3; never a decrease, confab 0 in every cell. Cross-seed compositional EM with the
+  fallback: 0.8733 / 0.6817 / 0.4967 / 0.7233. The spread is how many constructions land in the budget (7/5/5), and
+  identical code gave 7 or 6 constructions on different runs because every deadline is wall-clock. The registered
+  split is seed 1; a 1-of-3 result is not reported as a general capability.
+Honest headline for the thread: one schema per hard predicate is authoring, not learning; the number to watch is the
+count of seeded schemas, not the EM. Next lever on this evidence is the rebuild cost (cache the invariant base levels),
+then the selector, not the schedule.
+
 ### SWE-MINE (2026-09-07) -- do structural rewrites repeat? A clean NEGATIVE
 `swe_mine_prereg.md`, `swe_mine.py`, `swe_mine_result.txt`. Owner's hypothesis: structural fixes in a mature
 repository repeat, so edit operators anti-unified from its history give the engine a coarser move set where a

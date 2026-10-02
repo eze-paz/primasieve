@@ -26,3 +26,8 @@ _experts/
 _experts.pack
 _disktest.bin
 _nldata/
+
+# caches
+__pycache__/
+_nolf_fast_cache/
+emergence/kb_cache.json

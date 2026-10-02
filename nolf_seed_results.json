@@ -1,0 +1,1061 @@
+{
+ "records_noreuse": {
+  "constructions": 6,
+  "learned": [
+   [
+    "zumo",
+    5,
+    6,
+    3
+   ],
+   [
+    "morth",
+    5,
+    6,
+    3
+   ],
+   [
+    4,
+    5,
+    6,
+    3
+   ],
+   [
+    "quim",
+    "B"
+   ],
+   [
+    "B",
+    "blen",
+    "B"
+   ],
+   [
+    4,
+    5,
+    6,
+    5
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.5133333333333333,
+    "abstain": 0.03166666666666667,
+    "confab": 0.455,
+    "n": 600,
+    "precision": 0.5301204819277109
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.7333333333333333,
+    "abstain": 0.0,
+    "confab": 0.26666666666666666,
+    "n": 210,
+    "precision": 0.7333333333333333
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.3380952380952381,
+    "abstain": 0.6142857142857143,
+    "confab": 0.047619047619047616,
+    "n": 210,
+    "precision": 0.8765432098765432
+   },
+   "learner/heldout_comp": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 210,
+    "precision": 1.0
+   }
+  },
+  "seconds": 154,
+  "unsolved": []
+ },
+ "records_shuffled_noreuse": {
+  "constructions": 6,
+  "learned": [
+   [
+    "tovel",
+    6,
+    5,
+    4
+   ],
+   [
+    "ribbet",
+    6,
+    5,
+    4
+   ],
+   [
+    3,
+    6,
+    5,
+    4
+   ],
+   [
+    "tunk",
+    "B"
+   ],
+   [
+    "B",
+    "zumo",
+    "B"
+   ],
+   [
+    3,
+    6,
+    5,
+    6
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.5133333333333333,
+    "abstain": 0.03166666666666667,
+    "confab": 0.455,
+    "n": 600,
+    "precision": 0.5301204819277109
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.7333333333333333,
+    "abstain": 0.0,
+    "confab": 0.26666666666666666,
+    "n": 210,
+    "precision": 0.7333333333333333
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.3380952380952381,
+    "abstain": 0.6142857142857143,
+    "confab": 0.047619047619047616,
+    "n": 210,
+    "precision": 0.8765432098765432
+   },
+   "learner/heldout_comp": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 210,
+    "precision": 1.0
+   }
+  },
+  "seconds": 152,
+  "unsolved": []
+ },
+ "strings": {
+  "constructions": 0,
+  "learned": [],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 301,
+  "unsolved": [
+   [
+    3,
+    6
+   ],
+   [
+    6,
+    5,
+    6
+   ]
+  ]
+ },
+ "strings_cap6000": {
+  "constructions": 6,
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.7483333333333333,
+    "abstain": 0.25166666666666665,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8147410358565738,
+    "abstain": 0.1852589641434263,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 253,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ]
+  ]
+ },
+ "strings_noreuse": {
+  "constructions": 7,
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.8733333333333333,
+    "abstain": 0.12666666666666668,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.9681274900398407,
+    "abstain": 0.03187250996015936,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 215,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ]
+  ]
+ },
+ "strings_noreuse_cap6000": {
+  "constructions": 6,
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.8733333333333333,
+    "abstain": 0.12666666666666668,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8705179282868526,
+    "abstain": 0.1294820717131474,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 222,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ]
+  ]
+ },
+ "strings_noreuse_nofb": {
+  "constructions": 7,
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.7483333333333333,
+    "abstain": 0.25166666666666665,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8147410358565738,
+    "abstain": 0.1852589641434263,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 217,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ]
+  ]
+ },
+ "strings_noseed": {
+  "constructions": 6,
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.8733333333333333,
+    "abstain": 0.12666666666666668,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8705179282868526,
+    "abstain": 0.1294820717131474,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 258,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ]
+  ]
+ },
+ "strings_shuffled_noreuse": {
+  "constructions": 7,
+  "learned": [
+   [
+    6,
+    5
+   ],
+   [
+    "tunk",
+    "B"
+   ],
+   [
+    "B",
+    "vorp",
+    "B"
+   ],
+   [
+    6,
+    5,
+    "traz"
+   ],
+   [
+    5,
+    3,
+    5
+   ],
+   [
+    "jarn",
+    5,
+    3,
+    5
+   ],
+   [
+    6,
+    5,
+    7
+   ]
+  ],
+  "reused_slots": 0,
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.8733333333333333,
+    "abstain": 0.12666666666666668,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.9681274900398407,
+    "abstain": 0.03187250996015936,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 216,
+  "unsolved": [
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "jarn",
+    "B"
+   ],
+   [
+    "jarn",
+    "B"
+   ],
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "B",
+    7
+   ],
+   [
+    "tunk",
+    6,
+    5,
+    7
+   ],
+   [
+    6,
+    5,
+    "vorp",
+    6,
+    5,
+    7
+   ],
+   [
+    "jarn",
+    "B"
+   ],
+   [
+    "B",
+    7
+   ],
+   [
+    "B",
+    "traz"
+   ]
+  ]
+ }
+}

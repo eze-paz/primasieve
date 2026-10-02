@@ -1,0 +1,856 @@
+{
+ "records": {
+  "constructions": 6,
+  "energy": 1122,
+  "halt": "budget exhausted before the stall could be worked (BUDGET-BOUND, not a halt)",
+  "learned": [
+   [
+    "zumo",
+    5,
+    6,
+    3
+   ],
+   [
+    "morth",
+    5,
+    6,
+    3
+   ],
+   [
+    4,
+    5,
+    6,
+    3
+   ],
+   [
+    "quim",
+    "B"
+   ],
+   [
+    "B",
+    "blen",
+    "B"
+   ],
+   [
+    4,
+    5,
+    6,
+    5
+   ]
+  ],
+  "promoted": 24,
+  "rounds": [
+   [
+    1,
+    "grow",
+    5,
+    0,
+    128.1
+   ],
+   [
+    2,
+    "grow",
+    6,
+    0,
+    36.9
+   ],
+   [
+    3,
+    "stall/promote",
+    6,
+    24,
+    0.5
+   ],
+   [
+    4,
+    "stall/no-time",
+    6,
+    0,
+    0.3
+   ]
+  ],
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.5133333333333333,
+    "abstain": 0.03166666666666667,
+    "confab": 0.455,
+    "n": 600,
+    "precision": 0.5301204819277109
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.7333333333333333,
+    "abstain": 0.0,
+    "confab": 0.26666666666666666,
+    "n": 210,
+    "precision": 0.7333333333333333
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.3380952380952381,
+    "abstain": 0.6142857142857143,
+    "confab": 0.047619047619047616,
+    "n": 210,
+    "precision": 0.8765432098765432
+   },
+   "learner/heldout_comp": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 210,
+    "precision": 1.0
+   }
+  },
+  "seconds": 231,
+  "unsolved": []
+ },
+ "records_once": {
+  "constructions": 6,
+  "energy": 0,
+  "halt": "once-only library pass exhausted (knockout arm)",
+  "learned": [
+   [
+    "zumo",
+    5,
+    6,
+    3
+   ],
+   [
+    "morth",
+    5,
+    6,
+    3
+   ],
+   [
+    4,
+    5,
+    6,
+    3
+   ],
+   [
+    "quim",
+    "B"
+   ],
+   [
+    "B",
+    "blen",
+    "B"
+   ],
+   [
+    4,
+    5,
+    6,
+    5
+   ]
+  ],
+  "promoted": 0,
+  "rounds": [
+   [
+    1,
+    "plain",
+    5,
+    0,
+    122.8
+   ],
+   [
+    2,
+    "library",
+    6,
+    0,
+    30.9
+   ]
+  ],
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.5133333333333333,
+    "abstain": 0.03166666666666667,
+    "confab": 0.455,
+    "n": 600,
+    "precision": 0.5301204819277109
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.7333333333333333,
+    "abstain": 0.0,
+    "confab": 0.26666666666666666,
+    "n": 210,
+    "precision": 0.7333333333333333
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.3380952380952381,
+    "abstain": 0.6142857142857143,
+    "confab": 0.047619047619047616,
+    "n": 210,
+    "precision": 0.8765432098765432
+   },
+   "learner/heldout_comp": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 210,
+    "precision": 1.0
+   }
+  },
+  "seconds": 197,
+  "unsolved": []
+ },
+ "records_shuffled": {
+  "constructions": 6,
+  "energy": 3306,
+  "halt": "BUDGET-BOUND: the loop was still working when the budget ran out (not a halt)",
+  "learned": [
+   [
+    "tovel",
+    6,
+    5,
+    4
+   ],
+   [
+    "ribbet",
+    6,
+    5,
+    4
+   ],
+   [
+    3,
+    6,
+    5,
+    4
+   ],
+   [
+    "tunk",
+    "B"
+   ],
+   [
+    "B",
+    "zumo",
+    "B"
+   ],
+   [
+    3,
+    6,
+    5,
+    6
+   ]
+  ],
+  "promoted": 48,
+  "rounds": [
+   [
+    1,
+    "grow",
+    5,
+    0,
+    123.4
+   ],
+   [
+    2,
+    "grow",
+    6,
+    0,
+    29.2
+   ],
+   [
+    3,
+    "stall/promote",
+    6,
+    24,
+    0.4
+   ],
+   [
+    4,
+    "stall/promote",
+    6,
+    24,
+    1.0
+   ]
+  ],
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.5133333333333333,
+    "abstain": 0.03166666666666667,
+    "confab": 0.455,
+    "n": 600,
+    "precision": 0.5301204819277109
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.7333333333333333,
+    "abstain": 0.0,
+    "confab": 0.26666666666666666,
+    "n": 210,
+    "precision": 0.7333333333333333
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.3380952380952381,
+    "abstain": 0.6142857142857143,
+    "confab": 0.047619047619047616,
+    "n": 210,
+    "precision": 0.8765432098765432
+   },
+   "learner/heldout_comp": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 1.0,
+    "abstain": 0.0,
+    "confab": 0.0,
+    "n": 210,
+    "precision": 1.0
+   }
+  },
+  "seconds": 683,
+  "unsolved": []
+ },
+ "strings": {
+  "constructions": 6,
+  "energy": 156,
+  "halt": "budget exhausted before the stall could be worked (BUDGET-BOUND, not a halt)",
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "promoted": 0,
+  "rounds": [
+   [
+    1,
+    "grow",
+    6,
+    0,
+    138.0
+   ],
+   [
+    2,
+    "stall/no-time",
+    6,
+    0,
+    27.5
+   ]
+  ],
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.7483333333333333,
+    "abstain": 0.25166666666666665,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8147410358565738,
+    "abstain": 0.1852589641434263,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 240,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ]
+  ]
+ },
+ "strings_once": {
+  "constructions": 6,
+  "energy": 0,
+  "halt": "once-only library pass exhausted (knockout arm)",
+  "learned": [
+   [
+    3,
+    6
+   ],
+   [
+    "sarn",
+    "B"
+   ],
+   [
+    "B",
+    "yark",
+    "B"
+   ],
+   [
+    3,
+    6,
+    "tovel"
+   ],
+   [
+    6,
+    5,
+    6
+   ],
+   [
+    3,
+    6,
+    1
+   ]
+  ],
+  "promoted": 0,
+  "rounds": [
+   [
+    1,
+    "plain",
+    6,
+    0,
+    138.0
+   ],
+   [
+    2,
+    "library",
+    6,
+    0,
+    31.4
+   ]
+  ],
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.7483333333333333,
+    "abstain": 0.25166666666666665,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8147410358565738,
+    "abstain": 0.1852589641434263,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 236,
+  "unsolved": [
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "sarn",
+    3,
+    6,
+    1
+   ],
+   [
+    3,
+    6,
+    "yark",
+    3,
+    6,
+    1
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ],
+   [
+    "gloop",
+    "B"
+   ],
+   [
+    "gloop",
+    6,
+    5,
+    6
+   ],
+   [
+    "B",
+    1
+   ],
+   [
+    "B",
+    "tovel"
+   ]
+  ]
+ },
+ "strings_shuffled": {
+  "constructions": 6,
+  "energy": 156,
+  "halt": "budget exhausted before the stall could be worked (BUDGET-BOUND, not a halt)",
+  "learned": [
+   [
+    6,
+    5
+   ],
+   [
+    "tunk",
+    "B"
+   ],
+   [
+    "B",
+    "vorp",
+    "B"
+   ],
+   [
+    6,
+    5,
+    "traz"
+   ],
+   [
+    5,
+    3,
+    5
+   ],
+   [
+    6,
+    5,
+    7
+   ]
+  ],
+  "promoted": 0,
+  "rounds": [
+   [
+    1,
+    "grow",
+    6,
+    0,
+    137.4
+   ],
+   [
+    2,
+    "stall/no-time",
+    6,
+    0,
+    31.3
+   ]
+  ],
+  "scores": {
+   "analogy/heldout_comp": {
+    "EM": 0.4216666666666667,
+    "abstain": 0.0,
+    "confab": 0.5783333333333334,
+    "n": 600,
+    "precision": 0.4216666666666667
+   },
+   "analogy/heldout_iid": {
+    "EM": 0.6792828685258964,
+    "abstain": 0.0,
+    "confab": 0.3207171314741036,
+    "n": 502,
+    "precision": 0.6792828685258964
+   },
+   "bag-of-words/heldout_comp": {
+    "EM": 0.0,
+    "abstain": 1.0,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "bag-of-words/heldout_iid": {
+    "EM": 0.16135458167330677,
+    "abstain": 0.8127490039840638,
+    "confab": 0.025896414342629483,
+    "n": 502,
+    "precision": 0.8617021276595744
+   },
+   "learner/heldout_comp": {
+    "EM": 0.7483333333333333,
+    "abstain": 0.25166666666666665,
+    "confab": 0.0,
+    "n": 600,
+    "precision": 1.0
+   },
+   "learner/heldout_iid": {
+    "EM": 0.8147410358565738,
+    "abstain": 0.1852589641434263,
+    "confab": 0.0,
+    "n": 502,
+    "precision": 1.0
+   }
+  },
+  "seconds": 237,
+  "unsolved": [
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "jarn",
+    "B"
+   ],
+   [
+    "jarn",
+    5,
+    3,
+    5
+   ],
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "B",
+    7
+   ],
+   [
+    "tunk",
+    6,
+    5,
+    7
+   ],
+   [
+    6,
+    5,
+    "vorp",
+    6,
+    5,
+    7
+   ],
+   [
+    "jarn",
+    "B"
+   ],
+   [
+    "jarn",
+    5,
+    3,
+    5
+   ],
+   [
+    "B",
+    7
+   ],
+   [
+    "B",
+    "traz"
+   ],
+   [
+    "jarn",
+    "B"
+   ],
+   [
+    "jarn",
+    5,
+    3,
+    5
+   ],
+   [
+    "B",
+    7
+   ],
+   [
+    "B",
+    "traz"
+   ]
+  ]
+ }
+}
