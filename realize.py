@@ -111,8 +111,9 @@ class Inverse:
     explicit relation or name reading in the reply lies inside the spans that survivor used (the reply says nothing
     the frame does not support)."""
 
-    def __init__(self, world, df, strict=False):
-        self.world, self.df, self.strict = world, df, strict; self.n = 0; self.misreport = 0; self.rejected = collections.Counter(); self.trace = []
+    def __init__(self, world, df, strict=False, reader=None):
+        self.world, self.df, self.strict, self.reader = world, df, strict, reader; self.n = 0; self.misreport = 0; self.rejected = collections.Counter(); self.trace = []
+        # reader(word, (s, o)) -> bool: an induced lexicon that accounts for a content word (gloss_prereg.md rung 1)
 
     def check(self, reply, s, p, o, label_o):
         self.n += 1
@@ -157,6 +158,7 @@ class Inverse:
             med = vals[len(vals) // 2] if vals else 0
             for k, x in enumerate(syms2):
                 if (self.df(x) if self.df else 0) <= med and not any(a <= k < b for a, b in allsp):
+                    if self.reader is not None and self.reader(x, (s, o)): continue
                     self.rejected["strict: unread content"] += 1; return False
         return True
 

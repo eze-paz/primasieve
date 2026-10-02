@@ -736,3 +736,15 @@ relation word and nothing else in a declarative; under the strict inverse (every
 coverage is 0.00. Misreport of the edge: 50 candidates, 0 emitted; shuffled-text knockout collapses (2 skeletons,
 coverage 0). The register is sound and data-only; the wall is the inverse, i.e. the engine's comprehension of declarative
 English (noun-phrase structure, apposition, dates), which no live mechanism provides. Nothing registered.
+
+### 2026-10-02 -- reading glosses, rung 1: a word -> relation lexicon by cross-situational elimination (gloss_prereg.md): NULL
+Owner's ask after the register null: apply the grammar induction to English glosses. The inducible rung on the data at
+hand is a lexicon -- a gloss word denotes a relation if every headword whose aligned definition contains it carries that
+relation (exact, base rate <= 0.5), the lexicon work's elimination over 312 (headword, gloss) texts of 158 cached
+entities. `gloss_lexicon.py`: 57 bound words, but proper-name fragments and incidental words bound to Wikimedia
+maintenance relations; held-out content words accounted for 0.16 -> 0.19 (+0.02); held-out soundness of what fires 0.86;
+the shuffled-gloss knockout keeps 47 % of the lexicon (chance bindings, measured); `realize.py`'s strict inverse with the
+lexicon as reader stays at 0/116. Diagnosis recorded: too few headwords for exact elimination over ~1,500 relations; the
+relations gloss nouns denote are `instance of <class>` -- a TYPE, not a bare relation -- which this binding cannot state;
+and adjectives, dates and apposition are outside any lexicon. Rung 2 (types, constructions) and a larger entity cache are
+named as the honest size of "the engine reads English". Nothing registered; the reader hook stays in `realize.Inverse`.
