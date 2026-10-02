@@ -264,6 +264,11 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
             for wo, sto, reso in surv2:
                 if wo is wi: continue                            # composition is across worlds; a world's own chains are its own
                 if getattr(wo, "quotes", False): continue        # a gloss of a computed value is not a composition
+                # R4: the outer of a pipe takes no context reading -- the pipe already supplies its argument; a predicate
+                # borrowed from an earlier turn on top of it is two inferences (chat_prose_prereg.md: a salary question
+                # beside a stated number became that salary multiplied by the number, the operator lingering from an
+                # arithmetic turn)
+                if any(i >= len(syms2) for i, _ in wo.spans_of(sto)): continue
                 osp = [(i, j) for i, j in wo.spans_of(sto) if i < len(syms2)]
                 if not any(i < a or j > a + len(lab) for i, j in osp): continue     # the outer must read something beyond the substituted value
                 if not any(i < a + len(lab) and j > a for i, j in wo.spans_of(sto) if i < len(syms2)): continue

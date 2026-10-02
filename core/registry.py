@@ -74,6 +74,8 @@ PUBLISHED = {
     #      trip and the fatal columns hold; the acts bar (0.90) is missed at 0.71 because the engine has no act for a
     #      REQUEST it cannot perform (recorded gap, owner's call), plus WordNet-less thanks and two-structure yes/no forms
     "chat_acts": ["CONVERSATION WORLD: SOUND", "CONFAB: 0"],
+    # ---- CHAT phase C (chat_prose_prereg.md): sentences over the understood structure, exact inverse, the user's words
+    "chat_prose": ["PROSE FRAMES: PASS", "MISREPORT 0"],
     # ---- nolf incremental enumeration table (nolf_rebuild_prereg.md): the library pass's table is equivalent to a full build;
     #      the speedup missed its bar and is not registered
     "nolf_rebuild": ["INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT"],

@@ -690,3 +690,22 @@ world's default LOOKUP; a quoted gloss entered context as a value; and through t
 spans of dictionary text into the offline Wikidata fixture (the alias "is a" -> P31 moved W5-c) -- 559 keys removed with a
 backup, and a live session now writes its own cache file (`Wikidata(cache_path=...)`). Rules that paid: a fixture the
 gates read is never written by live use; a value identity is its label, case-blind; a recall is not a turn to recall.
+
+## 2026-10-02 -- CHAT phase C (chat_prose_prereg.md): replies as sentences over the understood structure -- PASS
+`frames.py`: every content frame carries a PHRASE, the structure in the user's own words (`phrase_of`: a text span as the
+user wrote it, a context reading by its label; graph LOOKUP/CHAIN/MEMBER/PATH, table lookups/aggregates/counts/argmax/diff
+with hops, exec trees in infix with parentheses, a composite substituting the inner phrase), and is realized as one of
+three or more sentence shapes with an exact regex inverse (ANSWER: "The capital of japan is Tokyo (according to Wikidata;
+evidence: Japan -capital-> Tokyo)." / "As for ...: ..." / "...: ..."; CHECK "Yes:/No: ... not 130."; READINGS "It could
+be A [phrase] ; B [phrase]. Which ..."; PROPOSE "I found nothing for that. I looked in ..."; FOUND "The dictionary says
+(source): ..."; META "You asked ...; the support was ..."). Evidence uses the world's labels, never identifiers; a phrase
+carrying "is" keeps to the two shapes that invert it; capitalization is form (canonical lowers the phrase). Gate
+`chat_prose.py` (registered PROSE FRAMES: PASS, MISREPORT 0): round trip 1935/1935 over phase A's session, phase B's acts
+and the 12 dialogues; 0.989 of the spans a structure read appear in its phrase; variety 3.0-5.0 surfaces per frame kind;
+p95 0.19 s; the owner's case ("what is japan" after a capital question) now reads "The capital of japan is Tokyo". The
+it.10 form judge (Alice class bigram) scores the realized sentences at 7.15 bits/token against 7.44 for real held-out
+prose and 7.65 shuffled: MET, against my prediction, and read with it.9's caveat (a 113-word template register is cheap to
+a class bigram; the shuffled control shows the form half is real). Found on the way: a pipe's outer could still borrow a
+context predicate (R4 in core/reason.py: the outer of a composite takes no context reading); CHECK on PATH/MEMBER was
+meaningless (excluded). Rules that paid: a phrase must not contain the copula the sentence shape splits on; the
+dictionary's sense order is content, not form.
