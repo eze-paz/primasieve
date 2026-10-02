@@ -30,9 +30,9 @@ from core.session import Session
 from core.ledger import Ledger
 from core.registry import selfcheck
 from core.transcript import TranscriptWorld
-from core.resolve import segment
+from core.resolve import segment, matches, accept, decline, DECLINED, GLOSS
 import frames
-from frames import realize, parse, canonical, to_frame, fields_of, ANSWER, READ, PART, FOUND, PROPOSE, CONJ, META_K, CHECK_K, ACK_K
+from frames import realize, parse, canonical, to_frame, fields_of, sources_of, ANSWER, READ, PART, FOUND, PROPOSE, CONJ, META_K, CHECK_K, ACK_K, REQUEST
 
 F = Fraction
 TRANSCRIPTS = os.path.join(HERE, "_nldata", "chat")
@@ -113,12 +113,14 @@ class Door:
         """one sentence through the session -> (core frame, chat frame, act)"""
         fr = self.S.turn(text); frame = to_frame(fr)
         aw = fr["answer_worlds"][0] if fr.get("answer_worlds") else None
+        guess = None
         if fr.get("chosen"): act = "CHOICE"
         elif aw is not None and getattr(aw, "transcript", False) and fr["answers"] and fr["answers"][0][0][0] in ("frame", "brief"): act = "REPEAT"
-        else: act = frame["kind"]
+        else: frame, act, guess = self._mode(fr, frame)
         fields = fields_of(frame, text)
         if act == "REPEAT": fields["recallable"] = False          # a repeat is not a turn to look back at
         self.S.remember(fields)
+        self._last_guess = guess
         return fr, frame, act
 
     def _last_answer(self):
@@ -129,10 +131,31 @@ class Door:
 
     def _feedback(self, ok, last):
         q, v = last["text"], last["values"][0]
+        if last.get("guess") is not None:
+            # feedback on an INTENT GUESS (chat_request_prereg.md): the dictionary was not wrong, the reading of the
+            # question was -- accept or decline the skeleton; no ledger write
+            syms, topic = last["guess"]
+            fr = (accept if ok else decline)(self.S.frames, syms, topic, GLOSS, self.S.accepted if ok else self.S.declined)
+            note = (f"{'accepted' if ok else 'declined'}: {' '.join(syms)}" + (f" -> frame {' '.join(s or '_' for s in fr['skeleton'])}" if fr else ""))
+            return dict(kind="FEEDBACK", act="FEEDBACK", frame=dict(kind=FOUND, quotes=[(note, "frames")]), values=[], sources=["frames"], feedback=ok)
         out = self.S.teach(q, v, world=self._world_of(last)) if ok else self.S.deny(q)
         snap = out.get("ledger", self.ledger.snapshot())
         quotes = [(f"{s}: {c} confirmed, {d} contradicted", "ledger") for s, (c, d) in sorted(snap.items())] or [("no source on record", "ledger")]
         return dict(kind="FEEDBACK", act="FEEDBACK", frame=dict(kind=FOUND, quotes=quotes), values=[], sources=["ledger"], feedback=ok, ledger=snap)
+
+    def _mode(self, fr, frame):
+        """a FOUND over two or more symbols is an intent GUESS unless a frame decides (chat_request_prereg.md):
+        -> (frame, act, guess_ctx | None)"""
+        if frame["kind"] != FOUND or len(fr["syms"]) < 2 or not fr.get("answer_worlds"): return frame, frame["kind"], None
+        w = fr["answer_worlds"][0]
+        if not getattr(w, "quotes", False): return frame, frame["kind"], None
+        try: topic = fr["answers"][0][4][1][0]
+        except (IndexError, TypeError): return frame, frame["kind"], None
+        syms = list(fr["syms"]); hits = matches(syms, self.S.frames)
+        if any(f["state"] != DECLINED for f, _ in hits): return frame, FOUND, None                 # a confirmed question frame: plain
+        if hits and all(f["state"] == DECLINED for f, _ in hits):
+            return dict(kind=REQUEST, topic=syms[topic], offers=[c[len("source "):] for c in sources_of(fr)]), REQUEST, None
+        return dict(frame, guess=True, topic=syms[topic]), "GUESS", (syms, topic)
 
     def _world_of(self, rec):
         """the world that answered: teach re-induces only it (a KG has nothing to induce; a table or exec world
@@ -153,7 +176,7 @@ class Door:
                 for part in parts:
                     fr, frame, act = self._one(part)
                     frames_out.append(frame); acts.append(act); replies.append(realize(frame, self.rng))
-                rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts,
+                rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
                            sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
                            attributed=[bool(getattr(w, "attributed", True)) for w in fr["answer_worlds"]],

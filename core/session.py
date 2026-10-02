@@ -33,6 +33,7 @@ class Session:
         self.prefs = {}              # shape -> chosen structure key
         self.teaching = []           # [(question, gold)]
         self.deny_words = set(deny_words)       # chat-layer data: a word that, beside a choice, denies the previous answer
+        self.frames, self.accepted, self.declined = [], [], []     # E-10 question frames and their observations (chat_request_prereg.md)
         for w in self.worlds:                   # the transcript world (chat_acts_prereg.md) reads this session's own records
             if getattr(w, "transcript", False): w.session = self
 

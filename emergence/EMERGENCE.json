@@ -35,6 +35,7 @@
   "kaikki_full": true,
   "literals": [
    "",
+   "DECLINED",
    "Z",
    "answer",
    "consulted",
@@ -1875,7 +1876,7 @@
     "waste": 0.967
    }
   ],
-  "secs": 91.1
+  "secs": 100.9
  },
  "E7_attributed_state": {
   "cascaded": 13,
@@ -1915,7 +1916,7 @@
    "central",
    "lofty"
   ],
-  "secs": 1.7,
+  "secs": 1.8,
   "shuffle_admitted": 0,
   "strikes": {
    "DICT-A": 0,
@@ -1951,7 +1952,7 @@
    "yellow": 2
   },
   "prereg": "em_corpus_prereg.md",
-  "secs": 0.7,
+  "secs": 0.8,
   "single_token": 32,
   "sound": true,
   "stats": {

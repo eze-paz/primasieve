@@ -709,3 +709,17 @@ a class bigram; the shuffled control shows the form half is real). Found on the 
 context predicate (R4 in core/reason.py: the outer of a composite takes no context reading); CHECK on PATH/MEMBER was
 meaningless (excluded). Rules that paid: a phrase must not contain the copula the sentence shape splits on; the
 dictionary's sense order is content, not form.
+
+## 2026-10-02 -- the REQUEST act (chat_request_prereg.md): an intent guess, learned per skeleton -- PASS
+Phase B's gap closed in E-10's own terms: a multi-word text that only the dictionary can gloss is an INTENT GUESS, realized
+as one ("If you mean what paris is: ... If not, say wrong and I will offer what I can do."); `correct` accepts the
+observation and `wrong` declines it, and two observations of one skeleton anti-unify into a frame -- positive (E-10's
+`accept`) or, new in `core/resolve.py`, DECLINED (`decline`, its mirror) -- after which the same skeleton is answered
+plainly (FOUND) or with an offer (the REQUEST frame: "I cannot do that with kyoto. I can answer about ..."). A lone word
+stays a definition (its only affordance); ACK keeps precedence. `core/session.py` holds the frames; the door decides the
+mode; `to_frame` is untouched, so the single-call gates still see a plain FOUND. Gate `chat_request.py` (registered
+REQUEST ACT: PASS): 0 of 18 requests answered as a plain definition cold (GUESS 12, ACK 5, PROPOSE 1); the learning
+sequence yields ('write a poem about _', DECLINED) and ('what is a _', conjectured) and behaves accordingly; lone words
+plain; round trip 140/140. Limits recorded: per skeleton and per hole position; the hole is the rarest symbol, so a
+question word with few definitions can be the guessed topic; WordNet files languages under communication, so a text naming
+one is an ACK. No list of request verbs and no syntax was added; the chat-layer vocabulary grew by the three surfaces.

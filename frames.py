@@ -28,6 +28,7 @@ from core import kg as K
 
 ANSWER, READ, PART, FOUND, PROPOSE, CONJ = "ANSWER", "READINGS", "PARTIAL", "FOUND", "PROPOSE", "CONJECTURE"
 META_K, CHECK_K, ACK_K = "META", "CHECK", "ACK"          # phase B frames (chat_acts_prereg.md)
+REQUEST = "REQUEST"                                      # the request act (chat_request_prereg.md): an offer, not a guess
 SEP = " ; "
 
 # The transcript world's field names, as DATA (core/transcript.py holds no word): the realization words this file
@@ -64,6 +65,10 @@ V_NO = ["No:", "Not quite:", "Actually:"]
 V_COULD = ["It could be", "Two readings survive:", "Either"]
 V_NOTHING = ["I found nothing for that.", "Nothing I hold answers that.", "No world of mine reads that."]
 V_DICT = ["The dictionary says", "By the dictionary", "As defined"]
+V_IF = ["If you mean what", "If you are asking what", "Taking this as what"]
+V_IFNOT = ["If not, say wrong and I will offer what I can do.", "Say wrong if that is not it, and I will say what I can do.",
+           "Otherwise say wrong, and I will offer what I can do."]
+V_CANT = ["I cannot do that with", "That is not something I can do with", "No world of mine acts on"]
 
 
 def _cap(s): return s[:1].upper() + s[1:] if s else s
@@ -93,7 +98,11 @@ def realize(frame, rng):
         s = f"{_cap(frame['phrase'])} is {SEP.join(frame['values'])}{ev}, but I {rng.choice(V_MISS)} {SEP.join(frame['missing'])}."
     elif k == FOUND:
         qs = list(frame["quotes"])                 # the dictionary's own sense order stands (first sense first, E-8)
-        s = f"{rng.choice(V_DICT)} " + SEP.join(f"({src}): {t}" for t, src in qs)
+        body = SEP.join(f"({src}): {t}" for t, src in qs)
+        if frame.get("guess"): s = f"{rng.choice(V_IF)} {frame['topic']} is: {body} {rng.choice(V_IFNOT)}"
+        else: s = f"{rng.choice(V_DICT)} {body}"
+    elif k == REQUEST:
+        s = f"{rng.choice(V_CANT)} {frame['topic']}. I can answer about {SEP.join(frame['offers']) or 'nothing yet'}."
     elif k == PROPOSE:
         s = f"{rng.choice(V_NOTHING)} I looked in {SEP.join(frame['consulted']) or 'no source'}. {rng.choice(V_NEXT)} {frame['action']}"
     elif k == CONJ:
@@ -127,6 +136,8 @@ RX_A3 = re.compile(rf"^(.+?): (.+?) \({PER} (.+?)(?:; evidence: (.*))?\)\.$")
 RX_READ = re.compile(rf"^{_alt(V_COULD)} (.+?)\. {_alt(V_ASK)} (.*)$")
 RX_PART = re.compile(rf"^(.+?) is (.+?)(?: \((.*?)\))?, but I {_alt(V_MISS)} (.*)\.$")
 RX_FOUND = re.compile(rf"^{_alt(V_DICT)} (.*)$", re.S)
+RX_GUESS = re.compile(rf"^{_alt(V_IF)} (.+?) is: (.*) {_alt(V_IFNOT)}$", re.S)
+RX_REQUEST = re.compile(rf"^{_alt(V_CANT)} (.+?)\. I can answer about (.*)\.$", re.S)
 RX_QUOTE = re.compile(r"^\((.+?)\): (.*)$", re.S)
 RX_PROPOSE = re.compile(rf"^{_alt(V_NOTHING)} I looked in (.+?)\. {_alt(V_NEXT)} (.*)$")
 RX_REC = r"(.+?) \(per (.+?); record (\d+) confirmed, (\d+) contradicted\)"
@@ -168,14 +179,17 @@ def parse(text):
             if not mm: return None
             opts.append((mm.group(1), mm.group(2)))
         return dict(kind=READ, options=sorted(opts), split=m.group(2))
+    m = RX_REQUEST.match(text)
+    if m:
+        off = m.group(2); return dict(kind=REQUEST, topic=m.group(1), offers=[] if off == "nothing yet" else off.split(SEP))
+    m = RX_GUESS.match(text)
+    if m:
+        qs = _quotes(m.group(2))
+        return None if qs is None else dict(kind=FOUND, quotes=sorted(qs), guess=True, topic=m.group(1))
     m = RX_FOUND.match(text)
     if m:
-        qs = []
-        for q in m.group(1).split(SEP):
-            mm = RX_QUOTE.match(q)
-            if not mm: return None
-            qs.append((mm.group(2), mm.group(1)))
-        return dict(kind=FOUND, quotes=sorted(qs))
+        qs = _quotes(m.group(1))
+        return None if qs is None else dict(kind=FOUND, quotes=sorted(qs))
     m = RX_PROPOSE.match(text)
     if m:
         c = m.group(1); return dict(kind=PROPOSE, consulted=[] if c == "no source" else c.split(SEP), action=m.group(2))
@@ -189,6 +203,15 @@ def parse(text):
     m = RX_A3.match(text)
     if m: return _answer(m)
     return None
+
+
+def _quotes(body):
+    qs = []
+    for q in body.split(SEP):
+        mm = RX_QUOTE.match(q)
+        if not mm: return None
+        qs.append((mm.group(2), mm.group(1)))
+    return qs
 
 
 def _answer(m):
@@ -231,6 +254,7 @@ def fields_of(frame, text):
     elif k == CONJ: f.update(answer=frame["choice"][0], source=frame["choice"][1], support=SEP.join(v for v, _, _, _ in frame["rivals"]))
     elif k == CHECK_K: f.update(answer=frame["value"], source=SEP.join(frame["sources"]), support=frame["phrase"])
     elif k == META_K: f.update(answer=frame["content"])
+    elif k == REQUEST: f.update(answer=SEP.join(frame["offers"]))
     return f
 
 

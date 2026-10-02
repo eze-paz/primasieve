@@ -76,6 +76,8 @@ PUBLISHED = {
     "chat_acts": ["CONVERSATION WORLD: SOUND", "CONFAB: 0"],
     # ---- CHAT phase C (chat_prose_prereg.md): sentences over the understood structure, exact inverse, the user's words
     "chat_prose": ["PROSE FRAMES: PASS", "MISREPORT 0"],
+    # ---- the REQUEST act (chat_request_prereg.md): an intent guess learned per skeleton from feedback, E-10's frames + their negative
+    "chat_request": ["REQUEST ACT: PASS"],
     # ---- nolf incremental enumeration table (nolf_rebuild_prereg.md): the library pass's table is equivalent to a full build;
     #      the speedup missed its bar and is not registered
     "nolf_rebuild": ["INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT"],

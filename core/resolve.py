@@ -135,3 +135,36 @@ def reject(frames, frame):
     """The user rejected an answer given through a frame: the frame is RETRACTED (one contradiction is enough)."""
     frame["state"] = RETRACTED
     return frame
+
+
+DECLINED = "DECLINED"
+
+
+def decline(frames, symbols, topic, kind, history):
+    """The mirror of `accept` (chat_request_prereg.md): the user DECLINED the guessed action. Two declined observations
+    of the same length, equal everywhere but the topic slot, give a frame in state DECLINED -- the skeleton is not a
+    question about its hole, so the next match is answered with an offer, not a guess. A positive frame is never
+    retracted here: a skeleton both accepted and declined is a contest, and the caller lets the guess stand."""
+    obs = (tuple(s.lower() for s in symbols), topic, kind)
+    for (sy, tp, kd) in history:
+        if kd == kind and tp == topic and len(sy) == len(obs[0]) and \
+           all(a == b for i, (a, b) in enumerate(zip(sy, obs[0])) if i != topic) and sy[topic] != obs[0][topic]:
+            skel = tuple(None if i == topic else s for i, s in enumerate(obs[0]))
+            if not any(f["skeleton"] == skel and f["state"] == DECLINED for f in frames):
+                fr = dict(skeleton=skel, kind=kind, state=DECLINED, support=[sy, obs[0]], deps=[])
+                frames.append(fr); history.append(obs); return fr
+    history.append(obs)
+    return None
+
+
+def matches(symbols, frames):
+    """-> every live frame whose skeleton matches, as [(frame, hole index)] (match_frame returns the first)."""
+    out = []
+    for fr in frames:
+        if fr["state"] == RETRACTED or len(fr["skeleton"]) != len(symbols): continue
+        hole = None; ok = True
+        for i, (a, b) in enumerate(zip(fr["skeleton"], symbols)):
+            if a is None: hole = i
+            elif a.lower() != b.lower(): ok = False; break
+        if ok and hole is not None: out.append((fr, hole))
+    return out
