@@ -1,0 +1,461 @@
+{
+ "strings/near": {
+  "scores": {
+   "heldout_iid": {
+    "n": 502,
+    "EM": 0.8147410358565738,
+    "confab": 0.0,
+    "abstain": 0.1852589641434263,
+    "precision": 1.0
+   },
+   "heldout_comp": {
+    "n": 600,
+    "EM": 0.7483333333333333,
+    "confab": 0.0,
+    "abstain": 0.25166666666666665,
+    "precision": 1.0
+   }
+  },
+  "constructions": 6,
+  "seconds": 247,
+  "halt": "HALT: the stall promoted nothing new",
+  "rounds": [
+   {
+    "stall": 1,
+    "unsolved": [
+     "['gloop', 6, 5, 6]"
+    ],
+    "promoted": 10,
+    "delta": {
+     "true": 377,
+     "false": 1904
+    },
+    "seconds": 28.3
+   }
+  ],
+  "landscapes": [
+   [
+    {
+     "key": "['gloop', 6, 5, 6]",
+     "probed": 690,
+     "scored": 374,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.246,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "key": "['gloop', 6, 5, 6]",
+     "probed": 687,
+     "scored": 371,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.248,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ]
+  ],
+  "mech": null,
+  "promoted": 10,
+  "learned": [
+   "[3, 6]",
+   "['sarn', 'B']",
+   "['B', 'yark', 'B']",
+   "[3, 6, 'tovel']",
+   "[6, 5, 6]",
+   "[3, 6, 1]"
+  ]
+ },
+ "strings/random": {
+  "scores": {
+   "heldout_iid": {
+    "n": 502,
+    "EM": 0.8147410358565738,
+    "confab": 0.0,
+    "abstain": 0.1852589641434263,
+    "precision": 1.0
+   },
+   "heldout_comp": {
+    "n": 600,
+    "EM": 0.7483333333333333,
+    "confab": 0.0,
+    "abstain": 0.25166666666666665,
+    "precision": 1.0
+   }
+  },
+  "constructions": 6,
+  "seconds": 281,
+  "halt": "BUDGET-BOUND (not a halt)",
+  "rounds": [
+   {
+    "stall": 1,
+    "unsolved": [
+     "['gloop', 6, 5, 6]"
+    ],
+    "promoted": 10,
+    "delta": {
+     "true": 373,
+     "false": 1533
+    },
+    "seconds": 29.6
+   },
+   {
+    "stall": 2,
+    "unsolved": [
+     "['gloop', 6, 5, 6]"
+    ],
+    "promoted": 10,
+    "delta": {
+     "true": 524,
+     "false": 1316
+    },
+    "seconds": 30.7
+   }
+  ],
+  "landscapes": [
+   [
+    {
+     "key": "['gloop', 6, 5, 6]",
+     "probed": 691,
+     "scored": 375,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.245,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "key": "['gloop', 6, 5, 6]",
+     "probed": 689,
+     "scored": 373,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.247,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ]
+  ],
+  "mech": null,
+  "promoted": 20,
+  "learned": [
+   "[3, 6]",
+   "['sarn', 'B']",
+   "['B', 'yark', 'B']",
+   "[3, 6, 'tovel']",
+   "[6, 5, 6]",
+   "[3, 6, 1]"
+  ]
+ },
+ "strings/recur": {
+  "scores": {
+   "heldout_iid": {
+    "n": 502,
+    "EM": 0.8147410358565738,
+    "confab": 0.0,
+    "abstain": 0.1852589641434263,
+    "precision": 1.0
+   },
+   "heldout_comp": {
+    "n": 600,
+    "EM": 0.7483333333333333,
+    "confab": 0.0,
+    "abstain": 0.25166666666666665,
+    "precision": 1.0
+   }
+  },
+  "constructions": 6,
+  "seconds": 246,
+  "halt": "BUDGET-BOUND (not a halt)",
+  "rounds": [
+   {
+    "stall": 1,
+    "unsolved": [
+     "['gloop', 6, 5, 6]"
+    ],
+    "promoted": 10,
+    "delta": {
+     "true": 1216,
+     "false": 8022
+    },
+    "seconds": 51.5
+   }
+  ],
+  "landscapes": [
+   [
+    {
+     "key": "['gloop', 6, 5, 6]",
+     "probed": 691,
+     "scored": 375,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.245,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ]
+  ],
+  "mech": null,
+  "promoted": 10,
+  "learned": [
+   "[3, 6]",
+   "['sarn', 'B']",
+   "['B', 'yark', 'B']",
+   "[3, 6, 'tovel']",
+   "[6, 5, 6]",
+   "[3, 6, 1]"
+  ]
+ },
+ "strings/once": {
+  "scores": {
+   "heldout_iid": {
+    "n": 502,
+    "EM": 0.8147410358565738,
+    "confab": 0.0,
+    "abstain": 0.1852589641434263,
+    "precision": 1.0
+   },
+   "heldout_comp": {
+    "n": 600,
+    "EM": 0.7483333333333333,
+    "confab": 0.0,
+    "abstain": 0.25166666666666665,
+    "precision": 1.0
+   }
+  },
+  "constructions": 6,
+  "seconds": 163,
+  "halt": "once",
+  "rounds": [],
+  "landscapes": [],
+  "mech": null,
+  "promoted": 0,
+  "learned": [
+   "[3, 6]",
+   "['sarn', 'B']",
+   "['B', 'yark', 'B']",
+   "[3, 6, 'tovel']",
+   "[6, 5, 6]",
+   "[3, 6, 1]"
+  ]
+ },
+ "records/near": {
+  "scores": {
+   "heldout_iid": {
+    "n": 210,
+    "EM": 1.0,
+    "confab": 0.0,
+    "abstain": 0.0,
+    "precision": 1.0
+   },
+   "heldout_comp": {
+    "n": 600,
+    "EM": 1.0,
+    "confab": 0.0,
+    "abstain": 0.0,
+    "precision": 1.0
+   }
+  },
+  "constructions": 6,
+  "seconds": 130,
+  "halt": "no unsolved skeleton",
+  "rounds": [],
+  "landscapes": [],
+  "mech": {
+   "key": "['morth', 5, 6, 3]",
+   "term": "ALL(S, x. REL_r(_i, id01(x, _i)))",
+   "on_promoted_leaf": false
+  },
+  "promoted": 0,
+  "learned": [
+   "['zumo', 5, 6, 3]",
+   "['morth', 5, 6, 3]",
+   "[4, 5, 6, 3]",
+   "['quim', 'B']",
+   "['B', 'blen', 'B']",
+   "[4, 5, 6, 5]"
+  ]
+ },
+ "strings_shuffled/near": {
+  "scores": {
+   "heldout_iid": {
+    "n": 502,
+    "EM": 0.8147410358565738,
+    "confab": 0.0,
+    "abstain": 0.1852589641434263,
+    "precision": 1.0
+   },
+   "heldout_comp": {
+    "n": 600,
+    "EM": 0.7483333333333333,
+    "confab": 0.0,
+    "abstain": 0.25166666666666665,
+    "precision": 1.0
+   }
+  },
+  "constructions": 6,
+  "seconds": 247,
+  "halt": "HALT: the stall promoted nothing new",
+  "rounds": [
+   {
+    "stall": 1,
+    "unsolved": [
+     "['jarn', 5, 3, 5]"
+    ],
+    "promoted": 10,
+    "delta": {
+     "true": 377,
+     "false": 1904
+    },
+    "seconds": 28.4
+   }
+  ],
+  "landscapes": [
+   [
+    {
+     "key": "['jarn', 5, 3, 5]",
+     "probed": 692,
+     "scored": 376,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.245,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ],
+   [
+    {
+     "key": "['jarn', 5, 3, 5]",
+     "probed": 686,
+     "scored": 370,
+     "rows": 40,
+     "max": 30,
+     "p90": 28,
+     "median": 22,
+     "mode": 22,
+     "mode_share": 0.246,
+     "top": [
+      [
+       30,
+       "REL_r(_i, if87(S, e637(S, _i)))"
+      ],
+      [
+       30,
+       "REL_r(if87(S, e637(S, _i)), _i)"
+      ],
+      [
+       30,
+       "SEL_s(S, x. REL_r(_i, if87(S, x)))"
+      ]
+     ]
+    }
+   ]
+  ],
+  "mech": null,
+  "promoted": 10,
+  "learned": [
+   "[6, 5]",
+   "['tunk', 'B']",
+   "['B', 'vorp', 'B']",
+   "[6, 5, 'traz']",
+   "[5, 3, 5]",
+   "[6, 5, 7]"
+  ]
+ }
+}
