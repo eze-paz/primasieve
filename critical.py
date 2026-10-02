@@ -17,7 +17,7 @@ from core.registry import selfcheck
 from frames import realize, parse, canonical, to_frame, CONJ, READ, ANSWER, PROPOSE
 
 T0 = time.time()
-BASELINE = "23714f0"       # main BEFORE critical_prereg.md: the W6-a arm runs its core/reason.py
+BASELINE = "2070a81"       # main BEFORE critical_prereg.md: the W6-a arm runs its core/reason.py
 
 
 def say(s=""): print(str(s).encode("ascii", "replace").decode(), flush=True)
@@ -28,7 +28,7 @@ def worlds(names):
 
 
 def main_reason():
-    src = subprocess.run(["git", "show", f"{BASELINE}:experiments/primasieve/core/reason.py"], capture_output=True, text=True, cwd=HERE, encoding="utf-8").stdout
+    src = subprocess.run(["git", "show", f"{BASELINE}:core/reason.py"], capture_output=True, text=True, cwd=HERE, encoding="utf-8").stdout
     src = src.replace("from .resolve import", "from core.resolve import").replace("from .verdict import", "from core.verdict import")
     m = types.ModuleType("reason_main"); exec(compile(src, "reason_main", "exec"), m.__dict__); return m.reason
 

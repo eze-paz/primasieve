@@ -1,3 +1,11 @@
+> **Standalone repo (2026-10-02).** Carved out of `sandpie/experiments/primasieve` with its full history
+> (`git subtree split`, 3,610 commits). Run everything from this directory: `python core_selftest.py` (the gate
+> on the core), `python worlds_general.py` (worlds as data, composition, library, turns, research),
+> `python critical.py` (contradictory claims and the record of a source). The regenerable data under
+> `_nldata/` (Wiktionary/Kaikki sqlite, the Wikidata cache) is git-ignored and must be present for the
+> offline gates; `build_wikt_corpus.py` and `kb_wikidata.py` rebuild it. Baseline-arm commits referenced by
+> the runners (`BASELINE = ...`) are hashes of THIS repo's history.
+
 **START HERE: [ARCHITECTURE.md](ARCHITECTURE.md)** — what the code is, the shared `core/`, the
 consolidation ledger, and the rule that keeps it from re-fragmenting. `python core_selftest.py`
 is the gate on the core itself. This README and the per-arc plans below are history.
