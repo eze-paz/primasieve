@@ -12,7 +12,7 @@ The only cues a Session uses are its own previous frame's values:
   * `teach(question, gold)` is the confirmation channel: it re-induces every world that can learn from
     (question, gold) pairs and retracts what the new example contradicts.
 No pronoun list, no speech-act taxonomy, no question-form classifier."""
-from .reason import reason, symbols, READINGS, PARTIAL, WEAK, NOT_FOUND
+from .reason import reason, symbols, shape_of, READINGS, PARTIAL, WEAK, NOT_FOUND
 from .verdict import ATTRIBUTED, COMMIT, CONJECTURED
 from fractions import Fraction
 
@@ -22,11 +22,7 @@ def _same(a, b):
     except Exception: return str(a).lower() == str(b).lower()
 
 
-def _shape(w, st):
-    from .reason import Composite
-    if isinstance(st, Composite):
-        return ("PIPE", _shape(st.inner[0], st.inner[1]), _shape(st.outer[0], st.outer[1]))
-    return w.shape(st) if hasattr(w, "shape") else (w.key(st) if hasattr(w, "key") else id(st))
+_shape = shape_of
 
 
 class Session:
@@ -38,14 +34,25 @@ class Session:
 
     # ---- context: the previous turns' values and the readings their answers used ----------------------------
     def context(self):
+        """-> items tagged by ROLE: a previous ANSWER ("value") is offered to every world; a reading a previous
+        question USED ("used") only to the world that used it (core.reason R0)."""
         out, seen = [], set()
         for text, fr in reversed(self.history[-self.depth:]):
             for (v, lab, sups, certs, st), w in zip(fr.get("answers", []), fr.get("answer_worlds", [])):
                 vr = w.value_reading(v) if hasattr(w, "value_reading") else None
-                item = (lab, w, vr[0], vr[1]) if vr else lab
+                item = (lab, w, vr[0], vr[1], "value") if vr else lab
                 if lab not in seen: seen.add(lab); out.append(item)
             for lab, w, kind, payload in fr.get("used", []):
-                if lab not in seen: seen.add(lab); out.append((lab, w, kind, payload))
+                if lab not in seen: seen.add(lab); out.append((lab, w, kind, payload, "used"))
+        return out
+
+    def shapes(self):
+        """the shapes of the recent turns' answers: what a turn that supplies only arguments may repeat (core.reason R2)."""
+        out = []
+        for text, fr in reversed(self.history[-self.depth:]):
+            for (v, lab, sups, certs, st), w in zip(fr.get("answers", []), fr.get("answer_worlds", [])):
+                s = shape_of(w, st)
+                if s not in out: out.append(s)
         return out
 
     def turn(self, text):
@@ -61,7 +68,8 @@ class Session:
                 fr = dict(prev, kind=prev.get("attributed_kind", COMMIT), answers=[hits[0]], chosen=True)
                 fr["used"] = _used(fr, w, st)
                 self.history.append((text, fr)); return fr
-        fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger)
+        recent = frozenset(s for t, _ in self.history[-self.depth:] for s in symbols(t, "LN"))
+        fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger, shapes=self.shapes(), recent=recent)
         if fr["kind"] == READINGS and self.prefs:
             keep = [(a, w) for a, w in zip(fr["answers"], fr["answer_worlds"]) if _shape(w, a[4]) in self.prefs]
             if len(keep) == 1:
@@ -87,6 +95,19 @@ class Session:
             if not hasattr(w, "induce_lexicon"): continue
             pairs = [(q, g) for q, g, ww in self.teaching if ww is None or ww is w]
             if world is None or world is w: out[getattr(w, "name", "?")] = w.induce_lexicon(pairs)
+        return out
+
+    def deny(self, question):
+        """the denial channel (chat_prereg.md A7): the oracle says the answer to `question` was wrong WITHOUT supplying
+        the right one. Every source that spoke on it is recorded as contradicted, with the claim; nothing is
+        re-induced (no gold to induce from) and nothing cascades yet (the transcript world, CHAT_PLAN.md phase B)."""
+        out = {}
+        if self.ledger is not None:
+            for t, fr in reversed(self.history):
+                if t != question or not fr.get("answers"): continue
+                for a, src in zip(fr["answers"], fr.get("answer_sources", [])):
+                    self.ledger.record(src, False, claim=(a[1], question))
+                out["ledger"] = self.ledger.snapshot(); break
         return out
 
 

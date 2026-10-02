@@ -62,14 +62,27 @@ def _sym_pos(sp, n):
     return len({p for i, j in sp for p in range(i, j) if p < n})        # distinct question positions covered
 
 
+def shape_of(w, st):
+    """the structure with its explicit readings abstracted (a world's own shape(), else its key): what a READINGS
+    choice generalizes over (core.session)."""
+    if isinstance(st, Composite):
+        return ("PIPE", shape_of(st.inner[0], st.inner[1]), shape_of(st.outer[0], st.outer[1]))
+    return w.shape(st) if hasattr(w, "shape") else (w.key(st) if hasattr(w, "key") else id(st))
+
+
 def _readings(world, syms, context):
-    """context items: a label, or (label, world, kind, payload): the world that produced a reading gets it back
-    verbatim (no re-search of an ambiguous label); every other world reads the label."""
+    """context items: a label, or (label, world, kind, payload[, role]): the world that produced a reading gets it
+    back verbatim (no re-search of an ambiguous label); every other world reads the label -- except that a reading
+    a previous question USED (role "used") is offered to its owning world only (R0, chat_prereg.md: the previous
+    question's column word, re-read by the graph as a property, was borrowed onto an unrelated entity). An answer
+    (role "value", or a bare label) is read by every world, as a chain across worlds needs."""
     rd = list(world.readings(syms)); n = len(syms)
     for k, item in enumerate(context):
-        lab, w, kind, payload = (item if isinstance(item, tuple) else (item, None, None, None))
+        lab, w, kind, payload = (item[:4] if isinstance(item, tuple) else (item, None, None, None))
+        role = item[4] if isinstance(item, tuple) and len(item) > 4 else "value"
         if w is world and kind is not None:
             rd.append((n + k, n + k + 1, kind, payload, lab, "ctx")); continue
+        if role == "used": continue
         lsyms = symbols(str(lab), "LN")
         if not lsyms: continue
         for i, j, kind2, payload2, label2 in world.readings(lsyms):
@@ -133,7 +146,7 @@ def _names(w, st):
     return [getattr(w, "name", type(w).__name__)]
 
 
-def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None):
+def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, shapes=(), recent=frozenset()):
     """-> Frame dict: kind, answers [(value, label, supports, certs, structure)], missing, weak, readings, consulted,
     sources (the world names of the top survivors), syms."""
     worlds = list(world) if isinstance(world, (list, tuple)) else [world]
@@ -167,6 +180,50 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None):
         mine = set(sp)
         return any((i, j) not in mine and k in vk for i, j, k in free[w])
     recs = [r for r in recs if not dominated(r[0], r[3])]
+    # context is ELLIPSIS, never a second question (chat_prereg.md run 1: a 200-turn session of unrelated questions
+    # produced 11 confabulations, every one a structure built from context on a text the world could not read).
+    #   R1  the text already affords a complete structure of this world covering everything this one reads of the
+    #       text -> the context added nothing the text needed (the lowest salary, asked after a question about one
+    #       employee: MIN over all salaries stands, MIN over that employee's does not)
+    #   R2  context is ELLIPSIS, two halves. (i) A turn that supplies only ARGUMENTS (every explicit reading it uses is
+    #       of a kind in which its world reads previous answers: an entity, a filter value, a number) repeats a recent
+    #       question with a slot changed, so its structure must have a shape a recent turn had (an employee name after
+    #       a salary question; a country after a continent question); a turn that supplies a PREDICATE (an operator, a
+    #       column, a property) may take its arguments from context freely (the difference, after two salaries). (ii)
+    #       A fragment brings no topic of its own: declared criterion, the loop's specificity bias (E-10) -- no symbol
+    #       left unread may be RARER (lower definition frequency; absent everywhere = rarest) than the rarest label
+    #       borrowed from context (a museum no world knows, left unread beside a borrowed property) -- and a symbol
+    #       that a RECENT turn's own text already contained is not a new topic, whatever its frequency (the question
+    #       words recur from turn to turn; the museum does not). (ii) is inactive without df. Withdrawn on the way,
+    #       recorded: rarity against the symbols READ (the table ranks a question word rarer than a property word),
+    #       and a detector by any world's readings (the offline graph reads common words as entities).
+    #   R3  a structure that borrows a context item and returns that very label says nothing (a capital question
+    #       asked after a continent question: MEMBER(country, continent) returning the continent)
+    role = {n + k: (item[4] if isinstance(item, tuple) and len(item) > 4 else "value") for k, item in enumerate(context)}
+    lab_at = {n + k: str(item[0] if isinstance(item, tuple) else item).lower() for k, item in enumerate(context)}
+    thing = collections.defaultdict(set)                      # world -> kinds in which it reads previous answers
+    for w, r in readings:
+        if len(r) > 5 and role.get(r[0]) == "value": thing[w].add(r[2])
+    def explicit(sp): return {(i, j) for i, j in sp if i < n}
+    def rarity(s): return min((df(t) if df(t) > 0 else -1) for t in (symbols(s, "LN") or [s]))
+    free_spans = collections.defaultdict(list)
+    for w, st, res, sp in recs:
+        if all(i < n for i, _ in sp): free_spans[w].append(explicit(sp))
+    def keep(w, st, res, sp):
+        virt = [i for i, _ in sp if i >= n]
+        if not virt: return True
+        ex = explicit(sp)
+        if any(fs >= ex for fs in free_spans[w]): return False                                                  # R1
+        ow = st.outer[0] if isinstance(st, Composite) else w
+        predicate = any(k not in thing[ow] for i, j in ex for k in kinds_at[(ow, i, j)])
+        if not predicate and shape_of(w, st) not in shapes: return False                                        # R2 (i)
+        if df is not None:                                                                                      # R2 (ii)
+            read = {p for i, j in ex for p in range(i, j)}
+            unread = [rarity(syms[p]) for p in range(n) if p not in read and syms[p] not in recent]
+            if unread and min(unread) < min(rarity(lab_at[i]) for i in virt): return False
+        if any(lab_at.get(i) == str(_label(w, res[0])).lower() for i in virt): return False                     # R3
+        return True
+    recs = [r for r in recs if keep(*r)]
     survivors = [(w, st, res) for w, st, res, _ in recs]
     explicit_kinds = collections.defaultdict(set)              # world -> {(span, kind)} of every explicit reading
     for w, r in readings:

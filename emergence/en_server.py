@@ -27,6 +27,40 @@ STATE = {"scene": None, "lex": None, "alex": None, "pending": None, "acquire": N
          "beliefs": Beliefs(), "answers": 0, "answer_text": {}, "last_used": [], "research_log": [], "contested": {}}
 
 
+_DOOR = [None]
+
+
+def _door():
+    """THE ONE DOOR (chat.py, CHAT_PLAN.md phase A): the general worlds -- Wikidata, the records, the sales table,
+    arithmetic, the dictionary -- behind one Session. Built on first use. The scene path runs first exactly as
+    before; the door answers where the server used to fall to the resolver / OUT-OF-WORLD / ABSTAIN."""
+    if _DOOR[0] is None:
+        import chat
+        worlds, df = chat.build_worlds()
+        _DOOR[0] = chat.Door(worlds, df, transcript=os.path.join(chat.TRANSCRIPTS, "server.jsonl"), seed=int(_r.random() * 1e9))
+    return _DOOR[0]
+
+
+def _door_reply(text):
+    """-> a reply dict from the door, or None when the door only PROPOSES (then the resolver and the honest
+    OUT-OF-WORLD/ABSTAIN tail speak, as before). A FOUND frame is the DEFINED kind of the old path: the same fact."""
+    from frames import FOUND, PROPOSE
+    rec = _door().turn(text)
+    fk = rec["frame"]["kind"]
+    if fk == PROPOSE or rec["error"]: return None
+    STATE["last_door"] = rec
+    return {"kind": "DEFINED" if fk == FOUND else fk, "msg": rec["reply"], "highlight": [],
+            "door": {"verdict": rec["kind"], "sources": rec["sources"], "ms": rec["ms"]}}
+
+
+def _door_feedback(ok):
+    """`correct` / `wrong` after a door reply: Session.teach / Session.deny through the door itself."""
+    rec = _door().turn("correct" if ok else "wrong"); STATE["last_door"] = None
+    if rec.get("kind") != "FEEDBACK": return None
+    return {"kind": "TAUGHT" if ok else "RETRACTED", "msg": rec["reply"] + ("" if ok else "  Tell me what you meant."),
+            "highlight": [], "door": {"ledger": rec.get("ledger", {})}}
+
+
 def _hold(word, pred, prov):
     """hold `word` -> pred as an ATTRIBUTED belief with certificate pairs (source, span)."""
     STATE["beliefs"].hold(("word", word), pred, ATTRIBUTED, prov)
@@ -99,7 +133,8 @@ def _state_json():
             "actions": sorted(STATE["alex"]),
             "attributed": words,
             "sources": {s: {"confirms": B.confirms.get(s, 0), "strikes": B.strikes.get(s, 0)} for s in srcs},
-            "answers": STATE["answers"], "research_log": STATE["research_log"][-25:]}
+            "answers": STATE["answers"], "research_log": STATE["research_log"][-25:],
+            "door": {"worlds": [w.name for w in _DOOR[0].S.worlds], "ledger": _DOOR[0].ledger.snapshot()} if _DOOR[0] else None}
 
 # ---- TEACHING: the user states a meaning ("large means big", "teal is green", "it means big"). ----
 # Measured failure (chat, 2026-09-06): "large means big" was answered with the SAME WordNet proposal it was
@@ -158,6 +193,7 @@ def say(text):
     depends on an attributed premise is attributed, and is never presented as if the world had verified it."""
     r = _say(text)
     if r.get("kind") not in ("DEFINED", "RETRACTED", "TAUGHT"): STATE["last_resolve"] = None
+    if "door" not in r: STATE["last_door"] = None             # feedback goes to the door only right after a door reply
     used = [w for w in W.tokenize(text) if w in STATE["provenance"]]
     if "attributed" in r:                                    # already tagged by an inner say() (research/teach re-run)
         return r
@@ -195,6 +231,10 @@ def _say(text):
             return {"kind": "NONE", "msg": f"I do not hold '{w}'.", "highlight": []}
         return {"kind": "RETRACTED", "msg": f"retracted '{w}' and {len(deps)} answer(s) that relied on it"
                                              + (": " + " | ".join(deps[:4]) if deps else "") + ". Its source was struck.", "highlight": []}
+    if STATE.get("last_door") and low in ("wrong", "that's wrong", "thats wrong", "no that's wrong", "that is wrong", "incorrect",
+                                          "correct", "right", "that's right", "thats right", "yes that's right"):
+        r = _door_feedback(low in ("correct", "right", "that's right", "thats right", "yes that's right"))
+        if r is not None: return r
     if low in ("wrong", "that's wrong", "thats wrong", "no that's wrong", "that is wrong", "incorrect") and STATE.get("last_resolve"):
         rz = STATE["last_resolve"]; STATE["last_resolve"] = None
         topic = rz["symbols"][rz["topic"]].lower()
@@ -549,6 +589,9 @@ def _diagnose(unknown, original):
     #      topic by the sources' own specificity, derive the intent from what the engine CAN do with it, and answer
     #      with the certificate itself. Offline sources only, so the reply is deterministic. "what is a dog" lands
     #      here because no shape is a dog; the answer is the dictionary, cited, held on its word.
+    # ---- THE DOOR (chat.py): the general worlds answer before the resolver; a PROPOSE falls through to it.
+    dr = _door_reply(original)
+    if dr is not None: return dr
     rz = RES.resolve(original, KB.Lexica(online=False, world=dict(lex)), beliefs=STATE["beliefs"], frames=STATE.setdefault("frames", []))
     if rz["kind"] == RES.GLOSS and rz["answer"]:
         topic = rz["symbols"][rz["topic"]]; senses = rz["answer"]; src = senses[0][1]
@@ -591,6 +634,7 @@ PAGE = """<!doctype html><meta charset=utf-8><title>primasieve</title>
  .COMMIT{color:#4ade80}.ASK{color:#fbbf24}.ABSTAIN{color:#f87171}.UNKNOWABLE{color:#c084fc}.NONE{color:#8b93a7}
  .ACQUIRE{color:#38bdf8}.DEFINED{color:#fbbf24}.OUT-OF-WORLD{color:#94a3b8}.SPEECH-ACT{color:#e879f9}
  .ATTRIBUTED{color:#38bdf8}.TAUGHT{color:#a3e635}.RETRACTED{color:#fb7185}
+ .ANSWER{color:#4ade80}.READINGS{color:#fbbf24}.PARTIAL{color:#c084fc}.CONJECTURE{color:#38bdf8}.PROPOSE{color:#94a3b8}
  #kb{margin-top:18px;background:#171a21;border:1px solid #262b36;border-radius:8px;padding:12px;font-size:12px}
  #kb h2{font-size:13px;margin:0 0 6px;color:#c9d1e3} #kb table{border-collapse:collapse;width:100%}
  #kb td,#kb th{padding:2px 6px;text-align:left;border-bottom:1px solid #22262f;vertical-align:top}
@@ -616,7 +660,9 @@ reports what is unknowable, or refuses on a word it never learned.</div>
     <button onclick="send()">send</button>
     <div class=legend id=leg></div>
     <div class=legend>feedback: <b>wrong</b> retracts the attributed word the last answer relied on (and every answer built on it);
-    <b>correct</b> counts for its source; <b>forget &lt;word&gt;</b>; teach with <b>&lt;word&gt; means &lt;known word&gt;</b>.</div>
+    <b>correct</b> counts for its source; <b>forget &lt;word&gt;</b>; teach with <b>&lt;word&gt; means &lt;known word&gt;</b>.
+    Beyond the scene, the same door reaches Wikidata, the records, the sales table, arithmetic and the dictionary
+    (e.g. <i>what is the capital of france</i>, <i>what is the salary of alice</i>, <i>what is 3 times 4</i>).</div>
   </div>
 </div>
 <div id=kb>

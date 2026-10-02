@@ -201,6 +201,9 @@ class TableWorld:
                             continue
                         for c, hs in colsets:
                             if not disjoint(list(fs) + [c] + list(hs) + list(tsp) + owords): continue
+                            # a column selected on ITSELF and read back without a hop computes nothing: the value is the
+                            # filter (chat_prereg.md run 1: a city name in context was looked up as its own city)
+                            if not hs and any(h == c[3] for h, _ in filters): continue
                             if op in AGG or op == LOOKUP: out.append((op, c[3], filters, None, None, fs + (c,), owords, hs, A.name, tsp))
                             if op in (MAX, MIN):
                                 for tg in cols:

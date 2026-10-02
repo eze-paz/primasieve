@@ -193,8 +193,9 @@ if __name__ == "__main__":
         t = time.time()
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
         try:
+            # stdin is DEVNULL: a registered module is a gate and never reads the terminal (chat.py's REPL would wait)
             p = subprocess.run([sys.executable, path], capture_output=True, text=True, encoding="utf-8", errors="replace",
-                               cwd=os.path.dirname(path), env=env, timeout=3600)
+                               cwd=os.path.dirname(path), env=env, timeout=3600, stdin=subprocess.DEVNULL)
             out = (p.stdout or "") + (p.stderr or "")
         except subprocess.TimeoutExpired:
             out = "TIMEOUT"

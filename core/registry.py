@@ -68,6 +68,8 @@ PUBLISHED = {
     "critical": ["W6 CRITICAL THINKING: PASS", "CONFAB: 0"],
     # ---- turns over longer dialogues (turns_prereg.md): competing antecedents, ellipsis of either argument, cross-world chains, controls
     "turns": ["TURNS BIND: PASS", "CONFAB: 0"],
+    # ---- CHAT phase A (chat_prereg.md): the one door -- 200 utterances in one session, exceptions 0, bare abstain 0, fatal columns 0
+    "chat": ["ONE DOOR: PASS", "CONFAB: 0"],
     # ---- nolf incremental enumeration table (nolf_rebuild_prereg.md): the library pass's table is equivalent to a full build;
     #      the speedup missed its bar and is not registered
     "nolf_rebuild": ["INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT"],

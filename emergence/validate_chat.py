@@ -66,8 +66,10 @@ if __name__ == "__main__":
     k, m = say("which one is mustard"); check("single-source word held WITH the caveat", "no second source" in m.lower(), f"{k}: {m}")
     k, m = say("which one is teal"); check("contested word -> ASK with both readings", k == "ASK" and "blue" in m and "green" in m, f"{k}: {m}")
     k, m = say("none"); check("'none' leaves a contested word unknown", k == "ABSTAIN", f"{k}: {m}")
+    # re-pointed (chat_prereg.md A8): through the door a definition is a FOUND frame citing its source ("per WORDNET-noun"),
+    # the same fact the old DEFINED reply stated with "consulted"; OUT-OF-WORLD/ABSTAIN still name what was consulted
     k, m = say("which one is sex"); check("a word no shape can be -> DEFINED from the sources (cited) or OUT-OF-WORLD naming sources consulted",
-                                          k in ("DEFINED", "OUT-OF-WORLD", "ABSTAIN") and "consulted" in m, f"{k}: {m}")
+                                          (k == "DEFINED" and any(s in m.upper() for s in ("WORDNET", "KAIKKI"))) or (k in ("OUT-OF-WORLD", "ABSTAIN") and "consulted" in m), f"{k}: {m}")
     k, m = say("what is a dog"); check("'what is a dog' -> DEFINED, cited, held on the source's word (E-10)", k == "DEFINED" and "WORDNET" in m.upper() or "KAIKKI" in m, f"{k}: {m}")
     k, m = say("wrong"); check("'wrong' on a definition drops it and asks what was meant", k == "RETRACTED", f"{k}: {m}")
 

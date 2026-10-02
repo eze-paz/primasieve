@@ -601,6 +601,29 @@ signature is approximate and not compositional (hole environments are indexed by
 representative choice matters there -- the gate as registered fails at 4 and says so; strings at max_ops=4 did not
 finish three full builds in 50 minutes and is reported as not run.
 
+## 2026-10-02 -- CHAT phase A (CHAT_PLAN.md, chat_prereg.md): the one door, and context as ellipsis
+`chat.py` is the entry point a user types into: one `core.session.Session` over Wikidata, the orgchart records, the
+sales table, arithmetic and the dictionary -> `frames.to_frame` -> `frames.realize`; every turn a record in a replayable
+`.jsonl`; exceptions caught and still answered; `correct`/`wrong` go through `Session.teach` and the new
+`Session.deny` (the oracle contradicting without a gold: the ledger's contradicted count, no cascade yet). The server's
+`/api/say` reaches the same door before its resolver fallback (validate_chat 21/21, one check re-pointed). Gate
+`python chat.py` (registered: ONE DOOR: PASS, CONFAB: 0): 200 utterances in ONE session -- 113 with gold from the
+existing gates, 87 stress utterances (empty, emoji, a 300-word paragraph, injections, other scripts, requests it cannot
+do) -- plus the 12 dialogues of W4 and turns, feedback, fatal columns. **Run 1 found 11 confabulations the 3-6 turn
+gates never saw**: every one a structure built from CONTEXT on a text the world could not read (a previous employee
+filtered into "the lowest salary"; a previous question's column word re-read by the graph as a property onto an
+unrelated city; MEMBER(Japan, Asia) returning the borrowed Asia; and, not context, "how" bound alone to COUNT because
+the teaching never separated it from "many"). `core/reason.py` now treats context as ELLIPSIS, never a second question:
+R0 a reading a previous question used is offered only to the world that used it; R1 a context-free structure covering
+the same text wins; R2 a turn supplying only arguments repeats a recent shape, a turn supplying a predicate takes its
+arguments freely, and no unread symbol new to the recent turns may be rarer than the borrowed label (declared limit:
+the dictionary's definition counts); R3 returning the borrowed label says nothing; `core/table.py` no longer selects a
+column on itself. Two variants were tried and withdrawn in the same session (rarity against the symbols read; content
+by any world's readings) -- recorded in the code comment with their failure. Run 3: CONFAB 0/113, p95 0.85 s, round
+trip 600/600; worlds_general, turns, critical, f4_dialogue, kg_multihop, tables_numbers unchanged. Rules that paid:
+a long session of UNRELATED questions is the test of context, not a dialogue; a used reading belongs to the world that
+used it; a teaching set must separate words that always co-occur. Residual: the rect scene as a World (phase B).
+
 ### 2026-10-02 -- a compositional signature for the nolf enumerator (nolf_sig_prereg.md): a recorded null with one exact fact
 The rotation signature (`Enumerator._sig`: five hole environments indexed by the hole's position in the whole term) is
 not compositional, which is why an extended table differed from a rebuilt one by 11 of ~15,000 depth-4 signatures.
