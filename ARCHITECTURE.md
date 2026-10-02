@@ -723,3 +723,16 @@ sequence yields ('write a poem about _', DECLINED) and ('what is a _', conjectur
 plain; round trip 140/140. Limits recorded: per skeleton and per hole position; the hole is the rarest symbol, so a
 question word with few definitions can be the guessed topic; WordNet files languages under communication, so a text naming
 one is an ACK. No list of request verbs and no syntax was added; the chat-layer vocabulary grew by the three surfaces.
+
+### 2026-10-02 -- an attested register for replies, with the loop as the inverse (realize_prereg.md): NOT PASSED
+Owner's ask: replies that are not rigid, with no hardcoded structure. `realize.py` mines a register by distant supervision
+(1,895 cached Wikidata triples x the Wiktionary entries of both ends: 1,508 aligned texts), abstracts the two labels to
+slots, admits a skeleton when it recurs across two entries (14 admitted, 1,139 one-offs), and makes the engine's own
+reading the only constraint: a reply is emitted only if `core.reason` over the KG world finds the frame's edge in a
+survivor that says the relation, no conflicting edge, and no unverified name or relation. Measured on 116 engine-answered
+LOOKUP frames: coverage 0.32 under that inverse -- but the admitted replies include false sentences ("A former Germany
+and country that existed between 1871 and 1918. Capital: Brandenburg.") because the world reads two names and a
+relation word and nothing else in a declarative; under the strict inverse (every content symbol inside a verified span)
+coverage is 0.00. Misreport of the edge: 50 candidates, 0 emitted; shuffled-text knockout collapses (2 skeletons,
+coverage 0). The register is sound and data-only; the wall is the inverse, i.e. the engine's comprehension of declarative
+English (noun-phrase structure, apposition, dates), which no live mechanism provides. Nothing registered.
