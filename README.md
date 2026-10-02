@@ -6,6 +6,15 @@
 > offline gates; `build_wikt_corpus.py` and `kb_wikidata.py` rebuild it. Baseline-arm commits referenced by
 > the runners (`BASELINE = ...`) are hashes of THIS repo's history.
 
+> **Environment (2026-10-02).** Python 3.11, no packaging, no requirements file by design: the engine and every gate
+> are stdlib-only. Nine files import numpy/torch and are not part of any gate (`proposer*.py`, `emergence/em_weights*.py`,
+> `emergence/em_describer.py`, `emergence/qwen_fwd.py`: the Qwen-weights experiments). Network is used only by
+> `emergence/kb_wikidata.py` when a lookup misses the cache and by `kb_sources.py` online mode; every gate runs offline
+> from `_nldata/`. Rebuilding `_nldata/`: `python emergence/kb_offline.py --rebuild` (needs the kaikki.org English
+> JSONL, 3.2 GB), `python build_wikt_corpus.py`, and `emergence/kb_wikidata.py` fills `wikidata_cache.json` on demand
+> (run `kg_multihop.py` once online). The full gate takes ~30 min serial; `python core_selftest.py --jobs 4` runs the
+> registered modules in parallel lanes and prints each module's wall time.
+
 **START HERE: [ARCHITECTURE.md](ARCHITECTURE.md)** — what the code is, the shared `core/`, the
 consolidation ledger, and the rule that keeps it from re-fragmenting. `python core_selftest.py`
 is the gate on the core itself. This README and the per-arc plans below are history.

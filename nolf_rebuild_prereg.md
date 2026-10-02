@@ -132,3 +132,6 @@ one it searched before, and a later round costs only what is new. Registered nee
 `INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT` -- the equivalence is what protects the learner's
 numbers; the speedup is NOT registered (B3 failed its bar at this library size). What to attack next is unchanged
 from the closure prereg and now affordable to test: the SELECTOR for promoted fragments, not the schedule.
+
+Gate-runtime note (2026-10-02): the default run is the registered setting only (`--ops 2`, seconds); `--ops 2,4` gives the
+full report above (records at max_ops=4 is three ~100 s builds) and `--all` adds the strings max_ops=4 case.

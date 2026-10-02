@@ -89,7 +89,7 @@ if __name__ == "__main__":
     a = sys.argv
     frags = a[a.index("--frags") + 1] if "--frags" in a else None
     cap = int(a[a.index("--cap") + 1]) if "--cap" in a else 60000
-    ops = [int(x) for x in a[a.index("--ops") + 1].split(",")] if "--ops" in a else [2, 4]
+    ops = [int(x) for x in a[a.index("--ops") + 1].split(",")] if "--ops" in a else [2]      # the registered setting; --ops 2,4 for the full report (records at 4 is ~100 s per build)
     # strings at max_ops=4 with its 12 fragments: the three full builds did not finish in 50 minutes on the registration
     # day (the library pass's max_ops=2 is what keeps the lever affordable); reported as not run unless asked for
     skip = set() if "--all" in a else {("strings", 4)}

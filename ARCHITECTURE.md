@@ -466,6 +466,9 @@ hours, and the acceptance bar stays exactly where it is.
 1. **The gate:** `python core_selftest.py` — C1 (≥2 independent threads on core), C2 (every registered claim
    still reproduces, incl. `em_closure`, `em_attributed`, `em_conjecture`, `em_resolve`, `em_corpus`, `validate_chat`), C3 (zero islands), C4 (no world in a mechanism).
    `--map-only` for the island map alone.
+   C2 runs the registered modules as parallel subprocess lanes (`--jobs 4` default, 553 s on 2026-10-02 against ~30 min
+   serial; `--serial` keeps the in-process loop) and prints each module's wall time -- the slow ones are the next number to
+   drive down (nolf_rebuild 267 s at the full report, cogs_stage5 197 s, l0 152 s, fluency_form 119 s).
 2. **The chat acceptance test:** `python emergence/validate_chat.py` — a scripted conversation, offline sources
    only, deterministic scene; one line per check; ends with `CHAT VALIDATION: PASS` and exit code 0. It asserts
    COMMIT/ASK behaviour, teaching, protection of world-learned words, research through the offline sources,

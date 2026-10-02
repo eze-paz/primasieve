@@ -15,7 +15,8 @@ file enforces, mechanically:
       engine toward shapes. The wider count -- every non-world module that imports a world -- is PRINTED as a
       tracked number, the way the island map was before it reached zero.
 
-Run it after any change to core/. Usage:  python core_selftest.py [--map-only]"""
+Run it after any change to core/. Usage:  python core_selftest.py [--map-only] [--jobs N | --serial]
+(C2 runs the registered modules as parallel subprocesses, 4 lanes by default; --serial is the original in-process loop)"""
 import os, re, sys, collections, subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -179,18 +180,56 @@ if __name__ == "__main__":
                 return os.path.join(root, mod + ".py")
         return None
 
-    for mod in sorted(PUBLISHED):
-        buf = io.StringIO()
-        path = _locate(mod)
+    # The registered modules run as SUBPROCESSES, in parallel lanes (default --jobs 4; --serial for the old in-process
+    # loop). Measured 2026-10-02: the serial loop took 25-30 minutes, which is long enough that the gate stopped being run
+    # after every change to core/. Modules that write into the same directory (the emergence thread's EMERGENCE.json and
+    # kb_cache.json) share ONE lane and run in sequence inside it, so no two writers of one file ever overlap; every other
+    # module is its own lane. Each module's wall time is printed: the slow ones are the next number to drive down.
+    import subprocess, time, concurrent.futures
+    jobs = int(sys.argv[sys.argv.index("--jobs") + 1]) if "--jobs" in sys.argv else (1 if "--serial" in sys.argv else 4)
+
+    def _run_one(mod):
+        path = _locate(mod) or os.path.join(HERE, mod + ".py")
+        t = time.time()
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
         try:
-            with contextlib.redirect_stdout(buf):
-                if path:
-                    runpy.run_path(path, run_name="__main__")
-                else:
-                    runpy.run_module(mod, run_name="__main__")
-        except SystemExit:
-            pass
-        for claim, found in verify_output(mod, buf.getvalue()):
+            p = subprocess.run([sys.executable, path], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                               cwd=os.path.dirname(path), env=env, timeout=3600)
+            out = (p.stdout or "") + (p.stderr or "")
+        except subprocess.TimeoutExpired:
+            out = "TIMEOUT"
+        return mod, out, time.time() - t
+
+    def _lane(mod):
+        path = _locate(mod)
+        return os.path.dirname(path) if path else mod        # a thread subdirectory is one lane; a top-level module its own
+
+    lanes = {}
+    for mod in sorted(PUBLISHED): lanes.setdefault(_lane(mod), []).append(mod)
+    results = {}
+
+    def _run_lane(mods):
+        return [_run_one(m) for m in mods]
+
+    if jobs <= 1:
+        for mod in sorted(PUBLISHED):
+            buf = io.StringIO(); path = _locate(mod); t = time.time()
+            try:
+                with contextlib.redirect_stdout(buf):
+                    if path: runpy.run_path(path, run_name="__main__")
+                    else: runpy.run_module(mod, run_name="__main__")
+            except SystemExit:
+                pass
+            results[mod] = (buf.getvalue(), time.time() - t)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as ex:
+            for lane_res in ex.map(_run_lane, lanes.values()):
+                for mod, out, secs in lane_res: results[mod] = (out, secs)
+    print(f"  registered modules: {len(PUBLISHED)} in {len(lanes)} lanes, {jobs} parallel; per-module wall time:")
+    for mod in sorted(results, key=lambda m: -results[m][1]):
+        print(f"    {results[mod][1]:7.1f} s  {mod}")
+    for mod in sorted(PUBLISHED):
+        for claim, found in verify_output(mod, results[mod][0]):
             checks.append((f"{mod}: {claim[:26]}", 1.0 if found else 0.0, 1.0))
 
     allok = True
