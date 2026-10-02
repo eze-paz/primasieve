@@ -6,6 +6,8 @@ Every turn is a record in a replayable .jsonl transcript. Exceptions are caught,
     python chat.py                      the pre-registered gate (A1-A9) over the fixed 200-utterance session + dialogues
                                         (every registered file runs its gate bare, so core_selftest can run it)
     python chat.py --chat               interactive (stdin/stdout; works piped)
+    python chat.py --serve [--port N]   a chat page at http://127.0.0.1:8766 (one door, single user)
+    python chat.py ... --online         live Wikidata and the online dictionaries for research (the gate stays offline)
     python chat.py --replay FILE.jsonl  re-run a transcript's turns through a fresh door
     python chat.py --seeded             also load the three seeded contradicting sources of critical.py (fixtures)
     python chat.py --verbose            show the core verdict kind and the latency beside each reply
@@ -53,13 +55,15 @@ def _jsonable(o):
 
 # ---------------------------------------------------------------------------------------------------------------
 # the worlds: the general gate's list plus the tables gate's table. Data + teaching pairs; no world code here.
-def build_worlds(seeded=False, quiet=True):
+def build_worlds(seeded=False, quiet=True, online=False):
+    """online=True: Wikidata answers live (the cache grows) and the dictionary researches unknown words through the
+    online sources kb_sources registers (Wiktionary, Wikidata, ConceptNet). The gate stays offline (deterministic)."""
     from kb_wikidata import Wikidata
     from kb_sources import Lexica
     import kg_multihop as KG
     import tables_numbers as TN
     import worlds_general as G
-    src = Wikidata(offline=True); df = KG.make_df()
+    src = Wikidata(offline=not online); df = KG.make_df()
     kgw = KGWorld(src, df, name="Wikidata")
     recs = G.load_records(G.DOMAIN)
     # one discriminating pair added to the orgchart teaching (chat_prereg.md amendment): the gate's pairs never separate
@@ -71,7 +75,7 @@ def build_worlds(seeded=False, quiet=True):
     t = TN.make_table(); P = TN.prepare(t)
     salesw = TableWorld(t, P["lexicon"], P["order"], name="sales")
     execw = ExecWorld(name="exec"); execw.induce_lexicon(EXEC_TEACH)
-    glossw = GlossWorld(Lexica(online=False), name="dictionary")
+    glossw = GlossWorld(Lexica(online=online), name="dictionary")
     worlds = [kgw, recw, salesw, execw, glossw]
     if seeded:
         from core.triples import Triples
@@ -375,11 +379,11 @@ def gate(seeded=False):
     return not fails
 
 
-def repl(seeded=False, verbose=False, lines=None):
+def repl(seeded=False, verbose=False, lines=None, online=False):
     """interactive on a terminal; over `lines` when piped (on Windows the null device reports as a terminal, so the
     gate is the bare invocation and the REPL is --chat, never the other way round)."""
     if lines is None and not sys.stdin.isatty(): lines = [l.rstrip("\n") for l in sys.stdin]
-    worlds, df = build_worlds(seeded=seeded)
+    worlds, df = build_worlds(seeded=seeded, online=online)
     path = os.path.join(TRANSCRIPTS, time.strftime("%Y%m%d-%H%M%S") + ".jsonl")
     D = Door(worlds, df, transcript=path, seed=int(time.time()))
     say(f"primasieve chat -- worlds {[w.name for w in worlds]}; transcript {os.path.relpath(path, HERE)}; ctrl-d to quit")
@@ -390,6 +394,116 @@ def repl(seeded=False, verbose=False, lines=None):
         if it is not None: say(f"you> {line}")
         rec = D.turn(line)
         say(("  " + rec["reply"]) + (f"   [{rec['kind']} {rec['ms']:.0f} ms]" if verbose else ""))
+
+
+PAGE = """<!doctype html><meta charset=utf-8><title>primasieve chat</title>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<style>
+ body{font:15px/1.5 system-ui,sans-serif;margin:0;background:#0f1115;color:#e6e6e6}
+ .wrap{max-width:820px;margin:0 auto;padding:16px;display:flex;flex-direction:column;height:100vh;box-sizing:border-box}
+ h1{font-size:15px;font-weight:600;margin:0} .sub{color:#8b93a7;font-size:12px;margin:2px 0 10px}
+ #log{flex:1;overflow:auto;padding:4px 2px}
+ .m{margin:8px 0;display:flex} .m.you{justify-content:flex-end}
+ .b{max-width:85%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
+ .you .b{background:#2b3a55} .bot .b{background:#1b1f27;border:1px solid #262b36}
+ .meta{font-size:11px;color:#8b93a7;margin-top:4px} .k{padding:1px 6px;border-radius:4px;background:#ffffff14;margin-right:6px}
+ .ANSWER{color:#4ade80}.READINGS{color:#fbbf24}.PARTIAL{color:#c084fc}.FOUND{color:#38bdf8}.PROPOSE{color:#94a3b8}.CONJECTURE{color:#38bdf8}.FEEDBACK{color:#a3e635}.ERROR{color:#f87171}
+ form{display:flex;gap:8px;margin-top:8px}
+ input{flex:1;padding:10px;background:#171a21;color:#e6e6e6;border:1px solid #262b36;border-radius:8px;font:inherit}
+ button{padding:9px 12px;background:#262b36;color:#e6e6e6;border:0;border-radius:8px;cursor:pointer;font:inherit}
+ .row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap} .row button{font-size:12px;padding:5px 9px}
+</style>
+<div class=wrap>
+ <h1>primasieve chat</h1><div class=sub id=sub>connecting...</div>
+ <div id=log></div>
+ <form onsubmit="send(event)"><input id=inp autofocus autocomplete=off placeholder="ask anything; the engine answers only what a world can check, else it says what it consulted"><button>send</button></form>
+ <div class=row><button type=button onclick="quick('correct')">correct</button><button type=button onclick="quick('wrong')">wrong</button>
+  <button type=button onclick="newChat()">new chat</button>
+  <span class=meta id=hint>try: what is the capital of france / and its currency / what is the salary of alice / what is 3 times 4 / plus 5 / what is a pomegranate</span></div>
+</div>
+<script>
+async function state(){const j=await (await fetch('/api/state')).json();
+ document.getElementById('sub').textContent='worlds: '+j.worlds.join(', ')+(j.online?'  |  online research ON':'  |  offline')+'  |  turns '+j.turns+(Object.keys(j.ledger).length?'  |  ledger '+JSON.stringify(j.ledger):'')}
+function add(cls,txt,meta){const l=document.getElementById('log');const d=document.createElement('div');d.className='m '+cls;
+ d.innerHTML='<div class=b>'+txt.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+(meta?'<div class=meta>'+meta+'</div>':'')+'</div>';l.appendChild(d);l.scrollTop=l.scrollHeight}
+async function post(t){add('you',t,'');const i=document.getElementById('inp');i.disabled=true;
+ try{const j=await (await fetch('/api/turn',{method:'POST',body:JSON.stringify({text:t})})).json();
+  add('bot',j.reply,'<span class="k '+j.frame+'">'+j.frame+'</span>'+(j.kind||'')+(j.sources&&j.sources.length?' | '+j.sources.join(', '):'')+' | '+j.ms+' ms'+(j.error?' | '+j.error:''));}
+ catch(e){add('bot','(request failed: '+e+')','')}
+ i.disabled=false;i.focus();state()}
+function send(ev){ev.preventDefault();const i=document.getElementById('inp');const t=i.value.trim();if(!t)return;i.value='';post(t)}
+function quick(t){post(t)}
+async function newChat(){await fetch('/api/new',{method:'POST'});document.getElementById('log').innerHTML='';state()}
+state();
+</script>"""
+
+
+def serve(port=8766, seeded=False, online=False):
+    import http.server, threading, socket, queue
+    path = os.path.join(TRANSCRIPTS, "serve-" + time.strftime("%Y%m%d-%H%M%S") + ".jsonl")
+    # ONE worker thread builds the worlds and owns the door: the sqlite handles behind the dictionary frequencies and
+    # the Wiktionary index may only be used by the thread that opened them (the first served turn failed on exactly
+    # that); HTTP handler threads hand it work and wait. Turns are therefore in order, one at a time.
+    state, jobs, ready = {}, queue.Queue(), threading.Event()
+
+    def worker():
+        worlds, df = build_worlds(seeded=seeded, online=online)
+        state["worlds"], state["df"] = worlds, df
+        state["door"] = Door(worlds, df, transcript=path, seed=int(time.time())); ready.set()
+        while True:
+            fn, box, ev = jobs.get()
+            try: box["r"] = fn()
+            except Exception as e: box["e"] = e
+            ev.set()
+
+    def call(fn):
+        box, ev = {}, threading.Event(); jobs.put((fn, box, ev)); ev.wait()
+        if "e" in box: raise box["e"]
+        return box["r"]
+
+    threading.Thread(target=worker, daemon=True).start(); ready.wait()
+    worlds = state["worlds"]
+
+    class H(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"             # see en_server.py: a single-threaded server wedged on one keep-alive socket
+
+        def log_message(self, *a): pass
+
+        def _send(self, code, body, ctype="application/json"):
+            b = body.encode("utf-8") if isinstance(body, str) else body
+            self.send_response(code); self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+
+        def do_GET(self):
+            if self.path in ("/", "/index.html"): self._send(200, PAGE, "text/html; charset=utf-8")
+            elif self.path == "/api/state":
+                D = state["door"]
+                self._send(200, json.dumps({"worlds": [w.name for w in D.S.worlds], "online": online, "turns": len(D.records),
+                                            "ledger": {k: list(v) for k, v in D.ledger.snapshot().items()}, "transcript": os.path.relpath(D.transcript, HERE)}))
+            else: self._send(404, "{}")
+
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(n).decode("utf-8") if n else "{}"
+            if self.path == "/api/turn":
+                text = str(json.loads(raw or "{}").get("text", ""))
+                rec = call(lambda: state["door"].turn(text))
+                self._send(200, json.dumps(_jsonable({"reply": rec["reply"], "kind": rec.get("kind"), "frame": rec["frame"]["kind"],
+                                                      "sources": rec.get("sources", []), "ms": rec["ms"], "error": rec.get("error")}), ensure_ascii=False))
+            elif self.path == "/api/new":
+                def reset(): state["door"] = Door(state["worlds"], state["df"], transcript=path, seed=int(time.time()))
+                call(reset); self._send(200, "{}")
+            else: self._send(404, "{}")
+
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    srv4 = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
+    try:                                           # both loopback families: a browser resolving localhost to ::1 (en_server's lesson)
+        class H6(http.server.ThreadingHTTPServer): address_family = socket.AF_INET6
+        threading.Thread(target=H6(("::1", port), H).serve_forever, daemon=True).start()
+    except OSError: pass
+    say(f"primasieve chat -- worlds {[w.name for w in worlds]}; online research {'ON' if online else 'off'}; transcript {os.path.relpath(path, HERE)}")
+    say(f"  serving http://127.0.0.1:{port}  and  http://localhost:{port}")
+    srv4.serve_forever()
 
 
 def replay(path, seeded=False):
@@ -403,8 +517,9 @@ def replay(path, seeded=False):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    seeded = "--seeded" in args
-    if "--chat" in args: repl(seeded, "--verbose" in args)
+    seeded = "--seeded" in args; online = "--online" in args
+    if "--serve" in args: serve(int(args[args.index("--port") + 1]) if "--port" in args else 8766, seeded, online)
+    elif "--chat" in args: repl(seeded, "--verbose" in args, online=online)
     elif "--replay" in args: replay(args[args.index("--replay") + 1], seeded)
     else:
         selfcheck(__file__)
