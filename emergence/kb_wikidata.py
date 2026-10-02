@@ -19,8 +19,16 @@ API = "https://www.wikidata.org/w/api.php?"
 
 
 class Wikidata:
-    def __init__(self, offline=False):
-        self.cache = json.load(open(CACHE_PATH, encoding="utf-8")) if os.path.exists(CACHE_PATH) else {}
+    def __init__(self, offline=False, cache_path=None):
+        """cache_path: where LIVE results are saved. The default is the shared offline fixture the gates read; a live
+        chat passes its own file (chat.py --online) so that what a user happens to ask -- and what the graph is asked
+        about the dictionary text in that session's context -- never changes the fixture the registered claims rest on
+        (2026-10-02: an online session wrote the alias of P31 for the span "is a" into the fixture and W5-c moved)."""
+        self.path = cache_path or CACHE_PATH
+        base = json.load(open(CACHE_PATH, encoding="utf-8")) if os.path.exists(CACHE_PATH) else {}
+        if cache_path and os.path.exists(cache_path):
+            base.update(json.load(open(cache_path, encoding="utf-8")))
+        self.cache = base
         self.offline = offline
         self.last = 0.0
         self.log = []
@@ -46,7 +54,7 @@ class Wikidata:
         return txt
 
     def save(self):
-        try: json.dump(self.cache, open(CACHE_PATH, "w", encoding="utf-8"))
+        try: json.dump(self.cache, open(self.path, "w", encoding="utf-8"))
         except Exception: pass
 
     def _search(self, label, typ):

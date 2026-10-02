@@ -667,3 +667,26 @@ in the record (line above, CONSOLIDATION.md). Data that no remaining file reads:
 outputs; `swe_mine*` and `swe_mine_result.txt` stay). The preregs of deleted runners stay: they are the record. After
 the cut: 133 python files, one component, zero islands, no dangling import; the gate's C2 claims are unchanged (none of
 the deleted files was registered).
+
+## 2026-10-02 -- CHAT phase B (chat_acts_prereg.md): the conversation as a world -- SOUND, acts bar not met
+`core/transcript.py`: the session's turns as records, field names handed in as DATA by the chat layer (frames.py's own
+realization words plus four authored ones: why, again, repeat, shorter); RECALL(field) over the latest non-retracted,
+non-meta turn. `frames.py`: three frames with exact inverses -- META (looking back: question, field, content), CHECK
+(the world's value against a value the text itself names; match or not; no ledger write), ACK (a conversational move per
+WordNet's own communication class, with what the engine can answer about); `fields_of` records each reply for the
+transcript. Acts by affordance: META/REPEAT by the loop's rank (a computed recall beats a quoted gloss; a longer explicit
+structure beats both by coverage); CHECK when a unique answer (or a PARTIAL whose only unused reading is the stated value)
+leaves unused an explicit reading of the answer world's own value kind, at least as rare as the answer's label; ACK when
+no non-quoting world read anything and a symbol is a move; CHOICE by containment of one option label with the rest unread
+by any content world; `deny` retracts the turn from context (the cascade); multi-sentence turns run sentence by sentence.
+Gate `chat_acts.py` (registered CONVERSATION WORLD: SOUND, CONFAB: 0): knockout of the word map 18/18 (the acts follow a
+permutation of the map: the mechanism is the data), 38 generated dialogues 74/75 with the stand-alone arm 0/64 and no bind
+to a denied answer, round trip 497/497, fatal columns 0, phase A still PASS with the transcript world (p95 0.20 s). **Acts
+90/126 = 0.71 against a 0.90 bar: the engine has no act for a REQUEST it cannot perform** ("write a poem about paris" is
+quoted as a definition, "sing a song" acknowledged because WordNet files song under communication); nothing in the loop
+tells a request from a definition question without syntax or E-10's learned question frames. Left open as the owner's
+call, counted, not relabelled. Found on the way, each fixed: an operator word borrowed from context removed the table
+world's default LOOKUP; a quoted gloss entered context as a value; and through that vector a live --online session wrote
+spans of dictionary text into the offline Wikidata fixture (the alias "is a" -> P31 moved W5-c) -- 559 keys removed with a
+backup, and a live session now writes its own cache file (`Wikidata(cache_path=...)`). Rules that paid: a fixture the
+gates read is never written by live use; a value identity is its label, case-blind; a recall is not a turn to recall.

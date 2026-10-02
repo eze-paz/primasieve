@@ -70,6 +70,10 @@ PUBLISHED = {
     "turns": ["TURNS BIND: PASS", "CONFAB: 0"],
     # ---- CHAT phase A (chat_prereg.md): the one door -- 200 utterances in one session, exceptions 0, bare abstain 0, fatal columns 0
     "chat": ["ONE DOOR: PASS", "CONFAB: 0"],
+    # ---- CHAT phase B (chat_acts_prereg.md): the conversation as a world. SOUND, not PASS: knockout, continuity, round
+    #      trip and the fatal columns hold; the acts bar (0.90) is missed at 0.71 because the engine has no act for a
+    #      REQUEST it cannot perform (recorded gap, owner's call), plus WordNet-less thanks and two-structure yes/no forms
+    "chat_acts": ["CONVERSATION WORLD: SOUND", "CONFAB: 0"],
     # ---- nolf incremental enumeration table (nolf_rebuild_prereg.md): the library pass's table is equivalent to a full build;
     #      the speedup missed its bar and is not registered
     "nolf_rebuild": ["INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT"],

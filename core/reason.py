@@ -146,7 +146,7 @@ def _names(w, st):
     return [getattr(w, "name", type(w).__name__)]
 
 
-def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, shapes=(), recent=frozenset()):
+def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, shapes=(), recent=frozenset(), trace=None):
     """-> Frame dict: kind, answers [(value, label, supports, certs, structure)], missing, weak, readings, consulted,
     sources (the world names of the top survivors), syms."""
     worlds = list(world) if isinstance(world, (list, tuple)) else [world]
@@ -209,21 +209,34 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
     free_spans = collections.defaultdict(list)
     for w, st, res, sp in recs:
         if all(i < n for i, _ in sp): free_spans[w].append(explicit(sp))
-    def keep(w, st, res, sp):
+    def why_dropped(w, st, res, sp):
+        """-> None (kept) or the name of the rule that drops this context-using survivor."""
         virt = [i for i, _ in sp if i >= n]
-        if not virt: return True
+        if not virt: return None
         ex = explicit(sp)
-        if any(fs >= ex for fs in free_spans[w]): return False                                                  # R1
+        if any(fs >= ex for fs in free_spans[w]): return "R1"
         ow = st.outer[0] if isinstance(st, Composite) else w
         predicate = any(k not in thing[ow] for i, j in ex for k in kinds_at[(ow, i, j)])
-        if not predicate and shape_of(w, st) not in shapes: return False                                        # R2 (i)
+        if not predicate and shape_of(w, st) not in shapes: return "R2i-shape"
+        # R2 (i), the other half: the text's own predicate readings (for this world) must all be USED by a structure that
+        # borrows from context -- a borrowed column and operator over the text's filters, leaving the text's column word
+        # unread, is an older question wearing this one's arguments (chat_acts_prereg.md: "is the city of research
+        # berlin" answered the lowest salary in research)
+        for (ww, i, j), ks in kinds_at.items():
+            if ww is not ow or i >= n or not (ks - thing[ow]): continue
+            if not any(a < j and i < b for a, b in ex): return "R2i-predicate-unused"
         if df is not None:                                                                                      # R2 (ii)
             read = {p for i, j in ex for p in range(i, j)}
             unread = [rarity(syms[p]) for p in range(n) if p not in read and syms[p] not in recent]
-            if unread and min(unread) < min(rarity(lab_at[i]) for i in virt): return False
-        if any(lab_at.get(i) == str(_label(w, res[0])).lower() for i in virt): return False                     # R3
-        return True
-    recs = [r for r in recs if keep(*r)]
+            if unread and min(unread) < min(rarity(lab_at[i]) for i in virt): return "R2ii-rarity"
+        if any(lab_at.get(i) == str(_label(w, res[0])).lower() for i in virt): return "R3"
+        return None
+    kept = []
+    for r in recs:
+        why = why_dropped(*r)
+        if trace is not None: trace.append((getattr(r[0], "name", "?"), r[3], _label(r[0], r[2][0]), why))
+        if why is None: kept.append(r)
+    recs = kept
     survivors = [(w, st, res) for w, st, res, _ in recs]
     explicit_kinds = collections.defaultdict(set)              # world -> {(span, kind)} of every explicit reading
     for w, r in readings:
@@ -260,7 +273,8 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
     consulted = []
     for w in worlds:
         if hasattr(w, "consulted"): consulted += list(w.consulted())
-    frame = dict(readings=[r for _, r in readings], consulted=consulted, answers=[], missing=[], weak=None, syms=syms, sources=[], answer_worlds=[])
+    frame = dict(readings=[r for _, r in readings], reading_worlds=[w for w, _ in readings], consulted=consulted, answers=[], missing=[],
+                 weak=None, syms=syms, sources=[], answer_worlds=[], df=df)
     if not survivors:
         if weaks:
             w, st, (v, sup) = weaks[0]
@@ -283,11 +297,14 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
     used = [span for w, st, _ in best for span in _spans(w, st)]
     unused = [r for w, r in readings if r[0] < n and r[2] in getattr(w, "content_kinds", set())
               and not any(a < r[1] and r[0] < b for a, b in used)]
-    values = collections.OrderedDict()
+    # a VALUE is identified by its label, case-blind: two sources naming the same capital in two spellings agree on one
+    # claim (chat_acts_prereg.md: a seeded almanac's lower-case capital against the graph's was reported as a contest)
+    values = collections.OrderedDict(); first = {}
     for w, st, (v, sup, certs) in best:
-        values.setdefault(v, []).append((w, st, sup, certs))
-    frame["answers"] = [(v, _label(lst[0][0], v), [x[2] for x in lst], set().union(*[set(x[3]) for x in lst]), lst[0][1])
-                        for v, lst in values.items()]
+        key = str(_label(w, v)).lower(); first.setdefault(key, v)
+        values.setdefault(key, []).append((w, st, sup, certs))
+    frame["answers"] = [(first[k], _label(lst[0][0], first[k]), [x[2] for x in lst], set().union(*[set(x[3]) for x in lst]), lst[0][1])
+                        for k, lst in values.items()]
     frame["answer_worlds"] = [lst[0][0] for lst in values.values()]          # the world of each answer, aligned
     frame["answer_sources"] = [sorted({nm for w, st, _, _ in lst for nm in _names(w, st)}) for lst in values.values()]
     frame["sources"] = sorted({nm for lst in values.values() for w, st, _, _ in lst for nm in _names(w, st)})

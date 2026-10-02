@@ -176,7 +176,11 @@ class TableWorld:
         fsets = [()] + [(f,) for f in fils]
         for k in (2, 3):
             fsets += [tuple(p) for p in itertools.combinations(fils, k) if len({f[3][0] for f in p}) == k]
-        opset = sorted({o[3] for o in ops}) or [LOOKUP]
+        # an operator word IN THE TEXT replaces the default lookup; an operator offered by the session's context (a 6th
+        # element marks it) is one more option beside it, never a replacement (chat_acts_prereg.md run 2: an earlier
+        # "how many" lingering in context removed LOOKUP from "what is the city of marketing")
+        explicit_ops = sorted({o[3] for o in ops if len(o) <= 5})
+        opset = (explicit_ops or [LOOKUP]) + sorted({o[3] for o in ops if len(o) > 5} - set(explicit_ops or [LOOKUP]))
         # column subsets: a final column plus 0-2 hop columns, in BOTH nesting orders
         colsets = [(c, ()) for c in cols]
         for c in cols:

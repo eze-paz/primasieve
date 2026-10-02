@@ -9,13 +9,34 @@ Frame shapes (dicts):
   PARTIAL   {kind, values: [str], supports: [str], missing: [str]}
   FOUND     {kind, quotes: [(text, source)]}
   PROPOSE   {kind, consulted: [str], action: str}"""
+import os
 import re
+import sys
 
-from core.reason import READINGS, PARTIAL, WEAK, NOT_FOUND, Composite
+from core.reason import READINGS, PARTIAL, WEAK, NOT_FOUND, Composite, symbols, _spans
 from core.verdict import ATTRIBUTED, COMMIT, CONJECTURED
 
 ANSWER, READ, PART, FOUND, PROPOSE, CONJ = "ANSWER", "READINGS", "PARTIAL", "FOUND", "PROPOSE", "CONJECTURE"
+META_K, CHECK_K, ACK_K = "META", "CHECK", "ACK"          # phase B frames (chat_acts_prereg.md)
 SEP = " ; "
+
+# The transcript world's field names, as DATA (core/transcript.py holds no word): the realization words this file
+# already speaks -- support / evidence / source / answer / question -- plus FOUR authored words, counted in
+# chat_acts_prereg.md: why -> support, again / repeat -> the previous frame re-realized, shorter -> that frame briefed.
+META = {"support": "support", "evidence": "support", "source": "source", "sources": "source", "answer": "answer",
+        "question": "question", "why": "support", "again": "frame", "repeat": "frame", "shorter": "brief"}
+DENY = ("no",)                                            # beside a choice, denies the previous answer (core.session)
+
+
+def speech_act(word):
+    """WordNet's own classification of a word as a conversational move (emergence/wn_acquire.speech_act): a noun sense
+    filed under the communication lexicographer file; the act label is the gloss head. No list of acts here."""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "emergence"))
+        from wn_acquire import speech_act as _sa
+        return _sa(word)
+    except Exception:
+        return None
 
 # meaning-preserving variants (the RNG's whole range)
 V_PER = ["per", "according to", "as recorded by"]
@@ -25,6 +46,10 @@ V_MISS = ["could not apply", "did not use", "found no way to apply"]
 V_NEXT = ["Next step:", "To resolve this:", "What would settle it:"]
 V_CORRECT = ["Correct me if wrong.", "Say so if that is wrong.", "Tell me if not."]
 V_RATHER = ["rather than", "over", "and not"]
+V_BACK = ["Looking back at", "Earlier, for", "On your question"]
+V_MATCH = ["which matches what you said", "as you said", "as stated"]
+V_NOT = ["not", "rather than", "and not"]
+V_NOTED = ["Noted", "Understood", "Acknowledged"]
 
 
 def realize(frame, rng):
@@ -52,6 +77,17 @@ def realize(frame, rng):
         if rng.random() < 0.5: riv = riv[::-1]
         s = (f"Probably {v} (per {src}; record {c} confirmed, {d} contradicted) {rng.choice(V_RATHER)} "
              + SEP.join(f"{v2} (per {s2}; record {c2} confirmed, {d2} contradicted)" for v2, s2, c2, d2 in riv) + f". {rng.choice(V_CORRECT)}")
+    elif k == META_K:
+        s = f'{rng.choice(V_BACK)} "{frame["question"]}": the {frame["field"]} was {frame["content"]}.'
+    elif k == CHECK_K:
+        src = list(frame["sources"])
+        if rng.random() < 0.5: src = src[::-1]
+        tail = rng.choice(V_MATCH) if frame["stated"] is None else f"{rng.choice(V_NOT)} {frame['stated']}"
+        s = f"Checked: {frame['value']} ({rng.choice(V_PER)} {SEP.join(src)}), {tail}."
+    elif k == ACK_K:
+        acts = list(frame["acts"])
+        if rng.random() < 0.5: acts = acts[::-1]
+        s = f"{rng.choice(V_NOTED)} ({SEP.join(f'{w}: {a}' for w, a in acts)}). I can answer about: {SEP.join(frame['offers']) or 'nothing yet'}."
     else:
         raise ValueError(k)
     return s
@@ -68,6 +104,10 @@ RX_PROPOSE = re.compile(rf"^Nothing found\. Consulted: (.+?)\. {_alt(V_NEXT)} (.
 RX_QUOTE = re.compile(rf'^"(.*)" \({_alt(V_PER)} (.+)\)$')
 RX_REC = r"(.+?) \(per (.+?); record (\d+) confirmed, (\d+) contradicted\)"
 RX_CONJ = re.compile(rf"^Probably {RX_REC} {_alt(V_RATHER)} (.+)\. {_alt(V_CORRECT)}$")
+RX_META = re.compile(rf'^{_alt(V_BACK)} "(.*)": the (\w+) was (.*)\.$', re.S)
+RX_CHECK_M = re.compile(rf"^Checked: (.+?) \({_alt(V_PER)} (.+?)\), {_alt(V_MATCH)}\.$")
+RX_CHECK_N = re.compile(rf"^Checked: (.+?) \({_alt(V_PER)} (.+?)\), {_alt(V_NOT)} (.+)\.$")
+RX_ACK = re.compile(rf"^{_alt(V_NOTED)} \((.+)\)\. I can answer about: (.*)\.$")
 
 
 def parse(text):
@@ -105,16 +145,54 @@ def parse(text):
             if not mm: return None
             riv.append((mm.group(1), mm.group(2), int(mm.group(3)), int(mm.group(4))))
         return dict(kind=CONJ, choice=(m.group(1), m.group(2), int(m.group(3)), int(m.group(4))), rivals=sorted(riv))
+    m = RX_META.match(text)
+    if m: return dict(kind=META_K, question=m.group(1), field=m.group(2), content=m.group(3))
+    m = RX_CHECK_M.match(text)
+    if m: return dict(kind=CHECK_K, value=m.group(1), stated=None, sources=sorted(m.group(2).split(SEP)))
+    m = RX_CHECK_N.match(text)
+    if m: return dict(kind=CHECK_K, value=m.group(1), stated=m.group(3), sources=sorted(m.group(2).split(SEP)))
+    m = RX_ACK.match(text)
+    if m:
+        acts = []
+        for a in m.group(1).split(SEP):
+            if ": " not in a: return None
+            w, lab = a.split(": ", 1); acts.append((w, lab))
+        off = m.group(2); return dict(kind=ACK_K, acts=sorted(acts), offers=[] if off == "nothing yet" else off.split(SEP))
     return None
 
 
 def canonical(frame):
     f = dict(frame)
-    for k in ("supports",):
+    for k in ("supports", "sources"):
         if k in f: f[k] = sorted(f[k])
     if "options" in f: f["options"] = sorted(f["options"])
     if "quotes" in f: f["quotes"] = sorted(f["quotes"])
     if "rivals" in f: f["rivals"] = sorted(f["rivals"])
+    if "acts" in f: f["acts"] = sorted(f["acts"])
+    if f.get("kind") == ANSWER: f["sources"] = list(frame["sources"])          # ANSWER's sources are ordered in the surface
+    return f
+
+
+def brief(frame):
+    """the same frame, shortened: one support / quote / consulted item / rival; options stay (a choice needs them all)."""
+    f = dict(frame)
+    for k in ("supports", "quotes", "consulted", "rivals"):
+        if k in f and len(f[k]) > 1: f[k] = list(f[k])[:1]
+    return f
+
+
+def fields_of(frame, text):
+    """what the chat layer said, as the transcript world's record fields (core/transcript.py reads these as data)."""
+    k = frame["kind"]; f = {"question": text, "frame": frame, "brief": frame, "recallable": k not in (META_K, ACK_K)}
+    if k == ANSWER: f.update(answer=SEP.join(frame["values"]), support=SEP.join(frame["supports"]), source=SEP.join(frame["sources"]))
+    elif k == READ: f.update(answer=SEP.join(v for v, _ in frame["options"]), support=SEP.join(s for _, s in frame["options"]),
+                             source=SEP.join(s for _, s in frame["options"]))
+    elif k == PART: f.update(answer=SEP.join(frame["values"]), support=SEP.join(frame["supports"]))
+    elif k == FOUND: f.update(answer=SEP.join(t for t, _ in frame["quotes"]), source=SEP.join(s for _, s in frame["quotes"]))
+    elif k == PROPOSE: f.update(answer=frame["action"], source=SEP.join(frame["consulted"]))
+    elif k == CONJ: f.update(answer=frame["choice"][0], source=frame["choice"][1], support=SEP.join(v for v, _, _, _ in frame["rivals"]))
+    elif k == CHECK_K: f.update(answer=frame["value"], source=SEP.join(frame["sources"]))
+    elif k == META_K: f.update(answer=frame["content"])
     return f
 
 
@@ -139,6 +217,16 @@ def to_frame(fr, world=None, kind_hint=None):
     worlds = fr.get("answer_worlds") or ([world] * len(fr["answers"]) if world is not None else [])
     lab = (world.label if world is not None and hasattr(world, "label") else str)
     quotes = kind_hint == "gloss" or any(getattr(w, "quotes", False) for w in worlds)
+    # ---- phase B acts by affordance (chat_acts_prereg.md), decided before the five content frames
+    if k in (ATTRIBUTED, COMMIT) and worlds and getattr(worlds[0], "transcript", False) and len(fr["answers"]) == 1:
+        v = fr["answers"][0][0]; field, _, qtext = v; content = worlds[0].content(v)
+        if field == "frame": return dict(content)
+        if field == "brief": return brief(content)
+        return dict(kind=META_K, question=str(qtext), field=str(field), content=str(content))
+    ack = _ack(fr)
+    if ack is not None: return ack
+    chk = _check(fr)
+    if chk is not None: return chk
     if k in (ATTRIBUTED, COMMIT):
         if quotes:
             def src_of(sups):
@@ -171,6 +259,53 @@ def to_frame(fr, world=None, kind_hint=None):
     consulted += sources_of(fr)
     action = "name the thing you mean, or give a source that has it" if not ents else "check the name, or supply a table or source holding it"
     return dict(kind=PROPOSE, consulted=consulted, action=action)
+
+
+def _ack(fr):
+    """a conversational move: no non-quoting world read any symbol of the text, and WordNet classifies at least one
+    symbol as a move (chat_acts_prereg.md). The offer is what the worlds consulted: their sources, by name."""
+    rw = fr.get("reading_worlds")
+    if rw is None: return None
+    n = len(fr["syms"])
+    if any(r[0] < n and not getattr(w, "quotes", False) for w, r in zip(rw, fr["readings"])): return None
+    acts = []
+    for s in dict.fromkeys(fr["syms"]):
+        if len(s) < 2: continue                   # WordNet files single letters under communication; a letter is not a move
+        a = speech_act(s)
+        if a: acts.append((s, a[0]))
+    if not acts: return None
+    return dict(kind=ACK_K, acts=acts, offers=[c[len("source "):] for c in sources_of(fr)])
+
+
+def _check(fr):
+    """the text names, unused, a value of the kind the answer world reads its own answer as: a yes/no question or an
+    assertion. The world's value is reported against it; equal label = match. No ledger write (chat_acts_prereg.md)."""
+    # a unique answer, or a PARTIAL whose only unused content reading is the stated value itself (a table reads a
+    # stated city as a filter value: "is the city of research berlin")
+    if fr["kind"] not in (ATTRIBUTED, COMMIT, PARTIAL) or len(fr["answers"]) != 1 or not fr.get("answer_worlds"): return None
+    w = fr["answer_worlds"][0]
+    if getattr(w, "quotes", False) or getattr(w, "transcript", False): return None
+    v, lab, sups, certs, st = fr["answers"][0]; n = len(fr["syms"])
+    if isinstance(st, Composite): return None
+    used = [(i, j) for i, j in _spans(w, st) if i < n]
+    ls = symbols(str(lab), "LN")
+    if not ls: return None
+    vk = {r[2] for r in w.readings(ls) if r[0] == 0 and r[1] == len(ls)}
+    if not vk: return None
+    df = fr.get("df")
+    def rarity(s): return min((df(t) if df(t) > 0 else -1) for t in (symbols(s, "LN") or [s]))
+    stated = {}
+    for ww, r in zip(fr.get("reading_worlds") or [], fr["readings"]):
+        if ww is not w or r[0] >= n or len(r) > 5 or r[2] not in vk: continue
+        if any(a < r[1] and r[0] < b for a, b in used): continue
+        # a stated value is at least as specific as the answer's own label (the offline graph reads common words as
+        # entities: a question word is not a stated capital)
+        if df is not None and rarity(" ".join(fr["syms"][r[0]:r[1]])) > rarity(str(lab)): continue
+        stated[str(r[4]).lower()] = True
+    if len(stated) != 1: return None
+    s = next(iter(stated))
+    if fr["kind"] == PARTIAL and {str(m).lower() for m in fr["missing"]} - {s}: return None     # something else was left unread
+    return dict(kind=CHECK_K, value=str(lab), stated=None if s == str(lab).lower() else s, sources=list(fr.get("sources") or [getattr(w, "name", "source")]))
 
 
 def sources_of(fr):

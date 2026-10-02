@@ -29,7 +29,10 @@ from core.gloss import GlossWorld
 from core.session import Session
 from core.ledger import Ledger
 from core.registry import selfcheck
-from frames import realize, parse, canonical, to_frame, ANSWER, READ, PART, FOUND, PROPOSE, CONJ
+from core.transcript import TranscriptWorld
+from core.resolve import segment
+import frames
+from frames import realize, parse, canonical, to_frame, fields_of, ANSWER, READ, PART, FOUND, PROPOSE, CONJ, META_K, CHECK_K, ACK_K
 
 F = Fraction
 TRANSCRIPTS = os.path.join(HERE, "_nldata", "chat")
@@ -63,7 +66,8 @@ def build_worlds(seeded=False, quiet=True, online=False):
     import kg_multihop as KG
     import tables_numbers as TN
     import worlds_general as G
-    src = Wikidata(offline=not online); df = KG.make_df()
+    # live lookups are saved to the chat's OWN cache file, never into the offline fixture the gates read
+    src = Wikidata(offline=not online, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json") if online else None); df = KG.make_df()
     kgw = KGWorld(src, df, name="Wikidata")
     recs = G.load_records(G.DOMAIN)
     # one discriminating pair added to the orgchart teaching (chat_prereg.md amendment): the gate's pairs never separate
@@ -76,7 +80,7 @@ def build_worlds(seeded=False, quiet=True, online=False):
     salesw = TableWorld(t, P["lexicon"], P["order"], name="sales")
     execw = ExecWorld(name="exec"); execw.induce_lexicon(EXEC_TEACH)
     glossw = GlossWorld(Lexica(online=online), name="dictionary")
-    worlds = [kgw, recw, salesw, execw, glossw]
+    worlds = [kgw, recw, salesw, execw, glossw, TranscriptWorld(frames.META, name="transcript")]
     if seeded:
         from core.triples import Triples
         worlds += [KGWorld(Triples(os.path.join(HERE, "worlds", f"{n}.json"), n), None, name=n) for n in ("almanac", "gazetteer", "atlas")]
@@ -89,9 +93,33 @@ class Door:
 
     def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0):
         self.ledger = ledger if ledger is not None else Ledger()
-        self.S = Session(worlds, df, ledger=self.ledger)
+        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
+
+    @staticmethod
+    def sentences(text):
+        """a text with two or more sentence-final marks and symbols between them -> its sentences (chat_acts_prereg.md)."""
+        parts, cur = [], []
+        for tok in segment(text):
+            cur.append(tok)
+            if any(c in tok for c in ".?!"):
+                if symbols(" ".join(cur), "LN"): parts.append(" ".join(cur))
+                cur = []
+        if symbols(" ".join(cur), "LN"): parts.append(" ".join(cur))
+        return parts if len(parts) >= 2 else [text]
+
+    def _one(self, text):
+        """one sentence through the session -> (core frame, chat frame, act)"""
+        fr = self.S.turn(text); frame = to_frame(fr)
+        aw = fr["answer_worlds"][0] if fr.get("answer_worlds") else None
+        if fr.get("chosen"): act = "CHOICE"
+        elif aw is not None and getattr(aw, "transcript", False) and fr["answers"] and fr["answers"][0][0][0] in ("frame", "brief"): act = "REPEAT"
+        else: act = frame["kind"]
+        fields = fields_of(frame, text)
+        if act == "REPEAT": fields["recallable"] = False          # a repeat is not a turn to look back at
+        self.S.remember(fields)
+        return fr, frame, act
 
     def _last_answer(self):
         for rec in reversed(self.records):
@@ -104,7 +132,7 @@ class Door:
         out = self.S.teach(q, v, world=self._world_of(last)) if ok else self.S.deny(q)
         snap = out.get("ledger", self.ledger.snapshot())
         quotes = [(f"{s}: {c} confirmed, {d} contradicted", "ledger") for s, (c, d) in sorted(snap.items())] or [("no source on record", "ledger")]
-        return dict(kind="FEEDBACK", frame=dict(kind=FOUND, quotes=quotes), values=[], sources=["ledger"], feedback=ok, ledger=snap)
+        return dict(kind="FEEDBACK", act="FEEDBACK", frame=dict(kind=FOUND, quotes=quotes), values=[], sources=["ledger"], feedback=ok, ledger=snap)
 
     def _world_of(self, rec):
         """the world that answered: teach re-induces only it (a KG has nothing to induce; a table or exec world
@@ -121,14 +149,18 @@ class Door:
             if last is not None:
                 rec.update(self._feedback(low == YES, last))
             else:
-                fr = self.S.turn(text); frame = to_frame(fr)
-                rec.update(kind=fr["kind"], frame=frame, sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
+                parts = self.sentences(text); frames_out, replies, acts = [], [], []
+                for part in parts:
+                    fr, frame, act = self._one(part)
+                    frames_out.append(frame); acts.append(act); replies.append(realize(frame, self.rng))
+                rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts,
+                           sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
                            attributed=[bool(getattr(w, "attributed", True)) for w in fr["answer_worlds"]],
                            quotes=[bool(getattr(w, "quotes", False)) for w in fr["answer_worlds"]],
                            certs=[len(a[3]) for a in fr["answers"]], n_syms=len(fr["syms"]), n_consulted=len(fr["consulted"]))
-                rec["_fr"] = fr
-            rec["reply"] = realize(rec["frame"], self.rng)
+                rec["_fr"] = fr; rec["reply"] = " ".join(replies)
+            if "reply" not in rec: rec["reply"] = realize(rec["frame"], self.rng)
         except Exception as e:
             rec["error"] = f"{type(e).__name__}: {e}"; rec["trace"] = traceback.format_exc()[-1200:]
             frame = dict(kind=PROPOSE, consulted=[f"error {type(e).__name__}"], action="rephrase the question")

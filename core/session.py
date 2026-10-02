@@ -26,11 +26,28 @@ _shape = shape_of
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3, ledger=None):
+    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=()):
         self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
         self.history = []            # [(text, frame)]
+        self.memory = []             # the chat layer's record of each turn (fields of the realized frame), aligned with history
         self.prefs = {}              # shape -> chosen structure key
         self.teaching = []           # [(question, gold)]
+        self.deny_words = set(deny_words)       # chat-layer data: a word that, beside a choice, denies the previous answer
+        for w in self.worlds:                   # the transcript world (chat_acts_prereg.md) reads this session's own records
+            if getattr(w, "transcript", False): w.session = self
+
+    def remember(self, fields):
+        """the chat layer records what it said for the last turn (fields of the realized frame)."""
+        while len(self.memory) < len(self.history) - 1: self.memory.append({})
+        self.memory.append(dict(fields))
+
+    def _reads(self, syms):
+        """does any non-quoting content world read any of these symbols? (the remainder of a choice must be function words)"""
+        if not syms: return False
+        for w in self.worlds:
+            if getattr(w, "quotes", False) or getattr(w, "transcript", False): continue
+            if any(r[0] < len(syms) for r in w.readings(syms)): return True
+        return False
 
     # ---- context: the previous turns' values and the readings their answers used ----------------------------
     def context(self):
@@ -38,7 +55,9 @@ class Session:
         question USED ("used") only to the world that used it (core.reason R0)."""
         out, seen = [], set()
         for text, fr in reversed(self.history[-self.depth:]):
+            if fr.get("retracted"): continue                     # a denied turn leaves the context (the cascade, chat_acts_prereg.md)
             for (v, lab, sups, certs, st), w in zip(fr.get("answers", []), fr.get("answer_worlds", [])):
+                if getattr(w, "transcript", False) or getattr(w, "quotes", False): continue      # a recall or a quoted gloss is not a value to bind to
                 vr = w.value_reading(v) if hasattr(w, "value_reading") else None
                 item = (lab, w, vr[0], vr[1], "value") if vr else lab
                 if lab not in seen: seen.add(lab); out.append(item)
@@ -50,7 +69,9 @@ class Session:
         """the shapes of the recent turns' answers: what a turn that supplies only arguments may repeat (core.reason R2)."""
         out = []
         for text, fr in reversed(self.history[-self.depth:]):
+            if fr.get("retracted"): continue
             for (v, lab, sups, certs, st), w in zip(fr.get("answers", []), fr.get("answer_worlds", [])):
+                if getattr(w, "transcript", False) or getattr(w, "quotes", False): continue
                 s = shape_of(w, st)
                 if s not in out: out.append(s)
         return out
@@ -60,7 +81,14 @@ class Session:
         syms = symbols(text, "LN")
         prev = self.history[-1][1] if self.history else None
         if prev is not None and prev["kind"] == READINGS:
-            hits = [a for a in prev["answers"] if symbols(str(a[1]), "LN") == syms]
+            # a CHOICE: the turn CONTAINS exactly one option's label and every other symbol is read by no content world
+            # (W4 required equality; "no, I meant X" and "X please" are the same act -- chat_acts_prereg.md)
+            hits = []
+            for a in prev["answers"]:
+                ls = symbols(str(a[1]), "LN")
+                if not ls or not _contains(syms, ls): continue
+                rest = [s for s in syms if s not in ls and s not in self.deny_words]
+                if not self._reads(rest): hits.append(a)
             if len(hits) == 1:
                 v, lab, sups, certs, st = hits[0]
                 w = prev["answer_worlds"][prev["answers"].index(hits[0])]
@@ -73,8 +101,10 @@ class Session:
         if fr["kind"] == READINGS and self.prefs:
             keep = [(a, w) for a, w in zip(fr["answers"], fr["answer_worlds"]) if _shape(w, a[4]) in self.prefs]
             if len(keep) == 1:
-                a, w = keep[0]
-                fr = dict(fr, kind=ATTRIBUTED if getattr(w, "attributed", True) else COMMIT, answers=[a], answer_worlds=[w], preferred=True)
+                a, w = keep[0]; idx = fr["answers"].index(a)
+                srcs = fr.get("answer_sources", [[]])[idx] if idx < len(fr.get("answer_sources", [])) else fr["sources"]
+                fr = dict(fr, kind=ATTRIBUTED if getattr(w, "attributed", True) else COMMIT, answers=[a], answer_worlds=[w],
+                          answer_sources=[srcs], sources=list(srcs), preferred=True)       # the chosen option's sources, not every option's
         fr["attributed_kind"] = ATTRIBUTED if any(getattr(w, "attributed", True) for w in fr["answer_worlds"]) else COMMIT
         fr["used"] = _used(fr, fr["answer_worlds"][0], fr["answers"][0][4]) if fr["answers"] else []
         self.history.append((text, fr))
@@ -102,13 +132,20 @@ class Session:
         the right one. Every source that spoke on it is recorded as contradicted, with the claim; nothing is
         re-induced (no gold to induce from) and nothing cascades yet (the transcript world, CHAT_PLAN.md phase B)."""
         out = {}
-        if self.ledger is not None:
-            for t, fr in reversed(self.history):
-                if t != question or not fr.get("answers"): continue
+        for t, fr in reversed(self.history):
+            if t != question or not fr.get("answers"): continue
+            fr["retracted"] = True                   # the cascade: its values and used readings leave the context
+            if self.ledger is not None:
                 for a, src in zip(fr["answers"], fr.get("answer_sources", [])):
                     self.ledger.record(src, False, claim=(a[1], question))
-                out["ledger"] = self.ledger.snapshot(); break
+                out["ledger"] = self.ledger.snapshot()
+            break
         return out
+
+
+def _contains(syms, sub):
+    L = len(sub)
+    return any(syms[i:i + L] == sub for i in range(len(syms) - L + 1))
 
 
 def _used(fr, w, st):
