@@ -648,3 +648,22 @@ candidates, the top of them relation/count near-misses whose sub-terms unlock no
 near-miss is not reached. Four measurement confounders were found and fixed in order and are recorded in the prereg
 (reduced vs unreduced skeleton; per-row vs global score; which table to probe; unbalanced rows). The seventh strings
 construction still costs one seeded schema. Not registered.
+
+### 2026-10-02 -- the arc-1 cut, executed (owner's go-ahead): 25 files and the orphaned data
+The "Proposed next cut" above named ~45 files. Measured before deleting: the recommended keep list was not executable
+as written -- `meta_forms` imports `reasoner_code` and `reasoner_interp`, `meta_reason` imports `reasoner_code` and
+`meta_features`, `meta_library` and `emergence/em_real` import `reasoner_code`, `phase2*` import `meta_param` and
+`meta_bench`, `meta_e15` imports `meta_e9`, `l0` imports `meta_e8`. Those ten (`meta_e8`, `meta_e9`, `meta_param`,
+`meta_bench`, `meta_features`, `meta_struct`, `meta_codeparam`, `reasoner_code`, `reasoner_core`, `reasoner_analog`,
+`reasoner_interp`) are dependencies of live mechanisms and STAY (the meta_e4 lesson of Pass 3, applied before the
+deletion rather than after). Deleted, with their results already recorded in CONSOLIDATION.md, HANDOFF.md and this file:
+`meta_e1, e2, e3, e10, e11, meta_v2, meta_pool, meta_oracle, meta_learn, meta_transfer, meta_discover, meta_emerge,
+meta_ledger, meta_iterdeep, bench_all, domain_math, hdp_run, hdp_seg, hdp_sweep, beat_zhikov, phase4, proposer,
+proposer_regime, proposer_structured`, and `seg_zhikov` -- it became the one island once `hdp_seg`/`beat_zhikov` went,
+imports nothing of core/, and its mechanism (MDL over raw text) has its live form in `core/seqform.py`; its F 0.741 stays
+in the record (line above, CONSOLIDATION.md). Data that no remaining file reads: `controller_head.pt`, `lfm_emb.pt`
+(the controller arc, CONTROLLER_PLAN.md), `traces.json`, `html_data.jsonl`, `pyodide_data.jsonl`, `fin_demo.html`,
+`episodes/`, `library/op_ledger.json`, `meta_learn_result.json`, `meta_pool_stats.json`, `swebench_*.json` (the census
+outputs; `swe_mine*` and `swe_mine_result.txt` stay). The preregs of deleted runners stay: they are the record. After
+the cut: 133 python files, one component, zero islands, no dangling import; the gate's C2 claims are unchanged (none of
+the deleted files was registered).
