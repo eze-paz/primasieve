@@ -43,3 +43,8 @@ borrowing is confirmed without a person; circular routes refused. Nothing to do 
 An unread span goes to every attached fetcher once; what comes back is a world of a shape the loop reads, cited, kept in the store;
 10/10 questions about entities the fixture lacks answered with a fetched world; fetched content is readings, never teaching (the planted
 instruction is quoted and changes nothing). World-agnostic: no world was written for it.
+
+## 2026-10-03 -- two fetched sources (crosscheck_prereg.md): PASS; the live chat has everything on
+OpenStreetMap beside Wikidata as a second fetcher (emergence/kb_osm.py); agreement is printed with both citations, never counted;
+a disagreement is READINGS, then CONJECTURED by the sources' record once the user has spoken; a sole wrong source is the recorded
+limit. chat.py --serve --online now opens with the store, transfer, both fetchers and the proposal word ('propose').

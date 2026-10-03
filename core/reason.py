@@ -248,6 +248,10 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
             read = {p for i, j in ex for p in range(i, j)}
             unread = [rarity(syms[p]) for p in range(n) if p not in read and syms[p] not in recent]
             if unread and min(unread) < min(rarity(lab_at[i]) for i in virt): return "R2ii-rarity"
+            # a symbol no dictionary knows is a NAME candidate: the turn has a topic of its own (crosscheck_prereg.md: the
+            # country of an unfetched river was answered with the previous turn's entity because that entity's label was
+            # absent from the dictionary too, and absent-everywhere counted as the rarest)
+            if any(r < 0 for r in unread): return "R2ii-unknown-name"
         if any(lab_at.get(i) == str(_label(w, res[0])).lower() for i in virt): return "R3"
         return None
     kept = []

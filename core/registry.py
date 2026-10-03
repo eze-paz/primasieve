@@ -101,7 +101,9 @@ PUBLISHED = {
     # ---- selfconfirm_prereg.md: a guess confirmed by an independent computation; circular routes refused
     "selfconfirm": ["SELF-CONFIRMATION: PASS"],
     # ---- research_prereg.md: an unread symbol becomes a fetch, a fetch becomes a world (recorded cache; NOT RUN without it)
-    "research": ["RESEARCH BY ITSELF: PASS", "CONFAB: 0"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
+    "research": ["RESEARCH BY ITSELF: PASS", "CONFAB: 0"],
+    # ---- crosscheck_prereg.md: two fetched sources, corroborated / contested the W6 way, never voted (recorded caches)
+    "crosscheck": ["CROSSCHECK: PASS"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
 }
 
 

@@ -37,6 +37,7 @@ from frames import realize, parse, canonical, to_frame, fields_of, sources_of, A
 F = Fraction
 TRANSCRIPTS = os.path.join(HERE, "_nldata", "chat")
 YES, NO = "correct", "wrong"                      # the two authored cue words (chat_prereg.md section 2)
+ASK = "propose"                                   # the third (together_prereg.md): the engine offers the question that would settle most of what it holds
 EXEC_TEACH = [("what is 3 times 4", 12), ("what is 5 times 6", 30), ("what is 2 times 9", 18), ("what is 7 plus 1", 8),
               ("what is 2 plus 5", 7), ("what is 9 minus 4", 5), ("what is 8 minus 3", 5),
               ("what is the double of 4", 8), ("what is the double of 7", 14), ("what is the double of 10", 20),
@@ -186,6 +187,11 @@ class Door:
         t0 = time.perf_counter(); rec = dict(text=text, error=None)
         low = text.strip().lower()
         try:
+            if low == ASK:
+                g, q = self.propose()
+                frame = dict(kind=PROPOSE, consulted=[f"residue {len(self.S.goals())}"], action=(f"ask me: {q}" if q else "nothing is open that one answer would settle"))
+                rec.update(kind="PROPOSAL", frame=frame, values=[], sources=["goals"], proposal=q, reply=realize(frame, self.rng))
+                rec["ms"] = round((time.perf_counter() - t0) * 1000, 1); self.records.append(rec); return rec
             last = self._last_answer() if low in (YES, NO) else None
             if last is not None:
                 rec.update(self._feedback(low == YES, last))
@@ -452,13 +458,30 @@ def gate(seeded=False):
     return not fails
 
 
+def live_door(seeded, online, store, path, seed):
+    """the door the LIVE modes open (REPL and server): every ability on -- the store (default file), transfer, and when
+    online the researcher over the live Wikidata and OpenStreetMap sources with their own cache files (research_prereg.md,
+    crosscheck_prereg.md). The gate's door stays as registered."""
+    worlds, df = build_worlds(seeded=seeded, online=online)
+    for w in worlds:
+        if hasattr(w, "induce_lexicon") and hasattr(w, "df"): w.df = df
+    store = store or os.path.join(HERE, "_nldata", "chat_store.json")
+    researcher = None
+    if online:
+        from core.research import Researcher, WikidataFetcher
+        from kb_wikidata import Wikidata
+        from kb_osm import Nominatim
+        researcher = Researcher([WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)],
+                                os.path.join(HERE, "_nldata", "research_live"), df=df)
+    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher)
+
+
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
     """interactive on a terminal; over `lines` when piped (on Windows the null device reports as a terminal, so the
     gate is the bare invocation and the REPL is --chat, never the other way round)."""
     if lines is None and not sys.stdin.isatty(): lines = [l.rstrip("\n") for l in sys.stdin]
-    worlds, df = build_worlds(seeded=seeded, online=online)
     path = os.path.join(TRANSCRIPTS, time.strftime("%Y%m%d-%H%M%S") + ".jsonl")
-    D = Door(worlds, df, transcript=path, seed=int(time.time()), store=store)
+    D = live_door(seeded, online, store, path, int(time.time())); worlds = D.S.worlds
     say(f"primasieve chat -- worlds {[w.name for w in worlds]}; transcript {os.path.relpath(path, HERE)}; ctrl-d to quit")
     it = iter(lines) if lines is not None else None
     while True:
@@ -520,9 +543,8 @@ def serve(port=8766, seeded=False, online=False, store=None):
     state, jobs, ready = {}, queue.Queue(), threading.Event()
 
     def worker():
-        worlds, df = build_worlds(seeded=seeded, online=online)
-        state["worlds"], state["df"] = worlds, df
-        state["door"] = Door(worlds, df, transcript=path, seed=int(time.time()), store=store); ready.set()
+        state["door"] = live_door(seeded, online, store, path, int(time.time()))
+        state["worlds"], state["df"] = state["door"].S.worlds, state["door"].S.df; ready.set()
         while True:
             fn, box, ev = jobs.get()
             try: box["r"] = fn()

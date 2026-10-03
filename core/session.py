@@ -99,7 +99,8 @@ class Session:
                 v, lab, sups, certs, st = hits[0]
                 w = prev["answer_worlds"][prev["answers"].index(hits[0])]
                 self.prefs[_shape(w, st)] = True
-                fr = dict(prev, kind=prev.get("attributed_kind", COMMIT), answers=[hits[0]], chosen=True)
+                fr = dict(prev, kind=prev.get("attributed_kind", COMMIT), answers=[hits[0]], chosen=True,
+                          options=list(prev["answers"]), option_sources=list(prev.get("answer_sources", [])), question=self.history[-1][0])
                 fr["used"] = _used(fr, w, st)
                 self.history.append((text, fr)); return fr
         recent = frozenset(s for t, _ in self.history[-self.depth:] for s in symbols(t, "LN"))
@@ -168,6 +169,9 @@ class Session:
                 for a, src in zip(fr["answers"], fr.get("answer_sources", [])):
                     ok = _same(a[1], gold)
                     self.ledger.record(src, ok, claim=None if ok else (a[1], question))
+                if fr.get("chosen"):                         # a confirmed CHOICE: the options not chosen were wrong, on their sources' record
+                    for a, src in zip(fr.get("options", []), fr.get("option_sources", [])):
+                        if not _same(a[1], gold): self.ledger.record(src, False, claim=(a[1], fr.get("question", question)))
                 out["ledger"] = self.ledger.snapshot(); break
         for w in self.worlds:
             if not hasattr(w, "induce_lexicon"): continue

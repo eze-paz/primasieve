@@ -18,16 +18,20 @@ from .triples import Triples
 
 
 class Researcher:
-    def __init__(self, fetchers, folder, df=None, budget=40):
+    def __init__(self, fetchers, folder, df=None, budget=400):
         self.fetchers = list(fetchers); self.folder = folder; self.df = df; self.budget = budget
         self.tried = {}                 # (fetcher name, symbol) -> path | None
         self.attached = []              # (fetcher name, symbol, path)
         os.makedirs(folder, exist_ok=True)
 
     # ---- what a turn left unread: spans of symbols no non-quoting world read (longest first, no numerals) -------------
-    @staticmethod
-    def unread_spans(frame, maxlen=3):
-        syms = frame.get("syms", []); n = len(syms)
+    def unread_spans(self, frame, maxlen=3):
+        """spans no non-quoting world read, longest first; with a df, a span whose every symbol sits above the question's
+        median definition frequency is not a name (the graph world's A1) and is not fetched"""
+        syms = frame.get("syms", []); n = len(syms); df = self.df
+        med = None
+        if df is not None and n:
+            vals = sorted(df(x) for x in syms); med = vals[len(vals) // 2]
         read = set()
         for r, w in zip(frame.get("readings", []), frame.get("reading_worlds", [])):
             if getattr(w, "quotes", False) or r[2] in ("U", "X"): continue
@@ -37,6 +41,7 @@ class Researcher:
             for i in range(n - L + 1):
                 span = range(i, i + L)
                 if all(p not in read for p in span) and all(unicodedata.category(syms[p][0])[0] == "L" for p in span):
+                    if med is not None and all(df(syms[p]) > med for p in span): continue
                     out.append(" ".join(syms[i:i + L]))
         return out
 
@@ -63,8 +68,8 @@ class Researcher:
 
     def attach(self, session, path, fetcher=None):
         d = json.load(open(path, encoding="utf-8"))
-        name = f"{d['source']}:{d['symbol']}"
-        if any(getattr(w, "name", None) == name for w in session.worlds): return None
+        name = d["source"]                        # the SOURCE's name: the ledger's record belongs to a source, not to one of its entities
+        if any(getattr(w, "fetched", None) == path for w in session.worlds): return None
         if d["shape"] == "graph":
             w = KGWorld(FetchedGraph(d["data"], name), self.df, name=name)
         elif d["shape"] == "triples":
