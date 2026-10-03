@@ -86,7 +86,13 @@ class Generator:
                             toks2 = body2 + tuple(symbols(self.lab(o2), "LN")) + right2
                             sent2 = ls + JOIN + " ".join(toks2)
                             if sent2 not in seen: seen.add(sent2); out.append((sent2, keys + [fkey2], 2))
-        out.sort(key=lambda x: -sum(self.standing[k] for k in x[1]))
+        if getattr(self, "prefer_long", False):
+            # amendment (gloss_width_prereg.md X5-long, declared): say the MOST the reader can vouch for -- longest candidate first,
+            # standing second. Measured need: ordered by standing alone, the shortest and most frequent windows ('of {E}') won
+            # every frame and wider windows (W = 5, sound at 0.95) never reached the output.
+            out.sort(key=lambda x: (-len(x[0].split()), -sum(self.standing[k] for k in x[1])))
+        else:
+            out.sort(key=lambda x: -sum(self.standing[k] for k in x[1]))
         return out[:CAND]
 
 

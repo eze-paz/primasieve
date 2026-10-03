@@ -829,3 +829,16 @@ music", "watercraft: a vessel of"), composition degrades grammar while preservin
 knockout keeps 41 % acceptance because bare-relation conditions are interchangeable, and no word is claim-free under the
 strict rule. Fluency cannot emerge from three-token windows however many there are; width (W = 3) against data is the one
 lever left to measure. Not registered.
+
+### 2026-10-03 -- window width and a different register (gloss_width_prereg.md): width is free, the voucher is unsound
+Owner's ask: the width test, and genuinely distinct text (novels). `gloss_width.py`: W = 5 and 7 admit **1.48x and 1.78x**
+the W = 3 windows at soundness 0.95 -- the prediction that wider patterns would not recur was refuted; width was a
+parameter, not a wall. The Wiktionary EXAMPLE sentences (quotations from books and news, the checkable stand-in for
+novels) add 1,067 verified windows, and held-out reading on prose is **0.34**: two thirds of a quotation nothing accounts
+for, the measured distance from a novel. Generation with the longest vouched-for candidate first produced 7-token
+sentences that are **false** and pass the strict inverse ("Portuguese: neighborhood of new orleans louisiana portugal"):
+a window admitted with a one-relation condition carries words ("neighborhood") the condition never typed -- harmless in
+reading, where the source made them true, and an unchecked assertion in generation. The reader is sound as a reader and
+unsound as a voucher; the rule "every content word inside an admitted window" had to be "every content word TYPED by the
+window's condition", under which output returns to labels. The lever is the type lexicon, whose headword-binding form was
+a null twice. Learning from novels stays closed under the honesty rule. Not registered.
