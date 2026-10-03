@@ -377,11 +377,16 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
     frame["answer_sources"] = [sorted({nm for w, st, _, _ in lst for nm in _names(w, st)}) for lst in values.values()]
     frame["sources"] = sorted({nm for lst in values.values() for w, st, _, _ in lst for nm in _names(w, st)})
     attributed = any(_attributed(w, st) for lst in values.values() for w, st, _, _ in lst)
-    conj = any(_conjectured(w, st) for lst in values.values() for w, st, _, _ in lst)
+    # a value is a CONJECTURE only if every route to it is one (selfconfirm_prereg.md rule A): a plain computation among the
+    # routes makes the answer plain and the guessed route merely corroborated
+    def plain_route(w, st): return (not _conjectured(w, st)) and not _attributed(w, st)
+    conj = len(values) == 1 and any(_conjectured(w, st) for lst in values.values() for w, st, _, _ in lst) \
+        and not any(plain_route(w, st) for lst in values.values() for w, st, _, _ in lst)
+    frame["routes"] = {k: [(getattr(w, "name", "?"), _conjectured(w, st), plain_route(w, st), st) for w, st, _, _ in lst] for k, lst in values.items()}
     if unused:
         frame.update(kind=PARTIAL, missing=sorted({r[4] for r in unused}))
         return frame
-    if conj and len(values) == 1:            # one value, reached through a borrowed word (whatever structures carry it)
+    if conj:                                  # one value, reached only through guessed routes
         # a guess with a correction channel: the chat's CONJECTURE frame, one option, no rival
         frame["contest"] = [(frame["answers"][0][1], frame["answer_sources"][0], 0, 0)]
         frame.update(kind=CONJECTURED, via="transfer"); return frame

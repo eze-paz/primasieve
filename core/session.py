@@ -110,10 +110,41 @@ class Session:
                 srcs = fr.get("answer_sources", [[]])[idx] if idx < len(fr.get("answer_sources", [])) else fr["sources"]
                 fr = dict(fr, kind=ATTRIBUTED if getattr(w, "attributed", True) else COMMIT, answers=[a], answer_worlds=[w],
                           answer_sources=[srcs], sources=list(srcs), preferred=True)       # the chosen option's sources, not every option's
+        fr["self_confirmed"] = self._self_confirm(text, fr)
         fr["attributed_kind"] = ATTRIBUTED if any(getattr(w, "attributed", True) for w in fr["answer_worlds"]) else COMMIT
         fr["used"] = _used(fr, fr["answer_worlds"][0], fr["answers"][0][4]) if fr["answers"] else []
         self.history.append((text, fr))
         return fr
+
+    def _self_confirm(self, text, fr):
+        """selfconfirm_prereg.md rule B: a guessed route (world B, word w borrowed from world A) to the one top value, beside
+        a PLAIN route of a world C that is neither A nor B and whose certificates carry no link to A -> B receives the
+        pair through the confirmation channel, as from a person. -> [(B name, word, A name, C name)]; circular -> []."""
+        out = []
+        if fr.get("kind") not in (COMMIT,) or len(fr.get("answers", [])) != 1 or not fr.get("routes"): return out
+        (v, lab, sups, certs, st), = fr["answers"]
+        routes = next(iter(fr["routes"].values()))
+        plain = [(name, s) for name, cj, pl, s in routes if pl]
+        guessed = [(name, s) for name, cj, pl, s in routes if cj]
+        if not plain or not guessed: return out
+        by_name = {getattr(w, "name", None): w for w in self.worlds}
+        for bname, s in guessed:
+            B = by_name.get(bname)
+            links = {(c[1], c[2]) for c in certs if c[0] == "TRANSFER"}                 # (word, source) of every borrowed word in play
+            for word, src in sorted(links):
+                if word not in getattr(B, "borrowed", {}) or B.borrowed[word][1] != src: continue
+                A = by_name.get(src)
+                for cname, cs in plain:
+                    C = by_name.get(cname)
+                    if C is None or C is A or C is B: continue
+                    ccerts = _route_certs(C, cs)
+                    if any(c[0] == "TRANSFER" and c[2] == src for c in ccerts): continue       # C's route borrows from A: same origin
+                    if any(src in str(c) for c in ccerts if c[0] not in ("EXEC", "TABLE", "TEACH")): continue
+                    if hasattr(B, "induce_lexicon"):
+                        self.teaching.append((text, v, B)); B.induce_lexicon([(q, g) for q, g, ww in self.teaching if ww is None or ww is B])
+                        out.append((bname, word, src, cname))
+                    break
+        return out
 
     def teach(self, question, gold, world=None):
         """the confirmation channel: (question, confirmed answer) -> the world named (or every world that learns)
@@ -197,6 +228,16 @@ class Session:
 def _num(s):
     try: return Fraction(str(s))
     except Exception: return s
+
+
+def _route_certs(w, st):
+    """the certificates of one route, a composite's included (selfconfirm_prereg.md: the independence test reads them)"""
+    from .reason import Composite
+    if isinstance(st, Composite):
+        out = set().union(*[_route_certs(wi, sti) for wi, sti, _ in st.inners]) if st.inners else set()
+        return out | _route_certs(st.outer[0], st.outer[1])
+    r = w.evaluate(st) if hasattr(w, "evaluate") else None
+    return set(r[2]) if r else set()
 
 
 def _contains(syms, sub):

@@ -34,3 +34,7 @@ conjectures (fatal column 0); S2's wrong terms are conjectures (CONFAB 0); every
 Store, transfer, proposals and the conjecture rule together over the chat gate's 200 utterances plus a dependent batch, with a second
 session from the store: nothing worse (101 = base, fatal columns 0), joint answers 2 (right only with transfer and the store together),
 three engine-formed proposals confirmed and settled. Six long-use defects found and fixed, recorded in the prereg.
+
+## 2026-10-03 -- a guess confirmed by an independent computation (selfconfirm_prereg.md): PASS, fires 0 times here
+A value is a conjecture only if every route to it is one; a guessed route beside a plain route of a world sharing no source and no
+borrowing is confirmed without a person; circular routes refused. Nothing to do until independent computing sources exist in a session.

@@ -97,7 +97,9 @@ PUBLISHED = {
     # ---- EMERGENCE_PLAN.md S7 (dynamics_prereg.md): a world with time; SOUND (a one-transition guess is a COMMIT)
     "dynamics": ["S7 DYNAMICS: PASS"],
     # ---- together_prereg.md: everything on in one long conversation; a second session from the store; compounding counted
-    "together": ["TOGETHER: PASS", "CONFAB: 0"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
+    "together": ["TOGETHER: PASS", "CONFAB: 0"],
+    # ---- selfconfirm_prereg.md: a guess confirmed by an independent computation; circular routes refused
+    "selfconfirm": ["SELF-CONFIRMATION: PASS"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
 }
 
 
