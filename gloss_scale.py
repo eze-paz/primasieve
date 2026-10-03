@@ -181,7 +181,9 @@ class Scale(GT.Rung2):
         self._okwords = set()
         for h in (s, o):
             for key, f in self.windows(body, h):
-                if key in self.cons and self.wsatisfies(h, f, self.cons[key][1]): self._okwords |= set(key[0] + key[1])
+                if key in self.cons and self.wsatisfies(h, f, self.cons[key][1]):
+                    self._okwords |= set(key[0] + key[1])
+                    if isinstance(f, str) and f.startswith("Q"): self._okwords |= set(symbols(self.C.label(f), "LN"))   # a verified filler's name is vouched for
 
     def __call__(self, w, ents):
         if w in self.free: return True

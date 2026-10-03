@@ -817,3 +817,15 @@ claim-free words by "no lift on any type" find only articles (9 words); the stri
 constructions were allowed to STATE the relation (223 candidates read that way): attested definitions carry names and
 claims beyond the one edge a reply vouches for, and the inverse correctly refuses them. The register, not the reader, is
 now the bottleneck. Not registered.
+
+### 2026-10-03 -- generation from what was read (gloss_generate_prereg.md): NOT PASSED; coverage off zero, and the plateau measured
+Owner's objection to a mined register: not emergent. `gloss_generate.py` runs the reader's own typed-slot windows
+backwards -- a headword window opens, a relation window states the frame's fact, further windows add other verified facts,
+glued on overlapping tokens -- and the strict inverse (the same reader) selects; patterns carry a standing (+1 accepted,
+-1 rejected) and retire when negative. Measured on the 60 frames: **17 emitted replies (gloss_scale: 0), 0 false claims,
+15/17 novel, 9 two-fact compositions, acceptance 0.86 -> 0.93 with 18 patterns retired in two rounds, zero authored
+sentences.** And the plateau: the emitted sentences are labelled edges with a preposition ("EDM: of electronic dance
+music", "watercraft: a vessel of"), composition degrades grammar while preserving verification, the shuffled-condition
+knockout keeps 41 % acceptance because bare-relation conditions are interchangeable, and no word is claim-free under the
+strict rule. Fluency cannot emerge from three-token windows however many there are; width (W = 3) against data is the one
+lever left to measure. Not registered.
