@@ -790,3 +790,18 @@ The owner applied the campaign's standing finding: a tree, program or term found
 its examples but the newest reproduces the newest; otherwise the frame is CONJECTURED ("Probably X ... Tell me if not.") and a
 confirmed pair on a new input upgrades it. One rule in core/exec.py, core/trace.py, core/induced.py; elimination to a primitive
 stays COMMIT. Suite green; S7 PASS; the only registered line that changed is worlds_general's retraction case, now CONJECTURED.
+
+### 2026-10-03 -- reading glosses, rung 2: types and constructions (gloss_types_prereg.md): NOT PASSED, one piece stands
+Two data steps grew the offline cache (56,814 labels; 1,784 class entities, two rounds of subclass-of) to 1,193 headwords
+with 2,210 aligned Wiktionary definitions. `gloss_types.py`: a gloss word's type (relation, value) closed under
+subclass-of; constructions as LOCAL windows (<= 3 tokens each side of a verified mention) whose condition names the
+relation, the headword types of its words and the fillers' shared most specific type, admitted only when the condition
+holds for every training occurrence. Measured: **141 constructions, 0.91 held-out soundness, shuffled-gloss knockout 2
+of 141** -- `capital {E:capital}`, `and largest city {E:most populous urban area}`, `city of {E:capital of}` typed
+sovereign state -- the first mechanism here that reads English beyond two names and a relation word, with no authored
+word. Measured misses: headword-type bindings for gloss nouns are the wrong hypothesis (`city` predicates the mentioned
+entity: its headwords were countries), held-out soundness 0.59; held-out content words accounted for 0.18 -> 0.22; the
+strict inverse of realize.py stays 0/113 because most gloss words sit further than three tokens from any verified
+mention. Four amendments recorded in order (tolerance; non-vacuous conditions under the base-rate cap; subclass closure;
+local typed windows). Not registered. Next: windows anchored on the headword's own mention, and more headwords -- the
+cache grew 6x and could grow 100x; the mechanism's power is now data-bound, which rung 1 was not.

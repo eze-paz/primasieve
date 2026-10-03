@@ -154,6 +154,7 @@ class Inverse:
             # Measured need: the lenient inverse admitted 'A former Germany and country that existed between 1871 and 1918'
             # because the world reads two names and a relation word and nothing else.
             allsp = used + [sp for w, st, _ in survivors for sp in _spans(w, st)]
+            if self.reader is not None and hasattr(self.reader, "prepare"): self.reader.prepare(body, s, o)
             syms2 = symbols(body, "LN"); vals = sorted(self.df(x) for x in syms2) if self.df else []
             med = vals[len(vals) // 2] if vals else 0
             for k, x in enumerate(syms2):
