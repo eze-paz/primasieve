@@ -26,9 +26,10 @@ _shape = shape_of
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False):
+    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None):
         self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
         self.transfer = transfer     # transfer_prereg.md (S4): after every teach, words bound in one world are offered to the others by behaviour
+        self.researcher = researcher # research_prereg.md: a turn that leaves symbols unread makes the researcher fetch; what comes back is a world
         self.history = []            # [(text, frame)]
         self.memory = []             # the chat layer's record of each turn (fields of the realized frame), aligned with history
         self.prefs = {}              # shape -> chosen structure key
@@ -103,6 +104,17 @@ class Session:
                 self.history.append((text, fr)); return fr
         recent = frozenset(s for t, _ in self.history[-self.depth:] for s in symbols(t, "LN"))
         fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger, shapes=self.shapes(), recent=recent)
+        fr["researched"] = []
+        if self.researcher is not None and self.researcher.unread_spans(fr):           # whatever the verdict: an unread name beside a context answer is the confabulation this prevents
+            # RESEARCH BY ITSELF (research_prereg.md): the unread spans go to the fetchers; a fetched world joins the session
+            # and the same text is read once more over all worlds. Fetched content is readings, never teaching.
+            new = self.researcher.research(self, fr)
+            if new:
+                fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger, shapes=self.shapes(), recent=recent)
+                fr["researched"] = [getattr(w, "name", "?") for w in new]
+                if self.transfer:
+                    from .transfer import bridge
+                    bridge(self.worlds)
         if fr["kind"] == READINGS and self.prefs:
             keep = [(a, w) for a, w in zip(fr["answers"], fr["answer_worlds"]) if _shape(w, a[4]) in self.prefs]
             if len(keep) == 1:
@@ -181,13 +193,15 @@ class Session:
     # ---- persistence (core/store.py, persist_prereg.md): the session's own evidence ---------------------------------
     def evidence(self):
         L = self.ledger
-        return dict(teaching=[[q, str(g), getattr(w, "name", None) if w is not None else None] for q, g, w in self.teaching],
+        return dict(research=self.researcher.evidence() if self.researcher is not None else [],
+                    teaching=[[q, str(g), getattr(w, "name", None) if w is not None else None] for q, g, w in self.teaching],
                     frames=[dict(f, skeleton=list(f['skeleton']), support=[list(s) for s in f.get('support', [])]) for f in self.frames],
                     accepted=[[list(sy), tp, kd] for sy, tp, kd in self.accepted], declined=[[list(sy), tp, kd] for sy, tp, kd in self.declined],
                     ledger=None if L is None else dict(confirmed=dict(L.confirmed), contradicted=dict(L.contradicted),
                                                        retracted=[[s, list(c) if isinstance(c, (list, tuple)) else c] for s, c in L.retracted]))
 
     def absorb(self, ev):
+        if self.researcher is not None and ev.get("research"): self.researcher.absorb(self, ev["research"])      # fetched worlds re-attached first
         by_name = {getattr(w, "name", None): w for w in self.worlds}
         self.teaching = [(q, _num(g), by_name.get(n) if n else None) for q, g, n in ev.get("teaching", [])]
         self.frames = [dict(f, skeleton=tuple(f['skeleton']), support=[tuple(s) for s in f.get('support', [])]) for f in ev.get("frames", [])]

@@ -99,7 +99,9 @@ PUBLISHED = {
     # ---- together_prereg.md: everything on in one long conversation; a second session from the store; compounding counted
     "together": ["TOGETHER: PASS", "CONFAB: 0"],
     # ---- selfconfirm_prereg.md: a guess confirmed by an independent computation; circular routes refused
-    "selfconfirm": ["SELF-CONFIRMATION: PASS"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
+    "selfconfirm": ["SELF-CONFIRMATION: PASS"],
+    # ---- research_prereg.md: an unread symbol becomes a fetch, a fetch becomes a world (recorded cache; NOT RUN without it)
+    "research": ["RESEARCH BY ITSELF: PASS", "CONFAB: 0"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
 }
 
 

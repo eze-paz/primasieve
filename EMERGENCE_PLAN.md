@@ -38,3 +38,8 @@ three engine-formed proposals confirmed and settled. Six long-use defects found 
 ## 2026-10-03 -- a guess confirmed by an independent computation (selfconfirm_prereg.md): PASS, fires 0 times here
 A value is a conjecture only if every route to it is one; a guessed route beside a plain route of a world sharing no source and no
 borrowing is confirmed without a person; circular routes refused. Nothing to do until independent computing sources exist in a session.
+
+## 2026-10-03 -- research by itself (research_prereg.md): PASS
+An unread span goes to every attached fetcher once; what comes back is a world of a shape the loop reads, cited, kept in the store;
+10/10 questions about entities the fixture lacks answered with a fetched world; fetched content is readings, never teaching (the planted
+instruction is quoted and changes nothing). World-agnostic: no world was written for it.

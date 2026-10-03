@@ -25,4 +25,6 @@ class Triples:
 
     def label(self, x): return x
 
+    def labelled(self, x): return isinstance(x, str) and bool(x)      # its values ARE labels (research_prereg.md: a fetched value feeds the next hop)
+
     def consulted(self): return list(self.log)

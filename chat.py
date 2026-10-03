@@ -93,9 +93,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None):
         self.ledger = ledger if ledger is not None else Ledger()
-        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer)
+        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
         # persistence (persist_prereg.md, S8): the evidence of earlier sessions is loaded here and saved after every

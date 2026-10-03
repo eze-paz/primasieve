@@ -182,7 +182,7 @@ class KGWorld:
 
     def label(self, v): return self.source.label(v)
 
-    def labelled(self, v): return self.source.label(v) != v
+    def labelled(self, v): return self.source.labelled(v) if hasattr(self.source, "labelled") else self.source.label(v) != v
 
     def consulted(self): return self.source.consulted()
 
