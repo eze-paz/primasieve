@@ -805,3 +805,15 @@ strict inverse of realize.py stays 0/113 because most gloss words sit further th
 mention. Four amendments recorded in order (tolerance; non-vacuous conditions under the base-rate cap; subclass closure;
 local typed windows). Not registered. Next: windows anchored on the headword's own mention, and more headwords -- the
 cache grew 6x and could grow 100x; the mechanism's power is now data-bound, which rung 1 was not.
+
+### 2026-10-03 -- reading glosses at scale (gloss_scale_prereg.md): NOT PASSED; a sound, data-bound, traceable reader
+`emergence/kb_crawl.py` (a second, compact sqlite store with the Wikidata source interface; never imported by core/):
+65,263 full entries and 200,044 labels, with time- and quantity-valued claims kept for the first time. `gloss_scale.py`
+over 15,290 aligned definitions of 9,224 headwords: **2,139 typed-slot constructions at 0.96 held-out soundness, shuffled
+knockout 4 %**, with a headword anchor ("{HEAD} a special ward") and numeric mentions ("from {T} to" x52, "until {T}",
+soundness 0.91-0.95); held-out content words accounted for **0.19 -> 0.43** (bar 0.45); the learning curve in tenths is
+non-decreasing (9/9) and admits ~220 windows per tenth without falling off -- the corpus is not near saturation. Two nulls:
+claim-free words by "no lift on any type" find only articles (9 words); the strict reply check stays **0/60** even after
+constructions were allowed to STATE the relation (223 candidates read that way): attested definitions carry names and
+claims beyond the one edge a reply vouches for, and the inverse correctly refuses them. The register, not the reader, is
+now the bottleneck. Not registered.

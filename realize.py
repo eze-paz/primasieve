@@ -129,13 +129,22 @@ class Inverse:
             if (s, p, o) in edges and st[0] != "PATH" and any(r[3] == p for r in st[2]): carrier = carrier or (w, st)
             if any(e[0] == s and e[1] == p and e[2] != o for e in edges): conflict = True
         if conflict: self.misreport += 1; self.rejected["conflicting edge"] += 1; return False
-        if carrier is None: self.rejected["edge not read"] += 1; return False
-        used = [(i, j) for i, j in _spans(*carrier)] + [(n, n + 99)]
+        body0 = reply.split(TAIL.format("")[:5])[0] if TAIL.format("")[:5] in reply else reply
+        stated = None
+        if carrier is None and self.reader is not None and hasattr(self.reader, "states"):
+            stated = self.reader.states(body0, s, o, p)                 # an induced construction states the relation
+        if carrier is None and stated is None: self.rejected["edge not read"] += 1; return False
+        used = ([(i, j) for i, j in _spans(*carrier)] if carrier is not None else [(k, k + 1) for k in stated]) + [(n, n + 99)]
+        if carrier is None: self.rejected["stated by construction"] += 1
         used += [(r[0], r[1]) for w, r in readings if r[2] == "E" and r[3] in (s, o)]     # the frame's own two names, wherever they stand
+        okw = set()
+        if self.reader is not None and hasattr(self.reader, "prepare"):
+            self.reader.prepare(body0, s, o); okw = set(getattr(self.reader, "_okwords", ()))   # words an admitted construction covers
+        def covered(i, j): return any(a <= i and j <= b for a, b in used) or all(syms[k] in okw or (self.reader is not None and self.reader(syms[k], (s, o))) for k in range(i, j))
         if self.trace is not None and len(self.trace) < 12: self.trace.append((reply[:90], [(r[2], r[4]) for w, r in readings if r[0] < n and r[2] in ("P", "E") and not any(a <= r[0] and r[1] <= b for a, b in used)]))
         for w, r in readings:
             if r[0] >= n or r[2] not in ("P", "E"): continue
-            if not any(a <= r[0] and r[1] <= b for a, b in used):
+            if not covered(r[0], r[1]):
                 self.rejected["unverified " + ("relation" if r[2] == "P" else "name")] += 1; return False
         # names the world did not read: a capitalized token that is not sentence-initial and not inside a used span is
         # an unverified name (a fact about the writing system, declared; the df filter reads few names in long text)
@@ -145,7 +154,7 @@ class Inverse:
             if t in ".!?:;": prev = t; continue
             if t[0].isupper() and prev not in ".!?:;" and not t.isupper():
                 k = low.index(t.lower()) if t.lower() in low else -1
-                if k < 0 or not any(a <= k < b for a, b in used):
+                if k < 0 or not (any(a <= k < b for a, b in used) or t.lower() in okw):
                     self.rejected["unverified name"] += 1; return False
             prev = t
         if self.strict:
@@ -181,9 +190,11 @@ class Realizer:
                     out.append((reply + TAIL.format(self.sources), len(ts) if strength else 0.5, side))
         return out
 
+    MAX_CAND = 40          # at scale (983 skeletons) the inverse ran thousands of passes per frame; the best-attested shapes first
+
     def admissible(self, s, p, o):
         seen = set(); out = []
-        for reply, w, side in self.candidates(s, p, o):
+        for reply, w, side in sorted(self.candidates(s, p, o), key=lambda x: -x[1])[: self.MAX_CAND]:
             if reply in seen: continue
             seen.add(reply)
             if self.inv.check(reply, s, p, o, self.labels[o]): out.append((reply, w, side))
