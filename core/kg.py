@@ -66,6 +66,29 @@ class KGWorld:
     def __init__(self, source, df=None, max_ent=8, name=None):
         self.source, self.df, self.max_ent = source, df, max_ent; self.name = name or "kg"; self.rank = {}
         self._ent, self._prop = {}, {}                  # per-span memo over the source (the source parses JSON on every call)
+        # nesting as evidence (depth_prereg.md, S3; the exec world's rule of order_prereg.md): which order of two property
+        # words the confirmed pairs support. None / mixed -> both orders enumerated (as before); unanimous -> that order.
+        self.nesting = None; self.pairs = []
+
+    def induce_lexicon(self, teaching):
+        """the session's confirmation channel: the graph binds no word, but it learns how two property words NEST from
+        the pairs a CHAIN reproduces -- first-outer (the property named first is applied last) or first-inner."""
+        self.pairs = list(teaching); votes = set()
+        keep, self.nesting = self.nesting, None                  # vote with both orders enumerated
+        try:
+            for q, gold in self.pairs:
+                if gold is None: continue
+                syms = symbols(q); rd = self.readings(syms)
+                for st in self.structures(rd):
+                    if st[0] != CHAIN: continue
+                    for value, edges, certs in self.evaluate_all(st):
+                        if str(self.source.label(value)).lower() != str(gold).lower() and str(value).lower() != str(gold).lower(): continue
+                        p1, p2 = st[2]                            # CHAIN(e, p1, p2) = p2(p1(e)): p2 is the outer
+                        votes.add("first-outer" if p2[0] < p1[0] else "first-inner")
+        finally:
+            self.nesting = keep
+        self.nesting = None if not votes else (next(iter(votes)) if len(votes) == 1 else "mixed")
+        return dict(nesting=self.nesting, votes=sorted(votes))
 
     def readings(self, syms):
         df, source = self.df, self.source
@@ -106,7 +129,10 @@ class KGWorld:
             for p in props:
                 if disjoint([e, p]): out.append((LOOKUP, (e,), (p,)))
             for p1, p2 in itertools.permutations(props, 2):
-                if disjoint([e, p1, p2]): out.append((CHAIN, (e,), (p1, p2)))
+                if not disjoint([e, p1, p2]): continue
+                if self.nesting == "first-outer" and not p2[0] < p1[0]: continue       # the text-first property is the outer
+                if self.nesting == "first-inner" and not p1[0] < p2[0]: continue
+                out.append((CHAIN, (e,), (p1, p2)))
         for e1, e2 in itertools.combinations(ents, 2):
             if not disjoint([e1, e2]): continue
             out.append((PATH, (e1, e2), ()))

@@ -39,22 +39,33 @@ def symbols(text, cats="L"):
 
 
 class Composite:
-    """a structure of one world fed by a survivor of another (or the same) world: (inner, outer) with the map back."""
+    """a structure of one world fed by survivors of other worlds: `inners` [(world, structure, result)] with their
+    `regions` [(a, b, L)] in original coordinates (ascending, disjoint; L = the substituted label's length). `inner`,
+    `a`, `b`, `L` are the first inner's (the chat layer reads them). One inner is the pipe as it was; two inners at
+    once is depth_prereg.md (S3): an outer with two arguments reads both substituted values in one pass."""
 
-    def __init__(self, inner, outer, a, b, L):
+    def __init__(self, inner, outer, a, b, L, inners=None, regions=None):
         self.inner, self.outer, self.a, self.b, self.L = inner, outer, a, b, L      # inner covered [a,b); label length L
+        self.inners = list(inners) if inners else [inner]
+        self.regions = list(regions) if regions else [(a, b, L)]
 
     def back(self, i, j):
-        """map an outer-pass span to original positions (the label region maps to [a,b))."""
-        a, b, L = self.a, self.b, self.L
+        """map an outer-pass span to original positions (each label region maps to its [a,b))."""
+        regs = self.regions
+
         def m(p):
-            if p < a: return p
-            if p < a + L: return None
-            return p - L + (b - a)
-        lo, hi = m(i), m(j - 1)
-        if lo is None and hi is None: return (a, b)
-        if lo is None: lo = a
-        if hi is None: hi = b - 1
+            shift = 0
+            for k, (a, b, L) in enumerate(regs):
+                a2 = a - shift                                   # the region's start in the substituted text
+                if p < a2: return p + shift, None
+                if p < a2 + L: return None, k
+                shift += (b - a) - L
+            return p + shift, None
+
+        lo, rl = m(i); hi, rh = m(j - 1)
+        if lo is None and hi is None and rl == rh: return (regs[rl][0], regs[rl][1])
+        if lo is None: lo = regs[rl][0]
+        if hi is None: hi = regs[rh][1] - 1
         return (lo, hi + 1)
 
 
@@ -66,7 +77,7 @@ def shape_of(w, st):
     """the structure with its explicit readings abstracted (a world's own shape(), else its key): what a READINGS
     choice generalizes over (core.session)."""
     if isinstance(st, Composite):
-        return ("PIPE", shape_of(st.inner[0], st.inner[1]), shape_of(st.outer[0], st.outer[1]))
+        return ("PIPE",) + tuple(shape_of(wi, sti) for wi, sti, _ in st.inners) + (shape_of(st.outer[0], st.outer[1]),)
     return w.shape(st) if hasattr(w, "shape") else (w.key(st) if hasattr(w, "key") else id(st))
 
 
@@ -107,8 +118,8 @@ def _pass(syms, worlds, context):
 
 def _spans(w, st):
     if isinstance(st, Composite):
-        wi, sti, _ = st.inner; wo, sto, _ = st.outer
-        return _spans(wi, sti) + [st.back(i, j) for i, j in _spans(wo, sto)]
+        wo, sto, _ = st.outer
+        return [s for wi, sti, _ in st.inners for s in _spans(wi, sti)] + [st.back(i, j) for i, j in _spans(wo, sto)]
     return list(w.spans_of(st))
 
 
@@ -116,7 +127,7 @@ def _key(w, st):
     """the identity of a CLAIM: the structure AND the world that made it. Two sources asserting the same
     structure with different values are two claims in contest, never one multi-valued claim."""
     if isinstance(st, Composite):
-        return ("PIPE", _key(st.inner[0], st.inner[1]), _key(st.outer[0], st.outer[1]))
+        return ("PIPE",) + tuple(_key(wi, sti) for wi, sti, _ in st.inners) + (_key(st.outer[0], st.outer[1]),)
     return (getattr(w, "name", type(w).__name__), w.key(st) if hasattr(w, "key") else id(st))
 
 
@@ -126,12 +137,20 @@ def _label(w, v):
 
 def _attributed(w, st):
     if isinstance(st, Composite):
-        return _attributed(st.inner[0], st.inner[1]) or _attributed(st.outer[0], st.outer[1])
+        return any(_attributed(wi, sti) for wi, sti, _ in st.inners) or _attributed(st.outer[0], st.outer[1])
     return getattr(w, "attributed", True)
 
 
+def _conjectured(w, st):
+    """a structure using a reading the world holds only as a CONJECTURE (a word borrowed from another world by
+    behaviour, transfer_prereg.md): the answer is a guess with a correction channel, never a COMMIT."""
+    if isinstance(st, Composite):
+        return any(_conjectured(wi, sti) for wi, sti, _ in st.inners) or _conjectured(st.outer[0], st.outer[1])
+    return bool(w.conjectured(st)) if hasattr(w, "conjectured") else False
+
+
 def _rank_key(w, st):
-    if isinstance(st, Composite): return _rank_key(st.inner[0], st.inner[1]) + _rank_key(st.outer[0], st.outer[1])
+    if isinstance(st, Composite): return sum(_rank_key(wi, sti) for wi, sti, _ in st.inners) + _rank_key(st.outer[0], st.outer[1])
     return w.rank_key(st) if hasattr(w, "rank_key") else 0
 
 
@@ -142,7 +161,7 @@ def _quotes(w, st):
 
 def _names(w, st):
     if isinstance(st, Composite):
-        return _names(st.inner[0], st.inner[1]) + _names(st.outer[0], st.outer[1])
+        return [nm for wi, sti, _ in st.inners for nm in _names(wi, sti)] + _names(st.outer[0], st.outer[1])
     return [getattr(w, "name", type(w).__name__)]
 
 
@@ -243,6 +262,7 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
         if r[0] < n: explicit_kinds[w].add((r[0], r[1], r[2]))
     passes = {}
     if pipe and n > 1:
+        cands = []                                   # substitutable inners: (world, structure, result, a, b, label symbols)
         for wi, sti, resi, sp in list(recs):
             if getattr(wi, "quotes", False): continue            # quoted text is not a value to compute with
             if hasattr(wi, "labelled") and not wi.labelled(resi[0]): continue     # a value the world cannot name is not substitutable
@@ -255,26 +275,46 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
             if vk and any((i, j) not in set(sp) and k in vk for i, j, k in explicit_kinds[wi]): continue
             a, b = min(i for i, _ in real), max(j for _, j in real)
             if b - a >= n: continue
+            # an unused reading is PARTIAL, never a sub-answer (the standing rule): the substituted region [a, b) must not
+            # hide an explicit CONTENT reading of the inner's world that the inner does not use ("the double of the salary
+            # of the manager of alice": the inner "salary ... alice" = 120 swallowed "manager" and the outer doubled it)
+            inner_spans = set(real)
+            if any(i >= a and j <= b and (i, j) not in inner_spans and k in getattr(wi, "content_kinds", set())
+                   and not any(x <= i and j <= y for x, y in inner_spans) for i, j, k in explicit_kinds[wi]): continue
             lab = symbols(_label(wi, resi[0]), "LN")
             if not lab: continue
-            syms2 = syms[:a] + lab + syms[b:]
+            cands.append((wi, sti, resi, a, b, lab))
+        # one inner at a time (the pipe as it was), and every pair of DISJOINT inners at once (depth_prereg.md): an outer
+        # with two arguments -- "the salary of alice plus the salary of bob" -- reads both substituted values in one pass
+        groups = [[c] for c in cands]
+        for x in range(len(cands)):
+            for y in range(x + 1, len(cands)):
+                c1, c2 = cands[x], cands[y]
+                if c1[4] <= c2[3] or c2[4] <= c1[3]: groups.append(sorted([c1, c2], key=lambda c: c[3]))
+        for grp in groups:
+            syms2 = list(syms)
+            for wi, sti, resi, a, b, lab in reversed(grp): syms2 = syms2[:a] + lab + syms2[b:]
             k2 = tuple(syms2)
             if k2 not in passes: passes[k2] = _pass(syms2, worlds, context)[0]       # one pass per distinct substitution
-            surv2 = passes[k2]
-            for wo, sto, reso in surv2:
-                if wo is wi: continue                            # composition is across worlds; a world's own chains are its own
+            regions = [(a, b, len(lab)) for wi, sti, resi, a, b, lab in grp]
+            lab2, shift = [], 0                                                      # the label regions in the substituted text
+            for a, b, L in regions: lab2.append((a - shift, a - shift + L)); shift += (b - a) - L
+            for wo, sto, reso in passes[k2]:
+                if any(wo is c[0] for c in grp): continue       # composition is across worlds; a world's own chains are its own
                 if getattr(wo, "quotes", False): continue        # a gloss of a computed value is not a composition
                 # R4: the outer of a pipe takes no context reading -- the pipe already supplies its argument; a predicate
                 # borrowed from an earlier turn on top of it is two inferences (chat_prose_prereg.md: a salary question
                 # beside a stated number became that salary multiplied by the number, the operator lingering from an
                 # arithmetic turn)
-                if any(i >= len(syms2) for i, _ in wo.spans_of(sto)): continue
-                osp = [(i, j) for i, j in wo.spans_of(sto) if i < len(syms2)]
-                if not any(i < a or j > a + len(lab) for i, j in osp): continue     # the outer must read something beyond the substituted value
-                if not any(i < a + len(lab) and j > a for i, j in wo.spans_of(sto) if i < len(syms2)): continue
-                c = Composite((wi, sti, resi), (wo, sto, reso), a, b, len(lab))
+                osp_all = wo.spans_of(sto)
+                if any(i >= len(syms2) for i, _ in osp_all): continue
+                osp = [(i, j) for i, j in osp_all if i < len(syms2)]
+                if not any(all(not (i < lb and j > la) for la, lb in lab2) for i, j in osp): continue     # the outer must read something beyond the substituted values
+                if not all(any(i < lb and j > la for i, j in osp) for la, lb in lab2): continue          # and every substituted value
+                f = grp[0]
+                c = Composite((f[0], f[1], f[2]), (wo, sto, reso), f[3], f[4], len(f[5]), inners=[(g[0], g[1], g[2]) for g in grp], regions=regions)
                 v, supo, certo = reso
-                survivors.append((wo, c, (v, [resi[1], supo], set(resi[2]) | set(certo))))
+                survivors.append((wo, c, (v, [g[2][1] for g in grp] + [supo], set(certo).union(*[set(g[2][2]) for g in grp]))))
     consulted = []
     for w in worlds:
         if hasattr(w, "consulted"): consulted += list(w.consulted())
@@ -291,11 +331,34 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
     def spec(w, st):
         return sum((df(syms[i]) if (df and i < n) else 0) for i, j in _spans(w, st))
 
+    def unused_content(w, st):
+        """explicit content readings of the structure's worlds that it leaves unused (depth_prereg.md): at equal coverage a
+        structure that uses the text's readings outranks a shorter one that leaves one over -- a lookup through a two-word
+        property label and a chain through two one-word properties cover three positions each; the lookup has fewer
+        spans and left the second property unused, which the verdict then reported as PARTIAL."""
+        ws = ([wi for wi, _, _ in st.inners] + [st.outer[0]]) if isinstance(st, Composite) else [w]
+        used = [(i, j) for i, j in _spans(w, st) if i < n]
+        return sum(1 for ww in ws for i, j, k in explicit_kinds[ww]
+                   if k in getattr(ww, "content_kinds", set()) and not any(a < j and i < b for a, b in used))
+
+    # coverage credits CONTENT positions: a symbol above the question's median definition frequency (the graph world's
+    # own criterion for what is not a name, A1) earns nothing, so a two-word property label is not a better reading of
+    # the text than its one-word core for explaining the preposition (depth_prereg.md D4: under a mixed nesting the two
+    # chains then tie and the loop asks, instead of coverage choosing the reversed chain). Without df every position
+    # counts, as before.
+    med = None
+    if df is not None and n:
+        vals = sorted(df(s) for s in syms); med = vals[len(vals) // 2]
+    function = {p for p in range(n) if med is not None and df(syms[p]) > med}
+
+    def covered(sp): return len({p for i, j in sp for p in range(i, j) if p < n and p not in function})
+
     def rank(w, st):
-        """coverage; a computed value over a quoted text; fewer explicit spans; specificity; recency of context."""
+        """coverage (content positions); a computed value over a quoted text; fewer unused content readings; fewer explicit
+        spans; specificity; the world's own key; recency of context."""
         sp = _spans(w, st); real = [(i, j) for i, j in sp if i < n]
         own = _rank_key(w, st)                                    # a world's own structural preference
-        return (_sym_pos(sp, n), 0 if _quotes(w, st) else 1, -len(real), -spec(w, st), own, -sum(i for i, j in sp if i >= n))
+        return (covered(sp), 0 if _quotes(w, st) else 1, -unused_content(w, st), -len(real), -spec(w, st), own, -sum(i for i, j in sp if i >= n))
 
     top = max(rank(w, st) for w, st, _ in survivors)
     best = [(w, st, res) for w, st, res in survivors if rank(w, st) == top]
@@ -314,9 +377,14 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
     frame["answer_sources"] = [sorted({nm for w, st, _, _ in lst for nm in _names(w, st)}) for lst in values.values()]
     frame["sources"] = sorted({nm for lst in values.values() for w, st, _, _ in lst for nm in _names(w, st)})
     attributed = any(_attributed(w, st) for lst in values.values() for w, st, _, _ in lst)
+    conj = any(_conjectured(w, st) for lst in values.values() for w, st, _, _ in lst)
     if unused:
         frame.update(kind=PARTIAL, missing=sorted({r[4] for r in unused}))
         return frame
+    if conj and len(values) == 1:            # one value, reached through a borrowed word (whatever structures carry it)
+        # a guess with a correction channel: the chat's CONJECTURE frame, one option, no rival
+        frame["contest"] = [(frame["answers"][0][1], frame["answer_sources"][0], 0, 0)]
+        frame.update(kind=CONJECTURED, via="transfer"); return frame
     if len(values) == 1:
         frame.update(kind=ATTRIBUTED if attributed else COMMIT); return frame
     kinds = {_key(w, st) for lst in values.values() for w, st, _, _ in lst}

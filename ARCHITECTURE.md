@@ -748,3 +748,39 @@ lexicon as reader stays at 0/116. Diagnosis recorded: too few headwords for exac
 relations gloss nouns denote are `instance of <class>` -- a TYPE, not a bare relation -- which this binding cannot state;
 and adjectives, dates and apposition are outside any lexicon. Rung 2 (types, constructions) and a larger entity cache are
 named as the honest size of "the engine reads English". Nothing registered; the reader hook stays in `realize.Inverse`.
+
+## 2026-10-02 -- the EMERGENCE campaign: nine shortcomings, nine preregs (EMERGENCE_PLAN.md)
+Owner's instruction after a description of `core/` and a list of what it lacked for emergent intelligence: "systematically
+try solving each shortcoming you have identified. start now." One prereg and one gate per shortcoming, each with its main
+arm and knockout, verdicts recorded in the prereg files and summarized in `EMERGENCE_PLAN.md`:
+- **S1 graded search** (`core/guide.py`, opt-in): NULL on cost, SOUND on reach -- a lookahead score charged honestly is
+  slower than blind enumeration; a free match count's slope with depth is mostly the queue's order (shuffled 2.78x vs
+  4.69x at size 8); the seeded schedule reaches size-9 targets blind cannot inside the cap, 4/4 runs, CONFAB 0.
+- **S6 negative evidence** (`core/induce.py` negatives, `core/exec.py` forbidden inputs IN the dedupe signature,
+  `core/table.py`, `Session.deny` now teaches): SOUND, registered. REPEAT 0; survivors 5 -> 2 on a one-row filter;
+  iterated denial reaches the intended function in 3-4 steps with every guess consistent. Missed bar: a word bound from
+  two examples is a COMMIT (a guess).
+- **S8 persistence** (`core/store.py`, chat `--store`): PASS, registered. Evidence saved, re-induced and VERIFIED on
+  load; a tampered tree is dropped with its dependents and re-searched; byte-identical saves; three sessions == one.
+- **S5 word order** (`core/exec.py` arg_order per word, nesting per world): PASS, registered. A reverse word (`take 3
+  from 5`) is learnable; a unanimous nesting turns asks into COMMITs; a contradicted one keeps the ask.
+- **S4 transfer** (`core/transfer.py`, `Session(transfer=True)`, a rival-less CONJECTURE sentence in frames.py): PASS,
+  registered. A word moves between worlds when exactly one operator has the same behaviour on the primitive probes, held
+  CONJECTURED, confirmed into a binding or refused by a denial; LAUNDERING 0.
+- **S3 depth** (`core/reason.py`: pairs of disjoint inners, the region rule, coverage over content positions, unused
+  content readings before span count; `core/kg.py` nesting by teaching; `core/table.py` one structure per operator
+  reading): PASS, registered. Two-argument compositions COMMIT (main: PARTIAL); two confabulations on main removed.
+- **S9 goals** (`core/goals.py`, `Session.propose`): SOUND, registered. The residue (contested, borrowed, unanswered
+  READINGS, unknown symbols) as goals, the probe by `core.collect.best_split`; one ask settles a five-way word.
+- **S7 dynamics** (`core/trace.py`): SOUND, registered. A trace world induces a field's dynamics by search (the probe
+  includes the last situation, so rival futures stay distinct), predicts only when transitions are a function.
+- **S2 induced operators** (`core/induced.py`, one new atom: sum): FAIL as registered, mechanism demonstrated -- the
+  table's operators come back as terms (28/30, 14/20); the misses are terms fitted to one or two examples.
+Pre-existing defects found and fixed on the way (all in `core/`, each with the rule it violated, details in
+transfer_prereg.md section 7 and order_prereg.md section 7): stale elimination bindings under incremental teaching;
+co-occurrence ties broken by a set's iteration order (now the specificity bias when a df is given, else textual-first,
+declared); `Session._used` handing one world's reading to another by kind; a nested teaching pair corrupting both
+words' examples; a table structure attaching every reading of its operator word. **The standing finding of the campaign,
+met four times (S6, S7, S9, S2): structure bound by SEARCH from one or two examples is a guess and the engine reports it as
+a COMMIT. core/verdict's CONJECTURED state exists for exactly that; applying it to search-bound words changes what the
+chat says about every such word and is the owner's call.** Nothing is committed: the owner reads the verdicts first.

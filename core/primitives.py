@@ -215,6 +215,9 @@ P_SEQ = tuple(sorted({
     register(_last_pos, (SEQ, ELEM), INT, _NOLF + "the last position of an element (partial when absent)"),
     register(lambda s: min(s), (SEQ,), INT, _NOLF + "the least of a sequence of integers (partial on empty)"),
     register(lambda s: max(s), (SEQ,), INT, _NOLF + "the greatest of a sequence of integers (partial on empty)"),
+    register(lambda s: sum(s), (SEQ,), INT, "induced_prereg.md (S2, the table's operators as searched terms): the total of a "
+                                             "column's values is a target no composition of len/min/max/at expresses; the mean is "
+                                             "then this over len, a composition, not an entry"),
     register(lambda a, b: a < b, (INT, INT), BOOL, _NOLF + "order between integers"),
     register(lambda a, b: a > b, (INT, INT), BOOL, _NOLF + "order between integers, the other way"),
     register(lambda a, b: a == b, (INT, INT), BOOL, _NOLF + "equality of integers"),

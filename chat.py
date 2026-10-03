@@ -91,11 +91,17 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None):
         self.ledger = ledger if ledger is not None else Ledger()
         self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
+        # persistence (persist_prereg.md, S8): the evidence of earlier sessions is loaded here and saved after every
+        # confirmation or denial. Off by default; the gate runs without it.
+        self.store = store
+        if store and os.path.exists(store):
+            from core.store import load
+            self.store_report = load(self.S, store)
 
     @staticmethod
     def sentences(text):
@@ -139,6 +145,9 @@ class Door:
             note = (f"{'accepted' if ok else 'declined'}: {' '.join(syms)}" + (f" -> frame {' '.join(s or '_' for s in fr['skeleton'])}" if fr else ""))
             return dict(kind="FEEDBACK", act="FEEDBACK", frame=dict(kind=FOUND, quotes=[(note, "frames")]), values=[], sources=["frames"], feedback=ok)
         out = self.S.teach(q, v, world=self._world_of(last)) if ok else self.S.deny(q)
+        if self.store:
+            from core.store import save
+            save(self.S, self.store)
         snap = out.get("ledger", self.ledger.snapshot())
         quotes = [(f"{s}: {c} confirmed, {d} contradicted", "ledger") for s, (c, d) in sorted(snap.items())] or [("no source on record", "ledger")]
         return dict(kind="FEEDBACK", act="FEEDBACK", frame=dict(kind=FOUND, quotes=quotes), values=[], sources=["ledger"], feedback=ok, ledger=snap)
@@ -434,13 +443,13 @@ def gate(seeded=False):
     return not fails
 
 
-def repl(seeded=False, verbose=False, lines=None, online=False):
+def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
     """interactive on a terminal; over `lines` when piped (on Windows the null device reports as a terminal, so the
     gate is the bare invocation and the REPL is --chat, never the other way round)."""
     if lines is None and not sys.stdin.isatty(): lines = [l.rstrip("\n") for l in sys.stdin]
     worlds, df = build_worlds(seeded=seeded, online=online)
     path = os.path.join(TRANSCRIPTS, time.strftime("%Y%m%d-%H%M%S") + ".jsonl")
-    D = Door(worlds, df, transcript=path, seed=int(time.time()))
+    D = Door(worlds, df, transcript=path, seed=int(time.time()), store=store)
     say(f"primasieve chat -- worlds {[w.name for w in worlds]}; transcript {os.path.relpath(path, HERE)}; ctrl-d to quit")
     it = iter(lines) if lines is not None else None
     while True:
@@ -493,7 +502,7 @@ state();
 </script>"""
 
 
-def serve(port=8766, seeded=False, online=False):
+def serve(port=8766, seeded=False, online=False, store=None):
     import http.server, threading, socket, queue
     path = os.path.join(TRANSCRIPTS, "serve-" + time.strftime("%Y%m%d-%H%M%S") + ".jsonl")
     # ONE worker thread builds the worlds and owns the door: the sqlite handles behind the dictionary frequencies and
@@ -504,7 +513,7 @@ def serve(port=8766, seeded=False, online=False):
     def worker():
         worlds, df = build_worlds(seeded=seeded, online=online)
         state["worlds"], state["df"] = worlds, df
-        state["door"] = Door(worlds, df, transcript=path, seed=int(time.time())); ready.set()
+        state["door"] = Door(worlds, df, transcript=path, seed=int(time.time()), store=store); ready.set()
         while True:
             fn, box, ev = jobs.get()
             try: box["r"] = fn()
@@ -573,8 +582,10 @@ def replay(path, seeded=False):
 if __name__ == "__main__":
     args = sys.argv[1:]
     seeded = "--seeded" in args; online = "--online" in args
-    if "--serve" in args: serve(int(args[args.index("--port") + 1]) if "--port" in args else 8766, seeded, online)
-    elif "--chat" in args: repl(seeded, "--verbose" in args, online=online)
+    # --store PATH: load the evidence of earlier sessions and save after every confirmation or denial (persist_prereg.md)
+    store = args[args.index("--store") + 1] if "--store" in args else None
+    if "--serve" in args: serve(int(args[args.index("--port") + 1]) if "--port" in args else 8766, seeded, online, store=store)
+    elif "--chat" in args: repl(seeded, "--verbose" in args, online=online, store=store)
     elif "--replay" in args: replay(args[args.index("--replay") + 1], seeded)
     else:
         selfcheck(__file__)

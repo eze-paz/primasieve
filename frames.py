@@ -108,8 +108,11 @@ def realize(frame, rng):
     elif k == CONJ:
         v, src, c, d = frame["choice"]; riv = list(frame["rivals"])
         if rng.random() < 0.5: riv = riv[::-1]
-        s = (f"Probably {v} (per {src}; record {c} confirmed, {d} contradicted) {rng.choice(V_RATHER)} "
-             + SEP.join(f"{v2} (per {s2}; record {c2} confirmed, {d2} contradicted)" for v2, s2, c2, d2 in riv) + f". {rng.choice(V_CORRECT)}")
+        if not riv:                                 # a conjecture without a rival (a word borrowed by behaviour, transfer_prereg.md)
+            s = f"Probably {v} (per {src}; record {c} confirmed, {d} contradicted). {rng.choice(V_CORRECT)}"
+        else:
+            s = (f"Probably {v} (per {src}; record {c} confirmed, {d} contradicted) {rng.choice(V_RATHER)} "
+                 + SEP.join(f"{v2} (per {s2}; record {c2} confirmed, {d2} contradicted)" for v2, s2, c2, d2 in riv) + f". {rng.choice(V_CORRECT)}")
     elif k == META_K:
         s = f'{rng.choice(V_ASKED)} "{frame["question"]}"; the {frame["field"]} was {frame["content"]}.'
     elif k == CHECK_K:
@@ -142,6 +145,7 @@ RX_QUOTE = re.compile(r"^\((.+?)\): (.*)$", re.S)
 RX_PROPOSE = re.compile(rf"^{_alt(V_NOTHING)} I looked in (.+?)\. {_alt(V_NEXT)} (.*)$")
 RX_REC = r"(.+?) \(per (.+?); record (\d+) confirmed, (\d+) contradicted\)"
 RX_CONJ = re.compile(rf"^Probably {RX_REC} {_alt(V_RATHER)} (.+)\. {_alt(V_CORRECT)}$")
+RX_CONJ1 = re.compile(rf"^Probably {RX_REC}\. {_alt(V_CORRECT)}$")          # no rival (transfer_prereg.md)
 RX_META = re.compile(rf'^{_alt(V_ASKED)} "(.*)"; the (\w+) was (.*)\.$', re.S)
 RX_CHECK_Y = re.compile(rf"^{_alt(V_YES)} (.+?) is (.+?) \({PER} (.+?)\)\.$")
 RX_CHECK_N = re.compile(rf"^{_alt(V_NO)} (.+?) is (.+?) \({PER} (.+?)\), {_alt(V_NOT)} (.+)\.$")
@@ -171,6 +175,8 @@ def parse(text):
             if not mm: return None
             riv.append((mm.group(1), mm.group(2), int(mm.group(3)), int(mm.group(4))))
         return dict(kind=CONJ, choice=(m.group(1), m.group(2), int(m.group(3)), int(m.group(4))), rivals=sorted(riv))
+    m = RX_CONJ1.match(text)
+    if m: return dict(kind=CONJ, choice=(m.group(1), m.group(2), int(m.group(3)), int(m.group(4))), rivals=[])
     m = RX_READ.match(text)
     if m:
         opts = []

@@ -26,8 +26,9 @@ _shape = shape_of
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=()):
+    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False):
         self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
+        self.transfer = transfer     # transfer_prereg.md (S4): after every teach, words bound in one world are offered to the others by behaviour
         self.history = []            # [(text, frame)]
         self.memory = []             # the chat layer's record of each turn (fields of the realized frame), aligned with history
         self.prefs = {}              # shape -> chosen structure key
@@ -126,12 +127,51 @@ class Session:
             if not hasattr(w, "induce_lexicon"): continue
             pairs = [(q, g) for q, g, ww in self.teaching if ww is None or ww is w]
             if world is None or world is w: out[getattr(w, "name", "?")] = w.induce_lexicon(pairs)
+        if self.transfer:
+            from .transfer import bridge
+            out["transfer"] = bridge(self.worlds)
         return out
 
-    def deny(self, question):
+    # ---- the engine's own questions (core/goals.py, goals_prereg.md) ----------------------------------------------------
+    def goals(self):
+        from .goals import residue
+        return residue(self)
+
+    def propose(self):
+        """-> (goal, question) for the residue item one answer would settle most, or (None, None)."""
+        from .goals import residue, next_goal
+        g = next_goal(residue(self))
+        return (g, g.probe) if g is not None else (None, None)
+
+    # ---- persistence (core/store.py, persist_prereg.md): the session's own evidence ---------------------------------
+    def evidence(self):
+        L = self.ledger
+        return dict(teaching=[[q, str(g), getattr(w, "name", None) if w is not None else None] for q, g, w in self.teaching],
+                    frames=[dict(f, skeleton=list(f['skeleton']), support=[list(s) for s in f.get('support', [])]) for f in self.frames],
+                    accepted=[[list(sy), tp, kd] for sy, tp, kd in self.accepted], declined=[[list(sy), tp, kd] for sy, tp, kd in self.declined],
+                    ledger=None if L is None else dict(confirmed=dict(L.confirmed), contradicted=dict(L.contradicted),
+                                                       retracted=[[s, list(c) if isinstance(c, (list, tuple)) else c] for s, c in L.retracted]))
+
+    def absorb(self, ev):
+        by_name = {getattr(w, "name", None): w for w in self.worlds}
+        self.teaching = [(q, _num(g), by_name.get(n) if n else None) for q, g, n in ev.get("teaching", [])]
+        self.frames = [dict(f, skeleton=tuple(f['skeleton']), support=[tuple(s) for s in f.get('support', [])]) for f in ev.get("frames", [])]
+        self.accepted = [(tuple(sy), tp, kd) for sy, tp, kd in ev.get("accepted", [])]
+        self.declined = [(tuple(sy), tp, kd) for sy, tp, kd in ev.get("declined", [])]
+        led = ev.get("ledger")
+        if led and self.ledger is not None:
+            self.ledger.confirmed.clear(); self.ledger.confirmed.update(led.get("confirmed", {}))
+            self.ledger.contradicted.clear(); self.ledger.contradicted.update(led.get("contradicted", {}))
+            self.ledger.retracted = [(s, tuple(c) if isinstance(c, list) else c) for s, c in led.get("retracted", [])]
+        return dict(teaching=len(self.teaching), frames=len(self.frames), ledger=None if self.ledger is None else self.ledger.snapshot())
+
+    def deny(self, question, negative=True):
         """the denial channel (chat_prereg.md A7): the oracle says the answer to `question` was wrong WITHOUT supplying
-        the right one. Every source that spoke on it is recorded as contradicted, with the claim; nothing is
-        re-induced (no gold to induce from) and nothing cascades yet (the transcript world, CHAT_PLAN.md phase B)."""
+        the right one. Every source that spoke on it is recorded as contradicted, with the claim, and the turn leaves
+        the context. negative_prereg.md (S6): the engine's own answer is a NEGATIVE EXAMPLE -- every learning world that
+        answered it receives (question, that value) through its `deny` and re-induces, so a binding that produced the
+        denied value is dropped and re-bound from all the evidence. `negative=False` is the previous behaviour (the
+        knockout arm of negative.py)."""
         out = {}
         for t, fr in reversed(self.history):
             if t != question or not fr.get("answers"): continue
@@ -140,8 +180,19 @@ class Session:
                 for a, src in zip(fr["answers"], fr.get("answer_sources", [])):
                     self.ledger.record(src, False, claim=(a[1], question))
                 out["ledger"] = self.ledger.snapshot()
+            if negative:
+                for a, w in zip(fr["answers"], fr.get("answer_worlds", [])):
+                    if hasattr(w, "deny") and hasattr(w, "induce_lexicon"):
+                        w.deny(question, a[0])
+                        pairs = [(q, g) for q, g, ww in self.teaching if ww is None or ww is w]
+                        out[getattr(w, "name", "?")] = w.induce_lexicon(pairs)
             break
         return out
+
+
+def _num(s):
+    try: return Fraction(str(s))
+    except Exception: return s
 
 
 def _contains(syms, sub):
@@ -154,10 +205,16 @@ def _used(fr, w, st):
     from .reason import _spans, Composite
     n = len(fr["syms"]); out = []
     if isinstance(st, Composite):
-        return _used(fr, st.inner[0], st.inner[1]) + [x for x in _used(fr, st.outer[0], st.outer[1]) if x not in out]
+        for wi, sti, _ in st.inners:
+            out += [x for x in _used(fr, wi, sti) if x not in out]
+        return out + [x for x in _used(fr, st.outer[0], st.outer[1]) if x not in out]
     spans = [(i, j) for i, j in _spans(w, st) if i < n]
-    for r in fr["readings"]:
+    worlds_of = fr.get("reading_worlds") or [None] * len(fr["readings"])
+    for r, rw in zip(fr["readings"], worlds_of):
         if len(r) > 5: continue
+        # the reading must be THIS world's (transfer_prereg.md, run 3: two worlds reading the same span as an operator
+        # word, and the other world's operator id was handed back to this one by kind alone)
+        if rw is not None and rw is not w: continue
         if (r[0], r[1]) in spans and hasattr(w, "owns") and w.owns(r):
             item = (" ".join(fr["syms"][r[0]:r[1]]), w, r[2], r[3])
             if item not in out: out.append(item)

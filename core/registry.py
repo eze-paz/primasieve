@@ -81,6 +81,21 @@ PUBLISHED = {
     # ---- nolf incremental enumeration table (nolf_rebuild_prereg.md): the library pass's table is equivalent to a full build;
     #      the speedup missed its bar and is not registered
     "nolf_rebuild": ["INCREMENTAL TABLE at max_ops=2 (the library pass): EQUIVALENT"],
+    # ---- EMERGENCE_PLAN.md S6 (negative_prereg.md): a denial of the engine's own answer is elimination; SOUND, not PASS:
+    #      the registered "other hypothesis" bar is missed because a word bound from two examples is a COMMIT (a guess)
+    "negative": ["S6 NEGATIVE EVIDENCE: SOUND", "REPEAT 0"],
+    # ---- EMERGENCE_PLAN.md S8 (persist_prereg.md): evidence outlives the process; a fresh process re-induces and verifies
+    "persist": ["S8 PERSISTENCE: PASS", "CONFAB: 0"],
+    # ---- EMERGENCE_PLAN.md S5 (order_prereg.md): argument order and nesting as induced evidence in the exec world
+    "order": ["S5 WORD ORDER: PASS", "CONFAB: 0"],
+    # ---- EMERGENCE_PLAN.md S4 (transfer_prereg.md): a word moves between worlds by behaviour, held CONJECTURED
+    "transfer": ["S4 TRANSFER: PASS", "LAUNDERING: 0"],
+    # ---- EMERGENCE_PLAN.md S3 (depth_prereg.md): pairs of inners, the region rule, nesting as evidence in the graph
+    "depth": ["S3 DEPTH: PASS", "CONFAB: 0"],
+    # ---- EMERGENCE_PLAN.md S9 (goals_prereg.md): the engine's own questions by the split; SOUND (the recency knockout)
+    "goals": ["S9 GOALS: SOUND"],
+    # ---- EMERGENCE_PLAN.md S7 (dynamics_prereg.md): a world with time; SOUND (a one-transition guess is a COMMIT)
+    "dynamics": ["S7 DYNAMICS: SOUND"],
 }
 
 

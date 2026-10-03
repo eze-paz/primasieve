@@ -144,9 +144,38 @@ class TableWorld:
     content_kinds = {"C", "F"}
     attributed = False           # a computed answer over the user's own data is COMMIT, not a quoted source
 
-    def __init__(self, table, lexicon=None, order=None, name=None):
+    def __init__(self, table, lexicon=None, order=None, name=None, df=None):
         self.recs = Records.of(table); self.table = table; self.lexicon, self.order = lexicon or {}, order
-        self.name = name or "records"; self.log = []
+        self.name = name or "records"; self.log = []; self.negatives = []; self.pairs = []; self.df = df; self.contested = []
+        self.borrowed = {}; self.refused = set()            # transfer (transfer_prereg.md): see core/transfer.py
+
+    def deny(self, question, value):
+        """negative evidence (negative_prereg.md): the engine's own answer to `question` was wrong. Recorded and
+        applied at the next induction; the operators producing `value` on the question leave its words' survivors.
+        A BORROWED word that produced the value is refused for good."""
+        if (question, value) not in self.negatives: self.negatives.append((question, value))
+        syms = symbols(question)
+        for w in [w for w in self.borrowed if w in syms]:
+            rd = self.readings(syms)
+            if any(_same(r[0], value) for r in (self.evaluate(st) for st in self.structures(rd)) if r is not None):
+                del self.borrowed[w]; self.refused.add(w)
+
+    # ---- transfer: an operator's TWO-ARGUMENT restriction is its behaviour on the scalar probes (core/transfer.py) ----
+    def operators(self): return list(ALL_OPS)
+
+    def fingerprint(self, op):
+        from .primitives import PROBES, RAT
+        f = {DIFF: lambda a, b: a - b, SUM: lambda a, b: a + b, MAX: max, MIN: min, MEAN: lambda a, b: (a + b) / 2}.get(op)
+        if f is None: return None                      # COUNT and LOOKUP have no scalar behaviour
+        grid = PROBES[RAT]
+        return (2,) + tuple(str(Fraction(f(Fraction(a), Fraction(b)))) for a in grid for b in grid)
+
+    def borrow(self, word, op, source, order=None):
+        """`order`: the source word's argument order ("forward" = the first-named group first); DIFF reads it as "first"."""
+        if word in self.lexicon or word in self.refused or word in self.borrowed: return False
+        self.borrowed[word] = (op, source, order); return True
+
+    def conjectured(self, st): return any(len(o) > 4 and o[4] in self.borrowed for o in st[6])
 
     def readings(self, syms):
         t = self.recs; out = []
@@ -160,6 +189,7 @@ class TableWorld:
                     if text in vals: out.append((i, i + L, "F", (h, text), text))
                 if L == 1 and _isnum(text): out.append((i, i + 1, "N", Fraction(text), text))
                 if text in self.lexicon: out.append((i, i + L, "O", self.lexicon[text], text))
+                elif text in self.borrowed: out.append((i, i + L, "O", self.borrowed[text][0], text))
         self.log.append((self.name, " ".join(syms)))
         return out
 
@@ -180,7 +210,11 @@ class TableWorld:
         # element marks it) is one more option beside it, never a replacement (chat_acts_prereg.md run 2: an earlier
         # "how many" lingering in context removed LOOKUP from "what is the city of marketing")
         explicit_ops = sorted({o[3] for o in ops if len(o) <= 5})
-        opset = (explicit_ops or [LOOKUP]) + sorted({o[3] for o in ops if len(o) > 5} - set(explicit_ops or [LOOKUP]))
+        # one structure per operator READING, not per operator (depth_prereg.md): a question naming the same operator
+        # word twice (an aggregate of one group plus the same aggregate of another) must yield two inners whose
+        # spans are disjoint; attaching every reading of the word to each structure made them overlap
+        opitems = [(o[3], [o]) for o in ops if len(o) <= 5] or [(LOOKUP, [])]
+        opitems += [(o[3], [o]) for o in ops if len(o) > 5 and o[3] not in set(explicit_ops or [LOOKUP])]
         # column subsets: a final column plus 0-2 hop columns, in BOTH nesting orders
         colsets = [(c, ()) for c in cols]
         for c in cols:
@@ -193,8 +227,7 @@ class TableWorld:
             filters = [f[3] for f in fs]
             for A in (recs.holding([h for h, _ in filters]) if filters else list(recs.tables.values())):
                 for tsp in [()] + [(t,) for t in tabs]:            # a collection-name reading: the collection to end in
-                    for op in opset:
-                        owords = [o for o in ops if o[3] == op]
+                    for op, owords in opitems:
                         if op == COUNT:
                             if not disjoint(list(fs) + list(tsp)) or not all(disjoint(list(fs) + list(tsp) + [o]) for o in owords): continue
                             out.append((op, None, filters, None, None, fs, owords, (), A.name, tsp))
@@ -221,7 +254,8 @@ class TableWorld:
                                     # departments collection and select() crashed -- found by the turns gate)
                                     if fa[3][0] not in A.headers: continue
                                     if fa[3][0] == fb[3][0] and disjoint([fa, fb, c] + list(tsp) + owords):
-                                        if self.order == "first" and fa[0] > fb[0]: continue
+                                        order = self.order or ("first" if any(len(o) > 4 and o[4] in self.borrowed and self.borrowed[o[4]][2] == "forward" for o in owords) else None)
+                                        if order == "first" and fa[0] > fb[0]: continue
                                         out.append((op, c[3], [fa[3]], None, [fb[3]], (fa, fb, c), owords, (), A.name, tsp))
         return out
 
@@ -271,7 +305,9 @@ class TableWorld:
         res = compute(cur, op, col, rows, target, rows_b)
         if res is None: return None
         value, cells = res
-        return value, cells, {("TABLE", cur.name, r, h, str(v)) for r, h, v in cells}
+        certs = {("TABLE", cur.name, r, h, str(v)) for r, h, v in cells}
+        certs |= {("TRANSFER", o[4], self.borrowed[o[4]][1]) for o in owords if len(o) > 4 and o[4] in self.borrowed}      # (op, source, order); a probe's fake reading has no word
+        return value, cells, certs
 
     def label(self, v): return str(v)
 
@@ -280,9 +316,58 @@ class TableWorld:
     def consulted(self): return [(self.name, tuple(self.recs.tables))]
 
     def induce_lexicon(self, teaching):
-        """the session's confirmation channel: re-induce this world's operator lexicon from all pairs."""
-        self.lexicon, contested, self.order = induce_lexicon(teaching, self.recs)
-        return dict(bound=dict(self.lexicon), contested=contested, order=self.order)
+        """the session's confirmation channel: re-induce this world's operator lexicon from all pairs (and the denials)."""
+        self.pairs = list(teaching)                 # the session hands every pair each time; the world keeps the last set
+        self.lexicon, contested, self.order = induce_lexicon(list(self.pairs), self.recs, negatives=self.negatives, df=self.df)
+        for w in [w for w in self.borrowed if w in self.lexicon]: del self.borrowed[w]      # a binding of this world's own supersedes a borrowing
+        self.contested = sorted(contested)
+        return dict(bound=dict(self.lexicon), contested=self.contested, order=self.order)
+
+    def contested_words(self):
+        """the residue (core/goals.py), computed on demand: words the teaching leaves with several operators -- those
+        `contested` by core.induce, and a word seen once whose survivor set is still several (a one-row filter)."""
+        return sorted(set(self.contested) | {w for q, g in self.pairs for w in symbols(q) if w not in self.lexicon
+                                              and not _isnum(w) and self._pure(w) and len(self.survivors_of(w)) > 1})
+
+    def _pure(self, word):
+        """a candidate operator word: every question it occurs in is one no bound word explains"""
+        return all(not any(s in self.lexicon for s in symbols(q)) for q, g in self.pairs if word in symbols(q))
+
+    # ---- the residue's probes (core/goals.py): other values of a filter's header, and an operator's value on a question
+    def alternatives(self, sym):
+        for h, vals in self.recs.values.items():
+            if sym in vals: return sorted(v for v in vals if v != sym and " " not in v)
+        return []
+
+    def value_with(self, word, op, question):
+        """the value the question takes with `word` read as `op` (the probe's outcome), or None."""
+        syms = symbols(question); rd = [r for r in readings(syms, self.recs) if not (r[2] == "O" and r[4] == word)]
+        rd += [(k, k + 1, "O", op, word) for k, s in enumerate(syms) if s == word]
+        # the outcome is what the question's FULL reading computes: only the structures of greatest coverage count (a
+        # structure ignoring the filter would make a one-row group look splittable by the whole table's aggregate)
+        best = {}
+        for st in structures(rd, self.recs, self.order):
+            res = evaluate(self.recs, st)
+            if res is None: continue
+            cov = len({p for i, j in TableWorld.spans_of(self, st) for p in range(i, j)})
+            best.setdefault(cov, set()).add(str(res[0]))
+        return tuple(sorted(best[max(best)])) if best else None
+
+    # ---- persistence (core/store.py): the pairs and the denials are the evidence; the lexicon is re-induced -----------
+    def evidence(self):
+        return dict(pairs=[[q, str(g)] for q, g in self.pairs], negatives=[[q, str(v)] for q, v in self.negatives])
+
+    def absorb(self, ev):
+        def num(s):
+            try: return Fraction(str(s))
+            except Exception: return s
+        self.negatives = [(q, num(v)) for q, v in ev.get("negatives", [])]
+        r = self.induce_lexicon([(q, num(g)) for q, g in ev.get("pairs", [])])
+        return dict(bound=sorted(self.lexicon), contested=r["contested"])
+
+    def survivors_of(self, word):
+        """the operators still possible for `word` under every positive pair and denial so far (a diagnostic)."""
+        return induce_lexicon(list(self.pairs), self.recs, negatives=self.negatives, word=word)
 
 
 def structures(rd, table, order=None): return TableWorld(table, {}, order).structures(rd)
@@ -307,9 +392,10 @@ def answer(text, table, lexicon, order=None):
     return dict(state="COMMIT", value=v, cells=sups[0], structure=st[:5], readings=rd, answers=answers)
 
 
-def induce_lexicon(teaching, table, ops=ALL_OPS):
+def induce_lexicon(teaching, table, ops=ALL_OPS, negatives=(), word=None, df=None):
     """(question, confirmed answer) pairs -> (word -> operator, contested, diff order): core.induce by elimination
-    with this world's own probe (a fake operator reading past the end of the text, B1/B4)."""
+    with this world's own probe (a fake operator reading past the end of the text, B1/B4). `negatives`: denials
+    (question, forbidden value), see core.induce. `word`: return that word's surviving operator set instead."""
     def survivors(q, gold):
         syms = symbols(q); rd = readings(syms, table); surv, votes = set(), []
         for op in ops:
@@ -322,7 +408,16 @@ def induce_lexicon(teaching, table, ops=ALL_OPS):
                         fa, fb = st[5][0], st[5][1]; votes.append("first" if fa[0] < fb[0] else "second")
         read_pos = {k for r in rd for k in range(r[0], r[1])}
         return [w for k, w in enumerate(syms) if k not in read_pos], surv, votes
-    return induce(teaching, survivors)
+    if word is not None:                     # (the unpacked names must not shadow `ops`, which the probe iterates)
+        inter = None
+        for q, gold in teaching:
+            free, sv, _ = survivors(q, gold)
+            if word in free: inter = set(sv) if inter is None else inter & set(sv)
+        for q, bad in negatives:
+            free, sv, _ = survivors(q, bad)
+            if word in free and inter is not None: inter -= set(sv)
+        return inter or set()
+    return induce(teaching, survivors, negatives=negatives, df=df)
 
 
 def _same(a, b):
