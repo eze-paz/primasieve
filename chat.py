@@ -76,8 +76,10 @@ def build_worlds(seeded=False, quiet=True, online=False):
     teach = G.records_teaching() + [("how much is the total salary in marketing", sum(F(e["salary"]) for e in G.emps("marketing")))]
     lexicon, contested, order = induce_lexicon(teach, recs)
     recw = TableWorld(recs, lexicon, order, name="records")
+    recw.pairs = list(teach)                      # the evidence the world was built with stays its own (together_prereg.md)
     t = TN.make_table(); P = TN.prepare(t)
     salesw = TableWorld(t, P["lexicon"], P["order"], name="sales")
+    salesw.pairs = list(P["teaching"])
     execw = ExecWorld(name="exec"); execw.induce_lexicon(EXEC_TEACH)
     glossw = GlossWorld(Lexica(online=online), name="dictionary")
     worlds = [kgw, recw, salesw, execw, glossw, TranscriptWorld(frames.META, name="transcript")]
@@ -91,9 +93,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False):
         self.ledger = ledger if ledger is not None else Ledger()
-        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY)
+        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
         # persistence (persist_prereg.md, S8): the evidence of earlier sessions is loaded here and saved after every
@@ -102,6 +104,13 @@ class Door:
         if store and os.path.exists(store):
             from core.store import load
             self.store_report = load(self.S, store)
+            if transfer:                                   # offers and revocations against the loaded evidence
+                from core.transfer import bridge
+                bridge(self.S.worlds)
+
+    def propose(self, exclude=()):
+        """the engine's own question (core/goals.py, together_prereg.md): -> (goal, question text) or (None, None)"""
+        return self.S.propose(exclude)
 
     @staticmethod
     def sentences(text):

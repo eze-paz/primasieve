@@ -141,7 +141,7 @@ def hop_back(recs, cur, rows, col=None, to=None):
 
 
 class TableWorld:
-    content_kinds = {"C", "F"}
+    content_kinds = {"C", "F", "X"}
     attributed = False           # a computed answer over the user's own data is COMMIT, not a quoted source
 
     def __init__(self, table, lexicon=None, order=None, name=None, df=None):
@@ -190,6 +190,7 @@ class TableWorld:
                 if L == 1 and _isnum(text): out.append((i, i + 1, "N", Fraction(text), text))
                 if text in self.lexicon: out.append((i, i + L, "O", self.lexicon[text], text))
                 elif text in self.borrowed: out.append((i, i + L, "O", self.borrowed[text][0], text))
+                elif text in self.refused: out.append((i, i + L, "X", None, text))     # a denied operator word: a predicate the answer owes
         self.log.append((self.name, " ".join(syms)))
         return out
 
@@ -213,8 +214,12 @@ class TableWorld:
         # one structure per operator READING, not per operator (depth_prereg.md): a question naming the same operator
         # word twice (an aggregate of one group plus the same aggregate of another) must yield two inners whose
         # spans are disjoint; attaching every reading of the word to each structure made them overlap
-        opitems = [(o[3], [o]) for o in ops if len(o) <= 5] or [(LOOKUP, [])]
-        opitems += [(o[3], [o]) for o in ops if len(o) > 5 and o[3] not in set(explicit_ops or [LOOKUP])]
+        # a BORROWED operator word (a conjecture, transfer_prereg.md) is one more option beside the default lookup, never a
+        # replacement: with `plus` borrowed as SUM, "the salary of alice plus 30" lost its plain lookup and so its composite
+        def word(o): return o[4] if len(o) > 4 else None                       # a probe's fake reading has no word
+        own = [o for o in ops if len(o) <= 5 and word(o) not in self.borrowed]
+        opitems = [(o[3], [o]) for o in own] or [(LOOKUP, [])]
+        opitems += [(o[3], [o]) for o in ops if (len(o) > 5 or word(o) in self.borrowed) and o[3] not in {op for op, _ in opitems}]
         # column subsets: a final column plus 0-2 hop columns, in BOTH nesting orders
         colsets = [(c, ()) for c in cols]
         for c in cols:
@@ -317,8 +322,12 @@ class TableWorld:
 
     def induce_lexicon(self, teaching):
         """the session's confirmation channel: re-induce this world's operator lexicon from all pairs (and the denials)."""
-        self.pairs = list(teaching)                 # the session hands every pair each time; the world keeps the last set
-        self.lexicon, contested, self.order = induce_lexicon(list(self.pairs), self.recs, negatives=self.negatives, df=self.df)
+        # the world's evidence only GROWS (together_prereg.md: a session's first confirmation re-induced the records from
+        # the session's one pair and threw away the lexicon the world was built with; a context difference then answered
+        # "how many employees are in support" because no count word was left); retraction is by negatives
+        for pr in teaching:
+            if pr not in self.pairs: self.pairs.append(pr)
+        self.lexicon, contested, self.order = induce_lexicon(list(self.pairs), self.recs, negatives=self.negatives, df=self.df, prior=dict(self.lexicon))
         for w in [w for w in self.borrowed if w in self.lexicon]: del self.borrowed[w]      # a binding of this world's own supersedes a borrowing
         self.contested = sorted(contested)
         return dict(bound=dict(self.lexicon), contested=self.contested, order=self.order)
@@ -355,13 +364,15 @@ class TableWorld:
 
     # ---- persistence (core/store.py): the pairs and the denials are the evidence; the lexicon is re-induced -----------
     def evidence(self):
-        return dict(pairs=[[q, str(g)] for q, g in self.pairs], negatives=[[q, str(v)] for q, v in self.negatives])
+        return dict(pairs=[[q, str(g)] for q, g in self.pairs], negatives=[[q, str(v)] for q, v in self.negatives], refused=sorted(self.refused))
 
     def absorb(self, ev):
         def num(s):
             try: return Fraction(str(s))
             except Exception: return s
         self.negatives = [(q, num(v)) for q, v in ev.get("negatives", [])]
+        self.refused = set(ev.get("refused", []))
+        for w in [w for w in self.borrowed if w in self.refused]: del self.borrowed[w]
         r = self.induce_lexicon([(q, num(g)) for q, g in ev.get("pairs", [])])
         return dict(bound=sorted(self.lexicon), contested=r["contested"])
 
@@ -392,7 +403,7 @@ def answer(text, table, lexicon, order=None):
     return dict(state="COMMIT", value=v, cells=sups[0], structure=st[:5], readings=rd, answers=answers)
 
 
-def induce_lexicon(teaching, table, ops=ALL_OPS, negatives=(), word=None, df=None):
+def induce_lexicon(teaching, table, ops=ALL_OPS, negatives=(), word=None, df=None, prior=None):
     """(question, confirmed answer) pairs -> (word -> operator, contested, diff order): core.induce by elimination
     with this world's own probe (a fake operator reading past the end of the text, B1/B4). `negatives`: denials
     (question, forbidden value), see core.induce. `word`: return that word's surviving operator set instead."""
@@ -417,7 +428,7 @@ def induce_lexicon(teaching, table, ops=ALL_OPS, negatives=(), word=None, df=Non
             free, sv, _ = survivors(q, bad)
             if word in free and inter is not None: inter -= set(sv)
         return inter or set()
-    return induce(teaching, survivors, negatives=negatives, df=df)
+    return induce(teaching, survivors, negatives=negatives, df=df, prior=prior)
 
 
 def _same(a, b):

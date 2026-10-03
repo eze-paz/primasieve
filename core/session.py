@@ -35,6 +35,9 @@ class Session:
         self.teaching = []           # [(question, gold)]
         self.deny_words = set(deny_words)       # chat-layer data: a word that, beside a choice, denies the previous answer
         self.frames, self.accepted, self.declined = [], [], []     # E-10 question frames and their observations (chat_request_prereg.md)
+        if transfer:                              # worlds taught before the session opened have words to offer each other now
+            from .transfer import bridge
+            self.borrowed_at_start = bridge(self.worlds)
         for w in self.worlds:                   # the transcript world (chat_acts_prereg.md) reads this session's own records
             if getattr(w, "transcript", False): w.session = self
 
@@ -137,10 +140,11 @@ class Session:
         from .goals import residue
         return residue(self)
 
-    def propose(self):
-        """-> (goal, question) for the residue item one answer would settle most, or (None, None)."""
+    def propose(self, exclude=()):
+        """-> (goal, question) for the residue item one answer would settle most, or (None, None). `exclude`: goal keys
+        already proposed (a proposal that drew no answer is not repeated; the next goal is offered)."""
         from .goals import residue, next_goal
-        g = next_goal(residue(self))
+        g = next_goal([g for g in residue(self) if g.key not in set(exclude)])
         return (g, g.probe) if g is not None else (None, None)
 
     # ---- persistence (core/store.py, persist_prereg.md): the session's own evidence ---------------------------------

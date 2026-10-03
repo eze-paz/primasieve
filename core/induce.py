@@ -9,7 +9,7 @@ that explain the teaching. Nothing here knows a word; `survivors(question, gold)
 import collections
 
 
-def induce(teaching, survivors, order_of=None, negatives=(), df=None):
+def induce(teaching, survivors, order_of=None, negatives=(), df=None, prior=None):
     """teaching: [(question, gold)]; survivors(question, gold) -> (free words, set of operators that reproduce gold,
     extra) where `extra` is a list of order votes (or []). -> (lexicon word -> op, contested words, order or None).
     negatives: [(question, forbidden value)] -- a denial of the engine's own answer (negative_prereg.md, S6): the
@@ -41,7 +41,14 @@ def induce(teaching, survivors, order_of=None, negatives=(), df=None):
         def covers(w): return sum(1 for free, ops in uncovered if w in free and cands[w] in ops)
         live = [w for w in cands if covers(w) > 0]          # only a word that still explains something is a candidate
         if not live: break
-        key = lambda w: (purity(w), covers(w), seen[w])
+        # STABILITY (together_prereg.md): among pure words, one already bound to this operator keeps its place; a new pair
+        # must not flip a working lexicon without a contradiction (a confirmed swapped question made a preposition cover
+        # one more difference question than the difference word, and the preposition took the operator)
+        held = lambda w: 1 if (prior or {}).get(w) == cands[w] else 0
+        # a word that already appears in COVERED questions was a filler there; the operator of a new question is the word
+        # that is new to the cover (the preposition of the difference questions must not take a confirmed synonym's place)
+        covered = lambda w: sum(1 for free, ops in questions if w in free and (free, ops) not in uncovered)
+        key = lambda w: (purity(w), held(w), covers(w), -covered(w), seen[w])
         best = max(live, key=key)
         # words that ALWAYS CO-OCCUR (the same questions, the same operator) cannot be told apart by the pairs: an operator
         # word and the preposition it always comes with. The tie-break is DECLARED (transfer_prereg.md, run 2): the loop's specificity

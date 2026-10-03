@@ -158,7 +158,7 @@ def fragments(tree):
 
 
 class ExecWorld:
-    content_kinds = {"O"}      # an operator word the answer did not use -> PARTIAL
+    content_kinds = {"O", "X"}      # an operator word the answer did not use -> PARTIAL; "X" = a refused word, never usable, always owed
     attributed = False
     PROBE_BOTH = True          # the elimination probe tries both argument orders (order_prereg.md); False = textual only
 
@@ -237,6 +237,7 @@ class ExecWorld:
             if _isnum(s): out.append((i, i + 1, "N", Fraction(s), s))
             if s in self.lexicon: out.append((i, i + 1, "O", self.lexicon[s], s))
             elif s in self.borrowed: out.append((i, i + 1, "O", self.borrowed[s][0], s))
+            elif s in self.refused: out.append((i, i + 1, "X", None, s))     # an operator word whose reading the user denied: still a predicate, unresolved
         self.log.append((self.name, " ".join(syms)))
         return out
 
@@ -353,7 +354,7 @@ class ExecWorld:
         # session teaching one pair at a time kept the binding the FIRST pair alone forced (a question word bound to
         # multiplication by the first product question), because a stale binding is dropped only when a pair contradicts it and some other
         # structure always reproduced the gold.
-        previous = dict(self.lexicon)
+        previous = dict(self.lexicon); prior = dict(self.lexicon)
         for w in [w for w in self.lexicon if w not in self.searched_words]: del self.lexicon[w]
         # retraction FIRST: a bound word must reproduce every confirmed example that contains it; a contradicted
         # binding is dropped here so that the elimination and the search below re-bind it from all the evidence
@@ -384,7 +385,7 @@ class ExecWorld:
             read = {k for r in rd for k in range(r[0], r[1])}
             return [w for k, w in enumerate(syms) if k not in read], surv, []
 
-        lex, contested, _ = induce(teaching, survivors, negatives=self.negatives, df=self.df)
+        lex, contested, _ = induce(teaching, survivors, negatives=self.negatives, df=self.df, prior=prior)
         for w, op in lex.items():
             self.lexicon[w] = op
             self.teach.setdefault(w, []).extend((q, g) for q, g in teaching if w in symbols(q))
@@ -502,7 +503,7 @@ class ExecWorld:
     # ---- persistence: evidence out, evidence in (core/store.py, persist_prereg.md) --------------------------------
     def evidence(self):
         """pairs, denials, and the library as a cache: each tree with the record that forced it."""
-        return dict(pairs=[[q, str(g)] for q, g in self.pairs], negatives=[[q, str(v)] for q, v in self.negatives],
+        return dict(pairs=[[q, str(g)] for q, g in self.pairs], negatives=[[q, str(v)] for q, v in self.negatives], refused=sorted(self.refused),
                     library=[[lid, _json_tree(self.lib.entries[lid]), _json_forced(self.lib.forced.get(lid))] for lid in sorted(self.lib.entries)])
 
     def absorb(self, ev):
@@ -510,6 +511,8 @@ class ExecWorld:
         the pairs and denials; then consolidate. -> report."""
         self.pairs = [(q, _num(g)) for q, g in ev.get("pairs", [])]
         self.negatives = [(q, _num(v)) for q, v in ev.get("negatives", [])]
+        self.refused = set(ev.get("refused", []))          # a denied borrowing stays denied across sessions
+        for w in [w for w in self.borrowed if w in self.refused]: del self.borrowed[w]
         self.lib = Library(); self.lexicon = {}; self.teach = {}; self.searched_words = set(); self.unconfirmed = set()
         pending = [(lid, _tuple_tree(t), _tuple_forced(f)) for lid, t, f in ev.get("library", [])]
         kept, dropped = [], []

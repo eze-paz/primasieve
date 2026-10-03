@@ -57,14 +57,23 @@ def residue(session):
             goals.append(Goal("contested", (name, word), w, surv, cands, lambda op, q, w=w, word=word: w.value_with(word, op, q)))
         # borrowed words held as conjectures: the survivors are {the borrowed operator, nothing}; the probe is the question that used it
         for word, entry in sorted(getattr(w, "borrowed", {}).items()):
+            # the probe must be a question THIS world answers through the borrowed word: one of its own taught questions
+            # with the taught operator word of the same behaviour swapped for the borrowed one (a seen question, one
+            # symbol changed); else a question of the session that used the word; else the word itself
+            own = []
+            for q, g in getattr(w, "pairs", []):
+                for x in q.split():
+                    if getattr(w, "lexicon", {}).get(x) == entry[0] and x != word: own.append(_vary(q, x, word))
             used = [t for t, fr in session.history if word in t.split() and fr.get("answers")]
-            goals.append(Goal("borrowed", (name, word), w, [entry[0], None], used[-1:] or [f"{word}"],
+            goals.append(Goal("borrowed", (name, word), w, [entry[0], None], (own[-1:] or used[-1:] or [f"{word}"]),
                               lambda h, q: ("value" if h is not None else "nothing")))
     # READINGS the user never chose
+    asked = set()
     for k, (text, fr) in enumerate(session.history):
         if fr.get("kind") == "READINGS" and not fr.get("retracted") and not any(f2.get("chosen") for t2, f2 in session.history[k + 1:k + 2]):
             opts = [str(a[1]) for a in fr["answers"]]
-            if len(opts) > 1: goals.append(Goal("readings", (k, text), None, opts, [text], lambda h, q: h))
+            if len(opts) > 1 and text not in asked:                      # one goal per unanswered question, however often it was asked
+                asked.add(text); goals.append(Goal("readings", ("readings", text), None, opts, [text], lambda h, q: h))
     # symbols no world read (the dictionary's UNKNOWN reading): one question each, two outcomes (defined / not a word)
     unknown = collections.OrderedDict()
     for text, fr in session.history:
@@ -82,4 +91,8 @@ def next_goal(goals, key=None):
     if not live: return None
     score = key or (lambda g: g.split)
     best = max(score(g) for g in live)
-    return [g for g in live if score(g) == best][-1]
+    tied = [g for g in live if score(g) == best]
+    # at equal split, a probe the engine can ACT on -- a question of several symbols the session can answer and the user
+    # can confirm -- before a bare unknown symbol (together_prereg.md: the first proposal was a stress typo); then recency
+    acts = [g for g in tied if g.probe and len(str(g.probe).split()) > 1]
+    return (acts or tied)[-1]
