@@ -83,3 +83,11 @@ atom is the route; (ii) terms from one or two examples are guesses, the fourth t
 borrowed words, here), and the engine reports them as COMMIT: the CONJECTURED labelling of search-bound structure is
 the one change that would turn all four into honest conjectures with a correction channel, and it is the owner's call
 because it changes what the chat says about every searched word.
+
+## 8. Under conjectured_prereg.md (2026-10-03)
+
+With search-bound terms held CONJECTURED until they have predicted an unfitted example: I1 13 COMMIT + 15 conjectures
+right + 1 conjecture wrong (the spurious argmin, now said to be a guess) + 1 abstention of 30, CONFAB 0; I2 14 COMMIT +
+2 conjectures wrong + 4 abstentions, CONFAB 0. The registered bars count COMMITs and stay missed; the fatal column is
+now zero because every one-or-two-example term is reported as what it is. Verdict unchanged as registered (FAIL on the
+bars), the engine honest.

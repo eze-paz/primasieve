@@ -174,6 +174,7 @@ class ExecWorld:
         # a denial refuses the word for good, a confirmed pair supersedes the borrowing with a binding of this world's own
         self.borrowed = {}; self.refused = set()
         self.searched_words = set()        # words whose binding came from SEARCH (kept across inductions; elimination's are recomputed)
+        self.unconfirmed = set()           # search-bound words whose tree has not predicted an unfitted example (conjectured_prereg.md)
 
     # ---- transfer: the behaviour of an operator, and borrowing by it (core/transfer.py) ------------------------------
     def operators(self):
@@ -190,7 +191,9 @@ class ExecWorld:
         if order in ("forward", "reverse", "both"): self.arg_order[word] = order
         return True
 
-    def conjectured(self, st): return any(w in self.borrowed for w in self._words(st[0]))
+    def conjectured(self, st):
+        """a borrowed word, or a search-bound word that has not yet predicted an example it was not fitted to"""
+        return any(w in self.borrowed or w in self.unconfirmed for w in self._words(st[0]))
 
     # ---- the residue's probes (core/goals.py): the numerals 1..10, and an operator's value on a question
     def alternatives(self, sym): return [str(k) for k in range(1, 11) if str(k) != sym] if _isnum(sym) else []
@@ -360,7 +363,7 @@ class ExecWorld:
                 if w not in symbols(q): continue
                 syms = symbols(q); rd = self.readings(syms)
                 ok = any(_same(self.evaluate(st)[0], g) for st in self.structures(rd) if self.evaluate(st) is not None)
-                if not ok: dropped.append((w, q, g)); del self.lexicon[w]; self.searched_words.discard(w); break
+                if not ok: dropped.append((w, q, g)); del self.lexicon[w]; self.searched_words.discard(w); self.unconfirmed.discard(w); break
             if w not in self.lexicon: continue
             for q, bad in self.negatives:               # a binding that yields a DENIED value on its question is dropped too
                 if w not in symbols(q): continue
@@ -450,6 +453,16 @@ class ExecWorld:
             if tree is None: continue
             lid = self.lib.add(tree, forced_by=(w, ex))
             self.lexicon[w] = lid; self.searched_words.add(w); self.teach.setdefault(w, []).extend((q, g) for q, _, g in items)
+            # CONJECTURED until it has PREDICTED (conjectured_prereg.md): the fit on all examples but the newest must
+            # reproduce the newest, or the binding is a guess and the loop says so
+            predicted = False
+            if len(ex) >= 2:
+                k2 = (tuple(ex[:-1]), tuple(forbid), use_library, len(self.lib), guided, score)
+                if k2 not in memo: memo[k2] = synth(ex[:-1], self.lib, max_size=max_size, cap=cap, use_library=use_library, guided=guided, score=score, forbidden=forbid)
+                t2 = memo[k2][0]
+                predicted = t2 is not None and _same(ev(t2, Fraction(str(ex[-1][0])), self.lib), ex[-1][1])
+            if predicted: self.unconfirmed.discard(w)
+            else: self.unconfirmed.add(w)
         self._induce_order(teaching)
         for w in [w for w in self.borrowed if w in self.lexicon]: del self.borrowed[w]       # a binding of this world's own supersedes a borrowing
         # an elimination-bound word that the recompute no longer binds the same way was retracted by the new evidence too
@@ -497,7 +510,7 @@ class ExecWorld:
         the pairs and denials; then consolidate. -> report."""
         self.pairs = [(q, _num(g)) for q, g in ev.get("pairs", [])]
         self.negatives = [(q, _num(v)) for q, v in ev.get("negatives", [])]
-        self.lib = Library(); self.lexicon = {}; self.teach = {}; self.searched_words = set()
+        self.lib = Library(); self.lexicon = {}; self.teach = {}; self.searched_words = set(); self.unconfirmed = set()
         pending = [(lid, _tuple_tree(t), _tuple_forced(f)) for lid, t, f in ev.get("library", [])]
         kept, dropped = [], []
         while pending:

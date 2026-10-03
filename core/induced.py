@@ -161,7 +161,10 @@ class TermWorld(TableWorld):
 
     def rank_key(self, st): return 0
 
-    def conjectured(self, st): return False
+    def conjectured(self, st):
+        """conjectured_prereg.md: a term that has not predicted an example it was not fitted to"""
+        o, shape = st[1], st[2]; word = o[3] if o else None
+        return (word, self.shape_key(self._env(shape))) not in self.predicted
 
     def evaluate(self, st):
         o, shape, k = st[1], st[2], st[3]; word = o[3] if o else None
@@ -174,7 +177,15 @@ class TermWorld(TableWorld):
 
     # ---- induction: a word's term from the pairs it occurs in --------------------------------------------------------
     def induce_lexicon(self, teaching, max_size=7):
-        self.pairs = list(teaching); self.terms = {}; self.default = {}; self.searched = []
+        self.pairs = list(teaching); self.terms = {}; self.default = {}; self.searched = []; self.predicted = set()
+
+        def mark(word, sk, exs, found):
+            """COMMIT only if the fit on all examples but the newest reproduces the newest (conjectured_prereg.md)"""
+            if len(exs) < 2: return
+            prior = search([(env, g) for env, g, q in exs[:-1]], max_size=max_size, exclude=self.exclude)
+            env, g, q = exs[-1]
+            if prior and all(_same(_ev(t, env), g) for t in prior if _ev(t, env) is not None) and any(_ev(t, env) is not None for t in prior):
+                self.predicted.add((word, sk))
         explained = set()
         for _ in range(12):
             open_qs = [(q, g) for q, g in self.pairs if g is not None and q not in explained]
@@ -207,7 +218,7 @@ class TermWorld(TableWorld):
                     found = search([(env, g) for env, g, q in exs], max_size=max_size, exclude=self.exclude)
                     self.searched.append(("", sk, len(found), len(exs)))
                     if found:
-                        self.default[sk] = found; bound = True
+                        self.default[sk] = found; bound = True; mark(None, sk, exs, found)
                         for env, g, q in exs: explained.add(q)
                 if not bound: break
                 continue
@@ -223,6 +234,7 @@ class TermWorld(TableWorld):
                     if found: per[sk] = found
                 if per and len(per) == len(groups):           # every shape the word occurs in has a term: the word is explained
                     self.terms[w] = per; bound = True
+                    for sk, exs in groups.items(): mark(w, sk, exs, per[sk])
                     for q, g, shape in by_word[w]: explained.add(q)
                     break
             if not bound: break

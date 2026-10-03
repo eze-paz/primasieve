@@ -245,7 +245,10 @@ if __name__ == "__main__":
     third = ("what is the zap of 5", 11) if found_sq else ("what is the zap of 5", 26)
     r2 = wz.induce_lexicon([third])
     t2 = wz.lib.entries.get(wz.lexicon.get("zap")); frz = reason("what is the zap of 6", wz, cats="LN")
-    retracted = t1 is not None and t2 is not None and t1 != t2 and bool(r2["dropped"]) and frz["kind"] == COMMIT and same(frz["answers"][0][1], 13 if found_sq else 37)
+    # conjectured_prereg.md: the re-bound tree predicted nothing (the fit on the first two examples did not reproduce the third), so
+    # the honest kind is CONJECTURED, with the right value
+    from core.verdict import CONJECTURED as _CONJ
+    retracted = t1 is not None and t2 is not None and t1 != t2 and bool(r2["dropped"]) and frz["kind"] in (COMMIT, _CONJ) and same(frz["answers"][0][1], 13 if found_sq else 37)
     say(f"      retraction: zap first {t1} -> after a contradicting example dropped {r2['dropped']} -> {t2}; zap of 6 -> {[a[1] for a in frz['answers']]}")
     ok3c = hx["confab"] == 0 and retracted
     say(f"W3-c  held-out arithmetic: correct {hx['correct']}/{len(heldx)} confab {hx['confab']} ask {hx['ask']}; retraction shown {retracted}   [confab 0 -> {'PASS' if ok3c else 'FAIL'}]")

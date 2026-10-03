@@ -17,7 +17,7 @@ from core.reason import READINGS, PARTIAL, NOT_FOUND
 from core.registry import selfcheck
 
 T0 = time.time()
-MAIN = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=HERE).stdout.strip()
+MAIN = "0ee0ceed"        # main BEFORE depth_prereg.md (the commit the campaign started from): the D2 arm reproduces it
 
 
 def say(s=""): print(str(s).encode("ascii", "replace").decode(), flush=True)

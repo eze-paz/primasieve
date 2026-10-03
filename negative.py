@@ -23,7 +23,7 @@ def say(s=""): print(str(s).encode("ascii", "replace").decode(), flush=True)
 
 def val(fr):
     """the unique committed value of a frame, else None (an ask or an abstention is not a value)."""
-    if fr["kind"] in ("commit", "attributed") and len(fr["answers"]) == 1: return fr["answers"][0][0]
+    if fr["kind"] in ("commit", "attributed", "conjectured") and len(fr["answers"]) == 1: return fr["answers"][0][0]     # a conjecture is a value (with its channel)
     return None
 
 
@@ -51,8 +51,8 @@ def exec_script(negative, word, positives, probe, truth, heldout):
                repeat=(v2 is not None and same(v2, v1)), dropped=[d for d in w.negatives])
     held = collections.Counter()
     for q, g in heldout:
-        v = val(s.turn(q))
-        held["correct" if (v is not None and same(v, g)) else ("abstain" if v is None else "confab")] += 1
+        fh = s.turn(q); v = val(fh)
+        held["correct" if (v is not None and same(v, g)) else ("abstain" if v is None else ("conj-wrong" if fh["kind"] == "conjectured" else "confab"))] += 1
     out["held"] = held
     out["v2_correct"] = v2 is not None and same(v2, truth)
     return out
@@ -75,7 +75,7 @@ def main():
         say(f"    {arm:26s} first binding {r['first']}; zorb of 3 -> {r['v1']}; deny; again -> {r.get('v2')} ({r.get('kind2')}, {r.get('n2')} answers); binding now {r.get('after')}; repeat {r['repeat']}; held-out {dict(r['held'])}")
         if neg:
             ok1 = (not r["repeat"]) and r["v2_correct"] and r["held"]["confab"] == 0 and r["held"]["correct"] == len(held)
-            repeat_total += r["repeat"]; confab_total += r["held"]["confab"] + (0 if (r["v2"] is None or r["v2_correct"] or r["repeat"]) else 1)
+            repeat_total += r["repeat"]; confab_total += r["held"]["confab"] + (0 if (r["v2"] is None or r["v2_correct"] or r["repeat"] or r.get("kind2") != "commit") else 1)   # a CONJECTURED guess is not a confabulation (conjectured_prereg.md)
         else: main_r = r
     main1_fails = main_r["repeat"]
     say(f"N1  negative arm: denied value never repeated, re-bound to the other hypothesis, held-out 3/3   [{'PASS' if ok1 else 'FAIL'}]; main arm repeats the denied value: {main1_fails}   [{'FAILS ON MAIN' if main1_fails else 'does not discriminate'}]")
@@ -92,7 +92,7 @@ def main():
         say(f"    {arm:26s} first binding {r['first']}; zap of 3 -> {r['v1']}; deny; again -> {r.get('v2')} ({r.get('kind2')}, {r.get('n2')} answers); binding now {r.get('after')}; repeat {r['repeat']}; held-out {dict(r['held'])}")
         if neg:
             ok2 = (not r["repeat"]) and (r["v2"] is None or r["v2_correct"]) and r["held"]["confab"] == 0
-            repeat_total += r["repeat"]; confab_total += r["held"]["confab"] + (0 if (r["v2"] is None or r["v2_correct"] or r["repeat"]) else 1)
+            repeat_total += r["repeat"]; confab_total += r["held"]["confab"] + (0 if (r["v2"] is None or r["v2_correct"] or r["repeat"] or r.get("kind2") != "commit") else 1)   # a CONJECTURED guess is not a confabulation (conjectured_prereg.md)
         else: main2 = r
     say(f"N2  negative arm: denied value never repeated; the other hypothesis or an abstention; held-out confab 0   [{'PASS' if ok2 else 'FAIL'}]; main arm repeats: {main2['repeat']}   [{'FAILS ON MAIN' if main2['repeat'] else 'does not discriminate'}]")
     if not (ok2 and main2["repeat"]): fails.append("N2")

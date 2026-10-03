@@ -38,7 +38,7 @@ def fresh_worlds():
 
 
 def val(fr):
-    if fr["kind"] in ("commit", "attributed") and len(fr["answers"]) == 1: return str(fr["answers"][0][1])
+    if fr["kind"] in ("commit", "attributed", "conjectured") and len(fr["answers"]) == 1: return str(fr["answers"][0][1])
     return None
 
 

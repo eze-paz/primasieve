@@ -784,3 +784,9 @@ words' examples; a table structure attaching every reading of its operator word.
 met four times (S6, S7, S9, S2): structure bound by SEARCH from one or two examples is a guess and the engine reports it as
 a COMMIT. core/verdict's CONJECTURED state exists for exactly that; applying it to search-bound words changes what the
 chat says about every such word and is the owner's call.** Nothing is committed: the owner reads the verdicts first.
+
+### 2026-10-03 -- search-bound structure is a conjecture until it has predicted (conjectured_prereg.md)
+The owner applied the campaign's standing finding: a tree, program or term found by search is COMMIT only if the fit on all
+its examples but the newest reproduces the newest; otherwise the frame is CONJECTURED ("Probably X ... Tell me if not.") and a
+confirmed pair on a new input upgrades it. One rule in core/exec.py, core/trace.py, core/induced.py; elimination to a primitive
+stays COMMIT. Suite green; S7 PASS; the only registered line that changed is worlds_general's retraction case, now CONJECTURED.

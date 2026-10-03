@@ -27,6 +27,7 @@ def same(a, b):
 
 def score(fr, gold):
     if fr["kind"] == "commit" and len(fr["answers"]) == 1: return "correct" if same(fr["answers"][0][1], gold) else "confab"
+    if fr["kind"] == "conjectured" and len(fr["answers"]) == 1: return "conj-right" if same(fr["answers"][0][1], gold) else "conj-wrong"   # a guess, said so
     if fr["kind"] == READINGS: return "ask" if any(same(a[1], gold) for a in fr["answers"]) else "none"
     return "partial" if fr["kind"] == PARTIAL else "none"
 

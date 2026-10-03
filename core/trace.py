@@ -118,6 +118,19 @@ class TraceWorld:
         if field not in self._programs: self._programs[field] = induce(self.trace, field, exclude=self.exclude)
         return self._programs[field]
 
+    def predicted(self, field):
+        """conjectured_prereg.md: a program is more than a guess only if the fit on all transitions but the last
+        reproduces the last (it predicted a transition it was not fitted to)."""
+        if len(self.trace) < 3: return False
+        if field not in getattr(self, "_predicted", {}):
+            self._predicted = getattr(self, "_predicted", {})
+            shorter = Trace(self.trace.records[:-1]); a, b = self.trace.records[-2], self.trace.records[-1]
+            progs = induce(shorter, field, exclude=self.exclude)
+            self._predicted[field] = bool(progs) and all(_ev(p, a) == b.get(field) for p in progs)
+        return self._predicted[field]
+
+    def conjectured(self, st): return st[0] == NEXT and not self.predicted(st[1][3])
+
     # ---- the world contract -------------------------------------------------------------------------------------------
     def readings(self, syms):
         out = []

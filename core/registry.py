@@ -95,7 +95,7 @@ PUBLISHED = {
     # ---- EMERGENCE_PLAN.md S9 (goals_prereg.md): the engine's own questions by the split; SOUND (the recency knockout)
     "goals": ["S9 GOALS: SOUND"],
     # ---- EMERGENCE_PLAN.md S7 (dynamics_prereg.md): a world with time; SOUND (a one-transition guess is a COMMIT)
-    "dynamics": ["S7 DYNAMICS: SOUND"],
+    "dynamics": ["S7 DYNAMICS: PASS"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
 }
 
 

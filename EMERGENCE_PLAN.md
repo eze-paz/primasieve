@@ -24,3 +24,8 @@ from S1 (guided enumeration) if S1 holds.
 
 Rules kept throughout: prereg before code; the main arm reproduced in the same runner; one knockout per claim; nulls
 recorded, never spun; `python core_selftest.py` green before any commit; numbers registered only on a PASS.
+
+## 2026-10-03 -- the standing finding applied (conjectured_prereg.md, owner's call)
+Structure bound by SEARCH (an exec tree, a trace program, a table term) is COMMIT only once the fit on all examples but the
+newest has reproduced the newest; otherwise CONJECTURED, with the chat's correction channel. S7 rose to PASS; S6's guesses are
+conjectures (fatal column 0); S2's wrong terms are conjectures (CONFAB 0); every searched word with a predicted example stayed COMMIT.
