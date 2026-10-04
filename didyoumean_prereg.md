@@ -81,3 +81,12 @@ Not registered. Two things follow. (1) The silent wrong answers of run 1 are a s
 independent of this rung: an answer that leaves a content word unread must be PARTIAL ("..., but I did not use
 'threefold'"). That is the next step, with its own prereg, because it moves registered behaviour. (2) Better similarity
 (a larger corpus, or contexts two words wide) is what would raise D1.
+
+### The live chat (2026-10-04, after the gate)
+Offline the gate's worlds leave "aggregate" unread; in the LIVE chat they do not: the live Wikidata search returns an
+entity for almost any plain word ("aggregate": construction aggregate), and the researcher fetches it, so no offer was
+ever made. Fixed with its rule: for a turn nothing answered, a position counts as read only by a reading of one of its
+world's CONTENT kinds (a property, a column, a filter value, an operator) from a world that was not fetched. Gate numbers
+unchanged (D1 6/77, D2-D7 as above). Live: "what is the aggregate revenue in the south" -> "I cannot read 'aggregate'.
+Did you mean 'total'? ..." -> "correct" -> "Reading 'aggregate' as 'total', as you confirmed. The total revenue of south
+is 4805 ..." -> "... in the north" read through it directly.

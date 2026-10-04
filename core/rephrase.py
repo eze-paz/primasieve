@@ -13,11 +13,15 @@ OFFER = "OFFER"
 ANSWERED = (COMMIT, ATTRIBUTED, CONJECTURED)
 
 
-def read_positions(fr):
-    """positions of the turn some NON-quoting world read (a quoted gloss explains a word, it does not bind it)"""
+def read_positions(fr, strict=False):
+    """positions of the turn some NON-quoting world read (a quoted gloss explains a word, it does not bind it). With
+    `strict` (a turn nothing answered), a position counts as read only by a reading of one of its world's CONTENT kinds,
+    from a world that was not fetched: a live search finds an entry for almost any plain word, and a turn that nothing
+    answered may have sent a plain word to the researcher as if it were a name"""
     n = len(fr["syms"]); out = set()
     for r, w in zip(fr.get("readings", []), fr.get("reading_worlds", [])):
         if getattr(w, "quotes", False) or getattr(w, "transcript", False) or r[2] in ("U", "X") or r[0] >= n: continue
+        if strict and (getattr(w, "fetched", None) or r[2] not in getattr(w, "content_kinds", {r[2]})): continue
         out.update(range(r[0], min(r[1], n)))
     return out
 
@@ -44,8 +48,9 @@ class Rephraser:
         When the turn WAS answered while leaving the word unread (run 2, didyoumean_prereg.md), a replacement counts only
         if its answer READS the replaced position and differs from the direct answer: the unread word changed the
         question, and the direct answer was to another one."""
-        syms = list(fr["syms"]); read = read_positions(fr)
+        syms = list(fr["syms"])
         direct = {str(a[1]).lower() for a in fr.get("answers", [])} if fr["kind"] in ANSWERED else None
+        read = read_positions(fr, strict=direct is None)
         if direct is not None and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", [])) \
                 and not any(syms[p] not in self.common for p in read):
             return None                  # a quoted gloss of the turn's only content: the question was about the word itself
