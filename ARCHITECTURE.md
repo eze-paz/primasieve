@@ -842,3 +842,14 @@ reading, where the source made them true, and an unchecked assertion in generati
 unsound as a voucher; the rule "every content word inside an admitted window" had to be "every content word TYPED by the
 window's condition", under which output returns to labels. The lever is the type lexicon, whose headword-binding form was
 a null twice. Learning from novels stays closed under the honesty rule. Not registered.
+
+### 2026-10-04 -- positional type binding and a typed voucher (gloss_bind_prereg.md): NOT PASSED; binding captures selection, not meaning
+`gloss_bind.py`: a gloss word binds a type of the entity beside it -- the headword at the start of the gloss, a mentioned
+entity within three tokens -- and generation is vouched word by word against those bindings. As registered (no distance in
+the role) only 1 of 10 gloss nouns bound and the frequent ones fell into the declared function-word class, which made the
+first audit hollow; with distance in the role (amendment, recorded): 446 bindings, gloss nouns 6/10, **held-out soundness
+0.912**, knockout 46/446, and the false "neighborhood of new orleans" family removed (4 -> 0). The result that matters:
+the typed voucher emits "Portuguese: an extinct language of portugal" -- "extinct" bound to (instance of, language)
+because it opens glosses of languages. Type binding learns a word's selectional restriction, not its content; the
+unsupported-content audit rose 0.80 -> 0.89. Next rule, registered in the prereg: a content word is vouched only if it
+contributes a type strictly more specific than the slot's own and not already contributed. Not registered.
