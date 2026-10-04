@@ -26,8 +26,10 @@ _shape = shape_of
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None):
+    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None, guesser=None):
         self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
+        self.guesser = guesser       # guess_prereg.md (G1): a labelled source of mostly-true patterns, heard only when nothing known answers
+        self.predicted = set()       # (entity, property) whose guess was already checked against a known answer
         self.transfer = transfer     # transfer_prereg.md (S4): after every teach, words bound in one world are offered to the others by behaviour
         self.researcher = researcher # research_prereg.md: a turn that leaves symbols unread makes the researcher fetch; what comes back is a world
         self.history = []            # [(text, frame)]
@@ -63,7 +65,7 @@ class Session:
         for text, fr in reversed(self.history[-self.depth:]):
             if fr.get("retracted"): continue                     # a denied turn leaves the context (the cascade, chat_acts_prereg.md)
             for (v, lab, sups, certs, st), w in zip(fr.get("answers", []), fr.get("answer_worlds", [])):
-                if getattr(w, "transcript", False) or getattr(w, "quotes", False): continue      # a recall or a quoted gloss is not a value to bind to
+                if getattr(w, "transcript", False) or getattr(w, "quotes", False) or getattr(w, "guess", False): continue      # a recall, a quoted gloss or a guess is not a value to bind to
                 vr = w.value_reading(v) if hasattr(w, "value_reading") else None
                 item = (lab, w, vr[0], vr[1], "value") if vr else lab
                 if lab not in seen: seen.add(lab); out.append(item)
@@ -77,7 +79,7 @@ class Session:
         for text, fr in reversed(self.history[-self.depth:]):
             if fr.get("retracted"): continue
             for (v, lab, sups, certs, st), w in zip(fr.get("answers", []), fr.get("answer_worlds", [])):
-                if getattr(w, "transcript", False) or getattr(w, "quotes", False): continue
+                if getattr(w, "transcript", False) or getattr(w, "quotes", False) or getattr(w, "guess", False): continue
                 s = shape_of(w, st)
                 if s not in out: out.append(s)
         return out
@@ -123,7 +125,8 @@ class Session:
                 srcs = fr.get("answer_sources", [[]])[idx] if idx < len(fr.get("answer_sources", [])) else fr["sources"]
                 fr = dict(fr, kind=ATTRIBUTED if getattr(w, "attributed", True) else COMMIT, answers=[a], answer_worlds=[w],
                           answer_sources=[srcs], sources=list(srcs), preferred=True)       # the chosen option's sources, not every option's
-        fr["self_confirmed"] = self._self_confirm(text, fr)
+        if self.guesser is not None: fr = self._guess(fr)
+        fr["self_confirmed"] = self._self_confirm(text, fr) if not fr.get("guessed") else []
         fr["attributed_kind"] = ATTRIBUTED if any(getattr(w, "attributed", True) for w in fr["answer_worlds"]) else COMMIT
         fr["used"] = _used(fr, fr["answer_worlds"][0], fr["answers"][0][4]) if fr["answers"] else []
         self.history.append((text, fr))
@@ -158,6 +161,82 @@ class Session:
                         out.append((bname, word, src, cname))
                     break
         return out
+
+    # ---- the guesser (guess_prereg.md, GUESS_PLAN.md G1) ------------------------------------------------------------------
+    def _guess(self, fr):
+        """a KNOWN answer of a looked-up property: the guess the guesser would have made without it is compared, once per
+        (entity, property), and written on the guesser's record -- a prediction checked, not a vote (the guesser never
+        quotes). NOTHING known: a property the guesser has rules for, named in the turn, of an entity a world holds that
+        lacks it -> the guess, CONJECTURED, with its reason. Anything else is left as it was."""
+        G = self.guesser
+        if fr["kind"] in (COMMIT, ATTRIBUTED) and fr.get("answers"):
+            w, st = fr["answer_worlds"][0], fr["answers"][0][4]
+            try: kind, es, ps = st
+            except (TypeError, ValueError): return fr
+            if not (hasattr(w, "source") and len(es) == 1 and len(ps) == 1 and ps[0][4] in G.targets): return fr
+            q, t = es[0][3], ps[0][4]
+            if (q, t) in self.predicted or self.ledger is None: return fr
+            cl = {p: v for p, v in G.claims_of(w.source, q).items() if p != t}
+            g = G.guess(es[0][4], cl, t)
+            if not g: return fr
+            self.predicted.add((q, t)); ok = _same(g[0][0], fr["answers"][0][1])
+            self.ledger.record([G.name], ok, claim=None if ok else (G.spell(g[0][0]), fr.get("question", " ".join(fr["syms"]))))
+            fr["prediction_checked"] = (G.spell(g[0][0]), ok)
+            return fr
+        if fr["kind"] in (CONJECTURED, READINGS): return fr
+        syms = fr["syms"]; pick = None
+        for t in sorted(G.targets, key=lambda t: -len(symbols(t, "LN"))):
+            ls = symbols(t, "LN"); L = len(ls)
+            at = [i for i in range(len(syms) - L + 1) if ls and syms[i:i + L] == ls]
+            if not at: continue
+            tspan = (at[0], at[0] + L); ents = []
+            for r, w in zip(fr.get("readings", []), fr.get("reading_worlds", [])):
+                # a name IN the turn (a context reading is the previous topic: a guess about it would answer another question)
+                if r[2] != "E" or r[1] > len(syms) or not hasattr(getattr(w, "source", None), "claims") or not (r[1] <= tspan[0] or r[0] >= tspan[1]): continue
+                # the name: the span holding the rarest symbol (the graph world's A1: a frequent symbol is not a name), then
+                # the longest; without a df, the longest
+                rare = min(self.df(x) for x in syms[r[0]:r[1]]) if self.df is not None else 0
+                ents.append((rare, -(r[1] - r[0]), len(ents), r, w))
+            texts = self._texts(fr, tspan)
+            # one rule for the name, whichever world holds it: the span of rarest symbol, then the longest
+            if ents and (not texts or min(ents)[:2] <= texts[2]): pick = (t, min(ents)[3], min(ents)[4]); break
+            if texts: pick = (t, None, texts[:2]); break
+        if pick is None: return fr
+        t, r, w = pick
+        if r is None:                                          # no world holds the name; only quoted TEXT about it (guess_text_prereg.md)
+            span, text = w
+            from .guesser import text_cues
+            g = G.guess("", text_cues(text), t)
+            r = (span[0], span[1], "T", None, " ".join(syms[span[0]:span[1]]))
+        else:
+            cl = G.claims_of(w.source, r[3])
+            if t in cl: return fr                              # the world holds the property: a guess must not stand beside a fact
+            g = G.guess(r[4], cl, t)
+        if not g: return fr
+        gw = _GuessWorld(G.name)
+        answers = [(G.spell(v), G.spell(v), [], set(), ("GUESS", r, t)) for v, why in g]
+        rec = self.ledger.of([G.name]) if self.ledger is not None else (0, 0)
+        return dict(fr, kind=CONJECTURED, answers=answers, answer_worlds=[gw] * len(g), answer_sources=[[G.name]] * len(g),
+                    sources=[G.name], via="guess", guessed=[(G.spell(v), why) for v, why in g], guess_target=(r[4], t),
+                    contest=[(G.spell(v), [G.name], rec[1], rec[0]) for v, why in g])
+
+    def _texts(self, fr, tspan, k=3):
+        """-> ((i, j), text, key) for the turn's span of rarest symbol that only QUOTING worlds read (their values are texts:
+        a dictionary's definitions), the first k texts joined; None when no such span"""
+        syms = fr["syms"]; n = len(syms); by = {}
+        for w in self.worlds:
+            if not getattr(w, "quotes", False) or not hasattr(w, "structures"): continue
+            try: sts = w.structures(w.readings(syms))
+            except Exception: continue
+            for st in sts:
+                sp = w.spans_of(st)
+                if len(sp) != 1 or sp[0][1] > n or not (sp[0][1] <= tspan[0] or sp[0][0] >= tspan[1]): continue
+                got = w.evaluate(st)
+                if got: by.setdefault(tuple(sp[0]), []).append(str(got[0]))
+        if not by: return None
+        rare = lambda sp: (min(self.df(x) for x in syms[sp[0]:sp[1]]) if self.df is not None else 0, -(sp[1] - sp[0]), sp[0])
+        sp = min(by, key=rare)
+        return sp, " ".join(by[sp][:k]), rare(sp)[:2]
 
     def teach(self, question, gold, world=None):
         """the confirmation channel: (question, confirmed answer) -> the world named (or every world that learns)
@@ -282,3 +361,15 @@ def _used(fr, w, st):
             item = (" ".join(fr["syms"][r[0]:r[1]]), w, r[2], r[3])
             if item not in out: out.append(item)
     return out
+
+
+class _GuessWorld:
+    """the guesser's stand-in as an answer's world: it reads nothing, binds nothing, learns nothing from a pair, and its
+    values never enter the context (a guess is not a value to bind the next turn to)."""
+    guess = True; quotes = False; attributed = True
+
+    def __init__(self, name): self.name = name
+
+    def spans_of(self, st): return []
+
+    def owns(self, r): return False

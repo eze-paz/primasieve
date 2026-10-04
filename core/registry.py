@@ -104,6 +104,8 @@ PUBLISHED = {
     "research": ["RESEARCH BY ITSELF: PASS", "CONFAB: 0"],
     # ---- crosscheck_prereg.md: two fetched sources, corroborated / contested the W6 way, never voted (recorded caches)
     "crosscheck": ["CROSSCHECK: PASS"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
+    # ---- guess_prereg.md (GUESS_PLAN.md G1): a labelled guesser of mostly-true patterns, with a record (the crawl store)
+    "guess": ["G1: PASS"],
 }
 
 

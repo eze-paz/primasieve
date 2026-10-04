@@ -94,9 +94,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None):
         self.ledger = ledger if ledger is not None else Ledger()
-        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher)
+        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
         # persistence (persist_prereg.md, S8): the evidence of earlier sessions is loaded here and saved after every
@@ -473,7 +473,8 @@ def live_door(seeded, online, store, path, seed):
         from kb_osm import Nominatim
         researcher = Researcher([WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)],
                                 os.path.join(HERE, "_nldata", "research_live"), df=df)
-    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher)
+    from kb_guess import build_guesser                  # guess_prereg.md: the guesser, heard only when nothing known answers
+    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser())
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
@@ -503,7 +504,7 @@ PAGE = """<!doctype html><meta charset=utf-8><title>primasieve chat</title>
  .b{max-width:85%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
  .you .b{background:#2b3a55} .bot .b{background:#1b1f27;border:1px solid #262b36}
  .meta{font-size:11px;color:#8b93a7;margin-top:4px} .k{padding:1px 6px;border-radius:4px;background:#ffffff14;margin-right:6px}
- .ANSWER{color:#4ade80}.READINGS{color:#fbbf24}.PARTIAL{color:#c084fc}.FOUND{color:#38bdf8}.PROPOSE{color:#94a3b8}.CONJECTURE{color:#38bdf8}.FEEDBACK{color:#a3e635}.ERROR{color:#f87171}
+ .ANSWER{color:#4ade80}.READINGS{color:#fbbf24}.PARTIAL{color:#c084fc}.FOUND{color:#38bdf8}.PROPOSE{color:#94a3b8}.CONJECTURE{color:#38bdf8}.HUNCH{color:#f0abfc}.FEEDBACK{color:#a3e635}.ERROR{color:#f87171}
  form{display:flex;gap:8px;margin-top:8px}
  input{flex:1;padding:10px;background:#171a21;color:#e6e6e6;border:1px solid #262b36;border-radius:8px;font:inherit}
  button{padding:9px 12px;background:#262b36;color:#e6e6e6;border:0;border-radius:8px;cursor:pointer;font:inherit}
