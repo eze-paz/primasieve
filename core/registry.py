@@ -106,6 +106,8 @@ PUBLISHED = {
     "crosscheck": ["CROSSCHECK: PASS"],          # PASS since conjectured_prereg.md: a one-transition program is CONJECTURED
     # ---- guess_prereg.md (GUESS_PLAN.md G1): a labelled guesser of mostly-true patterns, with a record (the crawl store)
     "guess": ["G1: PASS"],
+    # ---- textmodel_prereg.md (GUESS_PLAN.md G4): a counting model of text -- cloze and word similarity (Wiktionary store)
+    "textmodel": ["G4: PASS"],
 }
 
 
