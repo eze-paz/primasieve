@@ -32,7 +32,7 @@ from core.registry import selfcheck
 from core.transcript import TranscriptWorld
 from core.resolve import segment, matches, accept, decline, DECLINED, GLOSS
 import frames
-from frames import realize, parse, canonical, to_frame, fields_of, sources_of, ANSWER, READ, PART, FOUND, PROPOSE, CONJ, META_K, CHECK_K, ACK_K, REQUEST
+from frames import realize, parse, canonical, to_frame, fields_of, sources_of, ANSWER, READ, PART, FOUND, PROPOSE, CONJ, META_K, CHECK_K, ACK_K, REQUEST, OFFER_K, read_as_note
 
 F = Fraction
 TRANSCRIPTS = os.path.join(HERE, "_nldata", "chat")
@@ -94,9 +94,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None):
         self.ledger = ledger if ledger is not None else Ledger()
-        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser)
+        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser, rephraser=rephraser)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
         # persistence (persist_prereg.md, S8): the evidence of earlier sessions is loaded here and saved after every
@@ -192,6 +192,19 @@ class Door:
                 frame = dict(kind=PROPOSE, consulted=[f"residue {len(self.S.goals())}"], action=(f"ask me: {q}" if q else "nothing is open that one answer would settle"))
                 rec.update(kind="PROPOSAL", frame=frame, values=[], sources=["goals"], proposal=q, reply=realize(frame, self.rng))
                 rec["ms"] = round((time.perf_counter() - t0) * 1000, 1); self.records.append(rec); return rec
+            offer = self.records[-1] if low in (YES, NO) and self.records and self.records[-1].get("kind") == OFFER_K else None
+            if offer is not None:                       # the person's word on a guessed READING (didyoumean_prereg.md)
+                off = offer["_fr"]["offer"]
+                if low == YES:
+                    self.S.accept(off)
+                    if self.store:
+                        from core.store import save
+                        save(self.S, self.store)
+                    return self.turn(offer["text"])
+                self.S.decline(off)
+                frame = dict(kind=PROPOSE, consulted=[f"declined reading '{off['word']}' as '{off['sub']}'"], action="rephrase the question")
+                rec.update(kind="FEEDBACK", act="FEEDBACK", frame=frame, values=[], sources=[], feedback=False, reply=realize(frame, self.rng))
+                rec["ms"] = round((time.perf_counter() - t0) * 1000, 1); self.records.append(rec); return rec
             last = self._last_answer() if low in (YES, NO) else None
             if last is not None:
                 rec.update(self._feedback(low == YES, last))
@@ -199,7 +212,8 @@ class Door:
                 parts = self.sentences(text); frames_out, replies, acts = [], [], []
                 for part in parts:
                     fr, frame, act = self._one(part)
-                    frames_out.append(frame); acts.append(act); replies.append(realize(frame, self.rng))
+                    frames_out.append(frame); acts.append(act)
+                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + realize(frame, self.rng))
                 rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
                            sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
@@ -474,7 +488,12 @@ def live_door(seeded, online, store, path, seed):
         researcher = Researcher([WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)],
                                 os.path.join(HERE, "_nldata", "research_live"), df=df)
     from kb_guess import build_guesser                  # guess_prereg.md: the guesser, heard only when nothing known answers
-    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser())
+    rephraser = None                                    # didyoumean_prereg.md: an unread word -> "did you mean ...?" from the text model
+    if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")):
+        from core.textmodel import TextModel
+        from core.rephrase import Rephraser
+        rephraser = Rephraser(TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json")))
+    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser)
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):

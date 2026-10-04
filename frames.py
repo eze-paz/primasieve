@@ -16,6 +16,7 @@ Frame shapes (dicts):
   PROPOSE   {kind, consulted: [str], action: str}
   CONJECTURE{kind, choice: (value, source, confirmed, contradicted), rivals: [...]}
   HUNCH     {kind, phrase, options: [(value, cue, hits, n)], record: (confirmed, contradicted)}   (guess_prereg.md)
+  OFFER     {kind, word, sub, shared}                                                         (didyoumean_prereg.md)
   META      {kind, question, field, content}          CHECK {kind, phrase, value, stated|None, sources}
   ACK       {kind, acts: [(word, act)], offers: [str]}"""
 import os
@@ -31,6 +32,7 @@ ANSWER, READ, PART, FOUND, PROPOSE, CONJ = "ANSWER", "READINGS", "PARTIAL", "FOU
 META_K, CHECK_K, ACK_K = "META", "CHECK", "ACK"          # phase B frames (chat_acts_prereg.md)
 REQUEST = "REQUEST"                                      # the request act (chat_request_prereg.md): an offer, not a guess
 HUNCH = "HUNCH"                                          # a labelled guess with its reason in counts (guess_prereg.md)
+OFFER_K = "OFFER"                                        # a guessed READING offered, never answered (didyoumean_prereg.md)
 SEP = " ; "
 
 # The transcript world's field names, as DATA (core/transcript.py holds no word): the realization words this file
@@ -60,6 +62,7 @@ V_NEXT = ["Next step:", "To resolve this:", "What would settle it:"]
 V_CORRECT = ["Correct me if wrong.", "Say so if that is wrong.", "Tell me if not."]
 V_RATHER = ["rather than", "over", "and not"]
 V_ASKED = ["You asked", "Earlier you asked", "Looking back, you asked"]
+V_CANTREAD = ["I cannot read", "No world of mine reads", "I do not know the word"]
 V_GUESS = ["My guess for", "I am guessing, not reading, for", "A guess, not a fact, for"]
 V_NOT = ["not", "rather than", "and not"]
 V_NOTED = ["Noted", "Understood", "Acknowledged"]
@@ -121,6 +124,9 @@ def realize(frame, rng):
         c, d = frame["record"]
         s = (f"{rng.choice(V_GUESS)} {frame['phrase']}: " + SEP.join(f"{v} (because {h} of {n} with {cue} have that)" for v, cue, h, n in opts)
              + f". (guesser record {c} confirmed, {d} contradicted) {rng.choice(V_CORRECT)}")
+    elif k == OFFER_K:
+        s = (f"{rng.choice(V_CANTREAD)} '{frame['word']}'. Did you mean '{frame['sub']}'? (they share {frame['shared']} contexts in what I "
+             f"have read) Say correct to have it answered, or wrong to decline.")
     elif k == META_K:
         s = f'{rng.choice(V_ASKED)} "{frame["question"]}"; the {frame["field"]} was {frame["content"]}.'
     elif k == CHECK_K:
@@ -156,6 +162,7 @@ RX_CONJ = re.compile(rf"^Probably {RX_REC} {_alt(V_RATHER)} (.+)\. {_alt(V_CORRE
 RX_CONJ1 = re.compile(rf"^Probably {RX_REC}\. {_alt(V_CORRECT)}$")          # no rival (transfer_prereg.md)
 RX_HUNCH = re.compile(rf"^{_alt(V_GUESS)} (.+?): (.+)\. \(guesser record (\d+) confirmed, (\d+) contradicted\) {_alt(V_CORRECT)}$", re.S)
 RX_HOPT = re.compile(r"^(.+?) \(because (\d+) of (\d+) with (.+) have that\)$", re.S)
+RX_OFFER = re.compile(rf"^{_alt(V_CANTREAD)} '(.+?)'\. Did you mean '(.+?)'\? \(they share (\d+) contexts in what I have read\) Say correct to have it answered, or wrong to decline\.$")
 RX_META = re.compile(rf'^{_alt(V_ASKED)} "(.*)"; the (\w+) was (.*)\.$', re.S)
 RX_CHECK_Y = re.compile(rf"^{_alt(V_YES)} (.+?) is (.+?) \({PER} (.+?)\)\.$")
 RX_CHECK_N = re.compile(rf"^{_alt(V_NO)} (.+?) is (.+?) \({PER} (.+?)\), {_alt(V_NOT)} (.+)\.$")
@@ -177,6 +184,8 @@ def parse(text):
             if ": " not in a: return None
             w, lab = a.split(": ", 1); acts.append((w, lab))
         off = m.group(2); return dict(kind=ACK_K, acts=sorted(acts), offers=[] if off == "nothing yet" else off.split(SEP))
+    m = RX_OFFER.match(text)
+    if m: return dict(kind=OFFER_K, word=m.group(1), sub=m.group(2), shared=int(m.group(3)))
     m = RX_HUNCH.match(text)
     if m:
         opts = []
@@ -286,6 +295,7 @@ def fields_of(frame, text):
     elif k == PART: f.update(answer=SEP.join(frame["values"]), support=SEP.join(frame["supports"]) or frame["phrase"])
     elif k == FOUND: f.update(answer=SEP.join(t for t, _ in frame["quotes"]), source=SEP.join(s for _, s in frame["quotes"]))
     elif k == PROPOSE: f.update(answer=frame["action"], source=SEP.join(frame["consulted"]))
+    elif k == OFFER_K: f.update(answer=frame["sub"], support=frame["word"], recallable=False)
     elif k == HUNCH: f.update(answer=SEP.join(o[0] for o in frame["options"]), source="guesser", support=SEP.join(o[1] for o in frame["options"]))
     elif k == CONJ: f.update(answer=frame["choice"][0], source=frame["choice"][1], support=SEP.join(v for v, _, _, _ in frame["rivals"]))
     elif k == CHECK_K: f.update(answer=frame["value"], source=SEP.join(frame["sources"]), support=frame["phrase"])
@@ -404,6 +414,8 @@ def to_frame(fr, world=None, kind_hint=None):
         return dict(kind=ANSWER, phrase=phrase_of(w0, fr["answers"][0][4], syms), values=[str(l) for _, l, _, _, _ in fr["answers"]],
                     supports=[sup_str(s, _labeller(ww, lab)) for (_, _, sups, _, _), ww in zip(fr["answers"], worlds or [world] * len(fr["answers"])) for s in sups[:1]],
                     sources=list(sources))
+    if k == OFFER_K:
+        off = fr["offer"]; return dict(kind=OFFER_K, word=off["word"], sub=off["sub"], shared=off["shared"])
     if k == CONJECTURED and fr.get("guessed"):
         ent, t = fr["guess_target"]; c, d = fr["contest"][0][2], fr["contest"][0][3]
         return dict(kind=HUNCH, phrase=f"the {t} of {ent}", options=[(str(v), cue_str(cue), h, n) for v, (cue, h, n) in fr["guessed"]], record=(c, d))
@@ -492,3 +504,8 @@ def sources_of(fr):
             else: nm = str(c[0]) + ("" if len(c) < 2 or not isinstance(c[1], tuple) else " " + "/".join(map(str, c[1])))
         if nm and nm not in names: names.append(nm)
     return [f"source {n}" for n in names]
+
+
+def read_as_note(pairs):
+    """the sentence that precedes an answer read through kept substitutions (didyoumean_prereg.md)"""
+    return " ".join(f"Reading '{a}' as '{b}', as you confirmed." for a, b in pairs)

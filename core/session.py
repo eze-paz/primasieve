@@ -26,10 +26,13 @@ _shape = shape_of
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None, guesser=None):
+    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None, guesser=None, rephraser=None):
         self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
         self.guesser = guesser       # guess_prereg.md (G1): a labelled source of mostly-true patterns, heard only when nothing known answers
         self.predicted = set()       # (entity, property) whose guess was already checked against a known answer
+        self.rephraser = rephraser   # didyoumean_prereg.md (G3): an unread word -> a reading OFFERED, answered only once confirmed
+        self.subs = {}               # unread word -> the word the person confirmed it means
+        self.declined_subs = set()   # (unread word, offered word) the person refused
         self.transfer = transfer     # transfer_prereg.md (S4): after every teach, words bound in one world are offered to the others by behaviour
         self.researcher = researcher # research_prereg.md: a turn that leaves symbols unread makes the researcher fetch; what comes back is a world
         self.history = []            # [(text, frame)]
@@ -106,6 +109,11 @@ class Session:
                 fr["used"] = _used(fr, w, st)
                 self.history.append((text, fr)); return fr
         recent = frozenset(s for t, _ in self.history[-self.depth:] for s in symbols(t, "LN"))
+        read_as = []
+        if self.subs:                                   # kept substitutions (G3): the turn is read through them, and says so
+            from .rephrase import rewrite
+            new, read_as = rewrite(syms, self.subs)
+            if read_as: text = " ".join(new)
         fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger, shapes=self.shapes(), recent=recent)
         fr["researched"] = []
         if self.researcher is not None and self.researcher.unread_spans(fr):           # whatever the verdict: an unread name beside a context answer is the confabulation this prevents
@@ -126,6 +134,16 @@ class Session:
                 fr = dict(fr, kind=ATTRIBUTED if getattr(w, "attributed", True) else COMMIT, answers=[a], answer_worlds=[w],
                           answer_sources=[srcs], sources=list(srcs), preferred=True)       # the chosen option's sources, not every option's
         if self.guesser is not None: fr = self._guess(fr)
+        if read_as: fr["read_as"] = read_as
+        # G3 (didyoumean_prereg.md): a turn nothing answered -- or, run 2, an answer from computing worlds that left a
+        # content word unread (a guess is not offered over) -- may hold a word that, read as one the worlds know,
+        # changes the question; then the reading is OFFERED and the direct answer, to another question, is withheld
+        if self.rephraser is not None and not read_as and (fr["kind"] not in (COMMIT, ATTRIBUTED, CONJECTURED)
+                                                            or (fr["kind"] in (COMMIT, ATTRIBUTED) and not fr.get("guessed"))):
+            off = self.rephraser.offer(self, fr, self.declined_subs)
+            if off is not None:                         # an OFFER is a reading, never an answer: no value is carried
+                from .rephrase import OFFER
+                fr = dict(fr, kind=OFFER, offer=off, answers=[], answer_worlds=[], answer_sources=[], sources=[])
         fr["self_confirmed"] = self._self_confirm(text, fr) if not fr.get("guessed") else []
         fr["attributed_kind"] = ATTRIBUTED if any(getattr(w, "attributed", True) for w in fr["answer_worlds"]) else COMMIT
         fr["used"] = _used(fr, fr["answer_worlds"][0], fr["answers"][0][4]) if fr["answers"] else []
@@ -238,6 +256,13 @@ class Session:
         sp = min(by, key=rare)
         return sp, " ".join(by[sp][:k]), rare(sp)[:2]
 
+    def accept(self, off):
+        """the person confirmed an OFFER: the substitution is kept (G3)"""
+        self.subs[off["word"]] = off["sub"]
+
+    def decline(self, off):
+        self.declined_subs.add((off["word"], off["sub"]))
+
     def teach(self, question, gold, world=None):
         """the confirmation channel: (question, confirmed answer) -> the world named (or every world that learns)
         re-induces from all its pairs; a binding the new pair contradicts is retracted by the world itself."""
@@ -280,6 +305,7 @@ class Session:
                     teaching=[[q, str(g), getattr(w, "name", None) if w is not None else None] for q, g, w in self.teaching],
                     frames=[dict(f, skeleton=list(f['skeleton']), support=[list(s) for s in f.get('support', [])]) for f in self.frames],
                     accepted=[[list(sy), tp, kd] for sy, tp, kd in self.accepted], declined=[[list(sy), tp, kd] for sy, tp, kd in self.declined],
+                    subs=dict(self.subs), declined_subs=[list(x) for x in sorted(self.declined_subs)],
                     ledger=None if L is None else dict(confirmed=dict(L.confirmed), contradicted=dict(L.contradicted),
                                                        retracted=[[s, list(c) if isinstance(c, (list, tuple)) else c] for s, c in L.retracted]))
 
@@ -290,6 +316,7 @@ class Session:
         self.frames = [dict(f, skeleton=tuple(f['skeleton']), support=[tuple(s) for s in f.get('support', [])]) for f in ev.get("frames", [])]
         self.accepted = [(tuple(sy), tp, kd) for sy, tp, kd in ev.get("accepted", [])]
         self.declined = [(tuple(sy), tp, kd) for sy, tp, kd in ev.get("declined", [])]
+        self.subs = dict(ev.get("subs", {})); self.declined_subs = {tuple(x) for x in ev.get("declined_subs", [])}
         led = ev.get("ledger")
         if led and self.ledger is not None:
             self.ledger.confirmed.clear(); self.ledger.confirmed.update(led.get("confirmed", {}))
