@@ -867,3 +867,15 @@ one-hop subgraph frame): **0/30**, after fixing a nested-name matching defect ("
 "capital" and "city" are diagnostic of no recorded type. With this graph, a sentence the engine can fully vouch for has
 almost no words the graph does not name. Next: bind words to RELATIONS in context (capital of, population rank), not only
 types. Not registered.
+
+### 2026-10-04 -- relation binding (gloss_relbind_prereg.md): NOT PASSED; relation words are 50-70 % reliable, the bar is 90 %
+`gloss_relbind.py`: a word beside a verified mention binds the RELATION linking the headword to that mention, under the
+same 90 % hold and diagnostic tests as types; the voucher then admits "capital" only when the capital relation links the
+two things it stands between, and a meaning test swaps relation words on a fixed pair ("the border city of Cape Verde")
+and requires refusal. Three runs (as registered; amendment 1, merging each relation with its graph-recorded inverse;
+an exploratory lower bar): 8-31 relation bindings at held-out soundness 0.88-0.93, knockout 0-4 -- and of the ten words a
+fluent definition needs, only "seat" binds. The deciding measurement: "capital" right before a place name matches a
+capital link between the two **69 %** of the time; "city" 52 %, "official" 47 %. Quoted definitions stay 0/30, generation
+unchanged with audit 0.000, the meaning test never fires. Every rung of this line ends in the same place: the words are
+noisier than the honesty rule allows. Owner's choice next: reading which entity a word is about inside nested names, or
+admitting words with their measured reliability attached. Not registered.
