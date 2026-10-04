@@ -853,3 +853,17 @@ the typed voucher emits "Portuguese: an extinct language of portugal" -- "extinc
 because it opens glosses of languages. Type binding learns a word's selectional restriction, not its content; the
 unsupported-content audit rose 0.80 -> 0.89. Next rule, registered in the prereg: a content word is vouched only if it
 contributes a type strictly more specific than the slot's own and not already contributed. Not registered.
+
+### 2026-10-04 -- specificity, glue from form (H2), subgraph frames (H1) (gloss_compose_prereg.md): S passes; H1 and H2 do not; the conflict is the result
+`gloss_compose.py`, three runs, three recorded amendments. **The specificity rule passes in every run**: a word keeps a type
+only if it is diagnostic of it (appears beside at least 20 % of the entities carrying it); unsupported content falls to
+**0.000** and the false "extinct" / "neighborhood" families to 0, at 16-22/30 coverage -- generation is honest at word
+level. **H2** (content from the world, glue from a class-bigram form model, glue restricted to type-claim-free words):
+meaning preserved 16/16 and **0/16 accepted by the reader** -- prepositions are claim-free with respect to types and not to
+relations ("in ukraine" IS the construction "in {E:country}"); the independent judge scored the glued replies as typical as
+real text, a known artefact of bits-per-token judges rewarding "of the". **H1** (quote whole attested sentences under a
+one-hop subgraph frame): **0/30**, after fixing a nested-name matching defect ("province of Thailand" swallowed
+"Thailand"); the decisive rejection is "Praia: The capital city of Cape Verde" refused by the specificity voucher, because
+"capital" and "city" are diagnostic of no recorded type. With this graph, a sentence the engine can fully vouch for has
+almost no words the graph does not name. Next: bind words to RELATIONS in context (capital of, population rank), not only
+types. Not registered.

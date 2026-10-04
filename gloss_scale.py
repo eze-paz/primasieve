@@ -168,6 +168,12 @@ class Scale(GT.Rung2):
                 end = start
                 while end in m and m[end][2] == start: end += 1
                 spans[start][1] = end
+            if not spans:
+                # amendment (gloss_compose_prereg.md, recorded): the value's name may sit INSIDE a longer mention -- 'province
+                # of Thailand' (the headword's type) swallowed 'Thailand' under longest-first matching; search it directly
+                ls = symbols(self.C.label(other), "LN")
+                for i0 in range(len(syms) - len(ls) + 1):
+                    if ls and syms[i0:i0 + len(ls)] == ls: spans[i0] = [i0, i0 + len(ls)]
             for start, (i, end) in spans.items():
                 for w in range(1, self.W + 1):
                     left = tuple(syms[max(0, i - w):i]); right = tuple(syms[end:end + w])
