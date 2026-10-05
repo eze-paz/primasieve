@@ -879,3 +879,15 @@ capital link between the two **69 %** of the time; "city" 52 %, "official" 47 %.
 unchanged with audit 0.000, the meaning test never fires. Every rung of this line ends in the same place: the words are
 noisier than the honesty rule allows. Owner's choice next: reading which entity a word is about inside nested names, or
 admitting words with their measured reliability attached. Not registered.
+
+### 2026-10-05 -- attachment (gloss_attach_prereg.md): "capital" now means capital; quoting blocked one step earlier
+`gloss_attach.py`: four rules for which thing a word is about -- skip the headword's own class words (A1), skip namesake
+mentions (A2), attach each gloss to the sense of the headword it describes (A3), nearest anchor only (A4) -- with the
+string-hash seed fixed so the 30 questions are identical across runs. **"Capital" before a place now matches a capital
+link 0.966 of the time (was 0.693)**, almost all from A1 ("capital city of Scotland": "city" is Edinburgh's own class and
+was taking the word); "capital" binds the capital relation at held-out soundness 0.965. A subject-swap meaning test with
+the full checker on the real words ("capital praia" said of Macau instead of Cape Verde) refuses **468 of 469** swaps and
+accepts all 74 true subjects -- the first relation word in the project with a verified meaning. (A first version of that
+test was circular and is retracted in the prereg.) Still failing: only 2 of 10 relation words bind, and quoted
+definitions stay 0/30 because the older reply check does not consult relation bindings when it looks for the asked edge.
+Next: let a relation-bound word whose relation holds state the edge in the reply check. Not registered.
