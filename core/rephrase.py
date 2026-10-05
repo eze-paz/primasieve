@@ -32,6 +32,20 @@ class Rephraser:
         self.common = {w for w, c in model.uni.most_common(common)}
         self._alone = {}
 
+    def _consolidated(self, session, u):
+        """H8: kept substitutions (w -> s) whose w is in u's family -> [(candidate, -1, (w, s))]: s with the same
+        alternation first, then s"""
+        if not getattr(self, "consolidate", False): return []          # consolidate_prereg.md: off unless asked (run 2 failed)
+        out = []
+        for w, sub in getattr(session, "subs", {}).items():
+            fam = family(w, u)
+            if fam is None: continue
+            tw, tu = fam
+            if tw and sub.endswith(tw): out.append((sub[:len(sub) - len(tw)] + tu, -1, (w, sub)))
+            elif not tw and tu: out.append((sub + tu, -1, (w, sub)))
+            out.append((sub, -1, (w, sub)))
+        return out
+
     def read_alone(self, worlds, sym):
         if sym not in self._alone:
             ok = False
@@ -57,7 +71,7 @@ class Rephraser:
         unread = [i for i, s in enumerate(syms) if i not in read and s not in self.common and s[:1].isalpha()]
         for i in unread:
             tried = 0
-            for c, shared in self.model.similar(syms[i], self.candidates):
+            for c, shared, src in self._consolidated(session, syms[i]) + [(c, n, None) for c, n in self.model.similar(syms[i], self.candidates)]:
                 if (syms[i], c) in declined or c in syms or not self.read_alone(session.worlds, c): continue
                 tried += 1
                 if tried > self.tries: break
@@ -72,8 +86,22 @@ class Rephraser:
                         w2, st2 = f2["answer_worlds"][0], f2["answers"][0][4]
                         if not any(a <= i < b for a, b in _spans(w2, st2)): continue
                         if {str(a[1]).lower() for a in f2["answers"]} == direct: continue
-                    return dict(pos=i, word=syms[i], sub=c, shared=shared, text=text, original=" ".join(syms))
+                    out = dict(pos=i, word=syms[i], sub=c, shared=shared, text=text, original=" ".join(syms))
+                    if src is not None: out["episode"] = src
+                    return out
         return None
+
+
+def family(a, b):
+    """consolidate_prereg.md: (alternation tails) if a and b share a stem -- the shorter >= 4 long, the longer beginning
+    with all but at most its last two characters -- else None"""
+    if a == b: return None
+    s, l = (a, b) if len(a) <= len(b) else (b, a)
+    if len(s) < 4: return None
+    for cut in (0, 1, 2):
+        stem = s[:len(s) - cut]
+        if len(stem) >= 4 and l.startswith(stem): return a[len(stem):], b[len(stem):]      # run 2: a stem is >= 4 long
+    return None
 
 
 def rewrite(syms, subs):

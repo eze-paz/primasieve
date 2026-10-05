@@ -87,3 +87,21 @@ Usage-based licensing is the rule that fixes word order (H10b: 0 % reversed, and
 and a child learns its attachments from millions of sentences. The order-carrying version of H10c (a chain attachment
 with its order, learned from many more read phrases -- e.g. the noun phrases of definitions the engine can read) is the
 next step. Not registered.
+
+## H10d -- EXPOSURE (declared after H10c, before its run)
+Claim: H10b's strict licensing fails on coverage for lack of exposure, not for being wrong. Exposure: windows of 3-6
+symbols from Wiktionary example sentences and definitions that contain a relation word (the crawl's property labels,
+the tables' headers) are read by the engine; a window read as one COMMIT/ATTRIBUTED value from a computing world with
+every open-class symbol used is a READ PHRASE, and its attachments (H10b's: one closed symbol or none) are counted
+beside the questions'. Up to 20,000 windows tried, seeded. Gates: W2d half B unlicensed <= 2 % (licence from half A +
+the read phrases); W3d reversed <= 10 %; W4d coverage >= 60 %; W5d knockout (windows' symbols shuffled before reading)
+does not meet W3d and W4d together.
+
+## H10d run (2026-10-05): NOT PASSED -- no exposure was gathered
+20,000 windows from Wiktionary sentences, each containing a relation word, were read: **0** read as one value from a
+computing world with every open-class symbol used. With no added exposure the licence is H10b's (W3d reversed 0/129, W4d
+10/18, W2d 32/54 unlicensed); the knockout is identical for the same reason. The test of "exposure is the bottleneck"
+could not run, and its failure is itself the finding: the engine can read NONE of 20,000 phrases of ordinary dictionary
+prose as a complete, used reading -- its reader covers the questions it was built for, and real text almost not at all
+(the gloss line's 0.34 measures word coverage; this measures whole-phrase readings, and finds zero). Comprehension of
+real text is the floor every fluency rung stands on.
