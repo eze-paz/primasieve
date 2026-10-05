@@ -16,6 +16,8 @@ from textmodel import MODEL, KAIKKI
 T0 = time.time()
 ALICE = os.path.join(HERE, "_nldata", "alice.txt")
 SLOT = None                      # a slot in a skeleton (never a symbol)
+LICENSE = False                  # wordorder_prereg.md H10b: require attested attachments
+ORDER = None                     # wordorder_prereg.md (H10): a core.wordorder.WordOrder; a re-read out of order is rejected
 
 
 def say(s=""): print(str(s).encode("ascii", "replace").decode(), flush=True)
@@ -125,7 +127,7 @@ def main():
     def read(side):
         if side not in cache:
             f = reason(side, worlds, df, cats="LN"); ok = None
-            if f["kind"] in (COMMIT, ATTRIBUTED) and len(f.get("answers", [])) == 1 and not any(getattr(w, "quotes", False) for w in f["answer_worlds"]):
+            if f["kind"] in (COMMIT, ATTRIBUTED) and len(f.get("answers", [])) == 1 and not any(getattr(w, "quotes", False) for w in f["answer_worlds"])                     and not (ORDER is not None and (ORDER.violations(f) or (LICENSE and ORDER.licensed(f, wide=LICENSE == "wide")))):
                 ss = f["syms"]; usedp = {p for a, w in zip(f["answers"], f["answer_worlds"]) for i, j in _spans(w, a[4]) for p in range(i, j)}
                 if all(p in usedp for p in range(len(ss)) if ss[p] not in closed): ok = str(f["answers"][0][1]).lower()
             cache[side] = ok
