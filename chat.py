@@ -642,7 +642,13 @@ def serve(port=8766, seeded=False, online=False, store=None):
                 self._send(200, json.dumps(_jsonable({"reply": rec["reply"], "kind": rec.get("kind"), "frame": rec["frame"]["kind"],
                                                       "sources": rec.get("sources", []), "ms": rec["ms"], "error": rec.get("error")}), ensure_ascii=False))
             elif self.path == "/api/new":
-                def reset(): state["door"] = Door(state["worlds"], state["df"], transcript=path, seed=int(time.time()))
+                def reset():
+                    # a new conversation keeps every ability of the live door (it used to rebuild a plain Door, silently
+                    # dropping the store, transfer, research, the guesser, "did you mean", integration and aligned replies)
+                    d0 = state["door"]
+                    state["door"] = Door(d0.S.worlds, state["df"], transcript=path, seed=int(time.time()), store=d0.store,
+                                         transfer=d0.S.transfer, researcher=d0.S.researcher, guesser=d0.S.guesser,
+                                         rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent)
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 

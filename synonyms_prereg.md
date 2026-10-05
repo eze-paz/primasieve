@@ -47,3 +47,9 @@ Not registered. Stands: the dictionary's own statements of sameness triple "did 
 drive it in the live chat, whose offers say "(the dictionary gives them as the same)". Refuted: synonymy from two-sided
 slots of a top-5 count table. The distributional idea itself is not dead -- the table pruned exactly the information it
 needed (a slot's rare fillers) -- but that is a different experiment.
+
+### After the run (2026-10-05, not a re-verdict)
+In the LIVE chat the dictionary arm's alphabetical order spent all eight tries on rare synonyms the live search reads as
+entities ("agg", "cluster") before "total". The dictionary arm is now ordered commonest-first (a corpus count). The same
+gate, rerun with that order: combined 0.117; Y2 **18/70 = 26 %**; Y3 9 %. Recorded as an observation after the registered
+run; the verdict above stands.

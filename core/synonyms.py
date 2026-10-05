@@ -34,7 +34,8 @@ class Synonyms:
         contexts)"""
         out, seen = [], {w}
         for arm in self.arms:
-            if arm == "dictionary": got = [(v, 0) for v in sorted(self.same.get(w, ()))]       # 0: a statement, not a count
+            # 0: a statement, not a count; commonest first -- a person means a common word more often than a rare one
+            if arm == "dictionary": got = [(v, 0) for v in sorted(self.same.get(w, ()), key=lambda v: (-self.uni.get(v, 0), v))]
             elif arm == "two-sided": got = self.two_sided(w, k)
             else: got = self.model.similar(w, k)
             for v, n in got:
