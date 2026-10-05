@@ -94,8 +94,10 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None):
         self.ledger = ledger if ledger is not None else Ledger()
+        self.fluent = set(fluent) if fluent is not None else None      # align_prereg.md (H6+H9): closed-class symbols, or None = frame replies
+        self.aligned_n = self.aligned_refused = 0
         self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser, rephraser=rephraser, integrate=integrate)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
@@ -176,6 +178,32 @@ class Door:
             return dict(kind=REQUEST, topic=syms[topic], offers=[c[len("source "):] for c in sources_of(fr)]), REQUEST, None
         return dict(frame, guess=True, topic=syms[topic]), "GUESS", (syms, topic)
 
+    def _aligned(self, text, fr):
+        """align_prereg.md: the answer in the person's own words -- the question with its question word replaced by the
+        value -- if the rest of the question, read again without context, gives that value with every open-class symbol
+        used (the monitor). -> sentence with its source name, or None."""
+        from core.reason import _spans
+        if fr["kind"] not in (ATTRIBUTED, COMMIT) or len(fr.get("answers", [])) != 1 or fr.get("guessed"): return None
+        w = fr["answer_worlds"][0]
+        if getattr(w, "quotes", False) or getattr(w, "transcript", False): return None
+        syms = list(fr["syms"]); used = {p for i, j in _spans(w, fr["answers"][0][4]) for p in range(i, j)}
+        if len(syms) < 3 or 0 in used or 1 in used: return None
+        value = str(fr["answers"][0][1]); rest = syms[2:]
+        vs = symbols(value, "LN")
+        if vs and any(syms[i:i + len(vs)] == vs for i in range(len(syms))): return None     # the value is named: a check, not a lookup
+        f2 = reason(" ".join(rest), self.S.worlds, self.S.df, cats="LN")
+        ok = f2["kind"] in (ATTRIBUTED, COMMIT) and len(f2.get("answers", [])) == 1 and str(f2["answers"][0][1]).lower() == value.lower()             and not getattr(f2["answer_worlds"][0], "quotes", False)
+        if ok:
+            u2 = {p for i, j in _spans(f2["answer_worlds"][0], f2["answers"][0][4]) for p in range(i, j)}
+            ok = all(p in u2 for p, x in enumerate(f2["syms"]) if x not in self.fluent and x[:1].isalpha())
+        if not ok: self.aligned_refused += 1; return None
+        words = re.findall(r"[^\W_]+", text)
+        if [x.lower() for x in words] != syms: words = syms
+        out = value + " " + " ".join(words[1:])
+        self.aligned_n += 1
+        src = "; ".join(fr.get("sources", [])) or getattr(w, "name", "source")
+        return out[:1].upper() + out[1:] + f". ({src})"
+
     def _world_of(self, rec):
         """the world that answered: teach re-induces only it (a KG has nothing to induce; a table or exec world
         re-induces from a pair it already satisfies)."""
@@ -213,7 +241,9 @@ class Door:
                 for part in parts:
                     fr, frame, act = self._one(part)
                     frames_out.append(frame); acts.append(act)
-                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + realize(frame, self.rng))
+                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") else None
+                    if said: rec["aligned"] = True
+                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or realize(frame, self.rng)))
                 rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
                            sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
@@ -495,7 +525,8 @@ def live_door(seeded, online, store, path, seed):
         from core.session import Integrator
         tm = TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json"))
         rephraser = Rephraser(tm); integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
-    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator)
+    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
+                fluent=integrator.common if integrator is not None else None)        # align_prereg.md: replies in the person's words
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
