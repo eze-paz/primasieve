@@ -155,3 +155,25 @@ this project has always put them.
 - From the literature, not fetched here: Levelt, *Speaking* (1989); McClelland, McNaughton & O'Reilly (1995),
   complementary learning systems; Frank & Goodman (2012), Rational Speech Act; Grice (1975); Saffran, Aslin & Newport
   (1996), statistical learning; Goldberg, *Constructions* (1995).
+
+## 7. Results of the loop (2026-10-05) -- every hypothesis tested, one prereg each
+
+| hypothesis | verdict | what stands | what failed |
+|---|---|---|---|
+| H3 integration (integrate_prereg.md) | NOT PASSED | paraphrase wrong facts **25 -> 0** | 16 % of correct answers owe a shape-read word (how / related / many / between) |
+| H1+H2+H7 speak (speak_prereg.md) | **PASS** (amended) | wording learned with no truth check (88/159 skeletons from book quotations) stays true under the re-read: false assignments 56 % -> 0 | the reader is order-blind: 46 % of accepted wordings reverse the order |
+| H6+H9 aligned replies (align_prereg.md) | NOT PASSED (58 % vs 60 %) | answers in the person's own words, 43 % of the old length, evidence still behind "why" (20/20) | coverage one point under the bar |
+| H5 synonyms (synonyms_prereg.md) | NOT PASSED (24 % vs 25 %) | dictionary statements of sameness: "did you mean" 8 % -> 24 % | two-sided slots refuted (0.011) |
+| H10 word order (wordorder_prereg.md, 4 runs) | NOT PASSED | licensing only attested attachments: reversed wordings **46 % -> 0 %**, chosen wordings read as English | coverage 10/18 from 96 questions; exposure from dictionary prose: **0 of 20,000 phrases readable** |
+| H4 chunks (chunks_prereg.md) | NOT PASSED (2.7x vs 3x) | counting alone finds real units (united states, hong kong); none from shuffled text | a third are the corpus's boilerplate |
+| H8 consolidation (consolidate_prereg.md) | NOT PASSED (run 1 invalid) | -- | spelling families are the wrong unit (1 %, 352/541 false offers) |
+
+**The finding of the loop.** Every rung that produces language now keeps the engine honest -- nothing it says has been
+false in any of these tests -- and the wording got shorter, aligned and partly learned from prose. Two walls remain, and
+they are the same wall seen twice: the reader is order-blind (H10), and it can read almost no real text (H10d: 0 of
+20,000 phrases). Fluent speech needs a monitor that understands sentences, and the monitor is the reader. **The next
+campaign is comprehension: a reader of ordinary sentences, order-aware, learned from exposure** -- the place where the
+brain's language network spends its millions of sentences, and where this engine has spent 96.
+
+The live chat now has: the guesser, "did you mean" with dictionary synonyms, integration (H3), and answers in the
+person's own words (H6).
