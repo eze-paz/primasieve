@@ -125,8 +125,8 @@ def realize(frame, rng):
         s = (f"{rng.choice(V_GUESS)} {frame['phrase']}: " + SEP.join(f"{v} (because {h} of {n} with {cue} have that)" for v, cue, h, n in opts)
              + f". (guesser record {c} confirmed, {d} contradicted) {rng.choice(V_CORRECT)}")
     elif k == OFFER_K:
-        s = (f"{rng.choice(V_CANTREAD)} '{frame['word']}'. Did you mean '{frame['sub']}'? (they share {frame['shared']} contexts in what I "
-             f"have read) Say correct to have it answered, or wrong to decline.")
+        why = "the dictionary gives them as the same" if frame["shared"] == 0 else f"they share {frame['shared']} contexts in what I have read"
+        s = f"{rng.choice(V_CANTREAD)} '{frame['word']}'. Did you mean '{frame['sub']}'? ({why}) Say correct to have it answered, or wrong to decline."
     elif k == META_K:
         s = f'{rng.choice(V_ASKED)} "{frame["question"]}"; the {frame["field"]} was {frame["content"]}.'
     elif k == CHECK_K:
@@ -162,7 +162,7 @@ RX_CONJ = re.compile(rf"^Probably {RX_REC} {_alt(V_RATHER)} (.+)\. {_alt(V_CORRE
 RX_CONJ1 = re.compile(rf"^Probably {RX_REC}\. {_alt(V_CORRECT)}$")          # no rival (transfer_prereg.md)
 RX_HUNCH = re.compile(rf"^{_alt(V_GUESS)} (.+?): (.+)\. \(guesser record (\d+) confirmed, (\d+) contradicted\) {_alt(V_CORRECT)}$", re.S)
 RX_HOPT = re.compile(r"^(.+?) \(because (\d+) of (\d+) with (.+) have that\)$", re.S)
-RX_OFFER = re.compile(rf"^{_alt(V_CANTREAD)} '(.+?)'\. Did you mean '(.+?)'\? \(they share (\d+) contexts in what I have read\) Say correct to have it answered, or wrong to decline\.$")
+RX_OFFER = re.compile(rf"^{_alt(V_CANTREAD)} '(.+?)'\. Did you mean '(.+?)'\? \((?:they share (\d+) contexts in what I have read|the dictionary gives them as the same)\) Say correct to have it answered, or wrong to decline\.$")
 RX_META = re.compile(rf'^{_alt(V_ASKED)} "(.*)"; the (\w+) was (.*)\.$', re.S)
 RX_CHECK_Y = re.compile(rf"^{_alt(V_YES)} (.+?) is (.+?) \({PER} (.+?)\)\.$")
 RX_CHECK_N = re.compile(rf"^{_alt(V_NO)} (.+?) is (.+?) \({PER} (.+?)\), {_alt(V_NOT)} (.+)\.$")
@@ -185,7 +185,7 @@ def parse(text):
             w, lab = a.split(": ", 1); acts.append((w, lab))
         off = m.group(2); return dict(kind=ACK_K, acts=sorted(acts), offers=[] if off == "nothing yet" else off.split(SEP))
     m = RX_OFFER.match(text)
-    if m: return dict(kind=OFFER_K, word=m.group(1), sub=m.group(2), shared=int(m.group(3)))
+    if m: return dict(kind=OFFER_K, word=m.group(1), sub=m.group(2), shared=int(m.group(3)) if m.group(3) else 0)
     m = RX_HUNCH.match(text)
     if m:
         opts = []

@@ -524,7 +524,10 @@ def live_door(seeded, online, store, path, seed):
         from core.rephrase import Rephraser
         from core.session import Integrator
         tm = TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json"))
-        rephraser = Rephraser(tm); integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
+        from core.synonyms import Synonyms
+        from kb_synonyms import load_same
+        integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
+        rephraser = Rephraser(Synonyms(tm, load_same(integrator.common)))    # synonyms_prereg.md (H5): the dictionary's synonyms first
     return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
                 fluent=integrator.common if integrator is not None else None)        # align_prereg.md: replies in the person's words
 
