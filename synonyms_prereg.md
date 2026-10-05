@@ -53,3 +53,7 @@ In the LIVE chat the dictionary arm's alphabetical order spent all eight tries o
 entities ("agg", "cluster") before "total". The dictionary arm is now ordered commonest-first (a corpus count). The same
 gate, rerun with that order: combined 0.117; Y2 **18/70 = 26 %**; Y3 9 %. Recorded as an observation after the registered
 run; the verdict above stands.
+Then in the live chat the dictionary arm alone still used up the tries ("total" for "aggregate" comes from the
+NEIGHBOURS arm, and every rare dictionary synonym is readable online). The arms now take turns, one candidate each. Same
+gate rerun: combined 0.082, Y2 18/71 = 25 %, Y3 9 %; live: "what is the aggregate revenue in the south" -> "Did you mean
+'total'? (they share 4 contexts ...)" -> "correct" -> answered and kept. Observation after the verdict; the verdict stands.

@@ -32,13 +32,17 @@ class Synonyms:
     def similar(self, w, k=10):
         """-> [(symbol, count)] in arm order; the count is the arm's own (0 for a dictionary statement, shared slots, shared
         contexts)"""
-        out, seen = [], {w}
+        lists = []
         for arm in self.arms:
             # 0: a statement, not a count; commonest first -- a person means a common word more often than a rare one
-            if arm == "dictionary": got = [(v, 0) for v in sorted(self.same.get(w, ()), key=lambda v: (-self.uni.get(v, 0), v))]
-            elif arm == "two-sided": got = self.two_sided(w, k)
-            else: got = self.model.similar(w, k)
-            for v, n in got:
-                if v not in seen: seen.add(v); out.append((v, n))
-                if len(out) >= k: return out
+            if arm == "dictionary": lists.append([(v, 0) for v in sorted(self.same.get(w, ()), key=lambda v: (-self.uni.get(v, 0), v))])
+            elif arm == "two-sided": lists.append(self.two_sided(w, k))
+            else: lists.append(self.model.similar(w, k))
+        # the arms take turns (one candidate each, in arm order): a long list from one arm cannot use up every try
+        out, seen = [], {w}
+        for rank in range(max((len(l) for l in lists), default=0)):
+            for l in lists:
+                if rank < len(l) and l[rank][0] not in seen:
+                    seen.add(l[rank][0]); out.append(l[rank])
+                    if len(out) >= k: return out
         return out
