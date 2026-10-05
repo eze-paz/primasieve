@@ -108,6 +108,8 @@ PUBLISHED = {
     "guess": ["G1: PASS"],
     # ---- textmodel_prereg.md (GUESS_PLAN.md G4): a counting model of text -- cloze and word similarity (Wiktionary store)
     "textmodel": ["G4: PASS"],
+    # ---- speak_prereg.md (FLUENCY H1+H2+H7): wording learned from any text, claims checked by re-reading
+    "speak": ["SPEAK: PASS"],
 }
 
 
