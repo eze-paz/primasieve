@@ -94,9 +94,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False):
         self.ledger = ledger if ledger is not None else Ledger()
-        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser, rephraser=rephraser)
+        self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser, rephraser=rephraser, integrate=integrate)
         self.rng = random.Random(seed); self.transcript = transcript; self.records = []
         if transcript: os.makedirs(os.path.dirname(transcript), exist_ok=True)
         # persistence (persist_prereg.md, S8): the evidence of earlier sessions is loaded here and saved after every
@@ -488,12 +488,14 @@ def live_door(seeded, online, store, path, seed):
         researcher = Researcher([WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)],
                                 os.path.join(HERE, "_nldata", "research_live"), df=df)
     from kb_guess import build_guesser                  # guess_prereg.md: the guesser, heard only when nothing known answers
-    rephraser = None                                    # didyoumean_prereg.md: an unread word -> "did you mean ...?" from the text model
+    rephraser = integrator = None                       # didyoumean_prereg.md: an unread word -> "did you mean ...?" from the text model
     if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")):
         from core.textmodel import TextModel
         from core.rephrase import Rephraser
-        rephraser = Rephraser(TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json")))
-    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser)
+        from core.session import Integrator
+        tm = TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json"))
+        rephraser = Rephraser(tm); integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
+    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator)
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):

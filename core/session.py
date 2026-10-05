@@ -26,10 +26,11 @@ _shape = shape_of
 
 
 class Session:
-    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None, guesser=None, rephraser=None):
+    def __init__(self, worlds, df=None, depth=3, ledger=None, deny_words=(), transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False):
         self.worlds = list(worlds); self.df = df; self.depth = depth; self.ledger = ledger
         self.guesser = guesser       # guess_prereg.md (G1): a labelled source of mostly-true patterns, heard only when nothing known answers
         self.predicted = set()       # (entity, property) whose guess was already checked against a known answer
+        self.integrate = integrate   # integrate_prereg.md (H3): an answer that leaves a content word unintegrated is PARTIAL
         self.rephraser = rephraser   # didyoumean_prereg.md (G3): an unread word -> a reading OFFERED, answered only once confirmed
         self.subs = {}               # unread word -> the word the person confirmed it means
         self.declined_subs = set()   # (unread word, offered word) the person refused
@@ -144,6 +145,7 @@ class Session:
             if off is not None:                         # an OFFER is a reading, never an answer: no value is carried
                 from .rephrase import OFFER
                 fr = dict(fr, kind=OFFER, offer=off, answers=[], answer_worlds=[], answer_sources=[], sources=[])
+        if self.integrate and fr["kind"] in (COMMIT, ATTRIBUTED) and fr.get("answers"): fr = self._integrated(fr)
         fr["self_confirmed"] = self._self_confirm(text, fr) if not fr.get("guessed") else []
         fr["attributed_kind"] = ATTRIBUTED if any(getattr(w, "attributed", True) for w in fr["answer_worlds"]) else COMMIT
         fr["used"] = _used(fr, fr["answer_worlds"][0], fr["answers"][0][4]) if fr["answers"] else []
@@ -255,6 +257,23 @@ class Session:
         rare = lambda sp: (min(self.df(x) for x in syms[sp[0]:sp[1]]) if self.df is not None else 0, -(sp[1] - sp[0]), sp[0])
         sp = min(by, key=rare)
         return sp, " ".join(by[sp][:k]), rare(sp)[:2]
+
+    def _integrated(self, fr, every=False):
+        """H3: the content positions (outside `integrate.common`, the corpus's commonest symbols; `every` = the knockout) that no
+        answer's structure uses -> PARTIAL naming them. A quoted answer and a labelled guess are left as they are."""
+        from .reason import _spans
+        if fr.get("guessed") or all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", [])): return fr
+        syms = fr["syms"]; n = len(syms)
+        common = getattr(self.integrate, "common", None) if not isinstance(self.integrate, bool) else None
+        if common is None and not every: return fr
+        # run 2: content = a symbol outside the corpus's commonest symbols (a count over all text read, not a per-turn median)
+        content = [p for p in range(n) if every or syms[p] not in common]
+        used = set()
+        for a, w in zip(fr["answers"], fr["answer_worlds"]):
+            for i, j in _spans(w, a[4]): used.update(range(i, j))
+        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha()]
+        if not missing: return fr
+        return dict(fr, kind=PARTIAL, missing=missing, integrated=False)
 
     def accept(self, off):
         """the person confirmed an OFFER: the substitution is kept (G3)"""
@@ -400,3 +419,9 @@ class _GuessWorld:
     def spans_of(self, st): return []
 
     def owns(self, r): return False
+
+
+class Integrator:
+    """integrate_prereg.md (H3): what the integration rule counts as a function symbol -- a set from a corpus count
+    (the text model's commonest symbols), never a list written here"""
+    def __init__(self, common): self.common = set(common)
