@@ -32,6 +32,8 @@ from core.registry import selfcheck
 from core.transcript import TranscriptWorld
 from core.resolve import segment, matches, accept, decline, DECLINED, GLOSS
 import frames
+from frames import SEP
+from core.constructions import FORWARD
 from frames import realize, parse, canonical, to_frame, fields_of, sources_of, ANSWER, READ, PART, FOUND, PROPOSE, CONJ, META_K, CHECK_K, ACK_K, REQUEST, OFFER_K, read_as_note
 
 F = Fraction
@@ -94,8 +96,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None, reader=None):
         self.ledger = ledger if ledger is not None else Ledger()
+        self.reader = reader                     # statements_prereg.md (C4): a statement is read and checked against the store
         self.fluent = set(fluent) if fluent is not None else None      # align_prereg.md (H6+H9): closed-class symbols, or None = frame replies
         self.aligned_n = self.aligned_refused = 0
         self.S = Session(worlds, df, ledger=self.ledger, deny_words=frames.DENY, transfer=transfer, researcher=researcher, guesser=guesser, rephraser=rephraser, integrate=integrate)
@@ -178,6 +181,31 @@ class Door:
             return dict(kind=REQUEST, topic=syms[topic], offers=[c[len("source "):] for c in sources_of(fr)]), REQUEST, None
         return dict(frame, guess=True, topic=syms[topic]), "GUESS", (syms, topic)
 
+    def _statement(self, text):
+        """statements_prereg.md: read the turn as a statement; SUPPORTED / CONTRADICTED -> the CHECK frame over the store's
+        own values; UNKNOWN -> what was read and that it cannot be checked; UNREAD -> None (the turn keeps its reply)"""
+        verdict, res = self.reader.check(text)
+        if verdict == "UNREAD": return None
+        if verdict == "UNKNOWN" and not any(v == "UNKNOWN" for _, v in res): return None
+        st = self.reader.store; lab = lambda q: st.lab.get(q, q)
+        for pr, v in res:
+            if v != verdict: continue
+            p, d = st.canon(*pr["lab"])
+            pick = [(qa, qb) for qa, qb in pr["pairs"] if (st.holds({qa}, {qb}, p, d) if v == "SUPPORTED" else st.contradicts(qa, qb, p, d))] or pr["pairs"]
+            qa, qb = pick[0]
+            S, O = (qa, qb) if d == FORWARD else (qb, qa)
+            if lab(p).endswith(" of") and st.inverse.get(p):          # "capital of" is shown through its inverse, "capital"
+                p = st.inverse[p]; S, O = O, S
+            phrase = f"the {lab(p)} of {lab(S)}"
+            if v == "SUPPORTED":
+                return dict(kind=CHECK_K, phrase=phrase, value=lab(O), stated=None, sources=["Wikidata store"])
+            if v == "CONTRADICTED":
+                vals = sorted(lab(x) for x in st.claims.get(S, {}).get(p, ()) if st.named(x))
+                if not vals: return None
+                return dict(kind=CHECK_K, phrase=phrase, value=SEP.join(vals[:3]), stated=lab(O), sources=["Wikidata store"])
+            return dict(kind=PROPOSE, consulted=[f"read {lab(S)} -{lab(p)}-> {lab(O)}"], action="give a source that holds it; I cannot check it")
+        return None
+
     def _aligned(self, text, fr):
         """align_prereg.md: the answer in the person's own words -- the question with its question word replaced by the
         value -- if the rest of the question, read again without context, gives that value with every open-class symbol
@@ -240,6 +268,12 @@ class Door:
                 parts = self.sentences(text); frames_out, replies, acts = [], [], []
                 for part in parts:
                     fr, frame, act = self._one(part)
+                    echo = fr["kind"] in (ATTRIBUTED, COMMIT) and any(symbols(str(x[1]), "LN") and " ".join(symbols(str(x[1]), "LN")) in " ".join(fr["syms"])
+                                                                       for x in fr.get("answers", []))
+                    gloss = fr["kind"] in (ATTRIBUTED, COMMIT) and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", []))
+                    if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss):
+                        checked = self._statement(part)
+                        if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = True
                     frames_out.append(frame); acts.append(act)
                     said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") else None
                     if said: rec["aligned"] = True
@@ -528,8 +562,15 @@ def live_door(seeded, online, store, path, seed):
         from kb_synonyms import load_same
         integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
         rephraser = Rephraser(Synonyms(tm, load_same(integrator.common)))    # synonyms_prereg.md (H5): the dictionary's synonyms first
+    reader = None                                       # statements_prereg.md (C4): statements read and checked against the store
+    try:
+        import kb_constructions as KC
+        if os.path.exists(KC.SAVED) and integrator is not None:
+            reader = KC.Reader(KC.Store(), KC.load(), {w for w, c in tm.uni.most_common(1000)})
+    except Exception:
+        reader = None
     return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
-                fluent=integrator.common if integrator is not None else None)        # align_prereg.md: replies in the person's words
+                fluent=integrator.common if integrator is not None else None, reader=reader)        # align_prereg.md: replies in the person's words
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
@@ -648,7 +689,7 @@ def serve(port=8766, seeded=False, online=False, store=None):
                     d0 = state["door"]
                     state["door"] = Door(d0.S.worlds, state["df"], transcript=path, seed=int(time.time()), store=d0.store,
                                          transfer=d0.S.transfer, researcher=d0.S.researcher, guesser=d0.S.guesser,
-                                         rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent)
+                                         rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader)
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 
