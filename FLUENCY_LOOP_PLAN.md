@@ -42,8 +42,11 @@ automatic.
   still at 0.
 - **Change course** when a line stalls (two hypotheses in a row move it < 3 points): the line needs a NEW CAPABILITY, not a
   tweak -- write a short capability plan (like COMPREHENSION_PLAN.md) and start it as the next phase.
-- **Stop and ask the owner** when (a) a phase needs data or tools the project does not have (Section 5), (b) three phases
-  in a row stall, or (c) a fix would require relaxing B1. The loop never relaxes honesty to gain fluency.
+- **Stop and ask the owner** when (a) a phase needs data or tools the project does not have (Section 5), (b) THIRTY phases
+  in a row stall (raised tenfold from three by the owner, 2026-10-06), or (c) a fix would require relaxing B1. The loop
+  never relaxes honesty to gain fluency.
+- **Change-course threshold, raised tenfold (owner, 2026-10-06):** a line is declared stalled only after TWENTY
+  hypotheses in a row move it < 3 points (was two); before that, the loop keeps trying new hypotheses on it.
 - **Done** when every line is at Level 3 on the held-out battery, confirmed by one fresh run of everything.
 
 ## 4. Phases, in order (each a capability campaign of several iterations)
@@ -81,6 +84,10 @@ Level 1 is plausible within the next phases (P0-P2). Level 2 needs the event rea
 Level 3 -- "fluent" in the sense people mean -- is a research target with no guarantee: today's engine is precise and
 honest but narrow, and every line of the battery measures how far. The loop's job is to move those numbers as far as
 they will go without ever trading away honesty, and to say plainly when they stop moving.
+
+## Frozen test sets
+The B2, B6, B9 and B10 sets were frozen AS DRAFTED on 2026-10-06 at the owner's instruction (tests/battery/FROZEN.json
+holds their hashes). B8 (the owner's blind rating) is not yet rated.
 
 ## 8. Log
 | date | iteration | line | hypothesis | verdict | battery delta |

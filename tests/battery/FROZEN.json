@@ -1,0 +1,10 @@
+{
+ "frozen": "2026-10-06",
+ "by": "owner instruction: freeze the tests as they are",
+ "sha256": {
+  "questions.json": "43f194384110cf158058447a4408c631e28425db40efc60bacf40c53934ace74",
+  "stories.json": "e4e44d7cf22013aad0c6f354f63fab63dc945c67d3c6da09dfa39a8c327300d7",
+  "dialogues.json": "9c731ada4120ea0a6754d3b0c41ce15cb444b5be774d2e43b973e38bd8da7ae7",
+  "open_domain.json": "50309418acc0af910c2e6c3a5bfceab07558a7df777df388a3fd08844b4866d9"
+ }
+}
