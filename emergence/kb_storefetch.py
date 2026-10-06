@@ -10,6 +10,7 @@ from kb_crawl import Crawl
 class StoreFetcher:
     quotes = True
     name = "store"
+    namesakes_ask = True          # near-equal namesakes are READINGS, not the first in the list
 
     def __init__(self, max_entities=4, max_values=8, closed=()):
         self.c = Crawl(); self.max_entities, self.max_values = max_entities, max_values
@@ -26,7 +27,12 @@ class StoreFetcher:
         if all(t in self.closed for t in self.symbols(symbol, "LN")): return None
         ents = [(q, l, "") for q, l in sorted(self.index.get(" ".join(self.symbols(symbol, "LN")), ()))]
         if not ents: return None
-        ranked = sorted(ents, key=lambda e: -len(self.c.claims(e[0])))[:self.max_entities]
+        ranked = sorted(ents, key=lambda e: (-len(self.c.claims(e[0])), e[0]))[:self.max_entities]
+        # research2_prereg.md run 2: a name means its best-known thing only when it is CLEARLY best known (at least twice
+        # the claims of the next); otherwise every near-equal namesake is kept, and the world asks which one is meant
+        if len(ranked) > 1:
+            top = len(self.c.claims(ranked[0][0])); nxt = len(self.c.claims(ranked[1][0]))
+            ranked = ranked[:1] if top >= 2 * max(1, nxt) else [e for e in ranked if 2 * len(self.c.claims(e[0])) >= top]
         data = {}
         for q, label, _ in ranked:
             cl = {}

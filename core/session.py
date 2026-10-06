@@ -117,10 +117,11 @@ class Session:
             if read_as: text = " ".join(new)
         fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger, shapes=self.shapes(), recent=recent)
         fr["researched"] = []
-        if self.researcher is not None and self.researcher.unread_spans(fr):           # whatever the verdict: an unread name beside a context answer is the confabulation this prevents
+        unanswered = fr["kind"] not in (COMMIT, ATTRIBUTED, CONJECTURED)
+        if self.researcher is not None and (self.researcher.unread_spans(fr) or (unanswered and getattr(self.researcher, "weak", False))):   # whatever the verdict: an unread name beside a context answer is the confabulation this prevents
             # RESEARCH BY ITSELF (research_prereg.md): the unread spans go to the fetchers; a fetched world joins the session
             # and the same text is read once more over all worlds. Fetched content is readings, never teaching.
-            new = self.researcher.research(self, fr)
+            new = self.researcher.research(self, fr, weak=unanswered and getattr(self.researcher, "weak", False))
             if new:
                 fr = reason(text, self.worlds, self.df, cats="LN", context=self.context(), ledger=self.ledger, shapes=self.shapes(), recent=recent)
                 fr["researched"] = [getattr(w, "name", "?") for w in new]
@@ -271,10 +272,9 @@ class Session:
         used = set()
         for a, w in zip(fr["answers"], fr["answer_worlds"]):
             for i, j in _leaf_spans(w, a[4]): used.update(range(i, j))
-        lo_u, hi_u = (min(used), max(used)) if used else (0, n - 1)
-        # natural_prereg.md (4): unread open-class symbols BEFORE the first or AFTER the last position the answer used are
-        # courtesy ("do you know ...", "... please"), not content; inside the answered span they stay owed ("the threefold of")
-        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha() and lo_u <= p <= hi_u]
+        # natural_prereg.md (4), REFUTED in its run: treating edge words as courtesy let "the official nomenclature of
+        # the country of machu picchu" be answered as "the country of machu picchu" -- every unread content word is owed
+        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha()]
         if not missing: return fr
         return dict(fr, kind=PARTIAL, missing=missing, integrated=False)
 

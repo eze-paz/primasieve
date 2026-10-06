@@ -183,7 +183,7 @@ class Door:
             return dict(kind=REQUEST, topic=syms[topic], offers=[c[len("source "):] for c in sources_of(fr)]), REQUEST, None
         return dict(frame, guess=True, topic=syms[topic]), "GUESS", (syms, topic)
 
-    def _filled(self, text):
+    def _filled(self, text, fr=None):
         """filled_prereg.md: a statement is a question with its answer filled in. The 1-3 symbols at the start or the end
         are taken as the stated answer; the rest (without one closed-class link beside it) is read as a question; one value
         with every open-class symbol used -> (SUPPORTED | CONTRADICTED, phrase, value, stated, sources), else None"""
@@ -192,6 +192,11 @@ class Door:
         n = len(syms)
         if n >= 2 and syms[0] in closed and syms[1] in closed and syms[0] != syms[1]:
             return None                                  # natural_prereg.md: a question-shaped turn (question word + link) is not a statement
+        if n and syms[0] in getattr(self, "qwords", ()): return None      # run 3: a turn opening with a learned question word
+        own = set()                                       # run 3: what the turn's own question reading used is not a stated answer
+        if fr is not None and fr.get("answers"):
+            from core.session import _leaf_spans
+            own = {p for a_, w_ in zip(fr["answers"], fr["answer_worlds"]) for i, j in _leaf_spans(w_, a_[4]) for p in range(i, j)}
         for L in (1, 2, 3):
             for side in ("start", "end"):
                 if n - L < 2: continue
@@ -199,6 +204,7 @@ class Door:
                 if any(x in closed for x in ans): continue          # run 2: an answer is open-class symbols only
                 lo, hi = (0, L) if side == "start" else (n - L, n)
                 if not self._thing(syms, lo, hi): continue          # natural_prereg.md (1): a stated answer is a THING some world reads
+                # (a rule excluding spans the question reading used was tried here and removed: it blocked true statements)
                 rest = syms[L:] if side == "start" else syms[:n - L]
                 link = rest[0] if side == "start" else rest[-1]
                 if link in closed: rest = rest[1:] if side == "start" else rest[:-1]
@@ -216,6 +222,7 @@ class Door:
 
     def _thing(self, syms, lo, hi):
         """natural_prereg.md (1): does some non-quoting world read syms[lo:hi] as an entity, a filter value or a number?"""
+        if all(x[:1].isdigit() for x in syms[lo:hi]): return True          # run 2: a numeral is a thing (a value, a count)
         for w in self.S.worlds:
             if getattr(w, "quotes", False) or getattr(w, "transcript", False): continue
             try:
@@ -228,7 +235,7 @@ class Door:
         own values; UNKNOWN -> what was read and that it cannot be checked; UNREAD -> None (the turn keeps its reply)"""
         verdict, res = self.reader.check(text)
         if verdict == "UNREAD":
-            got = self._filled(text)                     # filled_prereg.md: a conversational statement
+            got = self._filled(text, getattr(self, "_last_fr", None))     # filled_prereg.md: a conversational statement
             if got is None: return None
             v, phrase, value, stated, srcs = got
             return dict(kind=CHECK_K, phrase=phrase, value=value, stated=None if v == "SUPPORTED" else stated, sources=srcs)
@@ -331,6 +338,7 @@ class Door:
                         from core.session import _leaf_spans as _spans
                         usedp = {p for a_, w_ in zip(fr["answers"], fr["answer_worlds"]) for i, j in _spans(w_, a_[4]) for p in range(i, j)}
                         unclean = any(p not in usedp for p, x in enumerate(fr["syms"]) if x not in self.fluent and x[:1].isalpha())
+                    self._last_fr = fr
                     if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss or unclean):
                         checked = self._statement(part)
                         if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = True
@@ -615,15 +623,19 @@ def live_door(seeded, online, store, path, seed):
     try:                                                # breadth_prereg.md run 2: the 65k store as an OFFLINE fetcher -- consulted for
         from kb_crawl import DB as CRAWL_DB             # names nothing else read, like research (a world of its own interfered)
         from kb_storefetch import StoreFetcher
-        if os.path.exists(CRAWL_DB): fetchers.append(StoreFetcher(closed=set(w for w, c in TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json")).uni.most_common(100)) if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")) else ()))
-    except Exception:
-        pass
+        from core.textmodel import TextModel as _TM     # a local import later in this function shadowed the module-level name
+        tmp = os.path.join(HERE, "_nldata", "textmodel.json")
+        closed100 = {w for w, c in _TM.load(tmp).uni.most_common(100)} if os.path.exists(tmp) else set()
+        if os.path.exists(CRAWL_DB): fetchers.append(StoreFetcher(closed=closed100))
+    except Exception as ex:
+        print(f"  store fetcher not available: {type(ex).__name__}: {ex}", flush=True)
     if online:
         from kb_wikidata import Wikidata
         from kb_osm import Nominatim
         fetchers += [WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)]
     if fetchers:
         researcher = Researcher(fetchers, os.path.join(HERE, "_nldata", "research_live" if online else "research_offline"), df=df, per_turn=4)
+        researcher.weak = True                          # research2_prereg.md: a turn nothing answered also researches names read only weakly
     from kb_guess import build_guesser                  # guess_prereg.md: the guesser, heard only when nothing known answers
     rephraser = integrator = None                       # didyoumean_prereg.md: an unread word -> "did you mean ...?" from the text model
     if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")):
@@ -650,8 +662,23 @@ def live_door(seeded, online, store, path, seed):
             reader = KC.Reader(KC.Store(), KC.load(), {w for w, c in tm.uni.most_common(1000)})
     except Exception:
         reader = None
-    return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
-                fluent=integrator.common if integrator is not None else None, reader=reader, events=events, brief=True)        # align_prereg.md: replies in the person's words
+    qwords = set(); qcount = collections.Counter()      # natural_prereg.md run 3: question words LEARNED from the engine's own question set
+    try:
+        for qtext, typ, gold in held_out():
+            if typ == "STRESS" or gold is None: continue            # the stress items are commands and noise, not questions
+            fq = reason(qtext, worlds, df, cats="LN")
+            if fq["kind"] in (ATTRIBUTED, COMMIT) and fq.get("answers"):
+                from core.session import _leaf_spans
+                usedq = {p for a_, w_ in zip(fq["answers"], fq["answer_worlds"]) for i, j in _leaf_spans(w_, a_[4]) for p in range(i, j)}
+                if fq["syms"] and 0 not in usedq: qcount[fq["syms"][0]] += 1
+        qwords = {w for w, c in qcount.items() if c >= 2}
+    except Exception:
+        pass
+    D = Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
+                fluent=integrator.common if integrator is not None else None, reader=reader, events=events, brief=True)
+    D.qwords = qwords
+    if integrator is not None: integrator.common |= qwords     # a learned question word is not content an answer owes
+    return D        # align_prereg.md: replies in the person's words
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
@@ -772,6 +799,7 @@ def serve(port=8766, seeded=False, online=False, store=None):
                                          transfer=d0.S.transfer, researcher=d0.S.researcher, guesser=d0.S.guesser,
                                          rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader,
                                          events=type(d0.events)(d0.events.reader) if d0.events is not None else None, brief=d0.brief)
+                    state["door"].qwords = getattr(d0, "qwords", set())
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 

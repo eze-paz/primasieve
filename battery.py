@@ -1,7 +1,8 @@
 """THE FLUENCY BATTERY (FLUENCY_LOOP_PLAN.md, Section 1). Measures B1-B10 with the live chat's door built OFFLINE (every
 ability on, no network), on the frozen test sets in tests/battery/. Writes BATTERY.json and prints the table.
 
-    python battery.py [--fast]     (--fast skips the sub-gates that rerun whole experiments: B3, B7)"""
+    python battery.py [--fast] [--only B2,B10]     (--fast skips B3, B7; --only runs the named lines -- a full run is still
+                                                    required at each milestone)"""
 import os, sys, re, json, time, random, hashlib, subprocess, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,8 +44,10 @@ def run(cmd, needle_re):
 
 def main():
     res = {}; false_facts = 0; samples = []
+    only = set(sys.argv[sys.argv.index("--only") + 1].split(",")) if "--only" in sys.argv else None
+    want = lambda k: only is None or k in only
     # ---- B2 ordinary phrasing
-    q = json.load(open(os.path.join(TB, "questions.json"), encoding="utf-8"))["items"]
+    q = json.load(open(os.path.join(TB, "questions.json"), encoding="utf-8"))["items"] if want("B2") else []
     D = door(); right = abst = 0
     for it in q:
         r = D.turn(it["q"]); ok = hit(r["reply"], it["gold"]); right += ok
@@ -52,24 +55,26 @@ def main():
             false_facts += 1; say(f"      B1 case: {it['q']!r} -> {r['reply'][:120]}")
         if r["kind"] not in (COMMIT, ATTRIBUTED, CONJECTURED): abst += 1
         if len(samples) < 15 and ok: samples.append((it["q"], r["reply"]))
-    res["B2"] = dict(score=right / len(q), right=right, n=len(q), abstained=abst)
-    say(f"B2  ordinary phrasing: {right}/{len(q)} = {right / len(q):.1%} (abstained {abst})  ({time.time() - T0:.0f} s)")
+    if q:
+        res["B2"] = dict(score=right / len(q), right=right, n=len(q), abstained=abst)
+        say(f"B2  ordinary phrasing: {right}/{len(q)} = {right / len(q):.1%} (abstained {abst})  ({time.time() - T0:.0f} s)")
     # ---- B9 dialogues
-    dl = json.load(open(os.path.join(TB, "dialogues.json"), encoding="utf-8"))["dialogues"]; full = turns_ok = turns = 0
+    dl = json.load(open(os.path.join(TB, "dialogues.json"), encoding="utf-8"))["dialogues"] if want("B9") else []; full = turns_ok = turns = 0
     for d in dl:
         D = door(); ok_all = True
         for t, gold in d["turns"]:
             r = D.turn(t); ok = hit(r["reply"], gold); turns += 1; turns_ok += ok; ok_all &= ok
             if len(samples) < 30 and ok: samples.append((t, r["reply"]))
         full += ok_all
-    res["B9"] = dict(score=full / len(dl), dialogues=full, n=len(dl), turns_ok=turns_ok, turns=turns)
-    say(f"B9  dialogues fully right: {full}/{len(dl)}; turns {turns_ok}/{turns}  ({time.time() - T0:.0f} s)")
+    if dl:
+        res["B9"] = dict(score=full / len(dl), dialogues=full, n=len(dl), turns_ok=turns_ok, turns=turns)
+        say(f"B9  dialogues fully right: {full}/{len(dl)}; turns {turns_ok}/{turns}  ({time.time() - T0:.0f} s)")
     # ---- B10 open domain (held-out entities; the guesser learned on the training split only)
     from core.guesser import Guesser
     from kb_guess import load_entities, TARGETS, labels
     from guess import held_out
     G = Guesser(TARGETS); G.learn([(l, c) for qq, l, c in load_entities() if not held_out(qq)]); G.labels = labels()
-    od = json.load(open(os.path.join(TB, "open_domain.json"), encoding="utf-8"))["items"]
+    od = json.load(open(os.path.join(TB, "open_domain.json"), encoding="utf-8"))["items"] if want("B10") else []
     D = door(G); fact = guessed = 0
     for it in od:
         r = D.turn(it["q"]); ok = hit(r["reply"], it["gold"])
@@ -77,20 +82,22 @@ def main():
         elif ok: fact += 1
         elif r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement") and not all(r.get("quotes") or [False]):
             false_facts += 1; say(f"      B1 case (B10): {it['q']!r} gold {it['gold'][:2]} -> {r['reply'][:120]}")
-    res["B10"] = dict(score=(fact + guessed) / len(od), fact=fact, guessed=guessed, n=len(od))
-    say(f"B10 open domain: {fact + guessed}/{len(od)} ({fact} as facts, {guessed} as labelled guesses)  ({time.time() - T0:.0f} s)")
+    if od:
+        res["B10"] = dict(score=(fact + guessed) / len(od), fact=fact, guessed=guessed, n=len(od))
+        say(f"B10 open domain: {fact + guessed}/{len(od)} ({fact} as facts, {guessed} as labelled guesses)  ({time.time() - T0:.0f} s)")
     # ---- B6 stories
-    st = json.load(open(os.path.join(TB, "stories.json"), encoding="utf-8"))["stories"]; sr = sn = 0
+    st = json.load(open(os.path.join(TB, "stories.json"), encoding="utf-8"))["stories"] if want("B6") else []; sr = sn = 0
     for s in st:
         D = door()
         for sent in re.split(r"(?<=[.!?])\s+", s["text"]): D.turn(sent)
         for qq, gold in s["qs"]:
             r = D.turn(qq); sn += 1; sr += hit(r["reply"], gold)
-    res["B6"] = dict(score=sr / sn, right=sr, n=sn)
-    say(f"B6  story questions: {sr}/{sn}  ({time.time() - T0:.0f} s)")
+    if st:
+        res["B6"] = dict(score=sr / sn, right=sr, n=sn)
+        say(f"B6  story questions: {sr}/{sn}  ({time.time() - T0:.0f} s)")
     # ---- B5 + B4 on held-out novels (when the corpus is present)
     books = sorted(f[:-4] for f in os.listdir(GUT) if f.endswith(".txt")) if os.path.isdir(GUT) else []
-    test_books = [b for b in books if held_book(b)][:10]
+    test_books = [b for b in books if held_book(b)][:10] if (want("B5") or want("B4")) else []
     if test_books:
         from core.textworld import SlotWorld, find_entities
         from core.textmodel import TextModel
@@ -119,7 +126,7 @@ def main():
         read = sum(1 for s in sents if R.check(s)[0] in ("SUPPORTED", "CONTRADICTED", "UNKNOWN"))
         res["B4_novels"] = dict(score=read / max(1, len(sents)), read=read, n=len(sents))
         say(f"B4  held-out novel sentences with a proposition read: {read}/{len(sents)}  ({time.time() - T0:.0f} s)")
-    if "--fast" not in sys.argv:
+    if "--fast" not in sys.argv and (only is None or "B3" in only or "B7" in only):
         f = run(["statements.py", "--quick"], r"F[12] .*?: (\d+)/(\d+)"); b = run(["filled.py", "--quick"], r"B[12] .*?: (\d+)/(\d+)")
         if len(f) >= 2 and len(b) >= 2:
             res["B3"] = dict(dict_true=int(f[0][0]) / int(f[0][1]), dict_false_yes=int(f[1][0]) / int(f[1][1]),
@@ -132,7 +139,7 @@ def main():
         fh.write("# B8 blind rating sample\nRate each reply 1 (robotic) to 5 (natural).\n\n")
         for i, (qq, rr) in enumerate(random.Random(5).sample(samples, min(30, len(samples))), 1): fh.write(f"{i}. **{qq}** -> {rr}\n\n")
     res["time_s"] = round(time.time() - T0)
-    json.dump(res, open(OUT, "w", encoding="utf-8"), indent=1)
+    json.dump(res, open(OUT if only is None else OUT.replace(".json", "_partial.json"), "w", encoding="utf-8"), indent=1)
     say(f"\nBATTERY written: {OUT}; {res['time_s']} s")
 
 

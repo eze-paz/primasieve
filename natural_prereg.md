@@ -36,3 +36,25 @@ reader sees them (letters and digits), so "lenta.ru", "hun-saare", "category:pai
 closed-class -- "tell me which region ..." was rewritten "West me which region ..."); the store fetcher never looks up a
 span made only of closed-class symbols ("is" found Iceland, label "IS"); "did you mean" is never offered over an answer
 from the transcript ("why" was offered "how").
+
+## Run 1 (2026-10-06, stopped part-way): INVALID for B10, and fix (4) REFUTED
+B2 **76.5 %** (abstained 135, down from 320: brief replies and fewer false corrections), B9 17/20, but **B1 7**: the edge
+rule (4) let "the official nomenclature of the country of machu picchu" and "the remuneration of the manager of grace"
+be answered as their last half -- reverted. B10 fell to 70/500 because the store fetcher silently failed to build (a local
+import later in live_door shadowed the module name; the exception was swallowed) -- fixed, and the failure is now printed.
+The run was stopped; run 2 measures fixes (1)-(3), (5)-(7) together with iteration 7 (research2_prereg.md).
+
+## Run 2 (2026-10-06): NOT PASSED -- measured with research2_prereg.md run 1
+B2 73.7 % (abstained 320), B9 18/20, B10 156/500, B6 28/100, B5 +11.6, B7 15/18 at 0 %, **B1 5** (namesakes in the store
+fetcher: research2_prereg.md), **B3 dictionary false-yes 1.44 %** (from 0.43 %: fix (2)'s "any reading holds" let corrupted
+statements through on a minor reading) and **conversational true 58 %** (from 84 %: fix (1)'s "a stated answer is a THING"
+refused numerals -- nothing reads "120" as an entity). Amended for run 3: SUPPORTED only if the pair's DOMINANT reading
+holds; a numeral is a thing.
+
+## Amendment, run 3 (declared after run 2 and the builder's rating of its sample: b8_rated_it6.md, 2.80 / 5)
+False corrections remained on questions opening with "which" and "how" (not among the 100 commonest symbols, so the
+question-shape rule missed them). QUESTION WORDS are now LEARNED from the engine's own answered questions (the first symbol,
+when the answer's structure did not use it, seen at least twice; the stress items excluded): how, is, what, which, who. A
+turn opening with one is never read as a statement, and a learned question word is not content an answer owes. (A second
+rule -- excluding stated answers the question reading used -- was tried and removed before the run: it blocked true
+statements.) Plus run 2's amendments (dominant reading; a numeral is a thing) and research2_prereg.md run 2 (namesakes).

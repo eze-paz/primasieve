@@ -34,9 +34,11 @@ class EventReader:
     def run_at(self, toks, k, step, limit, pronoun=False):
         """the noun run nearest to position k in direction `step`, skipping at most `limit` closed symbols, inside the
         clause -> ((start, end), is_pronoun) or None. With `pronoun`, a closed symbol right beside k is returned as one."""
-        i = k + step; skipped = 0
+        i = k + step; skipped = 0; crossed = False
         while 0 <= i < len(toks):
             t = toks[i]
+            if not self.is_word(t) and pronoun and not crossed and i == k + step:      # events3_prereg.md (1): one comma beside the verb
+                crossed = True; i += step; continue
             if not self.is_word(t) or self.is_verb(t): break
             if self.is_noun(t):
                 j = i
@@ -53,7 +55,10 @@ class EventReader:
         toks = tokens(text); out = []
         for k, t in enumerate(toks):
             lemma = self.verbs.get(t.lower())
-            if lemma is None or t.lower() in self.closed:
+            main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks)
+                    and toks[k + 1].lower() not in self.participles and toks[k + 1].lower() not in self.verbs
+                    and k > 0 and self.is_noun(toks[k - 1]))                          # events3_prereg.md (3): "the crow had the cheese"
+            if (lemma is None or t.lower() in self.closed) and not main:
                 # events2_prereg.md: a closed-class finite symbol before a participle -> one event, the participle's verb
                 lp = self.participles.get(t.lower())
                 if lp is None or t.lower() in self.closed or k == 0 or toks[k - 1].lower() not in getattr(self, "auxiliaries", ()):
@@ -70,6 +75,11 @@ class EventReader:
                 if out and not pron and agent == out[-1]["patient"]: agent = out[-1]["agent"]
                 elif not pron: self.last_agent = agent
             patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
+            if pa is None:                                                             # events3_prereg.md (2): "found them" -> the last patient
+                nxt = k + 1
+                if nxt < len(toks) and self.is_word(toks[nxt]) and toks[nxt].lower() in self.closed and toks[nxt].lower() not in getattr(self, "auxiliaries", ()):
+                    patient = getattr(self, "last_patient", None)
+            elif patient: self.last_patient = patient
             adj = []; i = (pa[0][1] if pa else k + 1)
             while i < len(toks) - 1 and self.is_word(toks[i]) and not self.is_verb(toks[i]):
                 if toks[i].lower() in self.closed:
@@ -83,7 +93,7 @@ class EventReader:
 class EventMemory:
     """events read from a conversation's statements, and questions answered from them (events_prereg.md)"""
     def __init__(self, reader):
-        self.reader = reader; self.events = []; reader.last_agent = None     # a new conversation starts with no referent
+        self.reader = reader; self.events = []; reader.last_agent = None; reader.last_patient = None     # a new conversation starts with no referent
 
     def ingest(self, text):
         self.events += self.reader.read(text)
@@ -106,7 +116,7 @@ class EventMemory:
             if "agent" in filled and ev["patient"] and "patient" not in filled: ans = ev["patient"]
             elif "agent" in filled and "patient" in filled and ev["adjuncts"]: ans = ev["adjuncts"][0]
             elif "agent" in filled and not ev["patient"] and ev["adjuncts"]: ans = ev["adjuncts"][0]
-            elif "agent" not in filled and ev["agent"] and filled: ans = ev["agent"]
+            elif "agent" not in filled and ev["agent"] and (filled or not content): ans = ev["agent"]   # events3_prereg.md (4)
             else: continue                      # honesty_prereg.md: no role shared with the question -> no basis to answer
             score = len(filled) + (0.5 if ev["verb"] in lemmas else 0)
             if best is None or score > best[0]: best = (score, ans, ev)

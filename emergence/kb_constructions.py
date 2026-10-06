@@ -143,14 +143,14 @@ class Reader:
         syms, ms, full = tokens(text, self.store, self.common)
         out = []
         for run, a, b in instances(syms, ms, head, full=full):
-            labs = collections.defaultdict(set)
+            labs = collections.defaultdict(set); hits = collections.Counter()
             rank = lambda Q: best(self.store, Q)                    # construct_prereg.md run 7: a name means its best-known thing
             for qa in rank(a[2]):
                 for qb in rank(b[2]):
                     for key in typed(self.store, run, {qa}, {qb}):
-                        for lab, h, n in self.C.read(key): labs[lab].add((qa, qb))
+                        for lab, h, n in self.C.read(key): labs[lab].add((qa, qb)); hits[lab] = max(hits[lab], h)
             for lab, pairs in labs.items():
-                out.append(dict(run=run, a=a, b=b, lab=lab, pairs=sorted(pairs), syms=syms))
+                out.append(dict(run=run, a=a, b=b, lab=lab, pairs=sorted(pairs), syms=syms, hits=hits[lab]))
         return out
 
     def check(self, text, head=None):
@@ -166,7 +166,13 @@ class Reader:
         # holds if any reading holds, and is contradicted only if every reading is
         groups = {}
         for pr, v in res: groups.setdefault((pr["a"][0], pr["a"][1], pr["b"][0], pr["b"][1]), []).append(v)
-        merged = {k: ("SUPPORTED" if "SUPPORTED" in vs else "CONTRADICTED" if all(x == "CONTRADICTED" for x in vs) else "UNKNOWN") for k, vs in groups.items()}
+        # run 2 of natural_prereg.md: SUPPORTED only if the pair's DOMINANT reading (most sightings) holds -- "any reading"
+        # let corrupted statements through on a minor reading (1.4 %); contradicted only if every reading is
+        dom = {}
+        for pr, v in res:
+            k = (pr["a"][0], pr["a"][1], pr["b"][0], pr["b"][1])
+            if k not in dom or pr.get("hits", 0) > dom[k][0]: dom[k] = (pr.get("hits", 0), v)
+        merged = {k: (dom[k][1] if dom[k][1] == "SUPPORTED" else "CONTRADICTED" if all(x == "CONTRADICTED" for x in vs) else "UNKNOWN") for k, vs in groups.items()}
         res = [(pr, merged[(pr["a"][0], pr["a"][1], pr["b"][0], pr["b"][1])]) for pr, v in res]
         vs = [v for _, v in res]
         if not res: return "UNREAD", res

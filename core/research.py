@@ -26,6 +26,25 @@ class Researcher:
         os.makedirs(folder, exist_ok=True)
 
     # ---- what a turn left unread: spans of symbols no non-quoting world read (longest first, no numerals) -------------
+    def weak_spans(self, frame, maxlen=3):
+        """research2_prereg.md: for a turn nothing answered -- spans read only by NON-content readings (an entity, a filter
+        value) or by fetched worlds, longest first, letters only"""
+        syms = frame.get("syms", []); n = len(syms); strong = set()
+        for r, w in zip(frame.get("readings", []), frame.get("reading_worlds", [])):
+            if getattr(w, "quotes", False) or getattr(w, "fetched", None) or r[0] >= n: continue
+            if r[2] in getattr(w, "content_kinds", set()): strong.update(range(r[0], min(r[1], n)))
+        med = None
+        if self.df is not None and n:
+            vals = sorted(self.df(x) for x in syms); med = vals[len(vals) // 2]
+        out = []
+        for L in range(maxlen, 0, -1):
+            for i in range(n - L + 1):
+                span = range(i, i + L)
+                if all(p not in strong for p in span) and all(unicodedata.category(syms[p][0])[0] == "L" for p in span):
+                    if med is not None and all(self.df(syms[p]) > med for p in span): continue
+                    out.append(" ".join(syms[i:i + L]))
+        return out
+
     def unread_spans(self, frame, maxlen=3):
         """spans no non-quoting world read, longest first; with a df, a span whose every symbol sits above the question's
         median definition frequency is not a name (the graph world's A1) and is not fetched"""
@@ -47,10 +66,13 @@ class Researcher:
         return out
 
     # ---- fetch, write, attach ---------------------------------------------------------------------------------------------
-    def research(self, session, frame):
-        """-> [worlds attached this turn]. Budgeted; one fetch per (fetcher, symbol) per session."""
+    def research(self, session, frame, weak=False):
+        """-> [worlds attached this turn]. Budgeted; one fetch per (fetcher, symbol) per session. With `weak`
+        (research2_prereg.md), the spans of weak_spans are offered after the unread ones."""
         new = []; taken = []; tries = 0
-        for span in self.unread_spans(frame):
+        spans = self.unread_spans(frame)
+        if weak: spans += [x for x in self.weak_spans(frame) if x not in spans]
+        for span in spans:
             if self.per_turn is not None and tries >= self.per_turn: break
             if any(span in t for t in taken): continue          # a span inside a name that attached is that name's part, not a thing
             for f in self.fetchers:
@@ -63,7 +85,7 @@ class Researcher:
                 if not got: self.tried[key] = None; continue
                 shape, data = got
                 path = os.path.join(self.folder, f"{f.name}-{abs(hash(span)) % 10**8}.json")
-                with open(path, "w", encoding="utf-8") as fh: json.dump(dict(shape=shape, symbol=span, source=f.name, data=data), fh, ensure_ascii=False, indent=1)
+                with open(path, "w", encoding="utf-8") as fh: json.dump(dict(shape=shape, symbol=span, source=f.name, data=data, namesakes_ask=bool(getattr(f, "namesakes_ask", False))), fh, ensure_ascii=False, indent=1)
                 self.tried[key] = path
                 w = self.attach(session, path, f)
                 if w is not None: new.append(w); self.attached.append((f.name, span, path)); taken.append(span)
@@ -83,6 +105,8 @@ class Researcher:
             w = TableWorld(Records([Table(c["headers"], c["rows"], cn) for cn, c in d["data"].items()]), name=name, df=self.df)
         else: return None
         w.attributed = bool(getattr(fetcher, "quotes", True)) if fetcher is not None else d.get("quotes", True)
+        if getattr(fetcher, "namesakes_ask", False) or d.get("namesakes_ask"):
+            w.rank_key = lambda st: 0          # the fetcher kept only near-equal namesakes: no order among them, so they are READINGS
         w.fetched = path
         session.worlds.append(w)
         return w
