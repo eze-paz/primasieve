@@ -1,0 +1,88 @@
+# FLUENCY LOOP -- a plan for looping toward full fluency (2026-10-06)
+
+The owner asked for a loop that runs until "full fluency". This file defines what that means in numbers, how one
+iteration of the loop works, when the loop keeps going and when it stops, what it works on in what order, and which
+decisions are the owner's. It builds on GUESS_PLAN.md, FLUENCY_HYPOTHESES.md and COMPREHENSION_PLAN.md.
+
+## 1. What "full fluency" means here -- a fixed test battery
+
+"Fluent" cannot be a feeling; it has to be a battery of tests that is built ONCE, held out, and never trained on. The loop
+is finished when every line reaches its Level 3 target. Levels 1 and 2 are milestones on the way.
+
+| # | ability | test (held out) | today | L1 useful | L2 conversational | L3 fluent |
+|---|---|---|---|---|---|---|
+| B1 | **honesty** | false facts stated as facts, across every gate | 0 | 0 | 0 | 0 (never relaxed) |
+| B2 | **understanding questions** | 500 questions in ordinary phrasing over things the engine can know (paraphrases, typos, chatty forms) | ~50 % of the chat set; paraphrases 25 % via "did you mean" | 60 % | 80 % | 95 % answered or honestly abstained with a right reason |
+| B3 | **understanding statements** | true/false statements, dictionary and conversational | 96 % / 84 % supported, 0-0.4 % false "yes" | held | held | held, on open-domain statements |
+| B4 | **reading prose** | share of held-out sentences with a checked proposition (definitions / news-book quotations / a novel) | 2.2 % / 0.5 % / 0 % | 15 / 5 / 5 % | 40 / 20 / 20 % | 70 / 50 / 50 % at precision >= 0.9 |
+| B5 | **following a story** | masked-name guessing in novels (Children's Book Test form), points over the frequency guess | +3 | +10 | +20 | +30 |
+| B6 | **story questions** | who-did-what questions on held-out short stories | -- (no event reader) | 30 % | 60 % | 85 % |
+| B7 | **saying it well** | replies whose wording is attested in prose at every joint, re-read exactly, not reversed | 15/18 messages, 0 % reversed | 80 % of all answers | 90 % | 98 % |
+| B8 | **saying it naturally** | owner's blind rating of 30 replies a milestone (1 = robotic, 5 = natural) | not yet rated | 3.0 | 4.0 | 4.5 |
+| B9 | **conversation** | 20 scripted multi-turn dialogues (pronouns, follow-ups, corrections, topic shifts) completed correctly | ellipsis rules exist; not measured as dialogues | 50 % | 80 % | 95 % |
+| B10 | **breadth** | share of a 500-question open-domain set answered correctly with a source, or guessed and labelled | not measured | 30 % | 60 % | 80 % |
+
+B8 is the only human-judged line: the owner rates a blind sample at each milestone (Section 6). Every other line is
+automatic.
+
+## 2. One iteration of the loop
+
+1. **Pick the weakest line** of the battery (furthest below its next-level target, weighted by what blocks other lines;
+   e.g. B6 blocks B5 and B9).
+2. **Diagnose before designing**: list the failures on that line and sort them by cause (this is how C7 found that the
+   monitor's real problem was two-word relations, not missing exposure).
+3. **Write a hypothesis and its prereg** (theory, mechanism, gates with bars, a knockout, predictions) BEFORE code.
+4. **Build, run, record.** At most three declared runs per hypothesis; every miss is recorded as a miss.
+5. **Re-measure the whole battery** (not only the targeted line), so no gain hides a loss elsewhere.
+6. **Commit; update the live chat** if the change is user-visible; update this file's "today" column.
+
+## 3. When the loop continues, changes course, or stops
+
+- **Continue** while the battery improves: at least one line gains >= 3 points (or a level) every two iterations, with B1
+  still at 0.
+- **Change course** when a line stalls (two hypotheses in a row move it < 3 points): the line needs a NEW CAPABILITY, not a
+  tweak -- write a short capability plan (like COMPREHENSION_PLAN.md) and start it as the next phase.
+- **Stop and ask the owner** when (a) a phase needs data or tools the project does not have (Section 5), (b) three phases
+  in a row stall, or (c) a fix would require relaxing B1. The loop never relaxes honesty to gain fluency.
+- **Done** when every line is at Level 3 on the held-out battery, confirmed by one fresh run of everything.
+
+## 4. Phases, in order (each a capability campaign of several iterations)
+
+| phase | capability | lines it moves | first hypotheses |
+|---|---|---|---|
+| **P0** | **The battery** | all | build B2, B6, B9, B10 test sets; freeze them; measure "today" for every line |
+| **P1** | **An event reader** -- who did what to whom | B5, B6, B4, B9 | verb-centred constructions learned from prose: a verb with its typed slots (agent before, patient after, in this language's order, learned not written); events kept per entity as a story is read; checked by predicting held-out mentions and answering held-out story questions |
+| **P2** | **Conversational grammar** | B2, B3, B9 | constructions harvested from dialogue (novels' and plays' quoted speech) by the filled-question check; pronouns resolved by the event reader's entity tracking; questions in any word order read by licensing from far more than 96 examples |
+| **P3** | **Knowledge breadth** | B10, B2, B4 | more stores (larger Wikidata crawl, other open data), the researcher on by default, the guesser over more relations; reading prose ADDS facts as readings (labelled, sourced) |
+| **P4** | **Natural wording** | B7, B8 | wordings from event frames, not only lookups; junctions attested across a large prose corpus; alignment and brevity; variety on the form side; the reader as monitor for every reply |
+| **P5** | **Dialogue and pragmatics** | B9, B8 | topic tracking, follow-ups, clarifying questions only when needed, corrections remembered; say what the listener needs |
+| **P6** | **Consolidation** | all | one fresh run of the whole battery; owner's blind rating; whatever is weakest restarts the loop |
+
+## 5. What the loop needs from outside (owner decisions)
+
+1. **More text.** Fluency is learned from exposure; the project holds ~25 M words of dictionary text and one novel.
+   P1, P2 and P4 need a real prose corpus -- e.g. public-domain books (Project Gutenberg, a few hundred novels and plays,
+   ~50-100 M words). Downloading it needs the owner's permission (source, size, licence) before the loop fetches anything.
+2. **Test sets written by a person.** B2, B6, B9 and B10 are fairest when written by someone other than the engine's
+   builder. The loop can draft them, but the owner (or anyone) should review or replace them once, before they are frozen.
+3. **Blind ratings (B8).** 30 replies per milestone, shown without telling which version made them; about 10 minutes.
+4. **Compute and time.** An iteration is ~1-3 hours of machine time (the corpus passes dominate); a phase is days.
+5. **Pushing to GitHub** needs the owner's sign-in (the commits are local until then).
+
+## 6. Milestones and reporting
+
+- After every iteration: a short entry in this file (line, hypothesis, verdict, battery delta) and a commit.
+- At each level (L1, L2, L3): a plain-language report, the owner's blind rating (B8), and a decision point.
+- The live chat always runs the latest passing version.
+
+## 7. Honest expectations
+
+Level 1 is plausible within the next phases (P0-P2). Level 2 needs the event reader and a real prose corpus to work.
+Level 3 -- "fluent" in the sense people mean -- is a research target with no guarantee: today's engine is precise and
+honest but narrow, and every line of the battery measures how far. The loop's job is to move those numbers as far as
+they will go without ever trading away honesty, and to say plainly when they stop moving.
+
+## 8. Log
+| date | iteration | line | hypothesis | verdict | battery delta |
+|---|---|---|---|---|---|
+| 2026-10-06 | -- | -- | plan written | -- | -- |
