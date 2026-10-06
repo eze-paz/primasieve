@@ -113,6 +113,11 @@ def instances(syms, ms, head, max_len=5, full=None):
     return out
 
 
+def best(store, Q):
+    """construct_prereg.md run 7: the one entity a mention denotes -- the one the store knows most about (ties by id)"""
+    return sorted(Q, key=lambda q: (-len(store.claims.get(q, {})), q))[:1]
+
+
 def typed(store, run, A, B):
     return [(ta, tb) + tuple(run) for ta in sorted(store.types(A)) for tb in sorted(store.types(B))][:9]
 
@@ -139,7 +144,7 @@ class Reader:
         out = []
         for run, a, b in instances(syms, ms, head, full=full):
             labs = collections.defaultdict(set)
-            rank = lambda Q: sorted(Q, key=lambda q: (-len(self.store.claims.get(q, {})), q))[:6]      # the best-known entities first
+            rank = lambda Q: best(self.store, Q)                    # construct_prereg.md run 7: a name means its best-known thing
             for qa in rank(a[2]):
                 for qb in rank(b[2]):
                     for key in typed(self.store, run, {qa}, {qb}):
@@ -175,7 +180,8 @@ def learn(store, common, held=None, least=3, share=0.8):
             syms, ms, full = tokens(s, store, common)
             if not ms: continue
             for run, a, b in instances(syms, ms, head if s in defs else None, full=full):
-                labels = store.relations(a[2], b[2])
-                for key in typed(store, run, a[2], b[2]): C.observe(key, labels)
+                A, B = set(best(store, a[2])), set(best(store, b[2]))
+                labels = store.relations(A, B)
+                for key in typed(store, run, A, B): C.observe(key, labels)
     C.settle()
     return C

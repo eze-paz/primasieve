@@ -139,13 +139,20 @@ def main():
     def typed(run, a, b):                          # run 5: the run keyed with each combination of slot types
         return [(ta, tb) + tuple(run) for ta in sorted(store.types(a[2])) for tb in sorted(store.types(b[2]))][:9]
 
+    def rank(Q): return sorted(Q, key=lambda q: (-len(store.claims.get(q, {})), q))[:1]        # run 7: the best-known entity only
+
     def read(C, run, a, b):
-        out = []
-        for key in typed(run, a, b):
-            for lab, h, n in C.read(key):
-                if lab not in [x[0] for x in out]: out.append((lab, h, n))
-        return out
+        """run 6: per entity pair -- a label is read with the pairs whose own types admit it; -> [(lab, pairs)]"""
+        labs = {}
+        for qa in rank(a[2]):
+            for qb in rank(b[2]):
+                for key in typed(run, (0, 0, {qa}), (0, 0, {qb})):
+                    for lab, h, n in C.read(key): labs.setdefault(lab, set()).add((qa, qb))
+        return sorted(labs.items(), key=lambda x: str(x[0]))
     C = Constructions(max_len=7)
+    def best(m): return (m[0], m[1], set(rank(m[2])))
+    train_inst = [(run, best(a), best(b), store.relations(rank(a[2]) and set(rank(a[2])), set(rank(b[2]))), syms) for run, a, b, labels, syms in train_inst]
+    test_inst = [(run, best(a), best(b), store.relations(set(rank(a[2])), set(rank(b[2]))), syms) for run, a, b, labels, syms in test_inst]
     for run, a, b, labels, syms in train_inst:
         for key in typed(run, a, b): C.observe(key, labels)
     n_adm = C.settle(); rels = C.relations()
@@ -162,10 +169,10 @@ def main():
         reads = read(C, run, a, b)
         if labels:
             related += 1
-            got += any(lab in labels for lab, h, n in reads)
-        for (p, d), h, n in reads:
-            if not store.known(a[2], b[2], d): continue
-            ext += 1; ok = store.holds(a[2], b[2], p, d); right += ok
+            got += any(lab in labels for lab, pairs in reads)
+        for (p, d), pairs in reads:
+            if not any(store.known({qa}, {qb}, d) for qa, qb in pairs): continue
+            ext += 1; ok = any(store.holds({qa}, {qb}, p, d) for qa, qb in pairs); right += ok
             if len(ex) < 8: ex.append(f"      {' '.join(syms)[:90]!r}: {'/'.join(sorted(store.lab.get(q, q) for q in a[2]))[:20]} -[{plab.get(p, p)} {d}]- {'/'.join(sorted(store.lab.get(q, q) for q in b[2]))[:20]} {'OK' if ok else 'WRONG'}")
     for x in ex: say(x)
     prec = right / max(1, ext); rec = got / max(1, related)
@@ -179,8 +186,8 @@ def main():
     for run, a, b, labels, syms in test_inst:
         if not labels or a[0] == a[1]: continue
         swapped += 1
-        for (p, d), h, n in read(C, run, b, a):
-            if store.known(b[2], a[2], d) and not store.holds(b[2], a[2], p, d):
+        for (p, d), pairs in read(C, run, b, a):
+            if any(store.known({x}, {y}, d) for x, y in pairs) and not any(store.holds({x}, {y}, p, d) for x, y in pairs):
                 false += 1
                 if false <= 6: say(f"      swap false: {' '.join(syms)[:70]!r} run {' '.join(run)!r}: {'/'.join(sorted(store.lab.get(q, q) for q in b[2]))[:18]} -[{plab.get(p, p)} {d}]- {'/'.join(sorted(store.lab.get(q, q) for q in a[2]))[:18]}")
                 break

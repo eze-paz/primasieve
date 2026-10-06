@@ -112,3 +112,31 @@ construction expects (disambiguation by construction), not a looser bar.
 
 Not registered. Of the plan's C1 claim -- order-aware constructions learned from exposure -- the precision and reach
 stand (0.92 precision, 70 % of related pairs read), order holds for 96.8 % of swapped pairs, under the 98 % bar.
+
+## Amendment, run 6 (declared 2026-10-06 after run 5, the step run 5 named): disambiguation by construction
+Learning unchanged. READING: for each mention, its entities are ranked by how much the store knows about them (claims
+first) and the top six kept; a proposition is read for an (entity, entity) pair only when THAT pair's own types admit the
+construction, and it is checked on those pairs only (statements_prereg.md's Reader rule, brought back to C1's gates).
+
+## Run 6 (2026-10-06): WORSE -- refuted
+R2 precision **0.815** (run 5: 0.921), R3 0.702, R4 **599/8,952 = 6.7 %** (run 5: 3.2 %), R5 3. Letting ANY of a label's
+entities whose types fit the construction carry the reading is the wrong rule: in a list of countries some little-known
+entity named "Bolivia" or "Chile" has a type (a town, a river) that fits a construction, and the construction then reads
+a relation for it ("Bolivia -capital of-> Argentina").
+
+## Amendment, run 7 (declared after run 6): a name means its best-known thing
+Each mention denotes ONE entity: the one the store knows most about (most claims; ties by id). Learning and reading both
+use that entity's types and that entity alone.
+
+## Run 7 (2026-10-06): NOT PASSED by a hair (R4 152/7,415 = 2.05 % vs 2 %) -- the most precise reader
+10,148 constructions over 106 relations. R2 precision **0.939** (best of seven runs); R3 **0.557**; R4 2.05 %; R5 **0**
+of 10,148; R6 ok. The best-known-entity rule is the reader's rule from here on (the chat's reader follows it).
+
+### Summary of C1 (seven declared runs)
+| run | change | precision | read | swap false |
+|---|---|---|---|---|
+| 1 | as registered | 0.576 | 0.131 | 8.4 % |
+| 2 | adjacent mentions; every pair counts | 0.977 | 0.046 | 1.4 % |
+| 5 | + schemas, punctuation, typed slots, inverses | 0.921 | 0.697 | 3.2 % |
+| 6 | + any entity whose type fits | 0.815 | 0.702 | 6.7 % |
+| 7 | + a name means its best-known thing | **0.939** | 0.557 | 2.05 % |

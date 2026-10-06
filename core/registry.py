@@ -110,6 +110,8 @@ PUBLISHED = {
     "textmodel": ["G4: PASS"],
     # ---- speak_prereg.md (FLUENCY H1+H2+H7): wording learned from any text, claims checked by re-reading
     "speak": ["SPEAK: PASS"],
+    # ---- statements_prereg.md (COMPREHENSION C4): statements fact-checked by reading them (crawl + Wiktionary stores)
+    "statements": ["C4: PASS"],
 }
 
 

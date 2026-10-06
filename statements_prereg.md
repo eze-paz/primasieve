@@ -64,3 +64,8 @@ a contradiction is never shown without a named value. Gate numbers after these f
 France ..., and not Spain"; "hainaut, belgium" -> "Yes: the country of Hainaut is Belgium"; no false "Yes" or "No".
 "tokyo is the capital of japan" is still answered as a question: "is the capital of" between a city and a country is
 rare in definitions and was never admitted -- the reader knows the definitions' grammar, not yet conversation's.
+
+## Run 3 (2026-10-06): PASS -- with the reader of construct_prereg.md run 7
+Declared change, made in C1 (not tuned here): a mention denotes its best-known entity, in learning and in reading. F1
+**1,918/2,001 (96 %)**; F2 **8/1,872 (0.4 %)**; F3 **1,612/1,872 contradicted (86 %)**, 80 unknown, 172 unread; F4 no
+false "Yes"; F5 chat.py unchanged. Registered (statements.py): "C4: PASS".
