@@ -85,6 +85,13 @@ Level 3 -- "fluent" in the sense people mean -- is a research target with no gua
 honest but narrow, and every line of the battery measures how far. The loop's job is to move those numbers as far as
 they will go without ever trading away honesty, and to say plainly when they stop moving.
 
+## Owner's ruling (2026-10-06): no stop condition
+"There is no valid stop condition. You are as good a judge of fluency as me." The loop does not stop on stalls; a stalled
+line changes course (new capability) and the loop goes on. B1 (honesty) remains a RULE every iteration obeys, not a stop.
+B8 is rated by the builder against a fixed rubric (1 robotic: frame-like, evidence dumps, wrong word order; 3 plain but
+correct and readable; 5 natural: the person's words, right order, no unrequested trailer), with the rated samples kept in
+tests/battery/b8_rated_*.md so the owner can audit them -- disclosed as a builder's rating, not a blind one.
+
 ## Frozen test sets
 The B2, B6, B9 and B10 sets were frozen AS DRAFTED on 2026-10-06 at the owner's instruction (tests/battery/FROZEN.json
 holds their hashes). B8 (the owner's blind rating) is not yet rated.

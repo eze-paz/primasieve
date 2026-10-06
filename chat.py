@@ -588,6 +588,11 @@ def live_door(seeded, online, store, path, seed):
     worlds, df = build_worlds(seeded=seeded, online=online)
     for w in worlds:
         if hasattr(w, "induce_lexicon") and hasattr(w, "df"): w.df = df
+    try:                                                # breadth_prereg.md: the 65k crawl store answered from, quoted ("per store")
+        from kb_crawl import Crawl, DB as CRAWL_DB
+        if os.path.exists(CRAWL_DB): worlds.insert(1, KGWorld(Crawl(), df, name="store"))
+    except Exception:
+        pass
     store = store or os.path.join(HERE, "_nldata", "chat_store.json")
     researcher = None
     if online:

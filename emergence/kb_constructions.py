@@ -169,9 +169,32 @@ class Reader:
         return "UNKNOWN", res
 
 
-def learn(store, common, held=None, least=3, share=0.8):
-    """C1 run 5's learner over the Wiktionary sentences (training headwords only when `held` is given)"""
+def book_sentences(paths):
+    """novelgrammar_prereg.md: the sentences of the given book files"""
+    import re as _re
+    for p in paths:
+        text = open(p, encoding="utf-8", errors="replace").read()
+        for s in _re.split(r"(?<=[.!?])\s+", text):
+            if 3 <= len(s.split()) <= 80: yield " ".join(s.split())
+
+
+def learn(store, common, held=None, least=3, share=0.8, books=(), shuffle_books=None):
+    """C1 run 5's learner over the Wiktionary sentences (training headwords only when `held` is given), and, with
+    `books`, over those books' sentences too (novelgrammar_prereg.md); `shuffle_books` (a Random) shuffles the books'
+    relation labels before counting -- the knockout"""
     C = Constructions(least=least, share=share, max_len=7); db = sqlite3.connect(KAIKKI)
+    if books:
+        inst = []
+        for s in book_sentences(books):
+            syms, ms, full = tokens(s, store, common)
+            if len(ms) < 2: continue
+            for run, a, b in instances(syms, ms, None, full=full):
+                A, B = set(best(store, a[2])), set(best(store, b[2]))
+                inst.append((typed(store, run, A, B), store.relations(A, B)))
+        if shuffle_books is not None:
+            labs = [l for k, l in inst]; shuffle_books.shuffle(labs); inst = [(k, l) for (k, _), l in zip(inst, labs)]
+        for keys, labels in inst:
+            for key in keys: C.observe(key, labels)
     for w, v in db.execute("select w, v from e"):
         if held is not None and held(w): continue
         e = json.loads(v); head = store.index.get(" ".join(symbols(w, "LN")))
