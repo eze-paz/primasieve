@@ -162,6 +162,12 @@ class Reader:
             elif pr["pairs"] and all(self.store.contradicts(qa, qb, p, d) for qa, qb in pr["pairs"]): v = "CONTRADICTED"
             else: v = "UNKNOWN"
             res.append((pr, v))
+        # natural_prereg.md (2): one pair of mentions with several admitted relations is ONE claim read several ways -- it
+        # holds if any reading holds, and is contradicted only if every reading is
+        groups = {}
+        for pr, v in res: groups.setdefault((pr["a"][0], pr["a"][1], pr["b"][0], pr["b"][1]), []).append(v)
+        merged = {k: ("SUPPORTED" if "SUPPORTED" in vs else "CONTRADICTED" if all(x == "CONTRADICTED" for x in vs) else "UNKNOWN") for k, vs in groups.items()}
+        res = [(pr, merged[(pr["a"][0], pr["a"][1], pr["b"][0], pr["b"][1])]) for pr, v in res]
         vs = [v for _, v in res]
         if not res: return "UNREAD", res
         if "CONTRADICTED" in vs: return "CONTRADICTED", res

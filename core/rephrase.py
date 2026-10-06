@@ -64,6 +64,8 @@ class Rephraser:
         question, and the direct answer was to another one."""
         syms = list(fr["syms"])
         direct = {str(a[1]).lower() for a in fr.get("answers", [])} if fr["kind"] in ANSWERED else None
+        if direct is not None and any(getattr(w, "transcript", False) for w in fr.get("answer_worlds", [])):
+            return None                  # natural_prereg.md (7): an answer recalled from the conversation itself is not re-read
         read = read_positions(fr, strict=direct is None)
         if direct is not None and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", [])) \
                 and not any(syms[p] not in self.common for p in read):

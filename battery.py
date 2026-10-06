@@ -75,7 +75,8 @@ def main():
         r = D.turn(it["q"]); ok = hit(r["reply"], it["gold"])
         if ok and r["kind"] == CONJECTURED: guessed += 1
         elif ok: fact += 1
-        elif r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement") and not all(r.get("quotes") or [False]): false_facts += 1
+        elif r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement") and not all(r.get("quotes") or [False]):
+            false_facts += 1; say(f"      B1 case (B10): {it['q']!r} gold {it['gold'][:2]} -> {r['reply'][:120]}")
     res["B10"] = dict(score=(fact + guessed) / len(od), fact=fact, guessed=guessed, n=len(od))
     say(f"B10 open domain: {fact + guessed}/{len(od)} ({fact} as facts, {guessed} as labelled guesses)  ({time.time() - T0:.0f} s)")
     # ---- B6 stories

@@ -104,3 +104,6 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-06 | 1 | B5, B6 | an event reader (events_prereg.md) | NOT PASSED (E2) | B5 held-out novels +11.5 over frequency (events ~+3 of it); B6 31/100 (from ~0) |
 | 2026-10-06 | 2 | B1 | the baseline's false facts (honesty_prereg.md) | H1 PASS, H2 NOT PASSED | B1 20 -> 0; B2 74.7 %; B9 17/20; B6 26/100 in the live door; B3 96/0.4 and 84/0; B7 15/18 at 0 % reversed |
 | 2026-10-06 | 4 | B4 | constructions learned from 359 novels (novelgrammar_prereg.md) | NOT PASSED (null) | B4 novels 3/4,605 unchanged; statements held |
+| 2026-10-06 | 3 | B10 | the 65k store: as a world (run 1), as an offline fetcher (run 2) (breadth_prereg.md) | NOT PASSED | run 1 B10 79.6 % but B1 9; run 2 B10 30.8 %, B1 2, B9 18/20 |
+| 2026-10-06 | 5 | B6 | auxiliaries learned from books; synonym verbs (events2_prereg.md) | NOT PASSED | B6 26 -> 28 |
+| 2026-10-06 | -- | B8 | builder's rating of the it3 sample (b8_rated_it3.md) | -- | 2.07 / 5 |

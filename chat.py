@@ -96,8 +96,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None, reader=None, events=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None, reader=None, events=None, brief=False):
         self.ledger = ledger if ledger is not None else Ledger()
+        self.brief = brief                       # natural_prereg.md (3): replies without the evidence trailer ("why" keeps it)
         self.events = events                     # events_prereg.md: the person's statements read into events, asked about later
         self.reader = reader                     # statements_prereg.md (C4): a statement is read and checked against the store
         self.fluent = set(fluent) if fluent is not None else None      # align_prereg.md (H6+H9): closed-class symbols, or None = frame replies
@@ -186,14 +187,18 @@ class Door:
         """filled_prereg.md: a statement is a question with its answer filled in. The 1-3 symbols at the start or the end
         are taken as the stated answer; the rest (without one closed-class link beside it) is read as a question; one value
         with every open-class symbol used -> (SUPPORTED | CONTRADICTED, phrase, value, stated, sources), else None"""
-        from core.reason import _spans
+        from core.session import _leaf_spans as _spans
         syms = symbols(text, "LN"); closed = self.fluent or set()
         n = len(syms)
+        if n >= 2 and syms[0] in closed and syms[1] in closed and syms[0] != syms[1]:
+            return None                                  # natural_prereg.md: a question-shaped turn (question word + link) is not a statement
         for L in (1, 2, 3):
             for side in ("start", "end"):
                 if n - L < 2: continue
                 ans = syms[:L] if side == "start" else syms[n - L:]
                 if any(x in closed for x in ans): continue          # run 2: an answer is open-class symbols only
+                lo, hi = (0, L) if side == "start" else (n - L, n)
+                if not self._thing(syms, lo, hi): continue          # natural_prereg.md (1): a stated answer is a THING some world reads
                 rest = syms[L:] if side == "start" else syms[:n - L]
                 link = rest[0] if side == "start" else rest[-1]
                 if link in closed: rest = rest[1:] if side == "start" else rest[:-1]
@@ -208,6 +213,15 @@ class Door:
                 v = "SUPPORTED" if symbols(value, "LN") == ans else "CONTRADICTED"
                 return v, " ".join(rest), value, " ".join(ans), list(f.get("sources", [])) or [getattr(w, "name", "source")]
         return None
+
+    def _thing(self, syms, lo, hi):
+        """natural_prereg.md (1): does some non-quoting world read syms[lo:hi] as an entity, a filter value or a number?"""
+        for w in self.S.worlds:
+            if getattr(w, "quotes", False) or getattr(w, "transcript", False): continue
+            try:
+                if any(r[0] == lo and r[1] == hi and r[2] in ("E", "F", "N") for r in w.readings(syms)): return True
+            except Exception: continue
+        return False
 
     def _statement(self, text):
         """statements_prereg.md: read the turn as a statement; SUPPORTED / CONTRADICTED -> the CHECK frame over the store's
@@ -242,12 +256,13 @@ class Door:
         """align_prereg.md: the answer in the person's own words -- the question with its question word replaced by the
         value -- if the rest of the question, read again without context, gives that value with every open-class symbol
         used (the monitor). -> sentence with its source name, or None."""
-        from core.reason import _spans
+        from core.session import _leaf_spans as _spans
         if fr["kind"] not in (ATTRIBUTED, COMMIT) or len(fr.get("answers", [])) != 1 or fr.get("guessed"): return None
         w = fr["answer_worlds"][0]
         if getattr(w, "quotes", False) or getattr(w, "transcript", False): return None
         syms = list(fr["syms"]); used = {p for i, j in _spans(w, fr["answers"][0][4]) for p in range(i, j)}
         if len(syms) < 3 or 0 in used or 1 in used: return None
+        if self.fluent is not None and not (syms[0] in self.fluent and syms[1] in self.fluent): return None   # natural_prereg.md (7): question-shaped only
         value = str(fr["answers"][0][1]); rest = syms[2:]
         vs = symbols(value, "LN")
         if vs and any(syms[i:i + len(vs)] == vs for i in range(len(syms))): return None     # the value is named: a check, not a lookup
@@ -313,7 +328,7 @@ class Door:
                     gloss = fr["kind"] in (ATTRIBUTED, COMMIT) and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", []))
                     unclean = False                          # filled_prereg.md run 2: an answer that leaves an open-class symbol unused
                     if fr["kind"] in (ATTRIBUTED, COMMIT) and fr.get("answers") and self.fluent is not None:
-                        from core.reason import _spans
+                        from core.session import _leaf_spans as _spans
                         usedp = {p for a_, w_ in zip(fr["answers"], fr["answer_worlds"]) for i, j in _spans(w_, a_[4]) for p in range(i, j)}
                         unclean = any(p not in usedp for p, x in enumerate(fr["syms"]) if x not in self.fluent and x[:1].isalpha())
                     if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss or unclean):
@@ -322,7 +337,8 @@ class Door:
                     frames_out.append(frame); acts.append(act)
                     said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") else None
                     if said: rec["aligned"] = True
-                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or realize(frame, self.rng)))
+                    shown = frames.brief(frame) if self.brief and frame.get("kind") in (ANSWER, PART, CHECK_K) else frame
+                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or realize(shown, self.rng)))
                 rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
                            sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
@@ -581,6 +597,9 @@ def gate(seeded=False):
     return not fails
 
 
+from core.textmodel import TextModel
+
+
 def live_door(seeded, online, store, path, seed):
     """the door the LIVE modes open (REPL and server): every ability on -- the store (default file), transfer, and when
     online the researcher over the live Wikidata and OpenStreetMap sources with their own cache files (research_prereg.md,
@@ -588,19 +607,23 @@ def live_door(seeded, online, store, path, seed):
     worlds, df = build_worlds(seeded=seeded, online=online)
     for w in worlds:
         if hasattr(w, "induce_lexicon") and hasattr(w, "df"): w.df = df
-    try:                                                # breadth_prereg.md: the 65k crawl store answered from, quoted ("per store")
-        from kb_crawl import Crawl, DB as CRAWL_DB
-        if os.path.exists(CRAWL_DB): worlds.insert(1, KGWorld(Crawl(), df, name="store"))
-    except Exception:
-        pass
+
     store = store or os.path.join(HERE, "_nldata", "chat_store.json")
     researcher = None
+    from core.research import Researcher, WikidataFetcher
+    fetchers = []
+    try:                                                # breadth_prereg.md run 2: the 65k store as an OFFLINE fetcher -- consulted for
+        from kb_crawl import DB as CRAWL_DB             # names nothing else read, like research (a world of its own interfered)
+        from kb_storefetch import StoreFetcher
+        if os.path.exists(CRAWL_DB): fetchers.append(StoreFetcher(closed=set(w for w, c in TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json")).uni.most_common(100)) if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")) else ()))
+    except Exception:
+        pass
     if online:
-        from core.research import Researcher, WikidataFetcher
         from kb_wikidata import Wikidata
         from kb_osm import Nominatim
-        researcher = Researcher([WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)],
-                                os.path.join(HERE, "_nldata", "research_live"), df=df, per_turn=4)
+        fetchers += [WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)]
+    if fetchers:
+        researcher = Researcher(fetchers, os.path.join(HERE, "_nldata", "research_live" if online else "research_offline"), df=df, per_turn=4)
     from kb_guess import build_guesser                  # guess_prereg.md: the guesser, heard only when nothing known answers
     rephraser = integrator = None                       # didyoumean_prereg.md: an unread word -> "did you mean ...?" from the text model
     if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")):
@@ -628,7 +651,7 @@ def live_door(seeded, online, store, path, seed):
     except Exception:
         reader = None
     return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
-                fluent=integrator.common if integrator is not None else None, reader=reader, events=events)        # align_prereg.md: replies in the person's words
+                fluent=integrator.common if integrator is not None else None, reader=reader, events=events, brief=True)        # align_prereg.md: replies in the person's words
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
@@ -748,7 +771,7 @@ def serve(port=8766, seeded=False, online=False, store=None):
                     state["door"] = Door(d0.S.worlds, state["df"], transcript=path, seed=int(time.time()), store=d0.store,
                                          transfer=d0.S.transfer, researcher=d0.S.researcher, guesser=d0.S.guesser,
                                          rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader,
-                                         events=type(d0.events)(d0.events.reader) if d0.events is not None else None)
+                                         events=type(d0.events)(d0.events.reader) if d0.events is not None else None, brief=d0.brief)
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 

@@ -13,15 +13,17 @@ GUT = os.path.join(HERE, "..", "_nldata", "gutenberg")
 def verb_forms(uni=None):
     """-> (finite form -> lemma, non-finite form -> lemma) from UniMorph (past tense and third-person present are finite);
     a form with several lemmas takes the lemma most frequent in the text model's counts"""
-    fin, base = {}, {}; cand = collections.defaultdict(set); uni = uni or {}
+    fin, base = {}, {}; cand = collections.defaultdict(set); uni = uni or {}; pcand = collections.defaultdict(set)
     for line in open(UNIMORPH, encoding="utf-8", errors="replace"):
         f = line.rstrip("\n").split("\t")
         if len(f) < 3 or not f[2].startswith("V"): continue
         lemma, form, feats = f[0].lower(), f[1].lower(), f[2]
         if " " in form: continue
         if ("PST" in feats and "PTCP" not in feats) or ("PRS" in feats and "3" in feats): cand[form].add(lemma)
+        if "PTCP" in feats: pcand[form].add(lemma)
         base.setdefault(lemma, lemma)
     fin = {f: max(sorted(ls), key=lambda l: uni.get(l, 0)) for f, ls in cand.items()}
+    verb_forms.participles = {f: max(sorted(ls), key=lambda l: uni.get(l, 0)) for f, ls in pcand.items()}
     return fin, base
 
 
@@ -47,7 +49,26 @@ def learn_side(fin, closed, n_books=60):
     return ("L" if c["L"] >= c["R"] else "R"), dict(c)
 
 
-def build(closed, uni=None):
+def learn_auxiliaries(closed, participles, n_books=60, share=0.15):
+    """events2_prereg.md: closed-class symbols followed by a participle in >= `share` of their occurrences"""
+    tot = collections.Counter(); hit = collections.Counter()
+    for b in books(False)[:n_books]:
+        t = [x.lower() for x in tokens(open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read())]
+        for a, c in zip(t, t[1:]):
+            if a in closed: tot[a] += 1; hit[a] += c in participles
+    return {a for a, n in tot.items() if n >= 50 and hit[a] >= share * n}
+
+
+def build(closed, uni=None, same=None):
     fin, base = verb_forms(uni)
     side, counts = learn_side(fin, closed)
-    return EventReader(fin, closed, side, base=base), side, counts
+    aux = learn_auxiliaries(closed, verb_forms.participles)
+    if same is None:
+        try:
+            from kb_synonyms import load_same
+            same = load_same(set(closed))
+        except Exception:
+            same = {}
+    R = EventReader(fin, closed, side, base=base, participles=verb_forms.participles, same=same)
+    R.auxiliaries = aux
+    return R, side, counts

@@ -15,9 +15,11 @@ def tokens(text):
 
 
 class EventReader:
-    def __init__(self, verbs, closed, agent_side="L", entities=(), base=None):
+    def __init__(self, verbs, closed, agent_side="L", entities=(), base=None, participles=None, same=None):
         self.verbs = dict(verbs); self.closed = set(closed); self.side = agent_side; self.entities = set(entities)
         self.base = dict(base or {})                 # non-finite verb forms -> lemma (a question's "did ... row")
+        self.participles = dict(participles or {})   # events2_prereg.md: participle -> lemma ("was waiting", "had gone")
+        self.same = same or {}                       # events2_prereg.md: the dictionary's statements of sameness
         self.last_agent = None
 
     def is_word(self, t): return t[:1].isalnum()
@@ -51,7 +53,12 @@ class EventReader:
         toks = tokens(text); out = []
         for k, t in enumerate(toks):
             lemma = self.verbs.get(t.lower())
-            if lemma is None or t.lower() in self.closed: continue
+            if lemma is None or t.lower() in self.closed:
+                # events2_prereg.md: a closed-class finite symbol before a participle -> one event, the participle's verb
+                lp = self.participles.get(t.lower())
+                if lp is None or t.lower() in self.closed or k == 0 or toks[k - 1].lower() not in getattr(self, "auxiliaries", ()):
+                    continue
+                lemma = lp
             a_step, p_step = (-1, 1) if self.side == "L" else (1, -1)
             ag = self.run_at(toks, k, a_step, 1, pronoun=True); pa = self.run_at(toks, k, p_step, 2)
             agent = None
@@ -86,12 +93,14 @@ class EventMemory:
         lemma selects events; the role it leaves empty is the answer"""
         toks = tokens(text); words = [t for t in toks if self.reader.is_word(t)]
         if not words or words[0].lower() not in self.reader.closed: return None
-        lemmas = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) for t in words[1:]]
+        lemmas = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) or self.reader.participles.get(t.lower()) for t in words[1:]
+                  if t.lower() not in self.reader.closed]
         lemmas = [l for l in lemmas if l]
+        same = {x for l in lemmas for x in self.reader.same.get(l, ())}                 # events2_prereg.md: synonymous verbs, second
         content = {t.lower() for t in words[1:] if self.reader.is_noun(t)}
         best = None
         for ev in reversed(self.events):
-            if ev["verb"] not in lemmas: continue
+            if ev["verb"] not in lemmas and ev["verb"] not in same: continue
             roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or ""}
             filled = {r for r, v in roles.items() if v and set(v.lower().split()) & content}
             if "agent" in filled and ev["patient"] and "patient" not in filled: ans = ev["patient"]
@@ -99,6 +108,6 @@ class EventMemory:
             elif "agent" in filled and not ev["patient"] and ev["adjuncts"]: ans = ev["adjuncts"][0]
             elif "agent" not in filled and ev["agent"] and filled: ans = ev["agent"]
             else: continue                      # honesty_prereg.md: no role shared with the question -> no basis to answer
-            score = len(filled)
+            score = len(filled) + (0.5 if ev["verb"] in lemmas else 0)
             if best is None or score > best[0]: best = (score, ans, ev)
         return (best[1], best[2]) if best else None

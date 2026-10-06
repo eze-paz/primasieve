@@ -23,3 +23,7 @@ V1 ~33 %: "was waiting", "had ... owned" cases; where/why questions still mostly
 UniMorph does not list "was" (nor other forms of "be"), so "a closed-class FINITE symbol" cannot come from it.
 AUXILIARIES are learned instead: over 60 training books, a closed-class symbol is an auxiliary when at least 15 % of its
 occurrences are followed by a participle (UniMorph's V.PTCP forms) -- a count; "the" is followed by one far less often.
+
+## Run (2026-10-06): NOT PASSED (V1 28/100 vs 30) -- measured in the same battery as breadth_prereg.md run 2
+B6 **28/100** (from 26): auxiliaries learned (was, were, had, has, been, ... with noise: he, she, i, they, just, often),
+"Mira was waiting on the dock" now an event; V2 B1 2 (both in B10, not B6); V3 B5 +11.6 held. V4 not run separately.

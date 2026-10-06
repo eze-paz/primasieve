@@ -270,8 +270,11 @@ class Session:
         content = [p for p in range(n) if every or syms[p] not in common]
         used = set()
         for a, w in zip(fr["answers"], fr["answer_worlds"]):
-            for i, j in _spans(w, a[4]): used.update(range(i, j))
-        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha()]
+            for i, j in _leaf_spans(w, a[4]): used.update(range(i, j))
+        lo_u, hi_u = (min(used), max(used)) if used else (0, n - 1)
+        # natural_prereg.md (4): unread open-class symbols BEFORE the first or AFTER the last position the answer used are
+        # courtesy ("do you know ...", "... please"), not content; inside the answered span they stay owed ("the threefold of")
+        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha() and lo_u <= p <= hi_u]
         if not missing: return fr
         return dict(fr, kind=PARTIAL, missing=missing, integrated=False)
 
@@ -425,3 +428,19 @@ class Integrator:
     """integrate_prereg.md (H3): what the integration rule counts as a function symbol -- a set from a corpus count
     (the text model's commonest symbols), never a list written here"""
     def __init__(self, common): self.common = set(common)
+
+
+def _leaf_spans(w, st):
+    """the spans a structure's readings actually cover: a composite's inner readings, and its outer readings except the
+    substituted region (the inner's whole range -- which may include words no reading used; honesty_prereg.md's sequel:
+    "country of ciitzenship of albert einstein" was one region, so the typo counted as used)"""
+    from .reason import Composite, _spans
+    if isinstance(st, Composite):
+        out = []
+        for wi, sti, _ in st.inners: out += _leaf_spans(wi, sti)
+        regions = {(a, b) for a, b, L in st.regions}
+        for i, j in _spans(st.outer[0], st.outer[1]):
+            ij = st.back(i, j)
+            if ij not in regions: out.append(ij)
+        return out
+    return _spans(w, st)
