@@ -86,4 +86,6 @@ they will go without ever trading away honesty, and to say plainly when they sto
 | date | iteration | line | hypothesis | verdict | battery delta |
 |---|---|---|---|---|---|
 | 2026-10-06 | -- | -- | plan written | -- | -- |
+| 2026-10-06 | P0 | all | battery built (drafts), baseline measured | -- | B1 20 (later found: 14 counting, 4 memory, 1 test, 1 engine), B2 73.7 %, B9 17/20, B10 14 %, B6 4 %, B5 +11.6, B4 novels 0.07 % |
 | 2026-10-06 | 1 | B5, B6 | an event reader (events_prereg.md) | NOT PASSED (E2) | B5 held-out novels +11.5 over frequency (events ~+3 of it); B6 31/100 (from ~0) |
+| 2026-10-06 | 2 | B1 | the baseline's false facts (honesty_prereg.md) | H1 PASS, H2 NOT PASSED | B1 20 -> 0; B2 74.7 %; B9 17/20; B6 26/100 in the live door; B3 96/0.4 and 84/0; B7 15/18 at 0 % reversed |

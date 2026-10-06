@@ -48,7 +48,8 @@ def main():
     D = door(); right = abst = 0
     for it in q:
         r = D.turn(it["q"]); ok = hit(r["reply"], it["gold"]); right += ok
-        if not ok and r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement"): false_facts += 1
+        if not ok and r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement") and not all(r.get("quotes") or [False]):
+            false_facts += 1; say(f"      B1 case: {it['q']!r} -> {r['reply'][:120]}")
         if r["kind"] not in (COMMIT, ATTRIBUTED, CONJECTURED): abst += 1
         if len(samples) < 15 and ok: samples.append((it["q"], r["reply"]))
     res["B2"] = dict(score=right / len(q), right=right, n=len(q), abstained=abst)

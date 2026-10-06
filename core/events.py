@@ -97,8 +97,8 @@ class EventMemory:
             if "agent" in filled and ev["patient"] and "patient" not in filled: ans = ev["patient"]
             elif "agent" in filled and "patient" in filled and ev["adjuncts"]: ans = ev["adjuncts"][0]
             elif "agent" in filled and not ev["patient"] and ev["adjuncts"]: ans = ev["adjuncts"][0]
-            elif "agent" not in filled and ev["agent"]: ans = ev["agent"]
-            else: continue
+            elif "agent" not in filled and ev["agent"] and filled: ans = ev["agent"]
+            else: continue                      # honesty_prereg.md: no role shared with the question -> no basis to answer
             score = len(filled)
             if best is None or score > best[0]: best = (score, ans, ev)
         return (best[1], best[2]) if best else None

@@ -33,6 +33,13 @@ def b2():
         rec = D.turn(text)
         if rec["kind"] in (COMMIT, ATTRIBUTED) and rec["values"] and CH.score(rec, typ, gold, worlds[0].label) == "correct":
             items.append((text, [str(v) for v in rec["values"]]))
+    name_words = set()
+    for wld in worlds:
+        for t in getattr(getattr(wld, "recs", None), "tables", {}).values():
+            for vals in t.values.values(): name_words |= {str(v).lower() for v in vals}
+    for text, gold in items:
+        fr = CH.reason(text, worlds, df, cats="LN")
+        name_words |= {" ".join(fr["syms"][r[0]:r[1]]) for r in fr.get("readings", []) if r[2] in ("E", "F") and r[1] - r[0] == 1}
     out = []
     for text, gold in items:
         w = text.split()
@@ -40,7 +47,8 @@ def b2():
         forms = [f"{rng.choice(PREFIX)} {text}", (text.replace("what is", "what's", 1) if "what is" in text else text + "?")]
         if content:
             i = rng.choice(content); forms.append(" ".join(w[:i] + [typo(w[i], rng)] + w[i + 1:]))
-            alts = sorted(a for a in syn.get(w[i], ()) if a.isalpha())
+            # honesty_prereg.md: never swap a word a world reads as a name or a filter value (gadget -> widget is another product)
+            alts = sorted(a for a in syn.get(w[i], ()) if a.isalpha()) if w[i] not in name_words else []
             forms.append(" ".join(w[:i] + [rng.choice(alts)] + w[i + 1:]) if alts else f"{text} please")
         if w[0] in ("what", "who") and len(w) > 3 and w[1] == "is": forms.append(" ".join(w[2:]) + " is " + w[0])
         else: forms.append(f"tell me {text}")

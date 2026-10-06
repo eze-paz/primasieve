@@ -23,7 +23,7 @@
 "source": "how many employees are in support"
 },
 {
-"q": "how many employees are in patronize",
+"q": "how many employees are in support please",
 "gold": [
 "2"
 ],
@@ -51,7 +51,7 @@
 "source": "is kyoto in japan"
 },
 {
-"q": "is kytoo in japan",
+"q": "is kyoto in jpaan",
 "gold": [
 "Japan"
 ],
@@ -72,7 +72,7 @@
 "source": "is kyoto in japan"
 },
 {
-"q": "could you tell me which region has the highest revenue in january",
+"q": "hey, which region has the highest revenue in january",
 "gold": [
 "west"
 ],
@@ -86,14 +86,14 @@
 "source": "which region has the highest revenue in january"
 },
 {
-"q": "which rgeion has the highest revenue in january",
+"q": "which region has the highest rveenue in january",
 "gold": [
 "west"
 ],
 "source": "which region has the highest revenue in january"
 },
 {
-"q": "which realm has the highest revenue in january",
+"q": "which region has the highest gross in january",
 "gold": [
 "west"
 ],
@@ -107,7 +107,7 @@
 "source": "which region has the highest revenue in january"
 },
 {
-"q": "hey, which region has the lowest price",
+"q": "do you know which region has the lowest price",
 "gold": [
 "east"
 ],
@@ -121,7 +121,7 @@
 "source": "which region has the lowest price"
 },
 {
-"q": "which region has the loewst price",
+"q": "which region has the lowset price",
 "gold": [
 "east"
 ],
@@ -142,7 +142,7 @@
 "source": "which region has the lowest price"
 },
 {
-"q": "hey, how are rome and italy related",
+"q": "please tell me how are rome and italy related",
 "gold": [
 "Italy"
 ],
@@ -156,7 +156,7 @@
 "source": "how are rome and italy related"
 },
 {
-"q": "how are rome and italy relaetd",
+"q": "how are rome and italy reltaed",
 "gold": [
 "Italy"
 ],
@@ -177,7 +177,7 @@
 "source": "how are rome and italy related"
 },
 {
-"q": "do you know what is the country of the city of engineering",
+"q": "hey, what is the country of the city of engineering",
 "gold": [
 "France"
 ],
@@ -191,14 +191,14 @@
 "source": "what is the country of the city of engineering"
 },
 {
-"q": "what is the country of the city of egnineering",
+"q": "what is the country of the city of engineeirng",
 "gold": [
 "France"
 ],
 "source": "what is the country of the city of engineering"
 },
 {
-"q": "what is the country of the city of technology",
+"q": "what is the country of the city of engineering please",
 "gold": [
 "France"
 ],
@@ -226,14 +226,14 @@
 "source": "lowest quantity for gadget in march"
 },
 {
-"q": "lowest quanttiy for gadget in march",
+"q": "lwoest quantity for gadget in march",
 "gold": [
 "9"
 ],
 "source": "lowest quantity for gadget in march"
 },
 {
-"q": "lowest amount for gadget in march",
+"q": "last quantity for gadget in march",
 "gold": [
 "9"
 ],
@@ -247,7 +247,7 @@
 "source": "lowest quantity for gadget in march"
 },
 {
-"q": "please tell me what is the country of the city of the department of alice",
+"q": "do you know what is the country of the city of the department of alice",
 "gold": [
 "France"
 ],
@@ -261,14 +261,14 @@
 "source": "what is the country of the city of the department of alice"
 },
 {
-"q": "what is the cuontry of the city of the department of alice",
+"q": "what is the country of the city of the department of alice",
 "gold": [
 "France"
 ],
 "source": "what is the country of the city of the department of alice"
 },
 {
-"q": "what is the land of the city of the department of alice",
+"q": "what is the country of the metropolis of the department of alice",
 "gold": [
 "France"
 ],
@@ -282,7 +282,7 @@
 "source": "what is the country of the city of the department of alice"
 },
 {
-"q": "i wonder total quantity for doohickey",
+"q": "quick question: total quantity for doohickey",
 "gold": [
 "335"
 ],
@@ -296,14 +296,14 @@
 "source": "total quantity for doohickey"
 },
 {
-"q": "toatl quantity for doohickey",
+"q": "ttoal quantity for doohickey",
 "gold": [
 "335"
 ],
 "source": "total quantity for doohickey"
 },
 {
-"q": "tot quantity for doohickey",
+"q": "total quantity for doohickey please",
 "gold": [
 "335"
 ],
@@ -317,7 +317,7 @@
 "source": "total quantity for doohickey"
 },
 {
-"q": "quick question: what is the country of the eiffel tower",
+"q": "please tell me what is the country of the eiffel tower",
 "gold": [
 "France"
 ],
@@ -331,14 +331,14 @@
 "source": "what is the country of the eiffel tower"
 },
 {
-"q": "what is the counrty of the eiffel tower",
+"q": "what is the country of the efifel tower",
 "gold": [
 "France"
 ],
 "source": "what is the country of the eiffel tower"
 },
 {
-"q": "what is the state of the eiffel tower",
+"q": "what is the country of the eiffel tower please",
 "gold": [
 "France"
 ],
@@ -352,7 +352,7 @@
 "source": "what is the country of the eiffel tower"
 },
 {
-"q": "please tell me what is the official language of brazil",
+"q": "quick question: what is the official language of brazil",
 "gold": [
 "Portuguese"
 ],
@@ -366,14 +366,14 @@
 "source": "what is the official language of brazil"
 },
 {
-"q": "what is the offiical language of brazil",
+"q": "what is the official langugae of brazil",
 "gold": [
 "Portuguese"
 ],
 "source": "what is the official language of brazil"
 },
 {
-"q": "what is the prescribed language of brazil",
+"q": "what is the official nomenclature of brazil",
 "gold": [
 "Portuguese"
 ],
@@ -387,7 +387,7 @@
 "source": "what is the official language of brazil"
 },
 {
-"q": "quick question: what is 20 minus 8",
+"q": "hey, what is 20 minus 8",
 "gold": [
 "12"
 ],
@@ -408,7 +408,7 @@
 "source": "what is 20 minus 8"
 },
 {
-"q": "what is 20 negative 8",
+"q": "what is 20 minus 8 please",
 "gold": [
 "12"
 ],
@@ -422,7 +422,7 @@
 "source": "what is 20 minus 8"
 },
 {
-"q": "i wonder sum of quantity for gadget in january",
+"q": "could you tell me sum of quantity for gadget in january",
 "gold": [
 "82"
 ],
@@ -436,14 +436,14 @@
 "source": "sum of quantity for gadget in january"
 },
 {
-"q": "sum of quantity for gadegt in january",
+"q": "sum of quantity for gagdet in january",
 "gold": [
 "82"
 ],
 "source": "sum of quantity for gadget in january"
 },
 {
-"q": "sum of quantity for widget in january",
+"q": "sum of quantity for gadget in january please",
 "gold": [
 "82"
 ],
@@ -457,7 +457,7 @@
 "source": "sum of quantity for gadget in january"
 },
 {
-"q": "could you tell me who is the director of jaws",
+"q": "quick question: who is the director of jaws",
 "gold": [
 "Steven Spielberg"
 ],
@@ -471,14 +471,14 @@
 "source": "who is the director of jaws"
 },
 {
-"q": "who is the director of jaws",
+"q": "who is the dircetor of jaws",
 "gold": [
 "Steven Spielberg"
 ],
 "source": "who is the director of jaws"
 },
 {
-"q": "who is the director of jaws please",
+"q": "who is the conductor of jaws",
 "gold": [
 "Steven Spielberg"
 ],
@@ -492,7 +492,7 @@
 "source": "who is the director of jaws"
 },
 {
-"q": "do you know is tokyo in japan",
+"q": "i wonder is tokyo in japan",
 "gold": [
 "Japan"
 ],
@@ -506,14 +506,14 @@
 "source": "is tokyo in japan"
 },
 {
-"q": "is tkoyo in japan",
+"q": "is tokyo in jpaan",
 "gold": [
 "Japan"
 ],
 "source": "is tokyo in japan"
 },
 {
-"q": "is tokio in japan",
+"q": "is tokyo in japan please",
 "gold": [
 "Japan"
 ],
@@ -527,7 +527,7 @@
 "source": "is tokyo in japan"
 },
 {
-"q": "quick question: what does lofty mean",
+"q": "i wonder what does lofty mean",
 "gold": [
 "of high moral or intellectual value; elevated in nature or style; \"an exalted ideal\"; \"argue in terms of high-flown ideals\"- Oliver Franks; \"a noble and lofty concept\"; \"a grand purpose\"",
 "of imposing height; especially standing out above others; \"an eminent peak\"; \"lofty mountains\"; \"the soaring spires of the cathedral\"; \"towering icebergs\"",
@@ -545,7 +545,7 @@
 "source": "what does lofty mean"
 },
 {
-"q": "what does lfoty mean",
+"q": "what does lofty mean",
 "gold": [
 "of high moral or intellectual value; elevated in nature or style; \"an exalted ideal\"; \"argue in terms of high-flown ideals\"- Oliver Franks; \"a noble and lofty concept\"; \"a grand purpose\"",
 "of imposing height; especially standing out above others; \"an eminent peak\"; \"lofty mountains\"; \"the soaring spires of the cathedral\"; \"towering icebergs\"",
@@ -554,7 +554,7 @@
 "source": "what does lofty mean"
 },
 {
-"q": "what does grand mean",
+"q": "what does lofty mean please",
 "gold": [
 "of high moral or intellectual value; elevated in nature or style; \"an exalted ideal\"; \"argue in terms of high-flown ideals\"- Oliver Franks; \"a noble and lofty concept\"; \"a grand purpose\"",
 "of imposing height; especially standing out above others; \"an eminent peak\"; \"lofty mountains\"; \"the soaring spires of the cathedral\"; \"towering icebergs\"",
@@ -586,7 +586,7 @@
 "source": "is paris in france"
 },
 {
-"q": "is paris in farnce",
+"q": "is prais in france",
 "gold": [
 "France"
 ],
@@ -607,7 +607,7 @@
 "source": "is paris in france"
 },
 {
-"q": "hey, what is the total revenue in the south",
+"q": "quick question: what is the total revenue in the south",
 "gold": [
 "4805"
 ],
@@ -621,14 +621,14 @@
 "source": "what is the total revenue in the south"
 },
 {
-"q": "what is the total revenue in the suoth",
+"q": "what is the total rveenue in the south",
 "gold": [
 "4805"
 ],
 "source": "what is the total revenue in the south"
 },
 {
-"q": "what is the total revenue in the dixieland",
+"q": "what is the total receipts in the south",
 "gold": [
 "4805"
 ],
@@ -642,7 +642,7 @@
 "source": "what is the total revenue in the south"
 },
 {
-"q": "hey, which product has the highest quantity",
+"q": "could you tell me which product has the highest quantity",
 "gold": [
 "doohickey"
 ],
@@ -656,7 +656,7 @@
 "source": "which product has the highest quantity"
 },
 {
-"q": "which product has the higehst quantity",
+"q": "which product has the hihgest quantity",
 "gold": [
 "doohickey"
 ],
@@ -677,7 +677,7 @@
 "source": "which product has the highest quantity"
 },
 {
-"q": "please tell me who is the spouse of barack obama",
+"q": "hey, who is the spouse of barack obama",
 "gold": [
 "Michelle Obama"
 ],
@@ -691,14 +691,14 @@
 "source": "who is the spouse of barack obama"
 },
 {
-"q": "who is the spuose of barack obama",
+"q": "who is the spouse of barack oabma",
 "gold": [
 "Michelle Obama"
 ],
 "source": "who is the spouse of barack obama"
 },
 {
-"q": "who is the mate of barack obama",
+"q": "who is the spouse of barack obama please",
 "gold": [
 "Michelle Obama"
 ],
@@ -712,7 +712,7 @@
 "source": "who is the spouse of barack obama"
 },
 {
-"q": "quick question: is the eiffel tower in paris",
+"q": "please tell me is the eiffel tower in paris",
 "gold": [
 "Paris"
 ],
@@ -768,7 +768,7 @@
 "source": "what is 100 minus 1"
 },
 {
-"q": "what is 100 subtraction 1",
+"q": "what is 100 minus 1 please",
 "gold": [
 "99"
 ],
@@ -782,7 +782,7 @@
 "source": "what is 100 minus 1"
 },
 {
-"q": "could you tell me maximum price for doohickey",
+"q": "please tell me maximum price for doohickey",
 "gold": [
 "40"
 ],
@@ -796,14 +796,14 @@
 "source": "maximum price for doohickey"
 },
 {
-"q": "maximum prcie for doohickey",
+"q": "maxmium price for doohickey",
 "gold": [
 "40"
 ],
 "source": "maximum price for doohickey"
 },
 {
-"q": "maximum toll for doohickey",
+"q": "utmost price for doohickey",
 "gold": [
 "40"
 ],
@@ -817,7 +817,7 @@
 "source": "maximum price for doohickey"
 },
 {
-"q": "hey, what is a dog",
+"q": "could you tell me what is a dog",
 "gold": [
 "a member of the genus Canis (probably descended from the common wolf) that has been domesticated by man since prehistoric times; occurs in many breeds; \"the dog barked all night\"",
 "a dull unattractive unpleasant girl or woman; \"she got a reputation as a frump\"; \"she's a real dog\"",
@@ -870,14 +870,14 @@
 "source": "what is the average salary of the department of erin"
 },
 {
-"q": "what is the average saalry of the department of erin",
+"q": "what is the average salary of the dpeartment of erin",
 "gold": [
 "110"
 ],
 "source": "what is the average salary of the department of erin"
 },
 {
-"q": "what is the average remuneration of the department of erin",
+"q": "what is the average salary of the section of erin",
 "gold": [
 "110"
 ],
@@ -891,7 +891,7 @@
 "source": "what is the average salary of the department of erin"
 },
 {
-"q": "could you tell me how are steven spielberg and jaws related",
+"q": "hey, how are steven spielberg and jaws related",
 "gold": [
 "Steven Spielberg"
 ],
@@ -905,7 +905,7 @@
 "source": "how are steven spielberg and jaws related"
 },
 {
-"q": "how are steven spielberg and jaws rleated",
+"q": "how are steven spielberg and jaws related",
 "gold": [
 "Steven Spielberg"
 ],
@@ -926,7 +926,7 @@
 "source": "how are steven spielberg and jaws related"
 },
 {
-"q": "quick question: difference in quantity between february and march",
+"q": "i wonder difference in quantity between february and march",
 "gold": [
 "16"
 ],
@@ -940,14 +940,14 @@
 "source": "difference in quantity between february and march"
 },
 {
-"q": "difference in quantity between february and mrach",
+"q": "differnece in quantity between february and march",
 "gold": [
 "16"
 ],
 "source": "difference in quantity between february and march"
 },
 {
-"q": "difference in quantity between february and edge",
+"q": "departure in quantity between february and march",
 "gold": [
 "16"
 ],
@@ -961,7 +961,7 @@
 "source": "difference in quantity between february and march"
 },
 {
-"q": "i wonder what is the capital of the country of the brandenburg gate",
+"q": "please tell me what is the capital of the country of the brandenburg gate",
 "gold": [
 "Berlin"
 ],
@@ -975,7 +975,7 @@
 "source": "what is the capital of the country of the brandenburg gate"
 },
 {
-"q": "what is the capital of the country of the brandenburg gate",
+"q": "what is the capital of the country of the brnadenburg gate",
 "gold": [
 "Berlin"
 ],
@@ -996,7 +996,7 @@
 "source": "what is the capital of the country of the brandenburg gate"
 },
 {
-"q": "do you know what is 6 times 7",
+"q": "hey, what is 6 times 7",
 "gold": [
 "42"
 ],
@@ -1010,7 +1010,7 @@
 "source": "what is 6 times 7"
 },
 {
-"q": "what is 6 tiems 7",
+"q": "what is 6 tmies 7",
 "gold": [
 "42"
 ],
@@ -1031,7 +1031,7 @@
 "source": "what is 6 times 7"
 },
 {
-"q": "hey, which department has the lowest floor in lisbon",
+"q": "i wonder which department has the lowest floor in lisbon",
 "gold": [
 "support"
 ],
@@ -1045,14 +1045,14 @@
 "source": "which department has the lowest floor in lisbon"
 },
 {
-"q": "which deaprtment has the lowest floor in lisbon",
+"q": "which department has the lowest floor in lisobn",
 "gold": [
 "support"
 ],
 "source": "which department has the lowest floor in lisbon"
 },
 {
-"q": "which section has the lowest floor in lisbon",
+"q": "which department has the lowest floor in lisbon please",
 "gold": [
 "support"
 ],
@@ -1080,14 +1080,14 @@
 "source": "what is the continent of the city of the department of the manager of heidi"
 },
 {
-"q": "what is the continent of the city of the departmnet of the manager of heidi",
+"q": "what is the continent of the city of the department of the maanger of heidi",
 "gold": [
 "Europe"
 ],
 "source": "what is the continent of the city of the department of the manager of heidi"
 },
 {
-"q": "what is the continent of the city of the section of the manager of heidi",
+"q": "what is the continent of the city of the department of the coach of heidi",
 "gold": [
 "Europe"
 ],
@@ -1115,14 +1115,14 @@
 "source": "what is the official language of the country of machu picchu"
 },
 {
-"q": "what is the ofifcial language of the country of machu picchu",
+"q": "what is the official lnaguage of the country of machu picchu",
 "gold": [
 "Spanish"
 ],
 "source": "what is the official language of the country of machu picchu"
 },
 {
-"q": "what is the prescribed language of the country of machu picchu",
+"q": "what is the official nomenclature of the country of machu picchu",
 "gold": [
 "Spanish"
 ],
@@ -1157,7 +1157,7 @@
 "source": "mean quantity in the south in march"
 },
 {
-"q": "mean quantity in the s in march",
+"q": "mean quantity in the south in march please",
 "gold": [
 "81/4"
 ],
@@ -1171,7 +1171,7 @@
 "source": "mean quantity in the south in march"
 },
 {
-"q": "i wonder what is the average revenue",
+"q": "please tell me what is the average revenue",
 "gold": [
 "5521/12"
 ],
@@ -1185,14 +1185,14 @@
 "source": "what is the average revenue"
 },
 {
-"q": "what is the aevrage revenue",
+"q": "what is the avreage revenue",
 "gold": [
 "5521/12"
 ],
 "source": "what is the average revenue"
 },
 {
-"q": "what is the norm revenue",
+"q": "what is the average revenue please",
 "gold": [
 "5521/12"
 ],
@@ -1206,7 +1206,7 @@
 "source": "what is the average revenue"
 },
 {
-"q": "hey, how are the amazon river and brazil related",
+"q": "i wonder how are the amazon river and brazil related",
 "gold": [
 "Brazil"
 ],
@@ -1220,7 +1220,7 @@
 "source": "how are the amazon river and brazil related"
 },
 {
-"q": "how are the amazon rvier and brazil related",
+"q": "how are the amaozn river and brazil related",
 "gold": [
 "Brazil"
 ],
@@ -1241,7 +1241,7 @@
 "source": "how are the amazon river and brazil related"
 },
 {
-"q": "quick question: minimum price in the north",
+"q": "please tell me minimum price in the north",
 "gold": [
 "5"
 ],
@@ -1255,14 +1255,14 @@
 "source": "minimum price in the north"
 },
 {
-"q": "minimum pirce in the north",
+"q": "minimum prcie in the north",
 "gold": [
 "5"
 ],
 "source": "minimum price in the north"
 },
 {
-"q": "minimum terms in the north",
+"q": "minimum toll in the north",
 "gold": [
 "5"
 ],
@@ -1297,7 +1297,7 @@
 "source": "what is the double of 50"
 },
 {
-"q": "what is the threefold of 50",
+"q": "what is the double of 50 please",
 "gold": [
 "100"
 ],
@@ -1311,7 +1311,7 @@
 "source": "what is the double of 50"
 },
 {
-"q": "i wonder what is the double of 9",
+"q": "hey, what is the double of 9",
 "gold": [
 "18"
 ],
@@ -1325,14 +1325,14 @@
 "source": "what is the double of 9"
 },
 {
-"q": "what is the doulbe of 9",
+"q": "what is the duoble of 9",
 "gold": [
 "18"
 ],
 "source": "what is the double of 9"
 },
 {
-"q": "what is the treble of 9",
+"q": "what is the double of 9 please",
 "gold": [
 "18"
 ],
@@ -1360,14 +1360,14 @@
 "source": "what is the capital of the country of the acropolis of athens"
 },
 {
-"q": "what is the capital of the country of the acropolis of ahtens",
+"q": "what is the capital of the country of the acroplois of athens",
 "gold": [
 "Athens"
 ],
 "source": "what is the capital of the country of the acropolis of athens"
 },
 {
-"q": "what is the capital of the country of the acropolis of athinai",
+"q": "what is the capital of the country of the acropolis of athens please",
 "gold": [
 "Athens"
 ],
@@ -1395,14 +1395,14 @@
 "source": "what is the highest quantity"
 },
 {
-"q": "what is the highset quantity",
+"q": "what is the highest qauntity",
 "gold": [
 "49"
 ],
 "source": "what is the highest quantity"
 },
 {
-"q": "what is the highest quantity please",
+"q": "what is the highest measure",
 "gold": [
 "49"
 ],
@@ -1416,7 +1416,7 @@
 "source": "what is the highest quantity"
 },
 {
-"q": "please tell me how many employees are in the department of alice",
+"q": "quick question: how many employees are in the department of alice",
 "gold": [
 "3"
 ],
@@ -1430,14 +1430,14 @@
 "source": "how many employees are in the department of alice"
 },
 {
-"q": "how many empolyees are in the department of alice",
+"q": "how many employees are in the departmnet of alice",
 "gold": [
 "3"
 ],
 "source": "how many employees are in the department of alice"
 },
 {
-"q": "how many employees are in the department of alice please",
+"q": "how many employees are in the section of alice",
 "gold": [
 "3"
 ],
@@ -1451,7 +1451,7 @@
 "source": "how many employees are in the department of alice"
 },
 {
-"q": "quick question: what is the lowest salary",
+"q": "do you know what is the lowest salary",
 "gold": [
 "70"
 ],
@@ -1465,14 +1465,14 @@
 "source": "what is the lowest salary"
 },
 {
-"q": "what is the lowset salary",
+"q": "what is the lowest salray",
 "gold": [
 "70"
 ],
 "source": "what is the lowest salary"
 },
 {
-"q": "what is the last salary",
+"q": "what is the lowest wage",
 "gold": [
 "70"
 ],
@@ -1500,7 +1500,7 @@
 "source": "what is the double of the salary of alice"
 },
 {
-"q": "what is the double of the salray of alice",
+"q": "what is the double of the slaary of alice",
 "gold": [
 "240"
 ],
@@ -1521,7 +1521,7 @@
 "source": "what is the double of the salary of alice"
 },
 {
-"q": "quick question: what is the total salary in engineering",
+"q": "i wonder what is the total salary in engineering",
 "gold": [
 "380"
 ],
@@ -1535,14 +1535,14 @@
 "source": "what is the total salary in engineering"
 },
 {
-"q": "what is the toatl salary in engineering",
+"q": "what is the total slaary in engineering",
 "gold": [
 "380"
 ],
 "source": "what is the total salary in engineering"
 },
 {
-"q": "what is the full salary in engineering",
+"q": "what is the total remuneration in engineering",
 "gold": [
 "380"
 ],
@@ -1556,7 +1556,7 @@
 "source": "what is the total salary in engineering"
 },
 {
-"q": "do you know what is the capital of france",
+"q": "quick question: what is the capital of france",
 "gold": [
 "Paris"
 ],
@@ -1570,14 +1570,14 @@
 "source": "what is the capital of france"
 },
 {
-"q": "what is the captial of france",
+"q": "what is the capiatl of france",
 "gold": [
 "Paris"
 ],
 "source": "what is the capital of france"
 },
 {
-"q": "what is the majuscule of france",
+"q": "what is the cap of france",
 "gold": [
 "Paris"
 ],
@@ -1605,14 +1605,14 @@
 "source": "what is the floor of the department of erin"
 },
 {
-"q": "what is the floor of the deparmtent of erin",
+"q": "what is the floor of the department of erin",
 "gold": [
 "1"
 ],
 "source": "what is the floor of the department of erin"
 },
 {
-"q": "what is the floor of the section of erin",
+"q": "what is the floor of the department of erin please",
 "gold": [
 "1"
 ],
@@ -1626,7 +1626,7 @@
 "source": "what is the floor of the department of erin"
 },
 {
-"q": "quick question: what is the official language of the country of the colosseum",
+"q": "do you know what is the official language of the country of the colosseum",
 "gold": [
 "Italian"
 ],
@@ -1640,14 +1640,14 @@
 "source": "what is the official language of the country of the colosseum"
 },
 {
-"q": "what is the officail language of the country of the colosseum",
+"q": "what is the official langugae of the country of the colosseum",
 "gold": [
 "Italian"
 ],
 "source": "what is the official language of the country of the colosseum"
 },
 {
-"q": "what is the functionary language of the country of the colosseum",
+"q": "what is the official speech of the country of the colosseum",
 "gold": [
 "Italian"
 ],
@@ -1661,7 +1661,7 @@
 "source": "what is the official language of the country of the colosseum"
 },
 {
-"q": "do you know mean price in the east",
+"q": "please tell me mean price in the east",
 "gold": [
 "217/12"
 ],
@@ -1682,7 +1682,7 @@
 "source": "mean price in the east"
 },
 {
-"q": "mean price in the orient",
+"q": "think price in the east",
 "gold": [
 "217/12"
 ],
@@ -1696,7 +1696,7 @@
 "source": "mean price in the east"
 },
 {
-"q": "quick question: which month has the highest price for gizmo",
+"q": "do you know which month has the highest price for gizmo",
 "gold": [
 "january"
 ],
@@ -1710,14 +1710,14 @@
 "source": "which month has the highest price for gizmo"
 },
 {
-"q": "which month has the highset price for gizmo",
+"q": "which month has the highest prcie for gizmo",
 "gold": [
 "january"
 ],
 "source": "which month has the highest price for gizmo"
 },
 {
-"q": "which month has the highest price for gizmo please",
+"q": "which month has the highest terms for gizmo",
 "gold": [
 "january"
 ],
@@ -1745,14 +1745,14 @@
 "source": "what is the lowest revenue"
 },
 {
-"q": "what is the lowest reevnue",
+"q": "what is the lowset revenue",
 "gold": [
 "21"
 ],
 "source": "what is the lowest revenue"
 },
 {
-"q": "what is the lowest taxation",
+"q": "what is the last revenue",
 "gold": [
 "21"
 ],
@@ -1780,14 +1780,14 @@
 "source": "what is the official language of the city of research"
 },
 {
-"q": "what is the official language of the city of reserach",
+"q": "what is the ofifcial language of the city of research",
 "gold": [
 "German"
 ],
 "source": "what is the official language of the city of research"
 },
 {
-"q": "what is the official language of the city of enquiry",
+"q": "what is the official language of the city of research please",
 "gold": [
 "German"
 ],
@@ -1801,7 +1801,7 @@
 "source": "what is the official language of the city of research"
 },
 {
-"q": "please tell me how are tokyo and japan related",
+"q": "quick question: how are tokyo and japan related",
 "gold": [
 "Japan"
 ],
@@ -1815,14 +1815,14 @@
 "source": "how are tokyo and japan related"
 },
 {
-"q": "how are tokyo and jpaan related",
+"q": "how are tokyo and japan realted",
 "gold": [
 "Japan"
 ],
 "source": "how are tokyo and japan related"
 },
 {
-"q": "how are tokyo and nihon related",
+"q": "how are tokyo and japan related please",
 "gold": [
 "Japan"
 ],
@@ -1901,7 +1901,7 @@
 "source": "dog?"
 },
 {
-"q": "please tell me who is the manager of the manager of alice",
+"q": "i wonder who is the manager of the manager of alice",
 "gold": [
 "carol"
 ],
@@ -1915,14 +1915,14 @@
 "source": "who is the manager of the manager of alice"
 },
 {
-"q": "who is the mnaager of the manager of alice",
+"q": "who is the manager of the manager of ailce",
 "gold": [
 "carol"
 ],
 "source": "who is the manager of the manager of alice"
 },
 {
-"q": "who is the director of the manager of alice",
+"q": "who is the manager of the manager of alice please",
 "gold": [
 "carol"
 ],
@@ -1936,7 +1936,7 @@
 "source": "who is the manager of the manager of alice"
 },
 {
-"q": "could you tell me what is 11 plus 12",
+"q": "quick question: what is 11 plus 12",
 "gold": [
 "23"
 ],
@@ -1957,7 +1957,7 @@
 "source": "what is 11 plus 12"
 },
 {
-"q": "what is 11 addition 12",
+"q": "what is 11 plus 12 please",
 "gold": [
 "23"
 ],
@@ -1971,7 +1971,7 @@
 "source": "what is 11 plus 12"
 },
 {
-"q": "could you tell me which region has the lowest revenue in march",
+"q": "i wonder which region has the lowest revenue in march",
 "gold": [
 "east"
 ],
@@ -1985,14 +1985,14 @@
 "source": "which region has the lowest revenue in march"
 },
 {
-"q": "which region has the lowest revenue in macrh",
+"q": "which reigon has the lowest revenue in march",
 "gold": [
 "east"
 ],
 "source": "which region has the lowest revenue in march"
 },
 {
-"q": "which region has the lowest revenue in marching",
+"q": "which part has the lowest revenue in march",
 "gold": [
 "east"
 ],
@@ -2020,7 +2020,7 @@
 "source": "what is the continent of the country of the taj mahal"
 },
 {
-"q": "what is the cnotinent of the country of the taj mahal",
+"q": "what is the contnient of the country of the taj mahal",
 "gold": [
 "Asia"
 ],
@@ -2041,7 +2041,7 @@
 "source": "what is the continent of the country of the taj mahal"
 },
 {
-"q": "quick question: what is the continent of egypt",
+"q": "please tell me what is the continent of egypt",
 "gold": [
 "Africa"
 ],
@@ -2055,7 +2055,7 @@
 "source": "what is the continent of egypt"
 },
 {
-"q": "what is the continnet of egypt",
+"q": "what is the cnotinent of egypt",
 "gold": [
 "Africa"
 ],
@@ -2076,7 +2076,7 @@
 "source": "what is the continent of egypt"
 },
 {
-"q": "i wonder what is the capital of japan",
+"q": "could you tell me what is the capital of japan",
 "gold": [
 "Tokyo"
 ],
@@ -2090,7 +2090,7 @@
 "source": "what is the capital of japan"
 },
 {
-"q": "what is the capiatl of japan",
+"q": "what is the cpaital of japan",
 "gold": [
 "Tokyo"
 ],
@@ -2111,7 +2111,7 @@
 "source": "what is the capital of japan"
 },
 {
-"q": "hey, what is the city of research",
+"q": "i wonder what is the city of research",
 "gold": [
 "berlin"
 ],
@@ -2125,14 +2125,14 @@
 "source": "what is the city of research"
 },
 {
-"q": "what is the city of research",
+"q": "what is the city of reseacrh",
 "gold": [
 "berlin"
 ],
 "source": "what is the city of research"
 },
 {
-"q": "what is the metropolis of research",
+"q": "what is the city of research please",
 "gold": [
 "berlin"
 ],
@@ -2146,7 +2146,7 @@
 "source": "what is the city of research"
 },
 {
-"q": "quick question: who is the author of hamlet",
+"q": "do you know who is the author of hamlet",
 "gold": [
 "William Shakespeare"
 ],
@@ -2160,14 +2160,14 @@
 "source": "who is the author of hamlet"
 },
 {
-"q": "who is the author of halmet",
+"q": "who is the atuhor of hamlet",
 "gold": [
 "William Shakespeare"
 ],
 "source": "who is the author of hamlet"
 },
 {
-"q": "who is the author of village",
+"q": "who is the source of hamlet",
 "gold": [
 "William Shakespeare"
 ],
@@ -2181,7 +2181,7 @@
 "source": "who is the author of hamlet"
 },
 {
-"q": "please tell me what is the double of 3 times 4",
+"q": "quick question: what is the double of 3 times 4",
 "gold": [
 "24"
 ],
@@ -2195,14 +2195,14 @@
 "source": "what is the double of 3 times 4"
 },
 {
-"q": "what is the double of 3 tiems 4",
+"q": "what is the doulbe of 3 times 4",
 "gold": [
 "24"
 ],
 "source": "what is the double of 3 times 4"
 },
 {
-"q": "what is the double of 3 multiplication 4",
+"q": "what is the double of 3 times 4 please",
 "gold": [
 "24"
 ],
@@ -2216,7 +2216,7 @@
 "source": "what is the double of 3 times 4"
 },
 {
-"q": "quick question: largest revenue in february",
+"q": "could you tell me largest revenue in february",
 "gold": [
 "1410"
 ],
@@ -2237,7 +2237,7 @@
 "source": "largest revenue in february"
 },
 {
-"q": "largest taxation in february",
+"q": "largest receipts in february",
 "gold": [
 "1410"
 ],
@@ -2265,14 +2265,14 @@
 "source": "difference in revenue between widget and gadget"
 },
 {
-"q": "difference in revenue betewen widget and gadget",
+"q": "difference in revenue between widget and gdaget",
 "gold": [
 "-1780"
 ],
 "source": "difference in revenue between widget and gadget"
 },
 {
-"q": "difference in revenue betwixt widget and gadget",
+"q": "difference in revenue between widget and gadget please",
 "gold": [
 "-1780"
 ],
@@ -2286,7 +2286,7 @@
 "source": "difference in revenue between widget and gadget"
 },
 {
-"q": "could you tell me what is the total salary of engineering times 2",
+"q": "do you know what is the total salary of engineering times 2",
 "gold": [
 "760"
 ],
@@ -2300,14 +2300,14 @@
 "source": "what is the total salary of engineering times 2"
 },
 {
-"q": "what is the total salary of engnieering times 2",
+"q": "what is the total salary of engineering times 2",
 "gold": [
 "760"
 ],
 "source": "what is the total salary of engineering times 2"
 },
 {
-"q": "what is the total salary of technology times 2",
+"q": "what is the total salary of engineering times 2 please",
 "gold": [
 "760"
 ],
@@ -2321,7 +2321,7 @@
 "source": "what is the total salary of engineering times 2"
 },
 {
-"q": "i wonder is rome in italy",
+"q": "please tell me is rome in italy",
 "gold": [
 "Italy"
 ],
@@ -2342,7 +2342,7 @@
 "source": "is rome in italy"
 },
 {
-"q": "is rome in italia",
+"q": "is rome in italy please",
 "gold": [
 "Italy"
 ],
@@ -2356,7 +2356,7 @@
 "source": "is rome in italy"
 },
 {
-"q": "please tell me how many rows for gizmo",
+"q": "i wonder how many rows for gizmo",
 "gold": [
 "12"
 ],
@@ -2391,7 +2391,7 @@
 "source": "how many rows for gizmo"
 },
 {
-"q": "could you tell me how are shakespeare and hamlet related",
+"q": "quick question: how are shakespeare and hamlet related",
 "gold": [
 "William Shakespeare"
 ],
@@ -2405,7 +2405,7 @@
 "source": "how are shakespeare and hamlet related"
 },
 {
-"q": "how are shakespeare and hamlet relaetd",
+"q": "how are shakespeare and hmalet related",
 "gold": [
 "William Shakespeare"
 ],
@@ -2426,7 +2426,7 @@
 "source": "how are shakespeare and hamlet related"
 },
 {
-"q": "please tell me what is the city of the department of alice",
+"q": "hey, what is the city of the department of alice",
 "gold": [
 "paris"
 ],
@@ -2440,14 +2440,14 @@
 "source": "what is the city of the department of alice"
 },
 {
-"q": "what is the city of the department of ailce",
+"q": "what is the city of the department of alice",
 "gold": [
 "paris"
 ],
 "source": "what is the city of the department of alice"
 },
 {
-"q": "what is the city of the department of alice please",
+"q": "what is the metropolis of the department of alice",
 "gold": [
 "paris"
 ],
@@ -2461,7 +2461,7 @@
 "source": "what is the city of the department of alice"
 },
 {
-"q": "i wonder what is the capital of the country of citizenship of albert einstein",
+"q": "please tell me what is the capital of the country of citizenship of albert einstein",
 "gold": [
 "Stuttgart"
 ],
@@ -2475,7 +2475,7 @@
 "source": "what is the capital of the country of citizenship of albert einstein"
 },
 {
-"q": "what is the capital of the country of citzienship of albert einstein",
+"q": "what is the capital of the country of ciitzenship of albert einstein",
 "gold": [
 "Stuttgart"
 ],
@@ -2496,7 +2496,7 @@
 "source": "what is the capital of the country of citizenship of albert einstein"
 },
 {
-"q": "do you know what is the currency of the country of the statue of liberty",
+"q": "please tell me what is the currency of the country of the statue of liberty",
 "gold": [
 "United States dollar"
 ],
@@ -2510,14 +2510,14 @@
 "source": "what is the currency of the country of the statue of liberty"
 },
 {
-"q": "what is the currency of the coutnry of the statue of liberty",
+"q": "what is the currency of the conutry of the statue of liberty",
 "gold": [
 "United States dollar"
 ],
 "source": "what is the currency of the country of the statue of liberty"
 },
 {
-"q": "what is the currency of the area of the statue of liberty",
+"q": "what is the currency of the nation of the statue of liberty",
 "gold": [
 "United States dollar"
 ],
@@ -2531,7 +2531,7 @@
 "source": "what is the currency of the country of the statue of liberty"
 },
 {
-"q": "i wonder what is the salary of alice",
+"q": "please tell me what is the salary of alice",
 "gold": [
 "120"
 ],
@@ -2545,7 +2545,7 @@
 "source": "what is the salary of alice"
 },
 {
-"q": "what is the salary of alcie",
+"q": "what is the salary of ailce",
 "gold": [
 "120"
 ],
@@ -2566,7 +2566,7 @@
 "source": "what is the salary of alice"
 },
 {
-"q": "quick question: what is the highest salary in research",
+"q": "please tell me what is the highest salary in research",
 "gold": [
 "300"
 ],
@@ -2580,14 +2580,14 @@
 "source": "what is the highest salary in research"
 },
 {
-"q": "what is the highest salary in reesarch",
+"q": "what is the hgihest salary in research",
 "gold": [
 "300"
 ],
 "source": "what is the highest salary in research"
 },
 {
-"q": "what is the highest salary in explore",
+"q": "what is the highest salary in research please",
 "gold": [
 "300"
 ],
@@ -2601,7 +2601,7 @@
 "source": "what is the highest salary in research"
 },
 {
-"q": "do you know difference in price between east and west",
+"q": "hey, difference in price between east and west",
 "gold": [
 "-73"
 ],
@@ -2622,7 +2622,7 @@
 "source": "difference in price between east and west"
 },
 {
-"q": "difference in price between east and westward",
+"q": "difference in price between east and west please",
 "gold": [
 "-73"
 ],
@@ -2650,7 +2650,7 @@
 "source": "what is the salary of alice plus 30"
 },
 {
-"q": "what is the salary of alcie plus 30",
+"q": "what is the salary of alice plus 30",
 "gold": [
 "150"
 ],
@@ -2671,7 +2671,7 @@
 "source": "what is the salary of alice plus 30"
 },
 {
-"q": "i wonder what is the city of the department of the manager of heidi",
+"q": "do you know what is the city of the department of the manager of heidi",
 "gold": [
 "madrid"
 ],
@@ -2685,14 +2685,14 @@
 "source": "what is the city of the department of the manager of heidi"
 },
 {
-"q": "what is the city of the department of the manager of heidi",
+"q": "what is the city of the department of the manager of hedii",
 "gold": [
 "madrid"
 ],
 "source": "what is the city of the department of the manager of heidi"
 },
 {
-"q": "what is the metropolis of the department of the manager of heidi",
+"q": "what is the city of the department of the manager of heidi please",
 "gold": [
 "madrid"
 ],
@@ -2720,7 +2720,7 @@
 "source": "how are paris and france related"
 },
 {
-"q": "how are paris and france realted",
+"q": "how are prais and france related",
 "gold": [
 "France"
 ],
@@ -2741,7 +2741,7 @@
 "source": "how are paris and france related"
 },
 {
-"q": "do you know sum of revenue in february",
+"q": "please tell me sum of revenue in february",
 "gold": [
 "7697"
 ],
@@ -2755,14 +2755,14 @@
 "source": "sum of revenue in february"
 },
 {
-"q": "sum of revenue in februray",
+"q": "sum of reveune in february",
 "gold": [
 "7697"
 ],
 "source": "sum of revenue in february"
 },
 {
-"q": "sum of revenue in feb",
+"q": "sum of receipts in february",
 "gold": [
 "7697"
 ],
@@ -2811,7 +2811,7 @@
 "source": "how are mount everest and nepal related"
 },
 {
-"q": "please tell me what is the maximum quantity in the north",
+"q": "hey, what is the maximum quantity in the north",
 "gold": [
 "47"
 ],
@@ -2825,14 +2825,14 @@
 "source": "what is the maximum quantity in the north"
 },
 {
-"q": "what is the maxiumm quantity in the north",
+"q": "what is the maximum quantity in the nroth",
 "gold": [
 "47"
 ],
 "source": "what is the maximum quantity in the north"
 },
 {
-"q": "what is the utmost quantity in the north",
+"q": "what is the maximum quantity in the north please",
 "gold": [
 "47"
 ],
@@ -2846,7 +2846,7 @@
 "source": "what is the maximum quantity in the north"
 },
 {
-"q": "quick question: what is the continent of the city of sales",
+"q": "do you know what is the continent of the city of sales",
 "gold": [
 "Europe"
 ],
@@ -2860,14 +2860,14 @@
 "source": "what is the continent of the city of sales"
 },
 {
-"q": "what is the conitnent of the city of sales",
+"q": "what is the continent of the city of saels",
 "gold": [
 "Europe"
 ],
 "source": "what is the continent of the city of sales"
 },
 {
-"q": "what is the celibate of the city of sales",
+"q": "what is the continent of the city of sales please",
 "gold": [
 "Europe"
 ],
@@ -2881,7 +2881,7 @@
 "source": "what is the continent of the city of sales"
 },
 {
-"q": "hey, who is the manager of bob",
+"q": "i wonder who is the manager of bob",
 "gold": [
 "carol"
 ],
@@ -2895,14 +2895,14 @@
 "source": "who is the manager of bob"
 },
 {
-"q": "who is the mangaer of bob",
+"q": "who is the manaegr of bob",
 "gold": [
 "carol"
 ],
 "source": "who is the manager of bob"
 },
 {
-"q": "who is the director of bob",
+"q": "who is the coach of bob",
 "gold": [
 "carol"
 ],
@@ -2916,7 +2916,7 @@
 "source": "who is the manager of bob"
 },
 {
-"q": "could you tell me how are the eiffel tower and paris related",
+"q": "quick question: how are the eiffel tower and paris related",
 "gold": [
 "Paris"
 ],
@@ -2930,7 +2930,7 @@
 "source": "how are the eiffel tower and paris related"
 },
 {
-"q": "how are the eiffel tower and paris rleated",
+"q": "how are the eiffel twoer and paris related",
 "gold": [
 "Paris"
 ],
@@ -2951,7 +2951,7 @@
 "source": "how are the eiffel tower and paris related"
 },
 {
-"q": "quick question: what is the currency of the country of mount fuji",
+"q": "hey, what is the currency of the country of mount fuji",
 "gold": [
 "yen"
 ],
@@ -2965,14 +2965,14 @@
 "source": "what is the currency of the country of mount fuji"
 },
 {
-"q": "what is the currency of the country of mount fuji",
+"q": "what is the currency of the conutry of mount fuji",
 "gold": [
 "yen"
 ],
 "source": "what is the currency of the country of mount fuji"
 },
 {
-"q": "what is the currency of the country of mount fujinoyama",
+"q": "what is the currency of the nation of mount fuji",
 "gold": [
 "yen"
 ],
@@ -2986,7 +2986,7 @@
 "source": "what is the currency of the country of mount fuji"
 },
 {
-"q": "do you know define pomegranate",
+"q": "quick question: define pomegranate",
 "gold": [
 "shrub or small tree native to southwestern Asia having large red many-seeded fruit",
 "large globular fruit having many seeds with juicy red pulp in a tough brownish-red rind"
@@ -3002,7 +3002,7 @@
 "source": "define pomegranate"
 },
 {
-"q": "deifne pomegranate",
+"q": "define pomegrantae",
 "gold": [
 "shrub or small tree native to southwestern Asia having large red many-seeded fruit",
 "large globular fruit having many seeds with juicy red pulp in a tough brownish-red rind"
@@ -3010,7 +3010,7 @@
 "source": "define pomegranate"
 },
 {
-"q": "delimitate pomegranate",
+"q": "define pomegranate please",
 "gold": [
 "shrub or small tree native to southwestern Asia having large red many-seeded fruit",
 "large globular fruit having many seeds with juicy red pulp in a tough brownish-red rind"
@@ -3026,7 +3026,7 @@
 "source": "define pomegranate"
 },
 {
-"q": "please tell me average quantity for widget",
+"q": "quick question: average quantity for widget",
 "gold": [
 "79/4"
 ],
@@ -3040,14 +3040,14 @@
 "source": "average quantity for widget"
 },
 {
-"q": "average quanitty for widget",
+"q": "avearge quantity for widget",
 "gold": [
 "79/4"
 ],
 "source": "average quantity for widget"
 },
 {
-"q": "average measure for widget",
+"q": "average quantity for widget please",
 "gold": [
 "79/4"
 ],
@@ -3075,7 +3075,7 @@
 "source": "which employee has the highest salary"
 },
 {
-"q": "which empolyee has the highest salary",
+"q": "which employee has the higehst salary",
 "gold": [
 "dave"
 ],
@@ -3096,7 +3096,7 @@
 "source": "which employee has the highest salary"
 },
 {
-"q": "please tell me how are michelle obama and barack obama related",
+"q": "quick question: how are michelle obama and barack obama related",
 "gold": [
 "Barack Obama"
 ],
@@ -3110,7 +3110,7 @@
 "source": "how are michelle obama and barack obama related"
 },
 {
-"q": "how are michelle obama and barack obmaa related",
+"q": "how are michelle obmaa and barack obama related",
 "gold": [
 "Barack Obama"
 ],
@@ -3131,7 +3131,7 @@
 "source": "how are michelle obama and barack obama related"
 },
 {
-"q": "quick question: difference in salary between engineering and sales",
+"q": "could you tell me difference in salary between engineering and sales",
 "gold": [
 "160"
 ],
@@ -3145,14 +3145,14 @@
 "source": "difference in salary between engineering and sales"
 },
 {
-"q": "difference in salary between engineering and slaes",
+"q": "difefrence in salary between engineering and sales",
 "gold": [
 "160"
 ],
 "source": "difference in salary between engineering and sales"
 },
 {
-"q": "difference in salary between engineering and sales please",
+"q": "dispute in salary between engineering and sales",
 "gold": [
 "160"
 ],
@@ -3166,7 +3166,7 @@
 "source": "difference in salary between engineering and sales"
 },
 {
-"q": "i wonder what is the total salary of the department of ken",
+"q": "could you tell me what is the total salary of the department of ken",
 "gold": [
 "380"
 ],
@@ -3180,14 +3180,14 @@
 "source": "what is the total salary of the department of ken"
 },
 {
-"q": "what is the toatl salary of the department of ken",
+"q": "what is the total slaary of the department of ken",
 "gold": [
 "380"
 ],
 "source": "what is the total salary of the department of ken"
 },
 {
-"q": "what is the come salary of the department of ken",
+"q": "what is the total wage of the department of ken",
 "gold": [
 "380"
 ],
@@ -3215,7 +3215,7 @@
 "source": "what is the salary of the manager of grace"
 },
 {
-"q": "what is the salray of the manager of grace",
+"q": "what is the slaary of the manager of grace",
 "gold": [
 "130"
 ],
@@ -3236,7 +3236,7 @@
 "source": "what is the salary of the manager of grace"
 },
 {
-"q": "hey, what is the average salary in sales",
+"q": "could you tell me what is the average salary in sales",
 "gold": [
 "110"
 ],
@@ -3257,7 +3257,7 @@
 "source": "what is the average salary in sales"
 },
 {
-"q": "what is the average remuneration in sales",
+"q": "what is the average wage in sales",
 "gold": [
 "110"
 ],
@@ -3271,7 +3271,7 @@
 "source": "what is the average salary in sales"
 },
 {
-"q": "could you tell me what is the currency of japan",
+"q": "please tell me what is the currency of japan",
 "gold": [
 "yen"
 ],
@@ -3285,14 +3285,14 @@
 "source": "what is the currency of japan"
 },
 {
-"q": "what is the currency of jaapn",
+"q": "what is the currency of japan",
 "gold": [
 "yen"
 ],
 "source": "what is the currency of japan"
 },
 {
-"q": "what is the currency of nihon",
+"q": "what is the currentness of japan",
 "gold": [
 "yen"
 ],
@@ -3320,14 +3320,14 @@
 "source": "what is the quantity of gadget in the south in february"
 },
 {
-"q": "what is the qauntity of gadget in the south in february",
+"q": "what is the quantity of gadget in the south in feburary",
 "gold": [
 "3"
 ],
 "source": "what is the quantity of gadget in the south in february"
 },
 {
-"q": "what is the amount of gadget in the south in february",
+"q": "what is the quantity of gadget in the south in february please",
 "gold": [
 "3"
 ],
@@ -3341,7 +3341,7 @@
 "source": "what is the quantity of gadget in the south in february"
 },
 {
-"q": "please tell me what is the start of judy",
+"q": "quick question: what is the start of judy",
 "gold": [
 "2012"
 ],
@@ -3355,7 +3355,7 @@
 "source": "what is the start of judy"
 },
 {
-"q": "what is the start of judy",
+"q": "what is the strat of judy",
 "gold": [
 "2012"
 ],
@@ -3376,7 +3376,7 @@
 "source": "what is the start of judy"
 },
 {
-"q": "i wonder what is the continent of the country of the city of support",
+"q": "could you tell me what is the continent of the country of the city of support",
 "gold": [
 "Europe"
 ],
@@ -3390,14 +3390,14 @@
 "source": "what is the continent of the country of the city of support"
 },
 {
-"q": "what is the continent of the country of the city of supoprt",
+"q": "what is the continent of the country of the city of support",
 "gold": [
 "Europe"
 ],
 "source": "what is the continent of the country of the city of support"
 },
 {
-"q": "what is the continent of the country of the city of livelihood",
+"q": "what is the continent of the country of the metropolis of support",
 "gold": [
 "Europe"
 ],
@@ -3411,7 +3411,7 @@
 "source": "what is the continent of the country of the city of support"
 },
 {
-"q": "i wonder what is 4 times 25",
+"q": "do you know what is 4 times 25",
 "gold": [
 "100"
 ],
@@ -3446,7 +3446,7 @@
 "source": "what is 4 times 25"
 },
 {
-"q": "do you know what is the official language of the country of the city of marketing",
+"q": "i wonder what is the official language of the country of the city of marketing",
 "gold": [
 "Spanish"
 ],
@@ -3460,14 +3460,14 @@
 "source": "what is the official language of the country of the city of marketing"
 },
 {
-"q": "what is the official lanugage of the country of the city of marketing",
+"q": "what is the official language of the cuontry of the city of marketing",
 "gold": [
 "Spanish"
 ],
 "source": "what is the official language of the country of the city of marketing"
 },
 {
-"q": "what is the official nomenclature of the country of the city of marketing",
+"q": "what is the official language of the land of the city of marketing",
 "gold": [
 "Spanish"
 ],
@@ -3481,7 +3481,7 @@
 "source": "what is the official language of the country of the city of marketing"
 },
 {
-"q": "do you know what is the place of birth of napoleon",
+"q": "i wonder what is the place of birth of napoleon",
 "gold": [
 "Ajaccio"
 ],
@@ -3495,14 +3495,14 @@
 "source": "what is the place of birth of napoleon"
 },
 {
-"q": "what is the place of birth of napoelon",
+"q": "what is the place of birth of naopleon",
 "gold": [
 "Ajaccio"
 ],
 "source": "what is the place of birth of napoleon"
 },
 {
-"q": "what is the place of birth of bonaparte",
+"q": "what is the place of birth of napoleon please",
 "gold": [
 "Ajaccio"
 ],
@@ -3516,7 +3516,7 @@
 "source": "what is the place of birth of napoleon"
 },
 {
-"q": "i wonder what is the capital of the country of the eiffel tower",
+"q": "please tell me what is the capital of the country of the eiffel tower",
 "gold": [
 "Paris"
 ],
@@ -3530,14 +3530,14 @@
 "source": "what is the capital of the country of the eiffel tower"
 },
 {
-"q": "what is the capital of the coutnry of the eiffel tower",
+"q": "what is the cpaital of the country of the eiffel tower",
 "gold": [
 "Paris"
 ],
 "source": "what is the capital of the country of the eiffel tower"
 },
 {
-"q": "what is the capital of the state of the eiffel tower",
+"q": "what is the uppercase of the country of the eiffel tower",
 "gold": [
 "Paris"
 ],
