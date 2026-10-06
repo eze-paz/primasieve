@@ -226,6 +226,18 @@ class Door:
                 found.append(got)
         return found[0] if found else None
 
+    def _every_value(self, fr, frame):
+        """multivalue_prereg.md: an ANSWER from one graph structure whose world certifies several values -> all of them
+        (each with its own edge certificates, evaluate_all), so one value of six is not said as if it were the only one"""
+        if self.brief is not True or frame.get("kind") != ANSWER or len(fr.get("answers", [])) != 1: return frame
+        w = fr["answer_worlds"][0]
+        if not hasattr(w, "evaluate_all") or not hasattr(w, "source"): return frame
+        try: got = w.evaluate_all(fr["answers"][0][4])
+        except Exception: return frame
+        labs = list(dict.fromkeys(str(w.source.label(v)) for v, _, _ in got))
+        if len(labs) < 2: return frame
+        return dict(frame, values=labs, every=True)
+
     def _plain(self, frame):
         """natural2_prereg.md: the live door's plain shapes -- an ANSWER as one sentence "<phrase> is <values> (<sources>).";
         an abstention in one sentence with what would help (the consulted list stays in the transcript)"""
@@ -233,6 +245,11 @@ class Door:
         if k == ANSWER and frame.get("values"):
             ph = str(frame.get("phrase") or "").strip()
             if not ph: return None
+            if frame.get("every"):                                                  # multivalue_prereg.md
+                vs = frame["values"]; shown = vs[:6]
+                lst = ", ".join(shown[:-1]) + " and " + shown[-1] if len(vs) <= 6 else ", ".join(shown) + f" and {len(vs) - 6} more"
+                src = "; ".join(frame.get("sources", []))
+                return f"{ph[:1].upper() + ph[1:]} has {len(vs)} answers" + (f" ({src})" if src else "") + f": {lst}."
             src = "; ".join(frame.get("sources", []))
             return f"{ph[:1].upper() + ph[1:]} is {SEP.join(frame['values'])}" + (f" ({src})." if src else ".")
         if k == PROPOSE and frame.get("action") and not str(frame.get("action", "")).startswith("ask me"):
@@ -375,7 +392,8 @@ class Door:
                                        if checked.get("kind") == CHECK_K and checked.get("stated") is None else None)
                         if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = not wh
                     frames_out.append(frame); acts.append(act)
-                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") else None
+                    frame = self._every_value(fr, frame)                                    # multivalue_prereg.md
+                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") and not frame.get("every") else None
                     if said: rec["aligned"] = True
                     shown = frames.brief(frame) if self.brief and frame.get("kind") in (ANSWER, PART, CHECK_K) else frame
                     plain = self._plain(shown) if self.brief else None                     # natural2_prereg.md (3)(4)
