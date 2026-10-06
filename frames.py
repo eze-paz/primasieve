@@ -394,7 +394,7 @@ def _labeller(w, default):
     return w.label if (w is not None and hasattr(w, "label")) else default
 
 
-def to_frame(fr, world=None, kind_hint=None):
+def to_frame(fr, world=None, kind_hint=None, check=True):
     """core.reason result -> frame dict. `world`/`kind_hint` are the single-world callers' (f4_dialogue); the
     multi-world loop carries its worlds in fr["answer_worlds"] and its provenance names in fr["sources"]."""
     k = fr["kind"]
@@ -410,7 +410,7 @@ def to_frame(fr, world=None, kind_hint=None):
         return dict(kind=META_K, question=str(qtext), field=str(field), content=str(content))
     ack = _ack(fr)
     if ack is not None: return ack
-    chk = _check(fr)
+    chk = _check(fr) if check else None      # natural2_prereg.md: the live door never corrects a wh-question
     if chk is not None: return chk
     if k in (ATTRIBUTED, COMMIT):
         if quotes:

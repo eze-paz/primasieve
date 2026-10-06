@@ -71,6 +71,9 @@ class Rephraser:
                 and not any(syms[p] not in self.common for p in read):
             return None                  # a quoted gloss of the turn's only content: the question was about the word itself
         unread = [i for i, s in enumerate(syms) if i not in read and s not in self.common and s[:1].isalpha()]
+        qw = getattr(session, "qwords", set())          # natural2_prereg.md run 2: what frames the question before its first
+        first_q = next((p for p, x in enumerate(syms) if x in qw), None)       # learned question word is not a typo
+        if first_q is not None: unread = [i for i in unread if i > first_q]
         for i in unread:
             tried = 0
             for c, shared, src in self._consolidated(session, syms[i]) + [(c, n, None) for c, n in self.model.similar(syms[i], self.candidates)]:

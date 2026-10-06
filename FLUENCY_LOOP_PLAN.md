@@ -112,3 +112,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-06 | 8 | B6 | event reader: appositive commas, pronoun objects, main-verb have/be, verb-only questions (events3_prereg.md) | PASS | B6 28 -> 33 |
 | 2026-10-06 | 9 | B6, B1 | questions kept out of the story memory (events4_prereg.md) | PASS (J2, J3) | B6 33 held, B1 0 |
 | 2026-10-06 | -- | B8 | builder's ratings (b8_rated_it6/it7/it9.md) | -- | 2.80, 2.87, 2.87 |
+| 2026-10-06 | 10 | B8 | question frames, one answer shape, short abstentions, learned wh-words (natural2_prereg.md) | PASS (N1 3.30, N2 0, N3 0) | B8 2.87 -> 3.30; B2 74.5 %; **B10 154 was inflated by 29 abstentions listing the gold: honest 125** |

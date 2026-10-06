@@ -134,7 +134,8 @@ class Door:
 
     def _one(self, text):
         """one sentence through the session -> (core frame, chat frame, act)"""
-        fr = self.S.turn(text); frame = to_frame(fr)
+        fr = self.S.turn(text)
+        frame = to_frame(fr, check=not (fr.get("syms") and fr["syms"][0] in getattr(self, "whwords", ())))   # natural2_prereg.md run 2
         aw = fr["answer_worlds"][0] if fr.get("answer_worlds") else None
         guess = None
         if fr.get("chosen"): act = "CHOICE"
@@ -224,6 +225,19 @@ class Door:
                 if v == "SUPPORTED": return got            # natural_prereg.md run 4: a charitable reading -- true if ANY split reads true
                 found.append(got)
         return found[0] if found else None
+
+    def _plain(self, frame):
+        """natural2_prereg.md: the live door's plain shapes -- an ANSWER as one sentence "<phrase> is <values> (<sources>).";
+        an abstention in one sentence with what would help (the consulted list stays in the transcript)"""
+        k = frame.get("kind")
+        if k == ANSWER and frame.get("values"):
+            ph = str(frame.get("phrase") or "").strip()
+            if not ph: return None
+            src = "; ".join(frame.get("sources", []))
+            return f"{ph[:1].upper() + ph[1:]} is {SEP.join(frame['values'])}" + (f" ({src})." if src else ".")
+        if k == PROPOSE and frame.get("action") and not str(frame.get("action", "")).startswith("ask me"):
+            return f"I could not find that in what I hold. What would help: {frame['action']}."
+        return None
 
     def _thing(self, syms, lo, hi):
         """natural_prereg.md (1): does some non-quoting world read syms[lo:hi] as an entity, a filter value or a number?"""
@@ -351,14 +365,21 @@ class Door:
                         usedp = {p for a_, w_ in zip(fr["answers"], fr["answer_worlds"]) for i, j in _spans(w_, a_[4]) for p in range(i, j)}
                         unclean = any(p not in usedp for p, x in enumerate(fr["syms"]) if x not in self.fluent and x[:1].isalpha())
                     self._last_fr = fr
+                    wh = bool(fr.get("syms")) and fr["syms"][0] in getattr(self, "whwords", ()) and not echo     # natural2_prereg.md (1), run 2: wh-words learned
                     if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss or unclean):
                         checked = self._statement(part)
-                        if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = True
+                        if checked is not None and wh:
+                            # natural2_prereg.md (1), amended after run 1: a wh-question is never CORRECTED; a reading the
+                            # check finds true is the question's answer, said as an answer
+                            checked = (dict(kind=ANSWER, phrase=checked["phrase"], values=[checked["value"]], supports=[], sources=list(checked["sources"]))
+                                       if checked.get("kind") == CHECK_K and checked.get("stated") is None else None)
+                        if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = not wh
                     frames_out.append(frame); acts.append(act)
                     said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") else None
                     if said: rec["aligned"] = True
                     shown = frames.brief(frame) if self.brief and frame.get("kind") in (ANSWER, PART, CHECK_K) else frame
-                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or realize(shown, self.rng)))
+                    plain = self._plain(shown) if self.brief else None                     # natural2_prereg.md (3)(4)
+                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or plain or realize(shown, self.rng)))
                 rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
                            sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
@@ -674,7 +695,7 @@ def live_door(seeded, online, store, path, seed):
             reader = KC.Reader(KC.Store(), KC.load(), {w for w, c in tm.uni.most_common(1000)})
     except Exception:
         reader = None
-    qwords = set(); qcount = collections.Counter()      # natural_prereg.md run 3: question words LEARNED from the engine's own question set
+    qwords = set(); qcount = collections.Counter(); qecho = collections.Counter()      # natural_prereg.md run 3: question words LEARNED from the engine's own question set
     try:
         for qtext, typ, gold in held_out():
             if typ == "STRESS" or gold is None: continue            # the stress items are commands and noise, not questions
@@ -682,13 +703,17 @@ def live_door(seeded, online, store, path, seed):
             if fq["kind"] in (ATTRIBUTED, COMMIT) and fq.get("answers"):
                 from core.session import _leaf_spans
                 usedq = {p for a_, w_ in zip(fq["answers"], fq["answer_worlds"]) for i, j in _leaf_spans(w_, a_[4]) for p in range(i, j)}
-                if fq["syms"] and 0 not in usedq: qcount[fq["syms"][0]] += 1
+                if fq["syms"] and 0 not in usedq:
+                    qcount[fq["syms"][0]] += 1
+                    joined = " ".join(fq["syms"])     # natural2_prereg.md run 2: does this word's question NAME its answer (yes/no)?
+                    qecho[fq["syms"][0]] += any(symbols(str(a_[1]), "LN") and " ".join(symbols(str(a_[1]), "LN")) in joined for a_ in fq["answers"])
         qwords = {w for w, c in qcount.items() if c >= 2}
     except Exception:
         pass
     D = Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
                 fluent=integrator.common if integrator is not None else None, reader=reader, events=events, brief=True)
-    D.qwords = qwords
+    D.qwords = qwords; D.S.qwords = qwords
+    D.whwords = {w for w in qwords if 2 * qecho[w] < qcount[w]}      # question words whose questions do not name the answer
     if integrator is not None: integrator.common |= qwords     # a learned question word is not content an answer owes
     return D        # align_prereg.md: replies in the person's words
 
@@ -811,7 +836,7 @@ def serve(port=8766, seeded=False, online=False, store=None):
                                          transfer=d0.S.transfer, researcher=d0.S.researcher, guesser=d0.S.guesser,
                                          rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader,
                                          events=type(d0.events)(d0.events.reader) if d0.events is not None else None, brief=d0.brief)
-                    state["door"].qwords = getattr(d0, "qwords", set())
+                    state["door"].qwords = getattr(d0, "qwords", set()); state["door"].S.qwords = state["door"].qwords; state["door"].whwords = getattr(d0, "whwords", set())
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 

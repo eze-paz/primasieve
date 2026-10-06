@@ -274,7 +274,10 @@ class Session:
             for i, j in _leaf_spans(w, a[4]): used.update(range(i, j))
         # natural_prereg.md (4), REFUTED in its run: treating edge words as courtesy let "the official nomenclature of
         # the country of machu picchu" be answered as "the country of machu picchu" -- every unread content word is owed
-        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha()]
+        qw = getattr(self, "qwords", set())
+        first_q = next((p for p, x in enumerate(syms) if x in qw), None)
+        # natural2_prereg.md (2): symbols BEFORE the first learned question word frame the question ("tell me how many ...")
+        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha() and not (first_q is not None and p < first_q)]
         if not missing: return fr
         return dict(fr, kind=PARTIAL, missing=missing, integrated=False)
 
