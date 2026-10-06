@@ -595,7 +595,7 @@ def live_door(seeded, online, store, path, seed):
         from kb_wikidata import Wikidata
         from kb_osm import Nominatim
         researcher = Researcher([WikidataFetcher(Wikidata(offline=False, cache_path=os.path.join(HERE, "_nldata", "wikidata_cache_live.json"))), Nominatim(offline=False)],
-                                os.path.join(HERE, "_nldata", "research_live"), df=df)
+                                os.path.join(HERE, "_nldata", "research_live"), df=df, per_turn=4)
     from kb_guess import build_guesser                  # guess_prereg.md: the guesser, heard only when nothing known answers
     rephraser = integrator = None                       # didyoumean_prereg.md: an unread word -> "did you mean ...?" from the text model
     if os.path.exists(os.path.join(HERE, "_nldata", "textmodel.json")):

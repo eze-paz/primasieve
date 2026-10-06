@@ -18,8 +18,9 @@ from .triples import Triples
 
 
 class Researcher:
-    def __init__(self, fetchers, folder, df=None, budget=400):
+    def __init__(self, fetchers, folder, df=None, budget=400, per_turn=None):
         self.fetchers = list(fetchers); self.folder = folder; self.df = df; self.budget = budget
+        self.per_turn = per_turn      # at most this many fetch attempts in one turn (a story sentence is full of unread words)
         self.tried = {}                 # (fetcher name, symbol) -> path | None
         self.attached = []              # (fetcher name, symbol, path)
         os.makedirs(folder, exist_ok=True)
@@ -48,12 +49,14 @@ class Researcher:
     # ---- fetch, write, attach ---------------------------------------------------------------------------------------------
     def research(self, session, frame):
         """-> [worlds attached this turn]. Budgeted; one fetch per (fetcher, symbol) per session."""
-        new = []; taken = []
+        new = []; taken = []; tries = 0
         for span in self.unread_spans(frame):
+            if self.per_turn is not None and tries >= self.per_turn: break
             if any(span in t for t in taken): continue          # a span inside a name that attached is that name's part, not a thing
             for f in self.fetchers:
                 key = (f.name, span)
                 if key in self.tried or len(self.tried) >= self.budget: continue
+                tries += 1
                 got = None
                 try: got = f.fetch(span)
                 except Exception: got = None
