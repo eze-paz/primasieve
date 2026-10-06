@@ -44,3 +44,12 @@ It reads only between things its store knows (Alice: 0), and its constructions a
 conversation's. Next rungs: (C6) build a world from the text being read (things a text introduces become stored entities
 as it goes), so a novel has something to read between; (C7) harvest copular constructions from the corpus by the C4b
 check, to give the monitor exposure beyond 96 questions.
+
+## Results, second round (2026-10-06)
+| rung | verdict | numbers |
+|---|---|---|
+| C7 order-aware chains (2 runs) | NOT PASSED | monitor coverage 10/18 -> **15/18** with **0 %** reversed; first-only chains carry it, not chain order; held-out licence 11/54 short |
+| C6 a world from the text (2 runs) | NOT PASSED (null) | Alice masked-name guessing 58.5 % = the frequency baseline 58.1 % |
+
+The fluency monitor's wall is mostly lifted (15 of 18 messages get a true, correctly ordered wording). The novel stays
+unread: a story is events -- who did what to whom -- and the engine has no reader of events.
