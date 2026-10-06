@@ -18,3 +18,6 @@ before this file, and four causes are general grammar, not particular stories:
 | **G1** | B6 (live door) | **>= 33 %** |
 | **G2** | B5 (held-out novels) not lower by more than 1 point -- the independent check that the changes are not fitted to the drafted stories | held |
 | **G3** | B1 | **0** |
+
+## Run (2026-10-06, battery8): PASS
+**G1 B6 33/100** (bar 33); G2 B5 +11.6 held; G3 B1 0.

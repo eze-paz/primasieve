@@ -107,3 +107,8 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-06 | 3 | B10 | the 65k store: as a world (run 1), as an offline fetcher (run 2) (breadth_prereg.md) | NOT PASSED | run 1 B10 79.6 % but B1 9; run 2 B10 30.8 %, B1 2, B9 18/20 |
 | 2026-10-06 | 5 | B6 | auxiliaries learned from books; synonym verbs (events2_prereg.md) | NOT PASSED | B6 26 -> 28 |
 | 2026-10-06 | -- | B8 | builder's rating of the it3 sample (b8_rated_it3.md) | -- | 2.07 / 5 |
+| 2026-10-06 | 6 | B8, B1 | four defects the rating exposed; learned question words; charitable statement reading (natural_prereg.md) | NOT PASSED (R1) | B3 conversational 58 -> 86.4 %; B2 76.3 %; B1 0 |
+| 2026-10-06 | 7 | B10, B1 | store fetcher labels normalised; namesakes ask (research2_prereg.md) | NOT PASSED (Q1) | B10 30.8 % with B1 0 |
+| 2026-10-06 | 8 | B6 | event reader: appositive commas, pronoun objects, main-verb have/be, verb-only questions (events3_prereg.md) | PASS | B6 28 -> 33 |
+| 2026-10-06 | 9 | B6, B1 | questions kept out of the story memory (events4_prereg.md) | PASS (J2, J3) | B6 33 held, B1 0 |
+| 2026-10-06 | -- | B8 | builder's ratings (b8_rated_it6/it7/it9.md) | -- | 2.80, 2.87, 2.87 |

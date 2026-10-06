@@ -11,3 +11,7 @@ of its first three symbols is a LEARNED question word (natural_prereg.md run 3: 
 | **J1** | RECALL frames in B2 whose reply misses the gold | **0** |
 | **J2** | B6 not lower than the previous run | held |
 | **J3** | B1 | 0 |
+
+## Run (2026-10-06, battery8): J2, J3 PASS; J1 not measured
+J2 B6 33/100 (not lower); J3 B1 0. J1: the battery writes no per-case log of B2 frames, so RECALL misses were not counted
+-- recorded as not measured (B1 0 means no RECALL reply stated a false fact).

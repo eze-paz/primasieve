@@ -69,3 +69,10 @@ And: when the constructions read a statement but cannot decide it (UNKNOWN), the
 "cannot check" (an undecided construction reading pre-empted a decidable conversational one).
 And: the THING requirement guards only CONTRADICTION; a stated answer equal to the rest's value is SUPPORTED whatever reads
 it ("portuguese" has no entity reading offline, so true statements were refused).
+
+## Run 4 (2026-10-06, battery8): NOT PASSED (R1 2.87 < 3.0); R2-R4 held
+B1 **0**; B2 **76.3 %** (380/498); B9 18/20; B3 dictionary true 97.65 % / false-yes 0.59 %, **conversational true 86.4 %**
+(from 58 %) / false-yes 0 %. No false corrections in the B8 sample. The builder's rating of the fresh sample
+(tests/battery/b8_rated_it9.md -- the same 30 questions draw the same replies as iteration 7's) is **2.87**: the
+remaining low scores are "but I did not use tell ; me / please / hey" and the frame-like "X of Y: v (according to s)"
+shape. Iteration 10 (natural2_prereg.md) takes them.

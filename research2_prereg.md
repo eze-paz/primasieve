@@ -29,3 +29,8 @@ possible. Measured in the next run.
 And: a name the store holds SEVERAL entities for, answered through its clearly best-known one, is a guess about the
 referent -- the fetched world is marked conjectured, so such answers are CONJECTURED ("Probably ...", correctable), not
 facts ("easton" -> City of Pennsylvania was stated as a fact while the question meant another Easton).
+
+## Run 2 (2026-10-06, battery8): NOT PASSED (Q1); Q2, Q3 PASS
+B10 **154/500 (30.8 %)** (153 facts, 1 labelled guess) -- unchanged in count, but **B1 0** (the namesake rule removed both
+false facts). B2 76.3 %, B9 18/20. Normalised labels did not raise B10: the fetcher is consulted only for spans the
+researcher offers, and most unanswered B10 questions never offer the entity's full name as one span.
