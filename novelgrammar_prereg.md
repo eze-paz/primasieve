@@ -20,3 +20,11 @@ books not held out by kb_events.held_book); the held-out books are never read by
 ## Prediction
 N1 ~3 % (novels name few stored things per sentence; Level 1 may not be reached by this alone). N2 ~0.85 (narrative
 co-mentions are looser than definitions). N3 held.
+
+## Run (2026-10-06): NOT PASSED -- a null (N1, N2)
+359 training books. Constructions: dictionary 10,148; with the books 10,439 (+291); with the books' relations shuffled
+9,512. **N1: B4 read 3/4,605 both with and without the books** (0.07 %); N2 4/5 checkable correct; N3 statements held
+(95.8 % / 0.37 %); N4 knockout gain -1 vs 0. Novels rarely put two STORED things side by side ("I go to Turkey, Asia,
+Greece" is the kind of sentence that reads), so constructions over stored relations cannot reach fiction: what a novel's
+sentences say is events among its own characters. B4's novel column needs the event reader's propositions checked against
+the text itself -- a different capability; this line changes course.
