@@ -10,6 +10,7 @@ from kb_crawl import Crawl
 class StoreFetcher:
     quotes = True
     name = "store"
+    local = True                  # research3_prereg.md: an index on disk -- not rationed like a web lookup
     namesakes_ask = True          # near-equal namesakes are READINGS, not the first in the list
 
     def __init__(self, max_entities=4, max_values=8, closed=()):

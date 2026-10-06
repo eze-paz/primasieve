@@ -277,7 +277,8 @@ class Session:
         qw = getattr(self, "qwords", set())
         first_q = next((p for p, x in enumerate(syms) if x in qw), None)
         # natural2_prereg.md (2): symbols BEFORE the first learned question word frame the question ("tell me how many ...")
-        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalpha() and not (first_q is not None and p < first_q)]
+        # research3_prereg.md run 2: an unused NUMERAL is owed too ("2012 ad1" was answered as ".ad")
+        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalnum() and not (first_q is not None and p < first_q)]
         if not missing: return fr
         return dict(fr, kind=PARTIAL, missing=missing, integrated=False)
 

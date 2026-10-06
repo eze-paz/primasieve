@@ -23,7 +23,7 @@ Rate each reply 1 (robotic) to 5 (natural).
 
 11. **which region has the last price** -> The region with the lowest price is east, but I could not apply last.
 
-12. **tell me is kyoto in japan** -> Correct: the country of Kyoto is Japan (as recorded by Wikidata store).
+12. **tell me is kyoto in japan** -> Right: the country of Kyoto is Japan (according to Wikidata store).
 
 13. **how many employees are in support?** -> The number of employees of support is 2 (records).
 
@@ -37,7 +37,7 @@ Rate each reply 1 (robotic) to 5 (natural).
 
 18. **what is the capital of france** -> Paris is the capital of france. (Wikidata)
 
-19. **is kyoto in japan please** -> Kyoto and japan is Japan, but I could not apply please.
+19. **is kyoto in japan please** -> Yes: the country of Kyoto is Japan (as recorded by Wikidata store).
 
 20. **and for gadget** -> The total quantity of gadget is 252 (sales).
 
@@ -51,7 +51,7 @@ Rate each reply 1 (robotic) to 5 (natural).
 
 25. **which region has the highest revenue in january?** -> The region with the highest revenue of january is west (sales).
 
-26. **which region has the highest gross in january** -> Not quite: the region with the highest revenue of january is west (according to sales), and not january.
+26. **which region has the highest gross in january** -> The region with the highest revenue of january is west, but I could not apply january.
 
 27. **how many employees are in support please** -> The number of employees of support is 2, but I found no way to apply please.
 

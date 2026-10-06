@@ -70,15 +70,22 @@ class Researcher:
         """-> [worlds attached this turn]. Budgeted; one fetch per (fetcher, symbol) per session. With `weak`
         (research2_prereg.md), the spans of weak_spans are offered after the unread ones."""
         new = []; taken = []; tries = 0
+        # research3_prereg.md: a LOCAL fetcher (an index on disk) is not rationed like the web -- no budget, no per-turn
+        # cap, spans up to 6 symbols; online fetchers keep every limit
+        local = [f for f in self.fetchers if getattr(f, "local", False)]
+        online = [f for f in self.fetchers if not getattr(f, "local", False)]
         spans = self.unread_spans(frame)
         if weak: spans += [x for x in self.weak_spans(frame) if x not in spans]
-        for span in spans:
-            if self.per_turn is not None and tries >= self.per_turn: break
+        lspans = self.unread_spans(frame, maxlen=6) if local else []
+        if local and weak: lspans += [x for x in self.weak_spans(frame, maxlen=6) if x not in lspans]
+        plan = [(sp, local, True) for sp in lspans] + [(sp, online, False) for sp in spans]
+        for span, fs, is_local in plan:
+            if not is_local and self.per_turn is not None and tries >= self.per_turn: break
             if any(span in t for t in taken): continue          # a span inside a name that attached is that name's part, not a thing
-            for f in self.fetchers:
+            for f in fs:
                 key = (f.name, span)
-                if key in self.tried or len(self.tried) >= self.budget: continue
-                tries += 1
+                if key in self.tried or (not is_local and len([k for k in self.tried if k[0] in self._online_names()]) >= self.budget): continue
+                if not is_local: tries += 1
                 got = None
                 try: got = f.fetch(span)
                 except Exception: got = None
@@ -90,6 +97,8 @@ class Researcher:
                 w = self.attach(session, path, f)
                 if w is not None: new.append(w); self.attached.append((f.name, span, path)); taken.append(span)
         return new
+
+    def _online_names(self): return {f.name for f in self.fetchers if not getattr(f, "local", False)}
 
     def attach(self, session, path, fetcher=None):
         d = json.load(open(path, encoding="utf-8"))

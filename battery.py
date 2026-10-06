@@ -75,15 +75,18 @@ def main():
     from guess import held_out
     G = Guesser(TARGETS); G.learn([(l, c) for qq, l, c in load_entities() if not held_out(qq)]); G.labels = labels()
     od = json.load(open(os.path.join(TB, "open_domain.json"), encoding="utf-8"))["items"] if want("B10") else []
-    D = door(G); fact = guessed = 0
+    D = door(G); fact = guessed = clean = wrong_quoted = 0
     for it in od:
         r = D.turn(it["q"]); ok = hit(r["reply"], it["gold"])
+        clean += ok and " but I " not in r["reply"]           # research3_prereg.md: hits that owe nothing
+        if not ok and r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement") and all(r.get("quotes") or [False]): wrong_quoted += 1
         if ok and r["kind"] == CONJECTURED: guessed += 1
         elif ok: fact += 1
         elif r["kind"] in (COMMIT, ATTRIBUTED) and r.get("values") and not r.get("statement") and not all(r.get("quotes") or [False]):
             false_facts += 1; say(f"      B1 case (B10): {it['q']!r} gold {it['gold'][:2]} -> {r['reply'][:120]}")
     if od:
-        res["B10"] = dict(score=(fact + guessed) / len(od), fact=fact, guessed=guessed, n=len(od))
+        res["B10"] = dict(score=(fact + guessed) / len(od), fact=fact, guessed=guessed, n=len(od), clean=clean, wrong_quoted=wrong_quoted)
+        say(f"B10 hits owing nothing: {clean}; quoted answers missing the gold: {wrong_quoted}")
         say(f"B10 open domain: {fact + guessed}/{len(od)} ({fact} as facts, {guessed} as labelled guesses)  ({time.time() - T0:.0f} s)")
     # ---- B6 stories
     st = json.load(open(os.path.join(TB, "stories.json"), encoding="utf-8"))["stories"] if want("B6") else []; sr = sn = 0
