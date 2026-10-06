@@ -5,7 +5,7 @@ import os, sys, re, random, time, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(HERE, "emergence"))
-from core.textworld import TextWorld, find_entities
+from core.textworld import TextWorld, SlotWorld, find_entities
 from core.textmodel import TextModel
 from core.registry import selfcheck
 from textmodel import MODEL
@@ -60,6 +60,24 @@ def main():
     for ok, g in ((w1, "W1"), (w2, "W2"), (w3, "W3"), (w4, "W4")):
         if not ok: fails.append(g)
     say(f"\nC6: {'PASS' if not fails else 'FAIL ' + ','.join(fails)}; {time.time() - T0:.0f} s")
+    # ---- C6b the slot (declared after run 2)
+    S = SlotWorld(ents, closed); n = right = fr_ = ko = 0; ex = []
+    for k, toks in enumerate(raw):
+        syms = [t.lower() for t in toks]
+        mentioned = [i for i, s in enumerate(syms) if s in ents]
+        if k >= 100 and len({syms[i] for i in mentioned}) == 1:
+            i = mentioned[0]; truth = syms[i]; cands = S.candidates()
+            if truth in cands:
+                g, sc = S.guess_at(syms, i, cands); n += 1; right += g == truth; fr_ += cands[0] == truth
+                prof = list(S.profile[e] for e in cands); rng.shuffle(prof); sh = dict(S.profile); sh.update(zip(cands, prof))
+                gk, _ = S.guess_at(syms, i, cands, profile=sh); ko += gk == truth
+                if len(ex) < 6 and g == truth and g != cands[0]: ex.append(f"      {' '.join(toks)[:90]!r} -> {g} (frequency would say {cands[0]})")
+        S.read(syms)
+    for e in ex: say(e)
+    a2 = right / max(1, n); f2 = fr_ / max(1, n); k2 = ko / max(1, n)
+    say(f"W2b slot guessing: {right}/{n} = {a2:.1%}; frequency {f2:.1%}   [>= frequency + 10 -> {'PASS' if a2 >= f2 + 0.10 else 'FAIL'}]")
+    say(f"W3b knockout: {k2:.1%}   [<= frequency + 3 -> {'PASS' if k2 <= f2 + 0.03 else 'FAIL'}]")
+    say(f"C6b: {'PASS' if a2 >= f2 + 0.10 and k2 <= f2 + 0.03 else 'FAIL'}")
 
 
 if __name__ == "__main__":

@@ -50,3 +50,28 @@ class TextWorld:
             if tot: 
                 for e in cands: score[e] += P[e][w] / tot
         return max(((e, score[e]) for e in cands), key=lambda x: (x[1], self.freq[x[0]]))
+
+
+class SlotWorld(TextWorld):
+    """textworld_prereg.md C6b: an entity's profile is the (side, distance, symbol) around its mentions"""
+    def slot(self, syms, k):
+        out = []
+        for d in (1, 2):
+            if k - d >= 0 and syms[k - d] not in self.entities: out.append(("L", d, syms[k - d]))
+            if k + d < len(syms) and syms[k + d] not in self.entities: out.append(("R", d, syms[k + d]))
+        return out
+
+    def read(self, syms):
+        ents = [s for s in syms if s in self.entities]
+        for k, s in enumerate(syms):
+            if s in self.entities: self.freq[s] += 1; self.profile[s].update(self.slot(syms, k))
+        self.recent.append(set(ents)); self.recent = self.recent[-3:]
+
+    def guess_at(self, syms, k, cands, profile=None):
+        """-> (entity, score) for the mention at position k, hidden"""
+        P = profile or self.profile; feats = self.slot(syms, k); score = collections.Counter()
+        for f in feats:
+            tot = sum(P[e][f] for e in cands)
+            if tot:
+                for e in cands: score[e] += P[e][f] / tot
+        return max(((e, score[e]) for e in cands), key=lambda x: (x[1], self.freq[x[0]]))

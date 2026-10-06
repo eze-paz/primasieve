@@ -54,3 +54,14 @@ Mouse is WHO DOES WHAT -- "said the ___ with an important air", "begged the ___ 
 the thing C1's constructions capture for stored relations and nothing yet captures for a story's own events. The next
 rung would read each sentence's (agent, action, patient) and track them per entity; that is a reader of events, which
 this engine does not have.
+
+## C6b -- THE SLOT, NOT THE SENTENCE (declared after run 2, before its run)
+Claim: the words AROUND a mention (its slot: up to two symbols on each side, with their side and distance) carry the
+role -- "said the ___", "begged the ___ to" -- where the sentence's bag did not. Each entity's profile is the counts of
+(side, distance, symbol) seen around its earlier mentions; a hidden mention is guessed by the same evidence split over the
+masked position's slot. Gates as W2-W3 (>= baseline + 10 points; shuffle <= frequency + 3).
+
+## C6b run (2026-10-06): NOT PASSED (61.8 % vs frequency 58.6 %; +3.2 points, bar +10)
+The slot carries a little role: "... cried the ___ in a shrill passionate voice", "... said the ___" -> the Mouse, against
+the frequency guess (Alice); knockout 12.7 %. Three points over guessing the protagonist, not ten. The two words beside a
+name are a weak stand-in for who-does-what; an event reader remains the missing piece.
