@@ -50,6 +50,37 @@ def attachments(syms, roles, closed, chains=False, width=1):
     return out
 
 
+def kinds_of(fr):
+    """C7: span -> the reading code that gives it its role (a relation's code wins)"""
+    syms = fr["syms"]; n = len(syms)
+    if not fr.get("answers"): return {}
+    w, st = fr["answer_worlds"][0], fr["answers"][0][4]
+    used = {(i, j) for i, j in _spans(w, st) if j <= n}; out = {}
+    for r in fr.get("readings", []):
+        if (r[0], r[1]) not in used: continue
+        if r[2] in RELATION_KINDS: out[(r[0], r[1])] = r[2]
+        elif r[2] in ARGUMENT_KINDS: out.setdefault((r[0], r[1]), r[2])
+    return out
+
+
+def typed_attachments(fr, closed, ordered=True, width=3):
+    """C7: -> [(link, order, relation span)]; relation-relation attachments carry 'chain:K1>K2' (ordered) or 'chain'"""
+    syms = fr["syms"]; kinds = kinds_of(fr); out = []
+    spans = sorted(kinds)
+    for a in spans:
+        for b in spans:
+            if b[0] < a[1]: continue
+            gap = syms[a[1]:b[0]]
+            if len(gap) > width or any(t not in closed for t in gap): continue
+            link = " ".join(gap); ra = kinds[a] in RELATION_KINDS; rb = kinds[b] in RELATION_KINDS
+            if ra and rb:
+                lab = f"chain:{kinds[a]}>{kinds[b]}" if ordered else "chain"
+                out.append((link, lab, a))                 # run 2: a chain licenses only its first relation
+            elif ra != rb:
+                out.append((link, REL if ra else ARG, a if ra else b))
+    return out
+
+
 def roles_of(fr):
     syms = fr["syms"]; n = len(syms)
     if not fr.get("answers"): return {}
@@ -78,6 +109,17 @@ class WordOrder:
     def observe_wide(self, fr):
         """H10c: attachments with closed runs up to 3 wide, chains included"""
         for l, o, rel in attachments(fr["syms"], roles_of(fr), self.closed, chains=True, width=3): self.wide[(l, o)] += 1
+
+    def observe_typed(self, fr, ordered=True):
+        if not hasattr(self, "typed"): self.typed = collections.Counter()
+        for l, o, rel in typed_attachments(fr, self.closed, ordered): self.typed[(l, o)] += 1
+
+    def licensed_typed(self, fr, least=2, ordered=True):
+        """C7: every relation span licensed by an attested attachment (to an argument, or an ordered chain)"""
+        seen = {k for k, n in getattr(self, "typed", {}).items() if n >= least}
+        att = typed_attachments(fr, self.closed, ordered)
+        rels = [sp for sp, k in kinds_of(fr).items() if k in RELATION_KINDS]
+        return [sp for sp in rels if not any(rel == sp and (l, o) in seen for l, o, rel in att)]
 
     def licensed(self, fr, least=2, wide=False):
         """H10b: every relation span attached to an argument by a (link, order) seen >= `least` times -> [] ; else the

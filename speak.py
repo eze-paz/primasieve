@@ -129,7 +129,7 @@ def main():
     def read(side):
         if side not in cache:
             f = reason(side, worlds, df, cats="LN"); ok = None
-            if f["kind"] in (COMMIT, ATTRIBUTED) and len(f.get("answers", [])) == 1 and not any(getattr(w, "quotes", False) for w in f["answer_worlds"])                     and not (ORDER is not None and (ORDER.violations(f) or (LICENSE and ORDER.licensed(f, wide=LICENSE == "wide")))):
+            if f["kind"] in (COMMIT, ATTRIBUTED) and len(f.get("answers", [])) == 1 and not any(getattr(w, "quotes", False) for w in f["answer_worlds"])                     and not (ORDER is not None and (ORDER.violations(f) or (LICENSE and (ORDER.licensed_typed(f, ordered=LICENSE != "unordered") if LICENSE in ("typed", "unordered") else ORDER.licensed(f, wide=LICENSE == "wide"))))):
                 ss = f["syms"]; usedp = {p for a, w in zip(f["answers"], f["answer_worlds"]) for i, j in _spans(w, a[4]) for p in range(i, j)}
                 if all(p in usedp for p in range(len(ss)) if ss[p] not in closed): ok = str(f["answers"][0][1]).lower()
             cache[side] = ok
@@ -194,6 +194,9 @@ def main():
                 if score > best[m["q"]][0]: best[m["q"]] = (score, text, sk, pf)
                 if len(examples[m["q"]]) < 4 and text not in examples[m["q"]]: examples[m["q"]].append(text)
     covered = [m for m in msgs if acc[m["q"]]]
+    if os.environ.get("SPEAK_DIAG"):
+        for m in msgs:
+            if not acc[m["q"]]: say(f"    UNCOVERED {m['q']!r}: prop {m['prop']!r} arg {m['arg']!r} value {m['value']!r}; question-rest read {read(' '.join(m['syms'][2:]))!r}")
     skel_used = set().union(*acc_sk.values()) if acc_sk else set()
     prose = [sk for sk in skel_used if src[sk]["examples"] or src[sk]["alice"]]
     alice = [sk for sk in skel_used if src[sk]["alice"]]
