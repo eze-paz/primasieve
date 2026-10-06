@@ -12,10 +12,12 @@ from core.textmodel import TextModel
 from core.registry import selfcheck
 import chat as C
 from textmodel import MODEL, KAIKKI
+from kb_constructions import best as KCbest
 
 T0 = time.time()
 ALICE = os.path.join(HERE, "_nldata", "alice.txt")
 SLOT = None                      # a slot in a skeleton (never a symbol)
+READER = None                    # monitor_prereg.md (C3): the comprehension reader (kb_constructions.Reader), a second monitor
 LICENSE = False                  # wordorder_prereg.md H10b: require attested attachments
 ORDER = None                     # wordorder_prereg.md (H10): a core.wordorder.WordOrder; a re-read out of order is rejected
 
@@ -153,10 +155,24 @@ def main():
                     side = " ".join(toks[p] for p in ls)
                     got = read(side)
                     ok = got is not None and got == m["value"].lower() and lroles == {"prop", "arg"}             # (d)
+                    if not ok and READER is not None and lroles == {"prop", "arg"}: ok = reader_ok(" ".join(toks), m)   # C3 (b)
                     pf = ok and min(p for p in ls if owner[p] == "prop") < min(p for p in ls if owner[p] == "arg")
                     out.append((" ".join(toks), next(iter(vroles)), lroles, ok, pf))
         return out
 
+    rcache = {}
+
+    def reader_ok(text, m):
+        """C3 (b): the whole wording read SUPPORTED with a proposition over the message's argument and value"""
+        if text in rcache: return rcache[text]
+        st = READER.store
+        ent = lambda lab: set(KCbest(st, st.index.get(" ".join(symbols(lab, "LN")), set())))
+        A, V = ent(m["arg"]), ent(m["value"]); ok = False
+        if A and V:
+            verdict, res = READER.check(text)
+            ok = verdict == "SUPPORTED" and any({qa, qb} == A | V for pr, v in res for qa, qb in pr["pairs"])
+        rcache[text] = ok
+        return ok
     acc = collections.defaultdict(set); acc_sk = collections.defaultdict(set); false_acc = 0; ko_total = ko_false = 0
     ungrounded = 0; examples = collections.defaultdict(list); qsub = 0; reversed_order = 0
     best = collections.defaultdict(lambda: (0, None, None, None))      # S9 (declared after run 2): the wording whose weakest joint is best attested
