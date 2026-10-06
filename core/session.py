@@ -142,7 +142,10 @@ class Session:
         # changes the question; then the reading is OFFERED and the direct answer, to another question, is withheld
         if self.rephraser is not None and not read_as and (fr["kind"] not in (COMMIT, ATTRIBUTED, CONJECTURED)
                                                             or (fr["kind"] in (COMMIT, ATTRIBUTED) and not fr.get("guessed"))):
-            off = self.rephraser.offer(self, fr, self.declined_subs)
+            sp = self.rephraser.spell(self, fr, self.declined_subs) if getattr(self.rephraser, "spelling", False) else None
+            off = None if sp is not None else self.rephraser.offer(self, fr, self.declined_subs)
+            if sp is not None:                          # spelling_prereg.md: one slip, one reading -- answered, and said so
+                fr = dict(sp["fr"], spelled=[(sp["word"], sp["sub"])])
             if off is not None:                         # an OFFER is a reading, never an answer: no value is carried
                 from .rephrase import OFFER
                 fr = dict(fr, kind=OFFER, offer=off, answers=[], answer_worlds=[], answer_sources=[], sources=[])

@@ -384,7 +384,7 @@ class Door:
                     self._last_fr = fr
                     wh = bool(fr.get("syms")) and fr["syms"][0] in getattr(self, "whwords", ()) and not echo     # natural2_prereg.md (1), run 2: wh-words learned
                     if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss or unclean):
-                        checked = self._statement(part)
+                        checked = self._statement(" ".join(fr["syms"]) if fr.get("spelled") else part)    # spelling_prereg.md: the read text
                         if checked is not None and wh:
                             # natural2_prereg.md (1), amended after run 1: a wh-question is never CORRECTED; a reading the
                             # check finds true is the question's answer, said as an answer
@@ -393,11 +393,12 @@ class Door:
                         if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = not wh
                     frames_out.append(frame); acts.append(act)
                     frame = self._every_value(fr, frame)                                    # multivalue_prereg.md
-                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") and not frame.get("every") else None
+                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") and not frame.get("every") and not fr.get("spelled") else None
                     if said: rec["aligned"] = True
                     shown = frames.brief(frame) if self.brief and frame.get("kind") in (ANSWER, PART, CHECK_K) else frame
                     plain = self._plain(shown) if self.brief else None                     # natural2_prereg.md (3)(4)
-                    replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or plain or realize(shown, self.rng)))
+                    note = (read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + "".join(f"Reading '{a}' as '{b}'. " for a, b in fr.get("spelled", []))
+                    replies.append(note + (said or plain or realize(shown, self.rng)))
                 rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
                            sources=list(fr.get("sources", [])), values=[str(a[1]) for a in fr["answers"]],
                            labels=[str(a[1]) for a in fr["answers"]],
@@ -698,6 +699,7 @@ def live_door(seeded, online, store, path, seed):
         from kb_synonyms import load_same
         integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
         rephraser = Rephraser(Synonyms(tm, load_same(integrator.common)))    # synonyms_prereg.md (H5): the dictionary's synonyms first
+        rephraser.spelling = True                                            # spelling_prereg.md: one slip, one reading
     events = None                                       # events_prereg.md: a memory of the person's own story
     try:
         import kb_events as KE

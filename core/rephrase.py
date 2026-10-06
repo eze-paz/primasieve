@@ -57,6 +57,56 @@ class Rephraser:
             self._alone[sym] = ok
         return self._alone[sym]
 
+    # ---- spelling_prereg.md: a slip one keystroke from a known word ----------------------------------------------------
+    def _vocab(self):
+        if not hasattr(self, "_V"):
+            self._V = {w for w, c in self.model.uni.items() if c >= 3 and w[:1].isalpha()}
+            self._alpha = sorted({ch for w in self._V for ch in w})       # the alphabet is the vocabulary's own letters
+        return self._V
+
+    def edits(self, u):
+        """every word of the vocabulary one edit from u (delete, swap adjacent, replace, insert); knockout: random words"""
+        V = self._vocab(); A = self._alpha; out = set()
+        for i in range(len(u) + 1):
+            a, b = u[:i], u[i:]
+            if b: out.add(a + b[1:])
+            if len(b) > 1: out.add(a + b[1] + b[0] + b[2:])
+            for ch in A:
+                if b: out.add(a + ch + b[1:])
+                out.add(a + ch + b)
+        out = sorted(x for x in out if x in V and x != u)
+        if getattr(self, "spell_knockout", False):                      # T4: the same count, drawn at random
+            import random
+            rng = random.Random(hash(u) & 0xffff); pool = sorted(V); out = rng.sample(pool, len(out)) if out else []
+        return out
+
+    def spell(self, session, fr, declined=()):
+        """-> {pos, word, sub, fr} when EXACTLY ONE one-edit reading of one unread symbol gives an answer from a
+        non-quoting world whose structure reads the replaced position; else None"""
+        syms = list(fr["syms"])
+        if any(getattr(w, "transcript", False) for w in fr.get("answer_worlds", [])): return None
+        read = read_positions(fr, strict=fr["kind"] not in ANSWERED)
+        qw = getattr(session, "qwords", set())
+        first_q = next((p for p, x in enumerate(syms) if x in qw), None)
+        unread = [i for i, x in enumerate(syms) if i not in read and x not in self.common and x[:1].isalpha() and len(x) >= 3
+                  and (first_q is None or i > first_q)]
+        found = []
+        for i in unread:
+            for c in self.edits(syms[i]):
+                if (syms[i], c) in declined or not self.read_alone(session.worlds, c): continue
+                text = " ".join(syms[:i] + [c] + syms[i + 1:])
+                try:
+                    f2 = reason(text, session.worlds, session.df, cats="LN", context=session.context(), ledger=None,
+                                shapes=session.shapes(), recent=frozenset())
+                except Exception:
+                    continue
+                if f2["kind"] not in (COMMIT, ATTRIBUTED) or not f2.get("answers"): continue
+                if all(getattr(w, "quotes", False) for w in f2["answer_worlds"]): continue
+                if not any(a <= i < b for w2, a2 in zip(f2["answer_worlds"], f2["answers"]) for a, b in _spans(w2, a2[4])): continue
+                found.append(dict(pos=i, word=syms[i], sub=c, fr=f2))
+                if len(found) > 1: return None              # two readings: nothing is assumed
+        return found[0] if found else None
+
     def offer(self, session, fr, declined=()):
         """-> {pos, word, sub, shared, text, original} for the first replacement that yields an answer, or None.
         When the turn WAS answered while leaving the word unread (run 2, didyoumean_prereg.md), a replacement counts only
