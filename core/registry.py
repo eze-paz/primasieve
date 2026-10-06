@@ -114,6 +114,8 @@ PUBLISHED = {
     "statements": ["C4: PASS"],
     # ---- filled_prereg.md (COMPREHENSION C4b): a statement is a question with its answer filled in
     "filled": ["C4b: PASS"],
+    # ---- prose_prereg.md (COMPREHENSION C5): two propositions in one sentence (C2 coverage not passed)
+    "prose": ["C5: PASS"],
 }
 
 
