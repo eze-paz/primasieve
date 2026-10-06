@@ -96,8 +96,9 @@ def build_worlds(seeded=False, quiet=True, online=False):
 class Door:
     """one entry point. turn(text) -> record. Never raises; never silent."""
 
-    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None, reader=None):
+    def __init__(self, worlds, df=None, ledger=None, transcript=None, seed=0, store=None, transfer=False, researcher=None, guesser=None, rephraser=None, integrate=False, fluent=None, reader=None, events=None):
         self.ledger = ledger if ledger is not None else Ledger()
+        self.events = events                     # events_prereg.md: the person's statements read into events, asked about later
         self.reader = reader                     # statements_prereg.md (C4): a statement is read and checked against the store
         self.fluent = set(fluent) if fluent is not None else None      # align_prereg.md (H6+H9): closed-class symbols, or None = frame replies
         self.aligned_n = self.aligned_refused = 0
@@ -299,6 +300,14 @@ class Door:
                 parts = self.sentences(text); frames_out, replies, acts = [], [], []
                 for part in parts:
                     fr, frame, act = self._one(part)
+                    if self.events is not None:
+                        got = self.events.ask(part)
+                        clean = fr["kind"] in (ATTRIBUTED, COMMIT) and not all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", []))
+                        if got is not None and not clean:
+                            ans, ev = got
+                            frame = dict(kind=frames.RECALL_K, answer=ans, event=" ".join(x for x in (ev["agent"], ev["verb"], ev["patient"]) if x)); act = frame["kind"]
+                            rec["recall"] = True
+                        if not part.rstrip().endswith("?"): self.events.ingest(part)       # a question is not part of the story
                     echo = fr["kind"] in (ATTRIBUTED, COMMIT) and any(symbols(str(x[1]), "LN") and " ".join(symbols(str(x[1]), "LN")) in " ".join(fr["syms"])
                                                                        for x in fr.get("answers", []))
                     gloss = fr["kind"] in (ATTRIBUTED, COMMIT) and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", []))
@@ -598,6 +607,14 @@ def live_door(seeded, online, store, path, seed):
         from kb_synonyms import load_same
         integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
         rephraser = Rephraser(Synonyms(tm, load_same(integrator.common)))    # synonyms_prereg.md (H5): the dictionary's synonyms first
+    events = None                                       # events_prereg.md: a memory of the person's own story
+    try:
+        import kb_events as KE
+        from core.events import EventMemory
+        if integrator is not None:
+            events = EventMemory(KE.build({w for w, c in tm.uni.most_common(200)}, tm.uni)[0])
+    except Exception:
+        events = None
     reader = None                                       # statements_prereg.md (C4): statements read and checked against the store
     try:
         import kb_constructions as KC
@@ -606,7 +623,7 @@ def live_door(seeded, online, store, path, seed):
     except Exception:
         reader = None
     return Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
-                fluent=integrator.common if integrator is not None else None, reader=reader)        # align_prereg.md: replies in the person's words
+                fluent=integrator.common if integrator is not None else None, reader=reader, events=events)        # align_prereg.md: replies in the person's words
 
 
 def repl(seeded=False, verbose=False, lines=None, online=False, store=None):
@@ -725,7 +742,8 @@ def serve(port=8766, seeded=False, online=False, store=None):
                     d0 = state["door"]
                     state["door"] = Door(d0.S.worlds, state["df"], transcript=path, seed=int(time.time()), store=d0.store,
                                          transfer=d0.S.transfer, researcher=d0.S.researcher, guesser=d0.S.guesser,
-                                         rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader)
+                                         rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader,
+                                         events=type(d0.events)(d0.events.reader) if d0.events is not None else None)
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 

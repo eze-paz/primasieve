@@ -1,0 +1,4218 @@
+{
+"note": "B10 DRAFT: open-domain questions over the crawl store's HELD-OUT entities (guess_prereg.md's split); gold = the store's values. Review before freezing.",
+"items": [
+{
+"q": "what is the country of khanty",
+"gold": [
+"Russia"
+],
+"entity": "Khanty",
+"property": "country"
+},
+{
+"q": "what is the instance of of category:unitary state",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Unitary state",
+"property": "instance of"
+},
+{
+"q": "what is the currency of jin",
+"gold": [
+"ancient Chinese coinage"
+],
+"entity": "Jin",
+"property": "currency"
+},
+{
+"q": "what is the instance of of category:art by genre",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Art by genre",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of southern kalinga",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Southern Kalinga",
+"property": "instance of"
+},
+{
+"q": "what is the country of mauerbach",
+"gold": [
+"Austria"
+],
+"entity": "Mauerbach",
+"property": "country"
+},
+{
+"q": "what is the instance of of shitaya-ku",
+"gold": [
+"dissolved municipality of Japan"
+],
+"entity": "Shitaya-ku",
+"property": "instance of"
+},
+{
+"q": "what is the country of luri",
+"gold": [
+"Nigeria"
+],
+"entity": "Luri",
+"property": "country"
+},
+{
+"q": "what is the instance of of esmond knight",
+"gold": [
+"human"
+],
+"entity": "Esmond Knight",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of camden council",
+"gold": [
+"local government area of New South Wales"
+],
+"entity": "Camden Council",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of hyacinthe richaud",
+"gold": [
+"human"
+],
+"entity": "Hyacinthe Richaud",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of county of aragon",
+"gold": [
+"condado",
+"historical country",
+"march"
+],
+"entity": "County of Aragon",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of rocket launch",
+"gold": [
+"flight phase",
+"key event"
+],
+"entity": "rocket launch",
+"property": "instance of"
+},
+{
+"q": "what is the country of lenta.ru",
+"gold": [
+"Russia"
+],
+"entity": "lenta.ru",
+"property": "country"
+},
+{
+"q": "what is the instance of of 3939 huruhata",
+"gold": [
+"asteroid"
+],
+"entity": "3939 Huruhata",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of old spanish",
+"gold": [
+"historical language"
+],
+"entity": "Old Spanish",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of newman",
+"gold": [
+"United States"
+],
+"entity": "Newman",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of musicology",
+"gold": [
+"academic discipline",
+"academic major"
+],
+"entity": "musicology",
+"property": "instance of"
+},
+{
+"q": "what is the country of ancient monument in greece",
+"gold": [
+"Greece"
+],
+"entity": "ancient monument in Greece",
+"property": "country"
+},
+{
+"q": "what is the instance of of bridgers",
+"gold": [
+"family name"
+],
+"entity": "Bridgers",
+"property": "instance of"
+},
+{
+"q": "what is the country of hun-saare",
+"gold": [
+"Nigeria"
+],
+"entity": "Hun-Saare",
+"property": "country"
+},
+{
+"q": "what is the instance of of kolhapur state",
+"gold": [
+"historical country",
+"princely state"
+],
+"entity": "Kolhapur State",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of euronext paris",
+"gold": [
+"stock exchange"
+],
+"entity": "Euronext Paris",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of ga'aton river",
+"gold": [
+"wadi"
+],
+"entity": "Ga'aton River",
+"property": "instance of"
+},
+{
+"q": "what is the country of open data kathmandu",
+"gold": [
+"Nepal"
+],
+"entity": "Open Data Kathmandu",
+"property": "country"
+},
+{
+"q": "what is the capital of croatia and slavonia",
+"gold": [
+"Zagreb"
+],
+"entity": "Croatia and Slavonia",
+"property": "capital"
+},
+{
+"q": "what is the instance of of category:painting materials",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Painting materials",
+"property": "instance of"
+},
+{
+"q": "what is the currency of bank al-maghrib",
+"gold": [
+"Moroccan dirham"
+],
+"entity": "Bank Al-Maghrib",
+"property": "currency"
+},
+{
+"q": "what is the instance of of outer asteroid belt",
+"gold": [
+"asteroid family"
+],
+"entity": "outer asteroid belt",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of photograph",
+"gold": [
+"Wikimedia disambiguation page"
+],
+"entity": "Photograph",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of east slavs",
+"gold": [
+"ethnic group",
+"notion"
+],
+"entity": "East Slavs",
+"property": "instance of"
+},
+{
+"q": "what is the country of emblem of iran",
+"gold": [
+"Iran"
+],
+"entity": "Emblem of Iran",
+"property": "country"
+},
+{
+"q": "what is the instance of of wikiproject men",
+"gold": [
+"WikiProject"
+],
+"entity": "WikiProject Men",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of bigbrotherawards",
+"gold": [
+"Big Brother Awards"
+],
+"entity": "BigBrotherAwards",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of bryan cogman",
+"gold": [
+"screenwriter"
+],
+"entity": "Bryan Cogman",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of get back",
+"gold": [
+"musical work/composition"
+],
+"entity": "Get Back",
+"property": "instance of"
+},
+{
+"q": "what is the capital of municipality of burwood",
+"gold": [
+"Burwood"
+],
+"entity": "Municipality of Burwood",
+"property": "capital"
+},
+{
+"q": "what is the occupation of vanessa kirby",
+"gold": [
+"actor"
+],
+"entity": "Vanessa Kirby",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of procedure",
+"gold": [
+"type of process"
+],
+"entity": "procedure",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of desperate housewives, season 6",
+"gold": [
+"television series season"
+],
+"entity": "Desperate Housewives, season 6",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of algerian war",
+"gold": [
+"war of independence",
+"war of national liberation"
+],
+"entity": "Algerian War",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of croatia and slavonia",
+"gold": [
+"oblast of the Kingdom of Serbs, Croats and Slovenes"
+],
+"entity": "Croatia and Slavonia",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of charles darwin",
+"gold": [
+"human"
+],
+"entity": "Charles Darwin",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of warren j. kemmerling",
+"gold": [
+"United States"
+],
+"entity": "Warren J. Kemmerling",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of sheldon leonard",
+"gold": [
+"human"
+],
+"entity": "Sheldon Leonard",
+"property": "instance of"
+},
+{
+"q": "what is the currency of saskatchewan",
+"gold": [
+"Canadian dollar"
+],
+"entity": "Saskatchewan",
+"property": "currency"
+},
+{
+"q": "what is the country of cocama",
+"gold": [
+"Brazil",
+"Colombia",
+"Peru"
+],
+"entity": "Cocama",
+"property": "country"
+},
+{
+"q": "what is the occupation of lenny von dohlen",
+"gold": [
+"actor",
+"film actor",
+"stage actor",
+"television actor"
+],
+"entity": "Lenny Von Dohlen",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of category:presidential residences",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Presidential residences",
+"property": "instance of"
+},
+{
+"q": "what is the country of limba",
+"gold": [
+"Cameroon"
+],
+"entity": "Limba",
+"property": "country"
+},
+{
+"q": "what is the country of yucay district",
+"gold": [
+"Peru"
+],
+"entity": "Yucay District",
+"property": "country"
+},
+{
+"q": "what is the instance of of zulu wiktionary",
+"gold": [
+"Wiktionary language edition"
+],
+"entity": "Zulu Wiktionary",
+"property": "instance of"
+},
+{
+"q": "what is the country of battle of nagashino",
+"gold": [
+"Japan"
+],
+"entity": "Battle of Nagashino",
+"property": "country"
+},
+{
+"q": "what is the instance of of rajakng kayan",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Rajakng Kayan",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of chanthaburi",
+"gold": [
+"province of Thailand"
+],
+"entity": "Chanthaburi",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of template:infobox french department",
+"gold": [
+"Wikimedia infobox template"
+],
+"entity": "Template:Infobox French department",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of historische innenstadt",
+"gold": [
+"Ortsteil"
+],
+"entity": "Historische Innenstadt",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of uvs province",
+"gold": [
+"province of Mongolia"
+],
+"entity": "Uvs Province",
+"property": "instance of"
+},
+{
+"q": "what is the country of sapahi",
+"gold": [
+"Nepal"
+],
+"entity": "Sapahi",
+"property": "country"
+},
+{
+"q": "what is the continent of kolhapur state",
+"gold": [
+"Asia"
+],
+"entity": "Kolhapur State",
+"property": "continent"
+},
+{
+"q": "what is the instance of of category:kanagawa prefecture",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Kanagawa Prefecture",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of elected official",
+"gold": [
+"occupation"
+],
+"entity": "elected official",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of commodore basic v2",
+"gold": [
+"BASIC",
+"operating system"
+],
+"entity": "Commodore BASIC V2",
+"property": "instance of"
+},
+{
+"q": "what is the official language of tehran",
+"gold": [
+"Persian"
+],
+"entity": "Tehran",
+"property": "official language"
+},
+{
+"q": "what is the country of outline of athens",
+"gold": [
+"Greece"
+],
+"entity": "outline of Athens",
+"property": "country"
+},
+{
+"q": "what is the instance of of marco trudel",
+"gold": [
+"human"
+],
+"entity": "Marco Trudel",
+"property": "instance of"
+},
+{
+"q": "what is the country of statue of liberty, kalamata",
+"gold": [
+"Greece"
+],
+"entity": "Statue of Liberty, Kalamata",
+"property": "country"
+},
+{
+"q": "what is the currency of democratic federal yugoslavia",
+"gold": [
+"Yugoslav dinar"
+],
+"entity": "Democratic Federal Yugoslavia",
+"property": "currency"
+},
+{
+"q": "what is the country of vulnerable",
+"gold": [
+"Australia"
+],
+"entity": "vulnerable",
+"property": "country"
+},
+{
+"q": "what is the country of new taipei city",
+"gold": [
+"Taiwan"
+],
+"entity": "New Taipei City",
+"property": "country"
+},
+{
+"q": "what is the instance of of leon black",
+"gold": [
+"human"
+],
+"entity": "Leon Black",
+"property": "instance of"
+},
+{
+"q": "what is the country of viana do castelo",
+"gold": [
+"Portugal"
+],
+"entity": "Viana do Castelo",
+"property": "country"
+},
+{
+"q": "what is the country of cuando cubango province",
+"gold": [
+"Angola"
+],
+"entity": "Cuando Cubango Province",
+"property": "country"
+},
+{
+"q": "what is the country of citizenship of axel ganz",
+"gold": [
+"France",
+"Germany"
+],
+"entity": "Axel Ganz",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of technika",
+"gold": [
+"Wikimedia disambiguation page"
+],
+"entity": "Technika",
+"property": "instance of"
+},
+{
+"q": "what is the country of kobarid municipality",
+"gold": [
+"Slovenia"
+],
+"entity": "Kobarid Municipality",
+"property": "country"
+},
+{
+"q": "what is the country of wilawila",
+"gold": [
+"Australia"
+],
+"entity": "Wilawila",
+"property": "country"
+},
+{
+"q": "what is the country of tamworth regional council",
+"gold": [
+"Australia"
+],
+"entity": "Tamworth Regional Council",
+"property": "country"
+},
+{
+"q": "what is the instance of of brague",
+"gold": [
+"coastal river"
+],
+"entity": "Brague",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of npo",
+"gold": [
+"Wikimedia disambiguation page"
+],
+"entity": "NPO",
+"property": "instance of"
+},
+{
+"q": "what is the capital of canton of mersch",
+"gold": [
+"Mersch"
+],
+"entity": "Canton of Mersch",
+"property": "capital"
+},
+{
+"q": "what is the instance of of ictinus",
+"gold": [
+"human"
+],
+"entity": "Ictinus",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of great seal of france",
+"gold": [
+"national seal"
+],
+"entity": "Great Seal of France",
+"property": "instance of"
+},
+{
+"q": "what is the country of schwerin rural district",
+"gold": [
+"East Germany"
+],
+"entity": "Schwerin Rural District",
+"property": "country"
+},
+{
+"q": "what is the instance of of longwood",
+"gold": [
+"district"
+],
+"entity": "Longwood",
+"property": "instance of"
+},
+{
+"q": "what is the country of monagas",
+"gold": [
+"Venezuela"
+],
+"entity": "Monagas",
+"property": "country"
+},
+{
+"q": "what is the instance of of star fleet universe",
+"gold": [
+"fictional universe"
+],
+"entity": "Star Fleet Universe",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of directorate of ukraine",
+"gold": [
+"Q1770249"
+],
+"entity": "Directorate of Ukraine",
+"property": "instance of"
+},
+{
+"q": "what is the country of oro win",
+"gold": [
+"Brazil"
+],
+"entity": "Oro Win",
+"property": "country"
+},
+{
+"q": "what is the country of japanese name",
+"gold": [
+"Japan"
+],
+"entity": "Japanese name",
+"property": "country"
+},
+{
+"q": "what is the country of citizenship of gokulbhai bhatt",
+"gold": [
+"British Raj",
+"Dominion of India",
+"India"
+],
+"entity": "Gokulbhai Bhatt",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of tony jay",
+"gold": [
+"human"
+],
+"entity": "Tony Jay",
+"property": "instance of"
+},
+{
+"q": "what is the country of arglo river",
+"gold": [
+"Ireland"
+],
+"entity": "Arglo River",
+"property": "country"
+},
+{
+"q": "what is the country of westminster abbey",
+"gold": [
+"United Kingdom"
+],
+"entity": "Westminster Abbey",
+"property": "country"
+},
+{
+"q": "what is the country of adivasi odia",
+"gold": [
+"India"
+],
+"entity": "Adivasi Odia",
+"property": "country"
+},
+{
+"q": "what is the instance of of location",
+"gold": [
+"first-order class"
+],
+"entity": "location",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of redditch",
+"gold": [
+"town",
+"unparished area"
+],
+"entity": "Redditch",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:aveluy",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Aveluy",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of gaza strip",
+"gold": [
+"Q45220060",
+"disputed territory",
+"exclave",
+"occupied territory",
+"region"
+],
+"entity": "Gaza Strip",
+"property": "instance of"
+},
+{
+"q": "what is the country of blair house",
+"gold": [
+"United States"
+],
+"entity": "Blair House",
+"property": "country"
+},
+{
+"q": "what is the instance of of geography of europe",
+"gold": [
+"geography of geographic location"
+],
+"entity": "geography of Europe",
+"property": "instance of"
+},
+{
+"q": "what is the continent of county of flanders",
+"gold": [
+"Europe"
+],
+"entity": "County of Flanders",
+"property": "continent"
+},
+{
+"q": "what is the instance of of mudd in your eye",
+"gold": [
+"literary work"
+],
+"entity": "Mudd in Your Eye",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of 9 second language only",
+"gold": [
+"Ethnologue language status"
+],
+"entity": "9 Second language only",
+"property": "instance of"
+},
+{
+"q": "what is the country of parliament of cambodia",
+"gold": [
+"Cambodia"
+],
+"entity": "Parliament of Cambodia",
+"property": "country"
+},
+{
+"q": "what is the instance of of easton",
+"gold": [
+"town in the United States"
+],
+"entity": "Easton",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of international phonetic alphabet",
+"gold": [
+"phonetic alphabet"
+],
+"entity": "International Phonetic Alphabet",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of dan wielsch",
+"gold": [
+"human"
+],
+"entity": "Dan Wielsch",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of vladimir oblast",
+"gold": [
+"federal subject of Russia",
+"oblast of Russia"
+],
+"entity": "Vladimir Oblast",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of jairamdas daulatram",
+"gold": [
+"human"
+],
+"entity": "Jairamdas Daulatram",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of andajin",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Andajin",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of factgrid",
+"gold": [
+"WikiProject",
+"database",
+"knowledge base",
+"knowledge graph",
+"online publication"
+],
+"entity": "FactGrid",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of amazon logistics",
+"gold": [
+"business unit"
+],
+"entity": "Amazon Logistics",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of phool singh",
+"gold": [
+"politician"
+],
+"entity": "Phool Singh",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of category:deaths in estonia",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Deaths in Estonia",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of kurmukar",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Kurmukar",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of anna i of russia",
+"gold": [
+"human"
+],
+"entity": "Anna I of Russia",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of gheorghe nichita",
+"gold": [
+"diplomat",
+"engineer",
+"politician"
+],
+"entity": "Gheorghe Nichita",
+"property": "occupation"
+},
+{
+"q": "what is the country of syrians",
+"gold": [
+"Syria"
+],
+"entity": "Syrians",
+"property": "country"
+},
+{
+"q": "what is the country of citizenship of neil armstrong",
+"gold": [
+"United States"
+],
+"entity": "Neil Armstrong",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of higashiyamato",
+"gold": [
+"Japan"
+],
+"entity": "Higashiyamato",
+"property": "country"
+},
+{
+"q": "what is the country of moravia",
+"gold": [
+"Czech Republic"
+],
+"entity": "Moravia",
+"property": "country"
+},
+{
+"q": "what is the instance of of template:regions of peru",
+"gold": [
+"Wikimedia navigational template",
+"Wikimedia template"
+],
+"entity": "Template:Regions of Peru",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of southern district",
+"gold": [
+"district of Botswana"
+],
+"entity": "Southern District",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of municipality of lenart",
+"gold": [
+"municipality of Slovenia"
+],
+"entity": "Municipality of Lenart",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of alexander de croo",
+"gold": [
+"Belgium"
+],
+"entity": "Alexander De Croo",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of second french empire",
+"gold": [
+"France"
+],
+"entity": "Second French Empire",
+"property": "country"
+},
+{
+"q": "what is the instance of of netflix sweden",
+"gold": [
+"company"
+],
+"entity": "Netflix Sweden",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of religious",
+"gold": [
+"Christian religious occupation",
+"way of life"
+],
+"entity": "religious",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of portuguese ceylon",
+"gold": [
+"colony"
+],
+"entity": "Portuguese Ceylon",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of kukawa",
+"gold": [
+"local government area of Nigeria"
+],
+"entity": "Kukawa",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of warumungu",
+"gold": [
+"modern language",
+"natural language"
+],
+"entity": "Warumungu",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:people from tokyo metropolis",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:People from Tokyo Metropolis",
+"property": "instance of"
+},
+{
+"q": "what is the country of donetsk people's republic",
+"gold": [
+"Russia",
+"Ukraine"
+],
+"entity": "Donetsk People's Republic",
+"property": "country"
+},
+{
+"q": "what is the occupation of chien-shiung wu",
+"gold": [
+"nuclear physicist",
+"physicist",
+"scientist",
+"university teacher"
+],
+"entity": "Chien-Shiung Wu",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of category:born in gaul",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Born in Gaul",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of wilhelm breckvelt",
+"gold": [
+"human"
+],
+"entity": "Wilhelm Breckvelt",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of donald sumpter",
+"gold": [
+"human"
+],
+"entity": "Donald Sumpter",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of neil armstrong",
+"gold": [
+"human"
+],
+"entity": "Neil Armstrong",
+"property": "instance of"
+},
+{
+"q": "what is the country of river annas",
+"gold": [
+"United Kingdom"
+],
+"entity": "River Annas",
+"property": "country"
+},
+{
+"q": "what is the occupation of britta stark",
+"gold": [
+"drafter",
+"local government officer",
+"mechanical engineer",
+"politician"
+],
+"entity": "Britta Stark",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of sunpu domain",
+"gold": [
+"han"
+],
+"entity": "Sunpu Domain",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of michiel",
+"gold": [
+"male given name"
+],
+"entity": "Michiel",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of natalie carter",
+"gold": [
+"human"
+],
+"entity": "Natalie Carter",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of alex lubawinski",
+"gold": [
+"politician"
+],
+"entity": "Alex Lubawinski",
+"property": "occupation"
+},
+{
+"q": "what is the capital of kogi state",
+"gold": [
+"Lokoja"
+],
+"entity": "Kogi State",
+"property": "capital"
+},
+{
+"q": "what is the country of citizenship of ludovic orban",
+"gold": [
+"Romania"
+],
+"entity": "Ludovic Orban",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of kyoto city assembly",
+"gold": [
+"city assembly in Japan"
+],
+"entity": "Kyoto City Assembly",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of dacia mediterranea",
+"gold": [
+"Roman province"
+],
+"entity": "Dacia Mediterranea",
+"property": "instance of"
+},
+{
+"q": "what is the capital of bjelovar-bilogora county",
+"gold": [
+"Bjelovar"
+],
+"entity": "Bjelovar-Bilogora County",
+"property": "capital"
+},
+{
+"q": "what is the instance of of historical monument",
+"gold": [
+"Q23765411",
+"cultural property",
+"heritage designation",
+"historic preservation"
+],
+"entity": "Historical Monument",
+"property": "instance of"
+},
+{
+"q": "what is the country of westhafen canal",
+"gold": [
+"Germany"
+],
+"entity": "Westhafen Canal",
+"property": "country"
+},
+{
+"q": "what is the instance of of elden henson",
+"gold": [
+"human"
+],
+"entity": "Elden Henson",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of class",
+"gold": [
+"metaclass",
+"philosophical concept"
+],
+"entity": "class",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of julia",
+"gold": [
+"female given name"
+],
+"entity": "Julia",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of university teacher",
+"gold": [
+"academic profession",
+"occupation"
+],
+"entity": "university teacher",
+"property": "instance of"
+},
+{
+"q": "what is the country of daman and diu",
+"gold": [
+"India"
+],
+"entity": "Daman and Diu",
+"property": "country"
+},
+{
+"q": "what is the instance of of beaver river",
+"gold": [
+"river"
+],
+"entity": "Beaver River",
+"property": "instance of"
+},
+{
+"q": "what is the country of culture of rwanda",
+"gold": [
+"Rwanda"
+],
+"entity": "culture of Rwanda",
+"property": "country"
+},
+{
+"q": "what is the country of city of lake macquarie",
+"gold": [
+"Australia"
+],
+"entity": "City of Lake Macquarie",
+"property": "country"
+},
+{
+"q": "what is the country of fennoscandia",
+"gold": [
+"Russia"
+],
+"entity": "Fennoscandia",
+"property": "country"
+},
+{
+"q": "what is the instance of of comaltepec chinantec",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Comaltepec Chinantec",
+"property": "instance of"
+},
+{
+"q": "what is the official language of carchi province",
+"gold": [
+"Awa Pit",
+"Spanish"
+],
+"entity": "Carchi Province",
+"property": "official language"
+},
+{
+"q": "what is the country of corning inc.",
+"gold": [
+"United States"
+],
+"entity": "Corning Inc.",
+"property": "country"
+},
+{
+"q": "what is the instance of of musical style",
+"gold": [
+"musical concept"
+],
+"entity": "musical style",
+"property": "instance of"
+},
+{
+"q": "what is the country of canton of thurgau",
+"gold": [
+"Switzerland"
+],
+"entity": "Canton of Thurgau",
+"property": "country"
+},
+{
+"q": "what is the instance of of 15th arrondissement of paris",
+"gold": [
+"electoral unit",
+"municipal arrondissement of France"
+],
+"entity": "15th arrondissement of Paris",
+"property": "instance of"
+},
+{
+"q": "what is the country of new college",
+"gold": [
+"United Kingdom"
+],
+"entity": "New College",
+"property": "country"
+},
+{
+"q": "what is the instance of of formello",
+"gold": [
+"comune of Italy"
+],
+"entity": "Formello",
+"property": "instance of"
+},
+{
+"q": "what is the country of emblem of israel",
+"gold": [
+"Israel"
+],
+"entity": "Emblem of Israel",
+"property": "country"
+},
+{
+"q": "what is the instance of of muqtada al-sadr",
+"gold": [
+"human"
+],
+"entity": "Muqtada al-Sadr",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of class 3e in zaliznyak",
+"gold": [
+"Zaliznyak noun classification"
+],
+"entity": "class 3e in Zaliznyak",
+"property": "instance of"
+},
+{
+"q": "what is the country of second opium war",
+"gold": [
+"British India"
+],
+"entity": "Second Opium War",
+"property": "country"
+},
+{
+"q": "what is the country of carp",
+"gold": [
+"Canada"
+],
+"entity": "Carp",
+"property": "country"
+},
+{
+"q": "what is the country of cern",
+"gold": [
+"France",
+"Switzerland"
+],
+"entity": "CERN",
+"property": "country"
+},
+{
+"q": "what is the instance of of sikhism",
+"gold": [
+"lifestyle",
+"major religious group"
+],
+"entity": "Sikhism",
+"property": "instance of"
+},
+{
+"q": "what is the country of brown county",
+"gold": [
+"United States"
+],
+"entity": "Brown County",
+"property": "country"
+},
+{
+"q": "what is the occupation of sara michael foster",
+"gold": [
+"actor",
+"film actor",
+"model",
+"television actor"
+],
+"entity": "Sara Michael Foster",
+"property": "occupation"
+},
+{
+"q": "what is the country of government of south korea",
+"gold": [
+"South Korea"
+],
+"entity": "Government of South Korea",
+"property": "country"
+},
+{
+"q": "what is the country of ngwaba",
+"gold": [
+"Nigeria"
+],
+"entity": "Ngwaba",
+"property": "country"
+},
+{
+"q": "what is the instance of of comics creator",
+"gold": [
+"profession"
+],
+"entity": "comics creator",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of romain boffa",
+"gold": [
+"France"
+],
+"entity": "Romain Boffa",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of southern nisu",
+"gold": [
+"People's Republic of China"
+],
+"entity": "Southern Nisu",
+"property": "country"
+},
+{
+"q": "what is the instance of of brian k. vaughan",
+"gold": [
+"human"
+],
+"entity": "Brian K. Vaughan",
+"property": "instance of"
+},
+{
+"q": "what is the continent of hahnenkopf",
+"gold": [
+"Europe"
+],
+"entity": "Hahnenkopf",
+"property": "continent"
+},
+{
+"q": "what is the country of citizenship of p. sundaram nataraja pillai",
+"gold": [
+"British Raj",
+"Dominion of India",
+"India"
+],
+"entity": "P. Sundaram Nataraja Pillai",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of laurentian",
+"gold": [
+"Canada"
+],
+"entity": "Laurentian",
+"property": "country"
+},
+{
+"q": "what is the country of citizenship of mehran ahmadi",
+"gold": [
+"Iran"
+],
+"entity": "Mehran Ahmadi",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of danzig gulden",
+"gold": [
+"currency"
+],
+"entity": "Danzig gulden",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:former entities",
+"gold": [
+"Wikimedia meta category"
+],
+"entity": "Category:Former entities",
+"property": "instance of"
+},
+{
+"q": "what is the country of flag of estonia",
+"gold": [
+"Estonia"
+],
+"entity": "flag of Estonia",
+"property": "country"
+},
+{
+"q": "what is the instance of of azougui",
+"gold": [
+"ancient city",
+"human settlement",
+"oasis"
+],
+"entity": "Azougui",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of imperial estate",
+"gold": [
+"estates of the realm"
+],
+"entity": "Imperial Estate",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of triangle",
+"gold": [
+"literary work"
+],
+"entity": "Triangle",
+"property": "instance of"
+},
+{
+"q": "what is the country of cincinnati metropolitan area",
+"gold": [
+"United States"
+],
+"entity": "Cincinnati metropolitan area",
+"property": "country"
+},
+{
+"q": "what is the country of ecuadorian sucre",
+"gold": [
+"Ecuador"
+],
+"entity": "Ecuadorian sucre",
+"property": "country"
+},
+{
+"q": "what is the country of griffith park",
+"gold": [
+"United States"
+],
+"entity": "Griffith Park",
+"property": "country"
+},
+{
+"q": "what is the instance of of lynette scavo",
+"gold": [
+"fictional human",
+"television character"
+],
+"entity": "Lynette Scavo",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of chamicuro",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Chamicuro",
+"property": "instance of"
+},
+{
+"q": "what is the country of gibraltar",
+"gold": [
+"United Kingdom"
+],
+"entity": "Gibraltar",
+"property": "country"
+},
+{
+"q": "what is the occupation of paul martin",
+"gold": [
+"businessperson",
+"entrepreneur",
+"lawyer",
+"politician"
+],
+"entity": "Paul Martin",
+"property": "occupation"
+},
+{
+"q": "what is the country of citizenship of louise latham",
+"gold": [
+"United States"
+],
+"entity": "Louise Latham",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of asia/hovd",
+"gold": [
+"IANA time zone"
+],
+"entity": "Asia/Hovd",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of template:empires",
+"gold": [
+"Wikimedia navigational template"
+],
+"entity": "Template:Empires",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of jurisdiction",
+"gold": [
+"Q112121531"
+],
+"entity": "jurisdiction",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of luhansk people's republic",
+"gold": [
+"Russian-occupied territories of Ukraine",
+"de facto regime",
+"disputed territory",
+"federal subject of Russia",
+"republic of Russia"
+],
+"entity": "Luhansk People's Republic",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of ust-orda buryat autonomous okrug",
+"gold": [
+"former administrative territorial entity"
+],
+"entity": "Ust-Orda Buryat Autonomous Okrug",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of adolf hitler",
+"gold": [
+"Austria",
+"Cisleithania",
+"German Reich",
+"Nazi Germany"
+],
+"entity": "Adolf Hitler",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of vernal equinox day",
+"gold": [
+"public holiday in Japan"
+],
+"entity": "Vernal Equinox Day",
+"property": "instance of"
+},
+{
+"q": "what is the country of hmong",
+"gold": [
+"Laos",
+"People's Republic of China",
+"Thailand",
+"Vietnam"
+],
+"entity": "Hmong",
+"property": "country"
+},
+{
+"q": "what is the instance of of nanai",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Nanai",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of lolani",
+"gold": [
+"short film",
+"television series episode"
+],
+"entity": "Lolani",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of cosmo kramer",
+"gold": [
+"United States"
+],
+"entity": "Cosmo Kramer",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of sea of crete",
+"gold": [
+"Greece"
+],
+"entity": "Sea of Crete",
+"property": "country"
+},
+{
+"q": "what is the country of meguro",
+"gold": [
+"Japan"
+],
+"entity": "Meguro",
+"property": "country"
+},
+{
+"q": "what is the instance of of norwegian red cross",
+"gold": [
+"National Red Cross and Red Crescent society"
+],
+"entity": "Norwegian Red Cross",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of team manager",
+"gold": [
+"job title",
+"occupation",
+"position",
+"profession"
+],
+"entity": "team manager",
+"property": "instance of"
+},
+{
+"q": "what is the country of medny aleut",
+"gold": [
+"Russia"
+],
+"entity": "Medny Aleut",
+"property": "country"
+},
+{
+"q": "what is the country of citizenship of dileita mohamed dileita",
+"gold": [
+"Djibouti"
+],
+"entity": "Dileita Mohamed Dileita",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of tennessee river",
+"gold": [
+"river"
+],
+"entity": "Tennessee River",
+"property": "instance of"
+},
+{
+"q": "what is the country of order of saint januarius",
+"gold": [
+"Kingdom of Naples",
+"Kingdom of the Two Sicilies"
+],
+"entity": "Order of Saint Januarius",
+"property": "country"
+},
+{
+"q": "what is the instance of of iroha-hime",
+"gold": [
+"human"
+],
+"entity": "Iroha-hime",
+"property": "instance of"
+},
+{
+"q": "what is the country of nupe",
+"gold": [
+"Nigeria"
+],
+"entity": "Nupe",
+"property": "country"
+},
+{
+"q": "what is the instance of of saitama district",
+"gold": [
+"former district of Japan"
+],
+"entity": "Saitama district",
+"property": "instance of"
+},
+{
+"q": "what is the country of capisnon",
+"gold": [
+"Philippines"
+],
+"entity": "Capisnon",
+"property": "country"
+},
+{
+"q": "what is the country of kukawa",
+"gold": [
+"Nigeria"
+],
+"entity": "Kukawa",
+"property": "country"
+},
+{
+"q": "what is the official language of el oro province",
+"gold": [
+"Spanish"
+],
+"entity": "El Oro Province",
+"property": "official language"
+},
+{
+"q": "what is the instance of of dravidian folk religion",
+"gold": [
+"ethnic religion"
+],
+"entity": "Dravidian folk religion",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of voice",
+"gold": [
+"type of musical instrument"
+],
+"entity": "voice",
+"property": "instance of"
+},
+{
+"q": "what is the currency of switzerland",
+"gold": [
+"Swiss franc"
+],
+"entity": "Switzerland",
+"property": "currency"
+},
+{
+"q": "what is the instance of of kingdom of cambodia",
+"gold": [
+"historical country",
+"kingdom"
+],
+"entity": "Kingdom of Cambodia",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of adolf stern",
+"gold": [
+"historian",
+"literary historian",
+"poet",
+"university teacher",
+"writer"
+],
+"entity": "Adolf Stern",
+"property": "occupation"
+},
+{
+"q": "what is the currency of united kingdom",
+"gold": [
+"pound sterling"
+],
+"entity": "United Kingdom",
+"property": "currency"
+},
+{
+"q": "what is the occupation of ernst albrecht",
+"gold": [
+"politician"
+],
+"entity": "Ernst Albrecht",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of chimborazo highland quichua",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Chimborazo Highland Quichua",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of alexander jakowlewitsch danilewski",
+"gold": [
+"Russian Empire",
+"Soviet Union"
+],
+"entity": "Alexander Jakowlewitsch Danilewski",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of category:subdivisions of italy",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Subdivisions of Italy",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of pollution",
+"gold": [
+"human impact on the environment"
+],
+"entity": "pollution",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of malay studies",
+"gold": [
+"academic discipline"
+],
+"entity": "Malay studies",
+"property": "instance of"
+},
+{
+"q": "what is the country of zhemchuzhnaya",
+"gold": [
+"Russia"
+],
+"entity": "Zhemchuzhnaya",
+"property": "country"
+},
+{
+"q": "what is the instance of of awadhi",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Awadhi",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of flag of simferopol",
+"gold": [
+"municipal flag"
+],
+"entity": "flag of Simferopol",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of flag of estonia",
+"gold": [
+"national flag"
+],
+"entity": "flag of Estonia",
+"property": "instance of"
+},
+{
+"q": "what is the capital of california",
+"gold": [
+"Sacramento"
+],
+"entity": "California",
+"property": "capital"
+},
+{
+"q": "what is the instance of of rusko",
+"gold": [
+"Wikimedia disambiguation page"
+],
+"entity": "Rusko",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of council of government",
+"gold": [
+"government",
+"government agency"
+],
+"entity": "Council of Government",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of telangana",
+"gold": [
+"state of India"
+],
+"entity": "Telangana",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of jean bodin",
+"gold": [
+"Q1616837",
+"Q2664701",
+"demonologist",
+"economist",
+"historian"
+],
+"entity": "Jean Bodin",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of gazakh district",
+"gold": [
+"district of Azerbaijan"
+],
+"entity": "Gazakh District",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of papal tiara",
+"gold": [
+"religious symbol"
+],
+"entity": "papal tiara",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of laoag",
+"gold": [
+"component city"
+],
+"entity": "Laoag",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of richard martin west",
+"gold": [
+"Kingdom of Denmark"
+],
+"entity": "Richard Martin West",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of abai sungai",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Abai Sungai",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of tuva",
+"gold": [
+"federal subject of Russia",
+"republic of Russia"
+],
+"entity": "Tuva",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of naypyidaw",
+"gold": [
+"big city",
+"city",
+"planned national capital",
+"town in Myanmar"
+],
+"entity": "Naypyidaw",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of portuguese mozambique",
+"gold": [
+"Portuguese Empire",
+"colony",
+"historical period",
+"overseas province of Portugal"
+],
+"entity": "Portuguese Mozambique",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of happiness",
+"gold": [
+"basic emotion",
+"mood"
+],
+"entity": "happiness",
+"property": "instance of"
+},
+{
+"q": "what is the official language of northwest territories",
+"gold": [
+"Chipewyan",
+"Cree",
+"English",
+"French",
+"Gwich\u2019in"
+],
+"entity": "Northwest Territories",
+"property": "official language"
+},
+{
+"q": "what is the instance of of berenice",
+"gold": [
+"human"
+],
+"entity": "Berenice",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of protein dynamics",
+"gold": [
+"academic discipline"
+],
+"entity": "protein dynamics",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of shuar",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Shuar",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of prince eugen medal",
+"gold": [
+"medal"
+],
+"entity": "Prince Eugen Medal",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of lyon",
+"gold": [
+"big city",
+"college town",
+"commune of France",
+"commune of France with specific status"
+],
+"entity": "Lyon",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of sixth conjugation",
+"gold": [
+"conjugation class"
+],
+"entity": "sixth conjugation",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of ngom",
+"gold": [
+"dialect",
+"language",
+"modern language"
+],
+"entity": "Ngom",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of barcelos",
+"gold": [
+"municipality of Portugal"
+],
+"entity": "Barcelos",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of tom bower",
+"gold": [
+"human"
+],
+"entity": "Tom Bower",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of santa cruz",
+"gold": [
+"Q61878"
+],
+"entity": "Santa Cruz",
+"property": "instance of"
+},
+{
+"q": "what is the country of western bru",
+"gold": [
+"Laos",
+"Thailand"
+],
+"entity": "Western Bru",
+"property": "country"
+},
+{
+"q": "what is the instance of of palestinian national authority",
+"gold": [
+"executive branch",
+"provisional government"
+],
+"entity": "Palestinian National Authority",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of brandenburger vorstadt",
+"gold": [
+"Stadtbezirk"
+],
+"entity": "Brandenburger Vorstadt",
+"property": "instance of"
+},
+{
+"q": "what is the country of kelurahan",
+"gold": [
+"Indonesia"
+],
+"entity": "kelurahan",
+"property": "country"
+},
+{
+"q": "what is the occupation of alberto fujimori",
+"gold": [
+"agricultural engineer",
+"politician",
+"television presenter",
+"university teacher",
+"writer"
+],
+"entity": "Alberto Fujimori",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of category:deaths in algiers",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Deaths in Algiers",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of eth domain",
+"gold": [
+"government agency of Switzerland",
+"organization",
+"scientific organization"
+],
+"entity": "ETH Domain",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of lori province",
+"gold": [
+"province of Armenia"
+],
+"entity": "Lori Province",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of 2012 ad1",
+"gold": [
+"asteroid"
+],
+"entity": "2012 AD1",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of vanessa ray",
+"gold": [
+"human"
+],
+"entity": "Vanessa Ray",
+"property": "instance of"
+},
+{
+"q": "what is the country of vafsi",
+"gold": [
+"Iran"
+],
+"entity": "Vafsi",
+"property": "country"
+},
+{
+"q": "what is the instance of of non-open license",
+"gold": [
+"type of license"
+],
+"entity": "non-open license",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of s. v. krishnamoorthy rao",
+"gold": [
+"human"
+],
+"entity": "S. V. Krishnamoorthy Rao",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of fictional island",
+"gold": [
+"class of fictional entities"
+],
+"entity": "fictional island",
+"property": "instance of"
+},
+{
+"q": "what is the country of shueisha orange bunko",
+"gold": [
+"Japan"
+],
+"entity": "Shueisha Orange Bunko",
+"property": "country"
+},
+{
+"q": "what is the instance of of tsurukawa",
+"gold": [
+"dissolved municipality of Japan"
+],
+"entity": "Tsurukawa",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of folklore",
+"gold": [
+"genre"
+],
+"entity": "folklore",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of mila province",
+"gold": [
+"province of Algeria"
+],
+"entity": "Mila Province",
+"property": "instance of"
+},
+{
+"q": "what is the country of nigeria",
+"gold": [
+"Nigeria"
+],
+"entity": "Nigeria",
+"property": "country"
+},
+{
+"q": "what is the instance of of sxm-9",
+"gold": [
+"communications satellite",
+"geostationary satellite"
+],
+"entity": "SXM-9",
+"property": "instance of"
+},
+{
+"q": "what is the country of nyaw",
+"gold": [
+"Thailand"
+],
+"entity": "Nyaw",
+"property": "country"
+},
+{
+"q": "what is the occupation of joseph molitor",
+"gold": [
+"politician"
+],
+"entity": "Joseph Molitor",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of petyr baelish",
+"gold": [
+"A Song of Ice and Fire character",
+"Game of Thrones character",
+"fictional human"
+],
+"entity": "Petyr Baelish",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of archangel michael",
+"gold": [
+"painting"
+],
+"entity": "Archangel Michael",
+"property": "instance of"
+},
+{
+"q": "what is the country of bank negara malaysia",
+"gold": [
+"Malaysia"
+],
+"entity": "Bank Negara Malaysia",
+"property": "country"
+},
+{
+"q": "what is the country of county carlow",
+"gold": [
+"Ireland"
+],
+"entity": "County Carlow",
+"property": "country"
+},
+{
+"q": "what is the country of warumungu",
+"gold": [
+"Australia"
+],
+"entity": "Warumungu",
+"property": "country"
+},
+{
+"q": "what is the instance of of ancient greek religion",
+"gold": [
+"polytheistic religion"
+],
+"entity": "Ancient Greek religion",
+"property": "instance of"
+},
+{
+"q": "what is the country of orlyval",
+"gold": [
+"France"
+],
+"entity": "Orlyval",
+"property": "country"
+},
+{
+"q": "what is the instance of of eric stoltz",
+"gold": [
+"human"
+],
+"entity": "Eric Stoltz",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of bayungu",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Bayungu",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of petter",
+"gold": [
+"male given name"
+],
+"entity": "Petter",
+"property": "instance of"
+},
+{
+"q": "what is the country of tres cantos",
+"gold": [
+"Spain"
+],
+"entity": "Tres Cantos",
+"property": "country"
+},
+{
+"q": "what is the country of skagerrak",
+"gold": [
+"Denmark",
+"Norway",
+"Sweden"
+],
+"entity": "Skagerrak",
+"property": "country"
+},
+{
+"q": "what is the instance of of mizuho",
+"gold": [
+"town of Japan"
+],
+"entity": "Mizuho",
+"property": "instance of"
+},
+{
+"q": "what is the country of west philippine sea",
+"gold": [
+"Philippines"
+],
+"entity": "West Philippine Sea",
+"property": "country"
+},
+{
+"q": "what is the instance of of class 4a in zaliznyak",
+"gold": [
+"Zaliznyak noun classification"
+],
+"entity": "class 4a in Zaliznyak",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:multi-paradigm programming languages",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Multi-paradigm programming languages",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of statua di san francesco",
+"gold": [
+"statue"
+],
+"entity": "Statua di San Francesco",
+"property": "instance of"
+},
+{
+"q": "what is the capital of county of flanders",
+"gold": [
+"Bruges"
+],
+"entity": "County of Flanders",
+"property": "capital"
+},
+{
+"q": "what is the instance of of film production",
+"gold": [
+"economic activity",
+"field of study"
+],
+"entity": "film production",
+"property": "instance of"
+},
+{
+"q": "what is the country of economy of mecklenburg-western pomerania",
+"gold": [
+"Germany"
+],
+"entity": "economy of Mecklenburg-Western Pomerania",
+"property": "country"
+},
+{
+"q": "what is the country of kamakan",
+"gold": [
+"Brazil"
+],
+"entity": "Kamakan",
+"property": "country"
+},
+{
+"q": "what is the instance of of wayne county",
+"gold": [
+"county of New York"
+],
+"entity": "Wayne County",
+"property": "instance of"
+},
+{
+"q": "what is the country of molucca sea",
+"gold": [
+"Indonesia"
+],
+"entity": "Molucca Sea",
+"property": "country"
+},
+{
+"q": "what is the instance of of ukrainian soviet encyclopedia",
+"gold": [
+"national encyclopedia",
+"written work"
+],
+"entity": "Ukrainian Soviet Encyclopedia",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of cree",
+"gold": [
+"ethnic group"
+],
+"entity": "Cree",
+"property": "instance of"
+},
+{
+"q": "what is the country of pudtol atta",
+"gold": [
+"Philippines"
+],
+"entity": "Pudtol Atta",
+"property": "country"
+},
+{
+"q": "what is the instance of of statue of liberty",
+"gold": [
+"print"
+],
+"entity": "Statue of Liberty",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:words and phrases",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Words and phrases",
+"property": "instance of"
+},
+{
+"q": "what is the country of truth prevails",
+"gold": [
+"Czech Republic"
+],
+"entity": "Truth prevails",
+"property": "country"
+},
+{
+"q": "what is the country of didymoteicho",
+"gold": [
+"Greece"
+],
+"entity": "Didymoteicho",
+"property": "country"
+},
+{
+"q": "what is the instance of of makasae",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Makasae",
+"property": "instance of"
+},
+{
+"q": "what is the country of saint stephen's day",
+"gold": [
+"Hungary"
+],
+"entity": "Saint Stephen's Day",
+"property": "country"
+},
+{
+"q": "what is the instance of of transitional presidential council",
+"gold": [
+"political institution",
+"provisional government"
+],
+"entity": "Transitional Presidential Council",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of twelvepole creek",
+"gold": [
+"river"
+],
+"entity": "Twelvepole Creek",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:paris portal",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Paris portal",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of outline of portugal",
+"gold": [
+"Wikimedia outline article"
+],
+"entity": "outline of Portugal",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of you got me, babe",
+"gold": [
+"television series episode"
+],
+"entity": "You Got Me, Babe",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of substance",
+"gold": [
+"philosophical concept"
+],
+"entity": "substance",
+"property": "instance of"
+},
+{
+"q": "what is the country of kobe",
+"gold": [
+"Japan"
+],
+"entity": "Kobe",
+"property": "country"
+},
+{
+"q": "what is the country of shchukino district",
+"gold": [
+"Russia"
+],
+"entity": "Shchukino District",
+"property": "country"
+},
+{
+"q": "what is the instance of of r18 certificate",
+"gold": [
+"BBFC classification category"
+],
+"entity": "R18 certificate",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of item",
+"gold": [
+"level of description"
+],
+"entity": "item",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of ygritte",
+"gold": [
+"warrior"
+],
+"entity": "Ygritte",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of double helix games",
+"gold": [
+"video game developer"
+],
+"entity": "Double Helix Games",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of shankar dayal sharma",
+"gold": [
+"lawyer",
+"politician"
+],
+"entity": "Shankar Dayal Sharma",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of category:tourist attractions",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Tourist attractions",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of eduard franz",
+"gold": [
+"United States"
+],
+"entity": "Eduard Franz",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of citizenship of ictinus",
+"gold": [
+"Classical Athens"
+],
+"entity": "Ictinus",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of al-sayyid bedouin sign language",
+"gold": [
+"modern language",
+"sign language"
+],
+"entity": "Al-Sayyid Bedouin Sign Language",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of otto stromer von reichenbach",
+"gold": [
+"Germany"
+],
+"entity": "Otto Stromer von Reichenbach",
+"property": "country of citizenship"
+},
+{
+"q": "what is the currency of austrian empire",
+"gold": [
+"thaler"
+],
+"entity": "Austrian Empire",
+"property": "currency"
+},
+{
+"q": "what is the instance of of despite yourself",
+"gold": [
+"Star Trek episode"
+],
+"entity": "Despite Yourself",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:maps of madrid",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Maps of Madrid",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of hawaiian pidgin",
+"gold": [
+"creole",
+"language",
+"modern language"
+],
+"entity": "Hawaiian Pidgin",
+"property": "instance of"
+},
+{
+"q": "what is the country of municipality of greece",
+"gold": [
+"Greece"
+],
+"entity": "municipality of Greece",
+"property": "country"
+},
+{
+"q": "what is the instance of of atacuari river",
+"gold": [
+"watercourse"
+],
+"entity": "Atacuari River",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:tests",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Tests",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of kreuzer",
+"gold": [
+"coin type"
+],
+"entity": "kreuzer",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:documentary film directors",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Documentary film directors",
+"property": "instance of"
+},
+{
+"q": "what is the country of harris museum",
+"gold": [
+"United Kingdom"
+],
+"entity": "Harris Museum",
+"property": "country"
+},
+{
+"q": "what is the instance of of legal instrument",
+"gold": [
+"type of document"
+],
+"entity": "legal instrument",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of paris",
+"gold": [
+"United States"
+],
+"entity": "Paris",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of lucy krohg",
+"gold": [
+"human"
+],
+"entity": "Lucy Krohg",
+"property": "instance of"
+},
+{
+"q": "what is the country of luganville",
+"gold": [
+"Vanuatu"
+],
+"entity": "Luganville",
+"property": "country"
+},
+{
+"q": "what is the instance of of lishanid noshan",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Lishanid Noshan",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of alexander de croo",
+"gold": [
+"entrepreneur",
+"head of government",
+"politician"
+],
+"entity": "Alexander De Croo",
+"property": "occupation"
+},
+{
+"q": "what is the country of flag of iceland",
+"gold": [
+"Iceland"
+],
+"entity": "flag of Iceland",
+"property": "country"
+},
+{
+"q": "what is the instance of of italic peoples",
+"gold": [
+"extinct human group",
+"historical ethnic group"
+],
+"entity": "Italic peoples",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of elizabeth sung",
+"gold": [
+"Q28135085",
+"Q4676869",
+"dancer",
+"film actor",
+"film director"
+],
+"entity": "Elizabeth Sung",
+"property": "occupation"
+},
+{
+"q": "what is the occupation of shae",
+"gold": [
+"domestic worker",
+"prostitute"
+],
+"entity": "Shae",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of crichton",
+"gold": [
+"family name"
+],
+"entity": "Crichton",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of david koechner",
+"gold": [
+"comedian",
+"film actor",
+"screenwriter",
+"singer",
+"television actor"
+],
+"entity": "David Koechner",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of barcelonian pound",
+"gold": [
+"Q354091"
+],
+"entity": "Barcelonian pound",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of viceroyalty of new granada",
+"gold": [
+"former entity",
+"viceroyalty of the Spanish Empire"
+],
+"entity": "Viceroyalty of New Granada",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of victoria pedretti",
+"gold": [
+"United States"
+],
+"entity": "Victoria Pedretti",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of flag of pittsburgh",
+"gold": [
+"municipal flag",
+"vertical triband"
+],
+"entity": "flag of Pittsburgh",
+"property": "instance of"
+},
+{
+"q": "what is the country of jalaun state",
+"gold": [
+"India"
+],
+"entity": "Jalaun State",
+"property": "country"
+},
+{
+"q": "what is the instance of of zoologist",
+"gold": [
+"profession"
+],
+"entity": "zoologist",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of ricardo chavira",
+"gold": [
+"United States"
+],
+"entity": "Ricardo Chavira",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of harvard medical school",
+"gold": [
+"medical school"
+],
+"entity": "Harvard Medical School",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of bajram begaj",
+"gold": [
+"major general",
+"military personnel",
+"politician"
+],
+"entity": "Bajram Begaj",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of czechoslovak koruna",
+"gold": [
+"crown",
+"currency"
+],
+"entity": "Czechoslovak koruna",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of mehran ahmadi",
+"gold": [
+"human"
+],
+"entity": "Mehran Ahmadi",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of european atomic energy community",
+"gold": [
+"international organization",
+"organization",
+"regional organization"
+],
+"entity": "European Atomic Energy Community",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of the cw",
+"gold": [
+"television network"
+],
+"entity": "The CW",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of european air transport command",
+"gold": [
+"command center",
+"international organization"
+],
+"entity": "European Air Transport Command",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of androgen secretion",
+"gold": [
+"biological process"
+],
+"entity": "androgen secretion",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of mauno koivisto",
+"gold": [
+"human"
+],
+"entity": "Mauno Koivisto",
+"property": "instance of"
+},
+{
+"q": "what is the country of warwickshire",
+"gold": [
+"United Kingdom"
+],
+"entity": "Warwickshire",
+"property": "country"
+},
+{
+"q": "what is the instance of of figurative art",
+"gold": [
+"art genre"
+],
+"entity": "figurative art",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of lucy krohg",
+"gold": [
+"art model",
+"dancer",
+"gallerist",
+"model"
+],
+"entity": "Lucy Krohg",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of jagat narain lal",
+"gold": [
+"human"
+],
+"entity": "Jagat Narain Lal",
+"property": "instance of"
+},
+{
+"q": "what is the continent of taifa of baeza",
+"gold": [
+"Europe"
+],
+"entity": "Taifa of Baeza",
+"property": "continent"
+},
+{
+"q": "what is the capital of viceroyalty of new granada",
+"gold": [
+"Bogot\u00e1"
+],
+"entity": "Viceroyalty of New Granada",
+"property": "capital"
+},
+{
+"q": "what is the instance of of john diefenbaker",
+"gold": [
+"human"
+],
+"entity": "John Diefenbaker",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of hinrich",
+"gold": [
+"male given name"
+],
+"entity": "Hinrich",
+"property": "instance of"
+},
+{
+"q": "what is the country of cairo",
+"gold": [
+"Egypt"
+],
+"entity": "Cairo",
+"property": "country"
+},
+{
+"q": "what is the country of citizenship of elizabeth lail",
+"gold": [
+"United States"
+],
+"entity": "Elizabeth Lail",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of botswana",
+"gold": [
+"Botswana"
+],
+"entity": "Botswana",
+"property": "country"
+},
+{
+"q": "what is the country of mashhad",
+"gold": [
+"Iran"
+],
+"entity": "Mashhad",
+"property": "country"
+},
+{
+"q": "what is the instance of of battle of brandywine",
+"gold": [
+"battle"
+],
+"entity": "Battle of Brandywine",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of equine chorionic gonadotropin",
+"gold": [
+"Q187126"
+],
+"entity": "equine chorionic gonadotropin",
+"property": "instance of"
+},
+{
+"q": "what is the country of nagod state",
+"gold": [
+"British India"
+],
+"entity": "Nagod State",
+"property": "country"
+},
+{
+"q": "what is the instance of of category:types of beer",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Types of beer",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of gare",
+"gold": [
+"Wikimedia disambiguation page"
+],
+"entity": "Gare",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of academic publishing",
+"gold": [
+"field of study",
+"industry"
+],
+"entity": "academic publishing",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of carrot",
+"gold": [
+"Q140358161",
+"food crop"
+],
+"entity": "carrot",
+"property": "instance of"
+},
+{
+"q": "what is the country of sesto san giovanni",
+"gold": [
+"Italy"
+],
+"entity": "Sesto San Giovanni",
+"property": "country"
+},
+{
+"q": "what is the instance of of municipality of dobrepolje",
+"gold": [
+"municipality of Slovenia"
+],
+"entity": "Municipality of Dobrepolje",
+"property": "instance of"
+},
+{
+"q": "what is the country of mentana",
+"gold": [
+"Italy"
+],
+"entity": "Mentana",
+"property": "country"
+},
+{
+"q": "what is the country of nigori-ike pond",
+"gold": [
+"Japan"
+],
+"entity": "Nigori-ike Pond",
+"property": "country"
+},
+{
+"q": "what is the instance of of category:sports by type",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Sports by type",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of zagreb county (former)",
+"gold": [
+"Q852231"
+],
+"entity": "Zagreb County (former)",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of type of practice",
+"gold": [
+"metaclass"
+],
+"entity": "type of practice",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:west iberian languages",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:West Iberian languages",
+"property": "instance of"
+},
+{
+"q": "what is the country of north sea basin",
+"gold": [
+"Belgium",
+"Denmark",
+"France",
+"Germany",
+"Netherlands"
+],
+"entity": "North Sea basin",
+"property": "country"
+},
+{
+"q": "what is the instance of of world population",
+"gold": [
+"human population"
+],
+"entity": "world population",
+"property": "instance of"
+},
+{
+"q": "what is the country of west kalimantan",
+"gold": [
+"Indonesia"
+],
+"entity": "West Kalimantan",
+"property": "country"
+},
+{
+"q": "what is the instance of of template:infobox u.s. state",
+"gold": [
+"Wikimedia infobox template",
+"Wikimedia template"
+],
+"entity": "Template:Infobox U.S. state",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of loharu state",
+"gold": [
+"princely state"
+],
+"entity": "Loharu State",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of 5.1 surround sound",
+"gold": [
+"sound format"
+],
+"entity": "5.1 surround sound",
+"property": "instance of"
+},
+{
+"q": "what is the country of aalemannkanal",
+"gold": [
+"Germany"
+],
+"entity": "Aalemannkanal",
+"property": "country"
+},
+{
+"q": "what is the country of melk",
+"gold": [
+"Austria"
+],
+"entity": "Melk",
+"property": "country"
+},
+{
+"q": "what is the instance of of wayanad chetti",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Wayanad Chetti",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of yokohama",
+"gold": [
+"city designated by government ordinance",
+"city of Japan",
+"commuter town",
+"port city",
+"prefectural capital of Japan"
+],
+"entity": "Yokohama",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of ram nath kovind",
+"gold": [
+"governor",
+"lawyer",
+"politician"
+],
+"entity": "Ram Nath Kovind",
+"property": "occupation"
+},
+{
+"q": "what is the occupation of regina king",
+"gold": [
+"actor",
+"director",
+"film actor",
+"film director",
+"television actor"
+],
+"entity": "Regina King",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of category:independence days",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Independence days",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:moscow",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Moscow",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of anthony azizi",
+"gold": [
+"human"
+],
+"entity": "Anthony Azizi",
+"property": "instance of"
+},
+{
+"q": "what is the continent of spanish east indies",
+"gold": [
+"Insular Oceania"
+],
+"entity": "Spanish East Indies",
+"property": "continent"
+},
+{
+"q": "what is the instance of of kupaa studios",
+"gold": [
+"video game developer",
+"video game publisher"
+],
+"entity": "Kupaa Studios",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:bureaucrats (users)",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Bureaucrats (users)",
+"property": "instance of"
+},
+{
+"q": "what is the country of indo-portuguese",
+"gold": [
+"India"
+],
+"entity": "Indo-Portuguese",
+"property": "country"
+},
+{
+"q": "what is the country of chanthaburi",
+"gold": [
+"Thailand"
+],
+"entity": "Chanthaburi",
+"property": "country"
+},
+{
+"q": "what is the country of folketing",
+"gold": [
+"Denmark"
+],
+"entity": "Folketing",
+"property": "country"
+},
+{
+"q": "what is the occupation of heinrich julius holtzmann",
+"gold": [
+"Protestant theologian",
+"biblical scholar",
+"university teacher"
+],
+"entity": "Heinrich Julius Holtzmann",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of nkangala",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Nkangala",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of taymyr autonomous okrug",
+"gold": [
+"former administrative territorial entity"
+],
+"entity": "Taymyr Autonomous Okrug",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of khasi",
+"gold": [
+"modern language",
+"natural language"
+],
+"entity": "Khasi",
+"property": "instance of"
+},
+{
+"q": "what is the country of mila province",
+"gold": [
+"Algeria"
+],
+"entity": "Mila Province",
+"property": "country"
+},
+{
+"q": "what is the instance of of terminus",
+"gold": [
+"album"
+],
+"entity": "Terminus",
+"property": "instance of"
+},
+{
+"q": "what is the country of kangwon province",
+"gold": [
+"North Korea"
+],
+"entity": "Kangwon Province",
+"property": "country"
+},
+{
+"q": "what is the country of coolamon shire",
+"gold": [
+"Australia"
+],
+"entity": "Coolamon Shire",
+"property": "country"
+},
+{
+"q": "what is the occupation of masahiko imagawa",
+"gold": [
+"civil servant",
+"politician",
+"urban planner"
+],
+"entity": "Masahiko Imagawa",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of funai district",
+"gold": [
+"district of Japan"
+],
+"entity": "Funai district",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of co-op mode",
+"gold": [
+"game mode"
+],
+"entity": "co-op mode",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of danu self-administered zone",
+"gold": [
+"self-administered zone of Burma"
+],
+"entity": "Danu Self-Administered Zone",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of maria pia of savoy",
+"gold": [
+"Kingdom of Italy",
+"Kingdom of Portugal",
+"Portugal"
+],
+"entity": "Maria Pia of Savoy",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of category:visual artists",
+"gold": [
+"Wikimedia category",
+"Wikimedia soft redirect category"
+],
+"entity": "Category:Visual artists",
+"property": "instance of"
+},
+{
+"q": "what is the country of almonte",
+"gold": [
+"Spain"
+],
+"entity": "Almonte",
+"property": "country"
+},
+{
+"q": "what is the country of castello normanno",
+"gold": [
+"Italy"
+],
+"entity": "Castello Normanno",
+"property": "country"
+},
+{
+"q": "what is the occupation of link",
+"gold": [
+"Q122307681",
+"Q890527",
+"swordfighter"
+],
+"entity": "Link",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of nobility",
+"gold": [
+"estate of the realm",
+"social class"
+],
+"entity": "nobility",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of shirakami river",
+"gold": [
+"river"
+],
+"entity": "Shirakami River",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of .az",
+"gold": [
+"country code top-level domain"
+],
+"entity": ".az",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of the godfather",
+"gold": [
+"film"
+],
+"entity": "The Godfather",
+"property": "instance of"
+},
+{
+"q": "what is the country of municipality of nazarje",
+"gold": [
+"Slovenia"
+],
+"entity": "Municipality of Nazarje",
+"property": "country"
+},
+{
+"q": "what is the occupation of andreas urschlechter",
+"gold": [
+"jurist",
+"politician",
+"primator"
+],
+"entity": "Andreas Urschlechter",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of new hollywood",
+"gold": [
+"movement in cinema"
+],
+"entity": "New Hollywood",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of niiza",
+"gold": [
+"big city",
+"city of Japan"
+],
+"entity": "Niiza",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of kramer vs. kramer",
+"gold": [
+"film"
+],
+"entity": "Kramer vs. Kramer",
+"property": "instance of"
+},
+{
+"q": "what is the country of grossweikersdorf",
+"gold": [
+"Austria"
+],
+"entity": "Grossweikersdorf",
+"property": "country"
+},
+{
+"q": "what is the instance of of november 11",
+"gold": [
+"point in time with respect to recurrent timeframe"
+],
+"entity": "November 11",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of portal:burgos",
+"gold": [
+"Wikimedia portal"
+],
+"entity": "Portal:Burgos",
+"property": "instance of"
+},
+{
+"q": "what is the country of zawiercie",
+"gold": [
+"Poland"
+],
+"entity": "Zawiercie",
+"property": "country"
+},
+{
+"q": "what is the country of riyadh",
+"gold": [
+"Saudi Arabia"
+],
+"entity": "Riyadh",
+"property": "country"
+},
+{
+"q": "what is the instance of of die ruinen von tyrus",
+"gold": [
+"article"
+],
+"entity": "Die Ruinen von Tyrus",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of janusz przymanowski",
+"gold": [
+"journalist",
+"linguist",
+"military personnel",
+"poet",
+"translator"
+],
+"entity": "Janusz Przymanowski",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of standard malay",
+"gold": [
+"register",
+"standard variety"
+],
+"entity": "Standard Malay",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of konobo",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Konobo",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of ichigaya",
+"gold": [
+"neighborhood"
+],
+"entity": "Ichigaya",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of diversity of fish",
+"gold": [
+"Wikimedia list article",
+"biodiversity"
+],
+"entity": "diversity of fish",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of decorative art",
+"gold": [
+"academic discipline",
+"art genre"
+],
+"entity": "decorative art",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of joaquin phoenix",
+"gold": [
+"United States"
+],
+"entity": "Joaquin Phoenix",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of togoland campaign",
+"gold": [
+"military campaign"
+],
+"entity": "Togoland campaign",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of bailey chase",
+"gold": [
+"United States"
+],
+"entity": "Bailey Chase",
+"property": "country of citizenship"
+},
+{
+"q": "what is the instance of of council of people's ministers",
+"gold": [
+"executive branch",
+"government"
+],
+"entity": "Council of People's Ministers",
+"property": "instance of"
+},
+{
+"q": "what is the country of kleinmachnow",
+"gold": [
+"Germany"
+],
+"entity": "Kleinmachnow",
+"property": "country"
+},
+{
+"q": "what is the official language of central african republic",
+"gold": [
+"French",
+"Sango"
+],
+"entity": "Central African Republic",
+"property": "official language"
+},
+{
+"q": "what is the instance of of rubicon",
+"gold": [
+"river"
+],
+"entity": "Rubicon",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of r",
+"gold": [
+"MPA classification category"
+],
+"entity": "R",
+"property": "instance of"
+},
+{
+"q": "what is the capital of qena governorate",
+"gold": [
+"Qena"
+],
+"entity": "Qena Governorate",
+"property": "capital"
+},
+{
+"q": "what is the capital of sevnica municipality",
+"gold": [
+"Sevnica"
+],
+"entity": "Sevnica Municipality",
+"property": "capital"
+},
+{
+"q": "what is the instance of of template:united states political divisions",
+"gold": [
+"Wikimedia navigational template",
+"Wikimedia template"
+],
+"entity": "Template:United States political divisions",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of liberia",
+"gold": [
+"Wikimedia disambiguation page"
+],
+"entity": "Liberia",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of republic day",
+"gold": [
+"planned event",
+"public holiday"
+],
+"entity": "Republic Day",
+"property": "instance of"
+},
+{
+"q": "what is the country of citizenship of regina king",
+"gold": [
+"United States"
+],
+"entity": "Regina King",
+"property": "country of citizenship"
+},
+{
+"q": "what is the country of villatoro",
+"gold": [
+"Spain"
+],
+"entity": "Villatoro",
+"property": "country"
+},
+{
+"q": "what is the occupation of outline of william shakespeare",
+"gold": [
+"writer"
+],
+"entity": "outline of William Shakespeare",
+"property": "occupation"
+},
+{
+"q": "what is the capital of rio de janeiro",
+"gold": [
+"Rio de Janeiro"
+],
+"entity": "Rio de Janeiro",
+"property": "capital"
+},
+{
+"q": "what is the instance of of napoleon",
+"gold": [
+"male given name"
+],
+"entity": "Napoleon",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of bantoanon",
+"gold": [
+"language",
+"modern language"
+],
+"entity": "Bantoanon",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of iran open data",
+"gold": [
+"open data portal"
+],
+"entity": "Iran Open Data",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of vladivostok time",
+"gold": [
+"time zone"
+],
+"entity": "Vladivostok Time",
+"property": "instance of"
+},
+{
+"q": "what is the country of names of japan",
+"gold": [
+"Japan"
+],
+"entity": "names of Japan",
+"property": "country"
+},
+{
+"q": "what is the instance of of walter veltroni",
+"gold": [
+"human"
+],
+"entity": "Walter Veltroni",
+"property": "instance of"
+},
+{
+"q": "what is the occupation of carl christian hall",
+"gold": [
+"diplomat",
+"jurist",
+"pedagogue",
+"politician"
+],
+"entity": "Carl Christian Hall",
+"property": "occupation"
+},
+{
+"q": "what is the instance of of laing art gallery",
+"gold": [
+"art museum",
+"local authority museum"
+],
+"entity": "Laing Art Gallery",
+"property": "instance of"
+},
+{
+"q": "what is the country of ireland",
+"gold": [
+"Ireland",
+"United Kingdom"
+],
+"entity": "Ireland",
+"property": "country"
+},
+{
+"q": "what is the occupation of chas newby",
+"gold": [
+"bass guitarist"
+],
+"entity": "Chas Newby",
+"property": "occupation"
+},
+{
+"q": "what is the official language of american samoa",
+"gold": [
+"English",
+"Samoan"
+],
+"entity": "American Samoa",
+"property": "official language"
+},
+{
+"q": "what is the instance of of casus belli",
+"gold": [
+"Latin phrase"
+],
+"entity": "casus belli",
+"property": "instance of"
+},
+{
+"q": "what is the continent of australia/perth",
+"gold": [
+"Australian continent"
+],
+"entity": "Australia/Perth",
+"property": "continent"
+},
+{
+"q": "what is the country of kalsia state",
+"gold": [
+"India"
+],
+"entity": "Kalsia State",
+"property": "country"
+},
+{
+"q": "what is the instance of of german occupation of norway",
+"gold": [
+"country in World War II",
+"military occupation"
+],
+"entity": "German occupation of Norway",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of category:deaths in kamianets-podilskyi raion",
+"gold": [
+"Wikimedia category"
+],
+"entity": "Category:Deaths in Kamianets-Podilskyi Raion",
+"property": "instance of"
+},
+{
+"q": "what is the country of srd",
+"gold": [
+"Japan"
+],
+"entity": "SRD",
+"property": "country"
+},
+{
+"q": "what is the instance of of srem district",
+"gold": [
+"district of Serbia"
+],
+"entity": "Srem District",
+"property": "instance of"
+},
+{
+"q": "what is the instance of of guggenheim museum bilbao",
+"gold": [
+"museum",
+"museum building"
+],
+"entity": "Guggenheim Museum Bilbao",
+"property": "instance of"
+}
+]
+}

@@ -32,6 +32,7 @@ ANSWER, READ, PART, FOUND, PROPOSE, CONJ = "ANSWER", "READINGS", "PARTIAL", "FOU
 META_K, CHECK_K, ACK_K = "META", "CHECK", "ACK"          # phase B frames (chat_acts_prereg.md)
 REQUEST = "REQUEST"                                      # the request act (chat_request_prereg.md): an offer, not a guess
 HUNCH = "HUNCH"                                          # a labelled guess with its reason in counts (guess_prereg.md)
+RECALL_K = "RECALL"                                      # an answer read from the person's own story (events_prereg.md)
 OFFER_K = "OFFER"                                        # a guessed READING offered, never answered (didyoumean_prereg.md)
 SEP = " ; "
 
@@ -62,6 +63,7 @@ V_NEXT = ["Next step:", "To resolve this:", "What would settle it:"]
 V_CORRECT = ["Correct me if wrong.", "Say so if that is wrong.", "Tell me if not."]
 V_RATHER = ["rather than", "over", "and not"]
 V_ASKED = ["You asked", "Earlier you asked", "Looking back, you asked"]
+V_RECALL = ["From what you told me:", "By your account:", "As you told it:"]
 V_CANTREAD = ["I cannot read", "No world of mine reads", "I do not know the word"]
 V_GUESS = ["My guess for", "I am guessing, not reading, for", "A guess, not a fact, for"]
 V_NOT = ["not", "rather than", "and not"]
@@ -124,6 +126,8 @@ def realize(frame, rng):
         c, d = frame["record"]
         s = (f"{rng.choice(V_GUESS)} {frame['phrase']}: " + SEP.join(f"{v} (because {h} of {n} with {cue} have that)" for v, cue, h, n in opts)
              + f". (guesser record {c} confirmed, {d} contradicted) {rng.choice(V_CORRECT)}")
+    elif k == RECALL_K:
+        s = f"{rng.choice(V_RECALL)} {frame['answer']} ({frame['event']})."
     elif k == OFFER_K:
         why = ("the dictionary gives them as the same" if frame["shared"] == 0 else
                f"you confirmed '{frame['episode'][0]}' as '{frame['episode'][1]}'" if frame["shared"] == -1 else
@@ -164,6 +168,7 @@ RX_CONJ = re.compile(rf"^Probably {RX_REC} {_alt(V_RATHER)} (.+)\. {_alt(V_CORRE
 RX_CONJ1 = re.compile(rf"^Probably {RX_REC}\. {_alt(V_CORRECT)}$")          # no rival (transfer_prereg.md)
 RX_HUNCH = re.compile(rf"^{_alt(V_GUESS)} (.+?): (.+)\. \(guesser record (\d+) confirmed, (\d+) contradicted\) {_alt(V_CORRECT)}$", re.S)
 RX_HOPT = re.compile(r"^(.+?) \(because (\d+) of (\d+) with (.+) have that\)$", re.S)
+RX_RECALL = re.compile(rf"^{_alt(V_RECALL)} (.+?) \((.+)\)\.$")
 RX_OFFER = re.compile(rf"^{_alt(V_CANTREAD)} '(.+?)'\. Did you mean '(.+?)'\? \((?:they share (\d+) contexts in what I have read|the dictionary gives them as the same|you confirmed '(.+?)' as '(.+?)')\) Say correct to have it answered, or wrong to decline\.$")
 RX_META = re.compile(rf'^{_alt(V_ASKED)} "(.*)"; the (\w+) was (.*)\.$', re.S)
 RX_CHECK_Y = re.compile(rf"^{_alt(V_YES)} (.+?) is (.+?) \({PER} (.+?)\)\.$")
@@ -186,6 +191,8 @@ def parse(text):
             if ": " not in a: return None
             w, lab = a.split(": ", 1); acts.append((w, lab))
         off = m.group(2); return dict(kind=ACK_K, acts=sorted(acts), offers=[] if off == "nothing yet" else off.split(SEP))
+    m = RX_RECALL.match(text)
+    if m: return dict(kind=RECALL_K, answer=m.group(1), event=m.group(2))
     m = RX_OFFER.match(text)
     if m:
         if m.group(4): return dict(kind=OFFER_K, word=m.group(1), sub=m.group(2), shared=-1, episode=(m.group(4), m.group(5)))

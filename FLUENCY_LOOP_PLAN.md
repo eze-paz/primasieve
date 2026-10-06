@@ -86,3 +86,4 @@ they will go without ever trading away honesty, and to say plainly when they sto
 | date | iteration | line | hypothesis | verdict | battery delta |
 |---|---|---|---|---|---|
 | 2026-10-06 | -- | -- | plan written | -- | -- |
+| 2026-10-06 | 1 | B5, B6 | an event reader (events_prereg.md) | NOT PASSED (E2) | B5 held-out novels +11.5 over frequency (events ~+3 of it); B6 31/100 (from ~0) |

@@ -1,0 +1,373 @@
+{
+ "note": "B9 multi-turn dialogues (FLUENCY_LOOP_PLAN.md). DRAFT for the owner to review. Each turn has the gold value(s) a correct reply must contain (case-blind); a dialogue counts only if every turn is right. Facts are ones the engine's offline worlds hold (Wikidata fixture, the records and sales tables, arithmetic). Golds checked against the tables and stores on 2026-10-06 (widget/gadget totals corrected to the sales table); a statement turn's gold is the confirming or correcting phrase.",
+ "dialogues": [
+  {
+   "id": "d01",
+   "turns": [
+    [
+     "what is the capital of france",
+     [
+      "paris"
+     ]
+    ],
+    [
+     "and its currency",
+     [
+      "euro"
+     ]
+    ],
+    [
+     "what about japan",
+     [
+      "tokyo",
+      "yen"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d02",
+   "turns": [
+    [
+     "what is the salary of alice",
+     [
+      "120"
+     ]
+    ],
+    [
+     "and of bob",
+     [
+      "150"
+     ]
+    ],
+    [
+     "who is the manager of bob",
+     [
+      "carol"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d03",
+   "turns": [
+    [
+     "what is 3 times 4",
+     [
+      "12"
+     ]
+    ],
+    [
+     "plus 5",
+     [
+      "17"
+     ]
+    ],
+    [
+     "times 2",
+     [
+      "34"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d04",
+   "turns": [
+    [
+     "who is the director of jaws",
+     [
+      "steven spielberg",
+      "spielberg"
+     ]
+    ],
+    [
+     "who is the author of hamlet",
+     [
+      "william shakespeare",
+      "shakespeare"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d05",
+   "turns": [
+    [
+     "what is the capital of germany",
+     [
+      "berlin"
+     ]
+    ],
+    [
+     "paris is the capital of germany",
+     [
+      "capital of germany is berlin"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d06",
+   "turns": [
+    [
+     "what is the total quantity for widget",
+     [
+      "237"
+     ]
+    ],
+    [
+     "and for gadget",
+     [
+      "252"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d07",
+   "turns": [
+    [
+     "what is the continent of egypt",
+     [
+      "africa"
+     ]
+    ],
+    [
+     "and of japan",
+     [
+      "asia"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d08",
+   "turns": [
+    [
+     "what is the city of the department of alice",
+     [
+      "paris"
+     ]
+    ],
+    [
+     "what is the country of that city",
+     [
+      "france"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d09",
+   "turns": [
+    [
+     "who is the spouse of barack obama",
+     [
+      "michelle obama"
+     ]
+    ],
+    [
+     "tokyo is the capital of japan",
+     [
+      "capital of japan is tokyo"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d10",
+   "turns": [
+    [
+     "what is the highest salary in research",
+     [
+      "300"
+     ]
+    ],
+    [
+     "and the lowest",
+     [
+      "140"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d11",
+   "turns": [
+    [
+     "what is the official language of brazil",
+     [
+      "portuguese"
+     ]
+    ],
+    [
+     "and its capital",
+     [
+      "brasilia",
+      "bras\u00edlia"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d12",
+   "turns": [
+    [
+     "what is 100 minus 1",
+     [
+      "99"
+     ]
+    ],
+    [
+     "minus 9",
+     [
+      "90"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d13",
+   "turns": [
+    [
+     "what is the place of birth of napoleon",
+     [
+      "ajaccio"
+     ]
+    ],
+    [
+     "which country is that in",
+     [
+      "france"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d14",
+   "turns": [
+    [
+     "how many employees are in support",
+     [
+      "2"
+     ]
+    ],
+    [
+     "what is the average salary in sales",
+     [
+      "110"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d15",
+   "turns": [
+    [
+     "what is the currency of japan",
+     [
+      "yen"
+     ]
+    ],
+    [
+     "and the capital",
+     [
+      "tokyo"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d16",
+   "turns": [
+    [
+     "lyon, spain",
+     [
+      "country of lyon is france"
+     ]
+    ],
+    [
+     "what is the capital of spain",
+     [
+      "madrid"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d17",
+   "turns": [
+    [
+     "what is the double of 50",
+     [
+      "100"
+     ]
+    ],
+    [
+     "and of 9",
+     [
+      "18"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d18",
+   "turns": [
+    [
+     "what is the country of the eiffel tower",
+     [
+      "france"
+     ]
+    ],
+    [
+     "and its capital",
+     [
+      "paris"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d19",
+   "turns": [
+    [
+     "who is the manager of grace",
+     [
+      "frank"
+     ]
+    ],
+    [
+     "what is the salary of the manager of grace",
+     [
+      "130"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "d20",
+   "turns": [
+    [
+     "what is the capital of italy",
+     [
+      "rome"
+     ]
+    ],
+    [
+     "what is its currency",
+     [
+      "euro"
+     ]
+    ],
+    [
+     "what is the continent of italy",
+     [
+      "europe"
+     ]
+    ]
+   ]
+  }
+ ]
+}
