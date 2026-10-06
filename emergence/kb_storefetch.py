@@ -30,9 +30,12 @@ class StoreFetcher:
         ranked = sorted(ents, key=lambda e: (-len(self.c.claims(e[0])), e[0]))[:self.max_entities]
         # research2_prereg.md run 2: a name means its best-known thing only when it is CLEARLY best known (at least twice
         # the claims of the next); otherwise every near-equal namesake is kept, and the world asks which one is meant
+        self.last_guessed = False
         if len(ranked) > 1:
             top = len(self.c.claims(ranked[0][0])); nxt = len(self.c.claims(ranked[1][0]))
-            ranked = ranked[:1] if top >= 2 * max(1, nxt) else [e for e in ranked if 2 * len(self.c.claims(e[0])) >= top]
+            if top >= 2 * max(1, nxt):
+                ranked = ranked[:1]; self.last_guessed = True       # the referent is a GUESS (the best-known of several namesakes)
+            else: ranked = [e for e in ranked if 2 * len(self.c.claims(e[0])) >= top]
         data = {}
         for q, label, _ in ranked:
             cl = {}
@@ -42,4 +45,5 @@ class StoreFetcher:
                 vals = [v for v in vals if v and not (v[:1] == "Q" and v[1:].isdigit())]
                 if pl and not pl.startswith("P") and vals: cl[pl] = vals
             if cl: data[q] = dict(label=label, aliases=[symbol], desc="", claims=cl)
+        if data and self.last_guessed: data = {q: dict(e, referent_guessed=True) for q, e in data.items()}
         return ("graph", data) if data else None

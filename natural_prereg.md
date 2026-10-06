@@ -58,3 +58,14 @@ when the answer's structure did not use it, seen at least twice; the stress item
 turn opening with one is never read as a statement, and a learned question word is not content an answer owes. (A second
 rule -- excluding stated answers the question reading used -- was tried and removed before the run: it blocked true
 statements.) Plus run 2's amendments (dominant reading; a numeral is a thing) and research2_prereg.md run 2 (namesakes).
+
+## Run 3 (2026-10-06): measured with iterations 7 run 2 and 8 -- see the battery log; amendment run 4
+B3 dictionary false-yes 0.59 % (fixed), conversational true still 58 %: with numerals now things, "20 minus 8 is 12" was
+split "20 | minus 8 is 12" and "corrected" to -4. Amended: the filled-question check reads CHARITABLY -- every split is
+tried; SUPPORTED if any split reads true; CONTRADICTED only if none does and some split contradicts.
+Also run 4: the THING test reads the stated answer's span ALONE ("france" inside "france is the country of ..." is edged
+out of the graph's entity readings by the median-frequency rule, so true statements were refused).
+And: when the constructions read a statement but cannot decide it (UNKNOWN), the filled-question check is tried before
+"cannot check" (an undecided construction reading pre-empted a decidable conversational one).
+And: the THING requirement guards only CONTRADICTION; a stated answer equal to the rest's value is SUPPORTED whatever reads
+it ("portuguese" has no entity reading offline, so true statements were refused).

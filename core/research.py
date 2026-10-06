@@ -105,8 +105,13 @@ class Researcher:
             w = TableWorld(Records([Table(c["headers"], c["rows"], cn) for cn, c in d["data"].items()]), name=name, df=self.df)
         else: return None
         w.attributed = bool(getattr(fetcher, "quotes", True)) if fetcher is not None else d.get("quotes", True)
+        if d["shape"] == "graph" and any(e.get("referent_guessed") for e in d["data"].values()):
+            w.conjectured = lambda st: True    # the name has other namesakes; this one is the best-known -- an answer through it is a guess
         if getattr(fetcher, "namesakes_ask", False) or d.get("namesakes_ask"):
-            w.rank_key = lambda st: 0          # the fetcher kept only near-equal namesakes: no order among them, so they are READINGS
+            # the fetcher kept only near-equal namesakes: no order among them (READINGS), and below any world's own order --
+            # a constant 0 OUTRANKED the fixture's search order (its keys are negative), so a replica "Statue of Liberty"
+            # chained through a fetched world beat the real one (research2_prereg.md run 2's defect)
+            w.rank_key = lambda st: -10 ** 6
         w.fetched = path
         session.worlds.append(w)
         return w

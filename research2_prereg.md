@@ -22,3 +22,10 @@ Run 1's false facts were namesakes: the store holds several "Statue of Liberty" 
 "Easton", several "Southern District", and the fetched world took the first in its list. A name means its best-known
 thing only when CLEARLY best known (at least twice the claims of the next namesake); otherwise the near-equal namesakes
 are all kept and carry no order among them, so the question becomes READINGS -- it asks which one is meant.
+Defect found during run 2 (a long-session replay): the namesake rule gave fetched-store structures a rank key of 0, which
+OUTRANKS the fixture's own search order (negative keys), so "currency of the country of the statue of liberty" chained the
+fixture's replica (Statue of Liberty, Japan) through a fetched world and said "yen". The neutral key is now the lowest
+possible. Measured in the next run.
+And: a name the store holds SEVERAL entities for, answered through its clearly best-known one, is a guess about the
+referent -- the fetched world is marked conjectured, so such answers are CONJECTURED ("Probably ...", correctable), not
+facts ("easton" -> City of Pennsylvania was stated as a fact while the question meant another Easton).

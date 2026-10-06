@@ -197,13 +197,15 @@ class Door:
         if fr is not None and fr.get("answers"):
             from core.session import _leaf_spans
             own = {p for a_, w_ in zip(fr["answers"], fr["answer_worlds"]) for i, j in _leaf_spans(w_, a_[4]) for p in range(i, j)}
+        found = []
         for L in (1, 2, 3):
             for side in ("start", "end"):
                 if n - L < 2: continue
                 ans = syms[:L] if side == "start" else syms[n - L:]
                 if any(x in closed for x in ans): continue          # run 2: an answer is open-class symbols only
                 lo, hi = (0, L) if side == "start" else (n - L, n)
-                if not self._thing(syms, lo, hi): continue          # natural_prereg.md (1): a stated answer is a THING some world reads
+                thing = self._thing(syms, lo, hi)                   # natural_prereg.md (1): a stated answer is a THING some world reads --
+                                                                    # required only to CONTRADICT (run 4: an answer equal to the value needs none)
                 # (a rule excluding spans the question reading used was tried here and removed: it blocked true statements)
                 rest = syms[L:] if side == "start" else syms[:n - L]
                 link = rest[0] if side == "start" else rest[-1]
@@ -217,16 +219,20 @@ class Door:
                 if not all(p in used for p, x in enumerate(f["syms"]) if x not in closed and x[:1].isalpha()): continue
                 value = str(f["answers"][0][1])
                 v = "SUPPORTED" if symbols(value, "LN") == ans else "CONTRADICTED"
-                return v, " ".join(rest), value, " ".join(ans), list(f.get("sources", [])) or [getattr(w, "name", "source")]
-        return None
+                if v == "CONTRADICTED" and not thing: continue
+                got = (v, " ".join(rest), value, " ".join(ans), list(f.get("sources", [])) or [getattr(w, "name", "source")])
+                if v == "SUPPORTED": return got            # natural_prereg.md run 4: a charitable reading -- true if ANY split reads true
+                found.append(got)
+        return found[0] if found else None
 
     def _thing(self, syms, lo, hi):
         """natural_prereg.md (1): does some non-quoting world read syms[lo:hi] as an entity, a filter value or a number?"""
         if all(x[:1].isdigit() for x in syms[lo:hi]): return True          # run 2: a numeral is a thing (a value, a count)
         for w in self.S.worlds:
             if getattr(w, "quotes", False) or getattr(w, "transcript", False): continue
-            try:
-                if any(r[0] == lo and r[1] == hi and r[2] in ("E", "F", "N") for r in w.readings(syms)): return True
+            try:                                         # run 4: the span read ALONE -- inside the sentence a frequent name
+                span = syms[lo:hi]                       # ("france") is edged out of the entity readings by the median rule
+                if any(r[0] == 0 and r[1] == len(span) and r[2] in ("E", "F", "N") for r in w.readings(span)): return True
             except Exception: continue
         return False
 
@@ -234,6 +240,11 @@ class Door:
         """statements_prereg.md: read the turn as a statement; SUPPORTED / CONTRADICTED -> the CHECK frame over the store's
         own values; UNKNOWN -> what was read and that it cannot be checked; UNREAD -> None (the turn keeps its reply)"""
         verdict, res = self.reader.check(text)
+        if verdict == "UNKNOWN":                         # run 4: the constructions could not decide -- the filled-question check may
+            got = self._filled(text, getattr(self, "_last_fr", None))
+            if got is not None:
+                v, phrase, value, stated, srcs = got
+                return dict(kind=CHECK_K, phrase=phrase, value=value, stated=None if v == "SUPPORTED" else stated, sources=srcs)
         if verdict == "UNREAD":
             got = self._filled(text, getattr(self, "_last_fr", None))     # filled_prereg.md: a conversational statement
             if got is None: return None
@@ -329,7 +340,8 @@ class Door:
                             ans, ev = got
                             frame = dict(kind=frames.RECALL_K, answer=ans, event=" ".join(x for x in (ev["agent"], ev["verb"], ev["patient"]) if x)); act = frame["kind"]
                             rec["recall"] = True
-                        if not part.rstrip().endswith("?"): self.events.ingest(part)       # a question is not part of the story
+                        qlike = part.rstrip().endswith("?") or any(x in getattr(self, "qwords", ()) for x in symbols(part, "LN")[:3])
+                        if not qlike: self.events.ingest(part)       # a question is not part of the story (events4_prereg.md: a learned question word near the start too)
                     echo = fr["kind"] in (ATTRIBUTED, COMMIT) and any(symbols(str(x[1]), "LN") and " ".join(symbols(str(x[1]), "LN")) in " ".join(fr["syms"])
                                                                        for x in fr.get("answers", []))
                     gloss = fr["kind"] in (ATTRIBUTED, COMMIT) and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", []))
