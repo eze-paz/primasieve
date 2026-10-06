@@ -112,6 +112,8 @@ PUBLISHED = {
     "speak": ["SPEAK: PASS"],
     # ---- statements_prereg.md (COMPREHENSION C4): statements fact-checked by reading them (crawl + Wiktionary stores)
     "statements": ["C4: PASS"],
+    # ---- filled_prereg.md (COMPREHENSION C4b): a statement is a question with its answer filled in
+    "filled": ["C4b: PASS"],
 }
 
 

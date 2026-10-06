@@ -181,11 +181,42 @@ class Door:
             return dict(kind=REQUEST, topic=syms[topic], offers=[c[len("source "):] for c in sources_of(fr)]), REQUEST, None
         return dict(frame, guess=True, topic=syms[topic]), "GUESS", (syms, topic)
 
+    def _filled(self, text):
+        """filled_prereg.md: a statement is a question with its answer filled in. The 1-3 symbols at the start or the end
+        are taken as the stated answer; the rest (without one closed-class link beside it) is read as a question; one value
+        with every open-class symbol used -> (SUPPORTED | CONTRADICTED, phrase, value, stated, sources), else None"""
+        from core.reason import _spans
+        syms = symbols(text, "LN"); closed = self.fluent or set()
+        n = len(syms)
+        for L in (1, 2, 3):
+            for side in ("start", "end"):
+                if n - L < 2: continue
+                ans = syms[:L] if side == "start" else syms[n - L:]
+                if any(x in closed for x in ans): continue          # run 2: an answer is open-class symbols only
+                rest = syms[L:] if side == "start" else syms[:n - L]
+                link = rest[0] if side == "start" else rest[-1]
+                if link in closed: rest = rest[1:] if side == "start" else rest[:-1]
+                if not rest: continue
+                f = reason(" ".join(rest), self.S.worlds, self.S.df, cats="LN")
+                if f["kind"] not in (ATTRIBUTED, COMMIT) or len(f.get("answers", [])) != 1: continue
+                w = f["answer_worlds"][0]
+                if getattr(w, "quotes", False) or getattr(w, "transcript", False): continue
+                used = {p for i, j in _spans(w, f["answers"][0][4]) for p in range(i, j)}
+                if not all(p in used for p, x in enumerate(f["syms"]) if x not in closed and x[:1].isalpha()): continue
+                value = str(f["answers"][0][1])
+                v = "SUPPORTED" if symbols(value, "LN") == ans else "CONTRADICTED"
+                return v, " ".join(rest), value, " ".join(ans), list(f.get("sources", [])) or [getattr(w, "name", "source")]
+        return None
+
     def _statement(self, text):
         """statements_prereg.md: read the turn as a statement; SUPPORTED / CONTRADICTED -> the CHECK frame over the store's
         own values; UNKNOWN -> what was read and that it cannot be checked; UNREAD -> None (the turn keeps its reply)"""
         verdict, res = self.reader.check(text)
-        if verdict == "UNREAD": return None
+        if verdict == "UNREAD":
+            got = self._filled(text)                     # filled_prereg.md: a conversational statement
+            if got is None: return None
+            v, phrase, value, stated, srcs = got
+            return dict(kind=CHECK_K, phrase=phrase, value=value, stated=None if v == "SUPPORTED" else stated, sources=srcs)
         if verdict == "UNKNOWN" and not any(v == "UNKNOWN" for _, v in res): return None
         st = self.reader.store; lab = lambda q: st.lab.get(q, q)
         for pr, v in res:
@@ -271,11 +302,16 @@ class Door:
                     echo = fr["kind"] in (ATTRIBUTED, COMMIT) and any(symbols(str(x[1]), "LN") and " ".join(symbols(str(x[1]), "LN")) in " ".join(fr["syms"])
                                                                        for x in fr.get("answers", []))
                     gloss = fr["kind"] in (ATTRIBUTED, COMMIT) and all(getattr(w, "quotes", False) for w in fr.get("answer_worlds", []))
-                    if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss):
+                    unclean = False                          # filled_prereg.md run 2: an answer that leaves an open-class symbol unused
+                    if fr["kind"] in (ATTRIBUTED, COMMIT) and fr.get("answers") and self.fluent is not None:
+                        from core.reason import _spans
+                        usedp = {p for a_, w_ in zip(fr["answers"], fr["answer_worlds"]) for i, j in _spans(w_, a_[4]) for p in range(i, j)}
+                        unclean = any(p not in usedp for p, x in enumerate(fr["syms"]) if x not in self.fluent and x[:1].isalpha())
+                    if self.reader is not None and (fr["kind"] not in (ATTRIBUTED, COMMIT, CONJECTURED, "OFFER") or echo or gloss or unclean):
                         checked = self._statement(part)
                         if checked is not None: frame = checked; act = frame["kind"]; rec["statement"] = True
                     frames_out.append(frame); acts.append(act)
-                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") else None
+                    said = self._aligned(part, fr) if self.fluent is not None and not fr.get("read_as") and not rec.get("statement") else None
                     if said: rec["aligned"] = True
                     replies.append((read_as_note(fr["read_as"]) + " " if fr.get("read_as") else "") + (said or realize(frame, self.rng)))
                 rec.update(kind=fr["kind"], frame=frame, frames=frames_out, acts=acts, act=acts[-1], sentences=parts, guess=getattr(self, "_last_guess", None),
