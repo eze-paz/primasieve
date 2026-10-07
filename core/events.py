@@ -250,8 +250,10 @@ class EventMemory:
                 if a and b:
                     A = toks[a[0]:a[1]]
                     if A and A[0].lower() in dets: out.append((" ".join(toks[b[0]:b[1]]), " ".join(A)))
+        qw = getattr(self, "qwords", ())
         for k, t in enumerate(toks):
             if t.lower() not in cop or k == 0: continue
+            if toks[k - 1].lower() in qw or (k + 1 < len(toks) and toks[k + 1].lower() in qw): continue   # "what is", "is what": a question
             j = k - 1
             while j >= 0 and R.is_word(toks[j]): j -= 1
             subj = toks[j + 1:k]
@@ -272,7 +274,7 @@ class EventMemory:
             if subj and any(verb_use(i_, w) for i_, w in enumerate(subj)): continue
             content_ = lambda ws: any(w.lower() not in R.closed for w in ws)           # each side needs an open-class word
             if not (subj and pred and content_(subj) and content_(pred)): continue
-            if subj and pred and (pred[0].lower() in R.verbs or pred[0].lower() in getattr(R, "base", {})) and pred[0].lower() not in R.closed: continue
+            if subj and pred and pred[0].lower() in R.verbs and pred[0].lower() not in R.closed: continue     # a finite verb opens no predicate
             if subj and pred and pred[0].lower() not in getattr(R, "participles", {}) and pred[0].lower() not in getattr(R, "negatives", ()):
                 out.append((" ".join(subj), " ".join(pred)))
         return out

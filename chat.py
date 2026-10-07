@@ -226,6 +226,28 @@ class Door:
                 found.append(got)
         return found[0] if found else None
 
+    def _passage(self, text):
+        """bookread_prereg.md (C): >= 3 sentences, no question mark -> read as its own source ("your text"); the reply says
+        what was read, every reading in its context; the sentences also enter the story memory"""
+        sents = [x for x in re.split(r"(?<=[.!?])\s+", text.strip()) if x.strip()]
+        if self.events is None or len(sents) < 3 or "?" in text or len(text) < 150: return None
+        try:
+            import kb_bookread as BR
+            read = BR.read_text(text, title="your text")
+        except Exception:
+            return None
+        for snt in sents:
+            try: self.events.ingest(snt)
+            except Exception: pass
+        got = [BR.say_prop(p) for _, ps in read for p in ps]
+        k = sum(1 for _, ps in read if ps)
+        if got:
+            shown = "; ".join(dict.fromkeys(got[:5]))
+            reply = f"I read {k} of {len(read)} sentences. {shown[:1].upper() + shown[1:]}." + (" Ask me about it." if self.events is not None else "")
+        else:
+            reply = f"I read the {len(read)} sentences but could not settle what any of them says. Ask me about it, and I will say what I can."
+        return dict(kind="PASSAGE", act="PASSAGE", frame=dict(kind="PASSAGE"), values=[], sources=["your text"], reply=reply, passage_read=k)
+
     def _every_value(self, fr, frame):
         """multivalue_prereg.md: an ANSWER from one graph structure whose world certifies several values -> all of them
         (each with its own edge certificates, evaluate_all), so one value of six is not said as if it were the only one"""
@@ -364,7 +386,10 @@ class Door:
                 rec.update(kind="FEEDBACK", act="FEEDBACK", frame=frame, values=[], sources=[], feedback=False, reply=realize(frame, self.rng))
                 rec["ms"] = round((time.perf_counter() - t0) * 1000, 1); self.records.append(rec); return rec
             last = self._last_answer() if low in (YES, NO) else None
-            if last is not None:
+            passage = self._passage(text) if last is None else None        # bookread_prereg.md (C)
+            if passage is not None:
+                rec.update(passage)
+            elif last is not None:
                 rec.update(self._feedback(low == YES, last))
             else:
                 parts = self.sentences(text); frames_out, replies, acts = [], [], []
@@ -758,6 +783,7 @@ def live_door(seeded, online, store, path, seed):
                 fluent=integrator.common if integrator is not None else None, reader=reader, events=events, brief=True)
     D.qwords = qwords; D.S.qwords = qwords
     D.whwords = {w for w in qwords if 2 * qecho[w] < qcount[w]}      # question words whose questions do not name the answer
+    if events is not None: events.qwords = set(D.whwords)            # bookread_prereg.md: "what is ..." makes no identity
     D.qnum = {w: qnumc[w] / qcount[w] for w in qwords if qcount[w]}  # worldhonesty_prereg.md (C)
     if events is not None: D.S.negatives = set(getattr(events.reader, "negatives", ()))   # worldhonesty_prereg.md (B)
     if integrator is not None: integrator.common |= qwords     # a learned question word is not content an answer owes
@@ -884,6 +910,7 @@ def serve(port=8766, seeded=False, online=False, store=None):
                                          events=type(d0.events)(d0.events.reader) if d0.events is not None else None, brief=d0.brief)
                     state["door"].qwords = getattr(d0, "qwords", set()); state["door"].S.qwords = state["door"].qwords; state["door"].whwords = getattr(d0, "whwords", set())
                     state["door"].qnum = getattr(d0, "qnum", {}); state["door"].S.negatives = getattr(d0.S, "negatives", set())
+                    if getattr(state["door"], "events", None) is not None: state["door"].events.qwords = set(getattr(d0, "whwords", set()))
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 
