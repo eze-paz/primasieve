@@ -55,9 +55,19 @@ class EventReader:
         toks = tokens(text); out = []
         for k, t in enumerate(toks):
             lemma = self.verbs.get(t.lower())
+            inf = (lemma is None and k > 0 and toks[k - 1].lower() in (getattr(self, "to_marker", None) or ()) and t[:1].islower()
+                   and t.lower() in self.base and t.lower() not in self.closed)          # events5_prereg.md (D): "to fix"
+            if inf:
+                ag0 = out[-1]["agent"] if out else self.last_agent
+                pa = self.run_at(toks, k, 1 if self.side == "L" else -1, 2)
+                patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
+                out.append(dict(verb=self.base[t.lower()], pos=k, agent=ag0, patient=patient, adjuncts=[], text=text))
+                continue
             main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks)
                     and toks[k + 1].lower() not in self.participles and toks[k + 1].lower() not in self.verbs
                     and k > 0 and self.is_noun(toks[k - 1]))                          # events3_prereg.md (3): "the crow had the cheese"
+            if lemma is not None and k > 0 and toks[k - 1].lower() in getattr(self, "determiners", ()) and k + 1 < len(toks) and self.is_noun(toks[k + 1]):
+                continue                     # events5_prereg.md (F): "a lost puppy" -- after a symbol that never precedes a verb
             if (lemma is None or t.lower() in self.closed) and not main:
                 # events2_prereg.md: a closed-class finite symbol before a participle -> one event, the participle's verb
                 lp = self.participles.get(t.lower())
@@ -74,6 +84,7 @@ class EventReader:
                 # in one clause share the first one's agent ("the fox ate the cheese and ran away")
                 if out and not pron and agent == out[-1]["patient"]: agent = out[-1]["agent"]
                 elif not pron: self.last_agent = agent
+            if agent is None and out: agent = out[-1]["agent"]       # events5_prereg.md (C): coordinated verbs share the doer
             patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
             if pa is None:                                                             # events3_prereg.md (2): "found them" -> the last patient
                 nxt = k + 1
@@ -102,21 +113,30 @@ class EventMemory:
         """-> (answer text, event) or None. The question's first symbol must be closed-class (a question word); its verb
         lemma selects events; the role it leaves empty is the answer"""
         toks = tokens(text); words = [t for t in toks if self.reader.is_word(t)]
-        if not words or words[0].lower() not in self.reader.closed: return None
+        if not words or (words[0].lower() not in self.reader.closed and not text.rstrip().endswith("?")): return None   # events5 (G): or a "?"-ended turn
         lemmas = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) or self.reader.participles.get(t.lower()) for t in words[1:]
                   if t.lower() not in self.reader.closed]
         lemmas = [l for l in lemmas if l]
         same = {x for l in lemmas for x in self.reader.same.get(l, ())}                 # events2_prereg.md: synonymous verbs, second
         content = {t.lower() for t in words[1:] if self.reader.is_noun(t)}
+        # events5_prereg.md (E): a PASSIVE question -- a learned auxiliary, later a past participle -- names the patient
+        lw = [t.lower() for t in words]
+        aux_at = [i for i, t in enumerate(lw) if i > 0 and t in getattr(self.reader, "auxiliaries", ())]
+        passive = bool(aux_at) and any(t in getattr(self.reader, "past_participles", ()) for t in lw[aux_at[0] + 1:])
         best = None
         for ev in reversed(self.events):
             if ev["verb"] not in lemmas and ev["verb"] not in same: continue
             roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or ""}
             filled = {r for r, v in roles.items() if v and set(v.lower().split()) & content}
-            if "agent" in filled and ev["patient"] and "patient" not in filled: ans = ev["patient"]
-            elif "agent" in filled and "patient" in filled and ev["adjuncts"]: ans = ev["adjuncts"][0]
-            elif "agent" in filled and not ev["patient"] and ev["adjuncts"]: ans = ev["adjuncts"][0]
-            elif "agent" not in filled and ev["agent"] and (filled or not content): ans = ev["agent"]   # events3_prereg.md (4)
+            if passive and "agent" not in filled:
+                if "patient" in filled and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])
+                elif "patient" not in filled and ev["patient"]: ans = ev["patient"]
+                else: continue
+            elif "agent" in filled and ev["patient"] and "patient" not in filled: ans = ev["patient"]
+            elif "agent" in filled and "patient" in filled and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])     # (E): every adjunct
+            elif "agent" in filled and not ev["patient"] and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])
+            elif "agent" not in filled and ev["agent"] and (filled or not content
+                                                            or any(set(a.lower().split()) & content for a in ev["adjuncts"])): ans = ev["agent"]   # events3_prereg.md (4); events5 (H): an adjunct shared
             else: continue                      # honesty_prereg.md: no role shared with the question -> no basis to answer
             score = len(filled) + (0.5 if ev["verb"] in lemmas else 0)
             if best is None or score > best[0]: best = (score, ans, ev)
