@@ -148,3 +148,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 35 (novel 20) | B4-book precision | possessives kept whole, no object opened by a verb form, plural before a finite verb is a noun (bookposs_prereg.md) | PASS (0.96 at 38.0 %) | precision held at higher coverage |
 | 2026-10-07 | 36 | B6 (from the novel line) | identity facts from copulas and appositions in the story memory; abbreviation-split statements rejoined (identity_prereg.md) | PASS | **B6 49 -> 53**; probes RIGHT 104; B2 held after two amendments |
 | 2026-10-07 | 37 | B6 | roles with their determiners; identities widen a question; "a girl named Petra" (roles2_prereg.md) | PASS | **B6 53 -> 56**; probes RIGHT 105 |
+| 2026-10-07 | 38 (novel 21) | B4-book | pronoun referents from the book's own resolver / a per-book lift learner (bookresolve_prereg.md) | NOT PASSED (4 % resolved, ~half wrong) | found and fixed iteration 37's regression on books: 33.8 -> 38.7 % at 0.90 |

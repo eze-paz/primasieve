@@ -90,7 +90,48 @@ def existential_word(R, n_books=60):
     return ex
 
 
-def describe_hook(R, strict=False, pronouns=False, copula=None):
+_CLASSES = {}
+
+
+def book_classes(B, R):
+    """bookresolve run 2: a name's class in THIS book -- the subject-like symbol that follows it (later in its sentence, or
+    in the next sentence when it is the only name) most above the book's base rate (lift >= 1.3, >= 3 times)"""
+    key = id(B)
+    if key in _CLASSES: return _CLASSES[key]
+    subj = set(getattr(R, "subjects", ())); pairs = collections.defaultdict(collections.Counter); base = collections.Counter()
+    for i in range(len(B.sents)):
+        ns = B._names[i]; keys = {n[2] for n in ns}
+        if not keys: continue
+        ts = [t.lower() for t in B.toks[i]]
+        for n in ns:
+            for t in ts[n[1]:]:
+                if t in subj: pairs[n[2]][t] += 1; base[t] += 1; break
+        if len(keys) == 1 and i + 1 < len(B.sents):
+            for t in [t.lower() for t in B.toks[i + 1] if t[:1].isalnum()][:4]:
+                if t in subj: pairs[next(iter(keys))][t] += 1; base[t] += 1; break
+    tot = sum(base.values()) or 1; out = {}
+    for k, c in pairs.items():
+        n = sum(c.values())
+        lift = {p: (m / n) / (base[p] / tot) for p, m in c.items() if m >= 3}
+        if lift:
+            p = max(sorted(lift), key=lift.get)
+            if lift[p] >= 1.3: out[k] = p
+    _CLASSES[key] = out
+    return out
+
+
+def book_resolve(B, i, p):
+    """the one character of class p named in the previous two sentences or earlier in this one -> its name text, or None"""
+    cls = book_classes(B, B.R if hasattr(B, "R") else None) if hasattr(B, "R") else {}
+    cands = {}
+    for d in (2, 1, 0):
+        if i - d < 0: continue
+        for n in B._names[i - d]:
+            if cls.get(n[2]) == p: cands[n[2]] = n[3]
+    return next(iter(cands.values())) if len(cands) == 1 else None
+
+
+def describe_hook(R, strict=False, pronouns=False, copula=None, resolve_on=False):
     """bookdescribe_prereg.md: for a unit the book reader leaves unread, the story reader's realis events whose doer is
     written in the sentence and begins with a learned determiner or a capital, in sentences without a quotation mark"""
     dets = set(getattr(R, "dets", ())); DETS_FOR_OBJECTS.update(dets)
@@ -116,7 +157,7 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                 if not a or ev.get("status", "realis") != "realis": continue
                 aw = a.split()
                 if strict:              # bookdescribe run 2: the main clause's own subject, verb right after it, active, lexical
-                    if not words_at or (aw[0].lower() in R.closed and aw[0].lower() not in pron_sense): continue
+                    if not words_at or (aw[0].lower() in R.closed and aw[0].lower() not in pron_sense and aw[0].lower() not in dets): continue
                     if not aw[0][:1].isupper() and (aw[0].lower() in R.participles or aw[0].lower() in R.verbs): continue   # bookshapes guard
                     starts = [j for j in range(len(et)) if et[j:j + len(aw)] == aw]
                     if not starts: continue
@@ -134,8 +175,9 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                 if " " + " ".join(aw).lower() + " " not in low: continue
                 k = low.split().index(aw[0].lower()) if aw[0].lower() in low.split() else -1
                 prev = low.split()[k - 1] if k > 0 else ""
-                if not (prev in dets or aw[0][:1].isupper()): continue
-                got.append(dict(kind="event", subj=(prev + " " if prev in dets else "") + a, rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])),
+                det_led = aw[0].lower() in dets                  # bookresolve run 2: roles now carry their determiner (roles2_prereg.md)
+                if not (det_led or prev in dets or aw[0][:1].isupper()): continue
+                got.append(dict(kind="event", subj=(prev + " " if (prev in dets and not det_led) else "") + a, rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])),
                                 title=B.title, via=None, described=True))
             if not got and pronouns and words_at:          # bookpronoun_prereg.md: the referent said as unresolved
                 f0 = words_at[0]; p0 = et[f0].lower()
@@ -147,8 +189,14 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                         possess = (vt in R.closed and R.verbs.get(vt) not in (None, vt) and R.verbs.get(vt) != copula_lemma
                                    and k + 1 < len(et) and et[k + 1].lower() in dets)          # bookhave (A): "has a soul"
                         if vt not in R.verbs or ((vt in R.closed or ev["verb"] in R.closed) and not possess): continue
-                        got.append(dict(kind="event", subj=et[f0], rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])), title=B.title,
-                                        via="referent not resolved", described=True)); break
+                        subj_, via_ = et[f0], "referent not resolved"
+                        if resolve_on and hasattr(B, "_names"):            # bookresolve run 2: per-book name classes by lift
+                            try:
+                                d = book_resolve(B, i, p0)
+                                if d is not None: subj_, via_ = d, f"{et[f0]}, resolved by the book"
+                            except Exception: pass
+                        got.append(dict(kind="event", subj=subj_, rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])), title=B.title,
+                                        via=via_, described=True)); break
             if not got and copula and words_at:            # copula_prereg.md (B): "<doer> is <predicate>"
                 wl = [et[j] for j in words_at]; low_w = [x.lower() for x in wl]
                 negs = getattr(R, "negatives", ()); subj = None; cpos = None
@@ -368,7 +416,7 @@ def units(B, n=500):
 def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_ids=None, chains=True):
     R, L = KB.build(); abbr = set(L["abbreviations"])
     if it >= 7 and not hooks:
-        h = describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)
+        h = describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None, resolve_on=it >= 15)
         hooks = {"after_read": quote_hook(R, h) if it >= 11 else h}
         if it >= 12: hooks = {"after_read": clause_hook(R, hooks["after_read"])}
         if it >= 13: hooks = {"after_read": segment_hook(R, hooks["after_read"], cut2=it >= 14)}
