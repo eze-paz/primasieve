@@ -101,6 +101,7 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
     # amended (run 2): >= 30 % pronoun senses ("at" has a minor one)
     pron_sense = {w for w in R.closed if _share(w, "pron") >= 0.3} - set(getattr(R, "subjects", ())) - set(getattr(R, "negatives", ()))
     existential = existential_word(R) if copula else None
+    copula_lemma = R.verbs.get(next(iter(sorted(copula))), None) if copula else None
     def hook(B, per):
         R.last_agent = None; R.last_patient = None
         for i in sorted(per):
@@ -115,7 +116,7 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                 if not a or ev.get("status", "realis") != "realis": continue
                 aw = a.split()
                 if strict:              # bookdescribe run 2: the main clause's own subject, verb right after it, active, lexical
-                    if not words_at or aw[0].lower() in R.closed: continue
+                    if not words_at or (aw[0].lower() in R.closed and aw[0].lower() not in pron_sense): continue
                     if not aw[0][:1].isupper() and (aw[0].lower() in R.participles or aw[0].lower() in R.verbs): continue   # bookshapes guard
                     starts = [j for j in range(len(et)) if et[j:j + len(aw)] == aw]
                     if not starts: continue
@@ -126,7 +127,9 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                     if poss: a = " ".join(x for x in et[first:s0 - 2] if x != ".") + "'s " + a; aw = a.split()
                     k = ev["pos"]; vt = et[k].lower() if k < len(et) else ""
                     if not (k == e0 or (k == e0 + 1 and et[e0][:1].isalnum() and et[e0].lower() not in R.closed)): continue
-                    if vt not in R.verbs or vt in R.closed or ev["verb"] in R.closed: continue
+                    possess = (vt in R.closed and R.verbs.get(vt) not in (None, vt) and R.verbs.get(vt) != copula_lemma
+                               and k + 1 < len(et) and et[k + 1].lower() in dets)          # bookhave (A): "has a soul"
+                    if vt not in R.verbs or ((vt in R.closed or ev["verb"] in R.closed) and not possess): continue
                     if k > 0 and et[k - 1].lower() in getattr(R, "auxiliaries", ()): continue
                 if " " + " ".join(aw).lower() + " " not in low: continue
                 k = low.split().index(aw[0].lower()) if aw[0].lower() in low.split() else -1
@@ -141,7 +144,9 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                         k = ev["pos"]; vt = et[k].lower() if k < len(et) else ""
                         if ev.get("status", "realis") != "realis": continue
                         if not (k == f0 + 1 or (k == f0 + 2 and et[f0 + 1][:1].isalnum() and et[f0 + 1].lower() not in R.closed)): continue
-                        if vt not in R.verbs or vt in R.closed or ev["verb"] in R.closed: continue
+                        possess = (vt in R.closed and R.verbs.get(vt) not in (None, vt) and R.verbs.get(vt) != copula_lemma
+                                   and k + 1 < len(et) and et[k + 1].lower() in dets)          # bookhave (A): "has a soul"
+                        if vt not in R.verbs or ((vt in R.closed or ev["verb"] in R.closed) and not possess): continue
                         got.append(dict(kind="event", subj=et[f0], rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])), title=B.title,
                                         via="referent not resolved", described=True)); break
             if not got and copula and words_at:            # copula_prereg.md (B): "<doer> is <predicate>"
@@ -167,11 +172,19 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                         if not et[j][:1].isalnum(): break
                         pred.append(et[j]); j += 1
                     pl = [x.lower() for x in pred]
-                    if (1 <= len(pred) <= 6 and pl[0] not in negs and pl[0] not in R.participles and pl[0] not in R.verbs
+                    if (1 <= len(pred) <= 8 and pl[0] not in negs and pl[0] not in R.participles and pl[0] not in R.verbs
                             and not any(x in negs for x in pl)):
                         got.append(dict(kind="event", subj=subj[0], rel="is", obj=" ".join(pred), title=B.title, via=subj[1], described=True))
-            per[i] = got
+            per[i] = [p for p in got if keep_prop(p, sent)]
         return per
+    def keep_prop(p, sent):
+        """bookhave guards: a verb is needed; an object-less 'do' is empty; an object cut at a hyphen is dropped"""
+        if not p.get("rel"): return False
+        if p["rel"] in ("do",) and not p.get("obj"): return False
+        if p.get("obj"):
+            last = p["obj"].split()[-1]
+            if re.search(re.escape(last) + r"-[^\W\d_]", sent): p["obj"] = ""
+        return True
     return hook
 
 

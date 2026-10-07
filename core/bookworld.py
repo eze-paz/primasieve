@@ -409,6 +409,10 @@ class Book:
             # bookdescribe run 2: a learned negative symbol in the verb group ("does not need") -- the event is not told
             negs = getattr(self.R, "negatives", ()); j0 = max(0, min(vp, k) - 3)
             if any(ts[j].lower() in negs for j in range(j0, min(len(ts), k + 3))): continue      # "does not need": after, too
+            # bookhave run 2: an event in a clause opened by the learned conditional opener is not told as happened
+            jj = min(vp, k) - 1; conds = getattr(self.R, "cond", ())
+            while jj >= 0 and (is_word(ts[jj]) or (ts[jj] == "." and jj > 0 and ts[jj - 1] in self.abbr)) and ts[jj].lower() not in conds: jj -= 1
+            if jj >= 0 and ts[jj].lower() in conds: continue
             if self.v >= 4 and vp + 2 < len(ts) and ts[vp + 1] in "'’" and ts[vp + 2].lower() in self.closed: continue   # bookvoice (3)
             via = None
             if doer is None:

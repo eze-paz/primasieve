@@ -92,6 +92,10 @@ class EventReader:
             j += 1
         words = [j for j, x in enumerate(toks) if self.is_word(x)]
         if words and toks[words[0]].lower() in getattr(self, "cond", ()) and "," not in toks[:k]: return "irrealis"
+        j = k - 1                                    # bookhave run 2: the conditional opener earlier in the same clause
+        while j >= 0 and self.is_word(toks[j]):
+            if toks[j].lower() in getattr(self, "cond", ()): return "irrealis"
+            j -= 1
         return "realis"
 
     def run_at(self, toks, k, step, limit, pronoun=False):
