@@ -1,0 +1,2139 @@
+{
+ "note": "labels are the BUILDER's judgement (disclosed): ok = the sentence says this",
+ "it": 11,
+ "items": [
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 182,
+   "text": "\"Take them,\" said Porbus to Poussin, seeing that the latter trembled and blushed with shame, for the young scholar had the pride of poverty; \"take them, he has the ransom of two kings in his pouch.\"",
+   "prop": "according to The Hidden Masterpiece, Porbus said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 468,
+   "text": "The young man held his hand on his sword, and his ear seemed glued to the panel of the door.",
+   "prop": "according to The Hidden Masterpiece, the young man hold hand",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 417,
+   "text": "The man was a well-bred English servant.",
+   "prop": "according to Man And Wife, The man is a well",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 216,
+   "text": "They are wood, brass, iron, anything you please except flesh in shadow.",
+   "prop": "according to The Hidden Masterpiece, They (referent not resolved) is wood",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 332,
+   "text": "My vocation is to love thee,--thee alone!",
+   "prop": "according to The Hidden Masterpiece, My vocation is to love thee",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 528,
+   "text": "\"He is a poet even more than he is a painter,\" answered Poussin gravely.",
+   "prop": "according to The Hidden Masterpiece, Poussin answered",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 148,
+   "text": "\"Sir Jeoffry missed his mark when he called her an ugly brat,\" said the woman who had nursed her.",
+   "prop": "according to A Lady Of Quality, a speaker (not resolved)'s words, Sir Jeoffry miss mark",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 137,
+   "text": "This the child Clorinda had the infant wit to discover early, and having once discovered it, she never ceased to take advantage of her knowledge.",
+   "prop": "according to A Lady Of Quality, Clorinda had the infant wit",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 474,
+   "text": "His eyes wandered guiltily toward the window which led into the garden.",
+   "prop": "according to Man And Wife, his eyes wander guiltily",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 336,
+   "text": "She reigned; she felt instinctively that the arts were forgotten for her sake, and flung at her feet like grains of incense.",
+   "prop": "according to The Hidden Masterpiece, She (referent not resolved) reign",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 244,
+   "text": "The words acted like a spell on Nicolas Poussin, filling him with the inexplicable curiosity of a true artist.",
+   "prop": "according to The Hidden Masterpiece, the words act like",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 39,
+   "text": "The captain interfered gently and firmly.",
+   "prop": "according to Man And Wife, the captain interfere gently and firmly",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 562,
+   "text": "While Poussin listened to Gillette, Frenhofer drew a green curtain before his Catherine, with the grave composure of a jeweller locking his drawers when he thinks that thieves are near him.",
+   "prop": "according to The Hidden Masterpiece, Poussin listened",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 458,
+   "text": "She was tall and elegant; beautifully dressed, in the happiest combination of simplicity and splendor.",
+   "prop": "according to Man And Wife, She (referent not resolved) is tall and elegant",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 138,
+   "text": "Having found in the days when her one desire was pap, that she had but to roar lustily enough to find it beside her in her porringer, she tried the game upon all other occasions.",
+   "prop": "according to A Lady Of Quality, Having find days",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 210,
+   "text": "\"I should be glad to know, with great respect,\" persisted Trottle, \"if the person named Magsman was the last tenant who lived in the House.",
+   "prop": "according to Going Into Society, Trottle persisted",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 165,
+   "text": "my little pats, you are right; warm up that icy tone.",
+   "prop": "according to The Hidden Masterpiece, my little pat",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 383,
+   "text": "The beautiful youth left his playing with the dog and came forward with all the air of the young master of the house.",
+   "prop": "according to A Lady Of Quality, the beautiful youth leave playing",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 51,
+   "text": "She grew thin and yellow, only a scant covering of the fair hair was left her, and her eyes were big and sunken.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) grow thin and yellow",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 205,
+   "text": "\"Let this excellent person speak,\" said Jarber.",
+   "prop": "according to Going Into Society, Jarber said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 418,
+   "text": "\"Well,\" returned Porbus, \"then let us say no more.",
+   "prop": "according to The Hidden Masterpiece, Porbus returned",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 495,
+   "text": "He answered silently by an affirmative inclination of the head, which dextrously turned Mrs. Vanborough into to Mrs. Delamayn without allowing Mr. Delamayn the opportunity of hearing it.",
+   "prop": "according to Man And Wife, He (referent not resolved) answer silently",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 145,
+   "text": "Mrs. Vanborough rose immediately.",
+   "prop": "according to Man And Wife, Mrs. Vanborough rose immediately",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 49,
+   "text": "She was still a rarely beautiful woman.",
+   "prop": "according to Man And Wife, She (referent not resolved) is still a rarely beautiful woman",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 103,
+   "text": "I made the round of the bottles, first separate (to say I had done it), and then mixed 'em all together (to say I had done it), and then tried two of 'em as half-and-half, and then t'other two.",
+   "prop": "according to Going Into Society, I (narrator) made the round of the bottles",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 533,
+   "text": "\"But sooner or later, he will perceive that there is nothing there,\" cried Poussin.",
+   "prop": "according to The Hidden Masterpiece, Poussin cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 32,
+   "text": "Anatomical casts in plaster, fragments and torsos of antique goddesses amorously polished by the kisses of centuries, jostled each other upon shelves and brackets.",
+   "prop": "according to The Hidden Masterpiece, Anatomical cast plaster",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 72,
+   "text": "I expected her yesterday; I expect her to-day--she may come at any moment.",
+   "prop": "according to Man And Wife, I (referent not resolved) expect yesterday",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 300,
+   "text": "Mr. Kendrew started, and showed the first tokens of interest in the proceedings which had escaped him yet.",
+   "prop": "according to Man And Wife, . Kendrew started",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 562,
+   "text": "While Poussin listened to Gillette, Frenhofer drew a green curtain before his Catherine, with the grave composure of a jeweller locking his drawers when he thinks that thieves are near him.",
+   "prop": "according to The Hidden Masterpiece, Frenhofer drew a green curtain",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 65,
+   "text": "\"If you had not been a total stranger yourself for a whole year past,\" answered Mrs. Vanborough, \"you would never have made that confession.",
+   "prop": "according to Man And Wife, Mrs. Vanborough answered",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 69,
+   "text": "\"Women are poor things\"--a chill salt tear sliding past her lips so that she tasted its bitterness--\"only to be kissed for an hour, and then like this--only for this and nothing else.",
+   "prop": "according to A Lady Of Quality, a speaker (not resolved)'s words, Women is poor things",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 10,
+   "text": "They were now parting for the first time--and parting, it might be, for life.",
+   "prop": "according to Man And Wife, They (referent not resolved) is now parting for the first time",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 49,
+   "text": "He _did_ allow himself to break out into strong language respectin the Fat Lady from Norfolk; but that was an affair of the 'art; and when a man's 'art has been trifled with by a lady, and the preference giv to a Indian, he ain't master of his actions.",
+   "prop": "according to Going Into Society, He (referent not resolved) do allow",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 529,
+   "text": "Lady Jane turned to Mr. Vanborough.",
+   "prop": "according to Man And Wife, Lady Jane turned",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 375,
+   "text": "\"How so?\" asked Frenhofer, surprised.",
+   "prop": "according to The Hidden Masterpiece, Frenhofer asked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 152,
+   "text": "Not exactly keepin up with his meanin, I shook my head, put on a deep look, and said, \"You're right there, Mr. Chops.\"",
+   "prop": "according to Going Into Society, I (narrator) shook my head",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 134,
+   "text": "I looked out into the street; but nothin could I see, and nothin was I aware of, until I turned round quick, because some creetur run between my legs into the passage.",
+   "prop": "according to Going Into Society, I (narrator) looked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 97,
+   "text": "The gentlemen was at their wine arter dinner, and Mr. Chops's eyes was more fixed in that Ed of his than I thought good for him.",
+   "prop": "according to Going Into Society, The gentlemen is at their wine arter dinner",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 266,
+   "text": "\"Rake is my horse,\" she answered--\"the big black one.",
+   "prop": "according to A Lady Of Quality, she (referent not resolved)'s words, Rake is my horse",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 538,
+   "text": "My good Porbus,\" he added, turning to his friend, \"is it possible that you, too, are jesting with me?",
+   "prop": "according to The Hidden Masterpiece, a speaker (not resolved)'s words, he (referent not resolved) add",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 94,
+   "text": "They went into Society, in a chay and four grays with silk jackets.",
+   "prop": "according to Going Into Society, They (referent not resolved) go Society",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 415,
+   "text": "Mr. Vanborough looked up at the man with a sudden outbreak of anger.",
+   "prop": "according to Man And Wife, . Vanborough looked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 203,
+   "text": "if I were not so feeble,\" resumed Porbus, \"and if you would consent to let me see your Beautiful Nut-girl, I too could paint some lofty picture, grand and yet profound, where the forms should have the living life.\"",
+   "prop": "according to The Hidden Masterpiece, Porbus resumed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 409,
+   "text": "\"Exhort be damned, and Twemlow be damned too!\" cried Sir Jeoffry, who had a great quarrel with his lordship and hated him bitterly.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 144,
+   "text": "Porbus and Poussin stood motionless on either side of the easel, plunged in passionate contemplation.",
+   "prop": "according to The Hidden Masterpiece, Poussin stood motionless",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 530,
+   "text": "\"And from thence,\" added Poussin, \"it rises, to enter heaven.\"",
+   "prop": "according to The Hidden Masterpiece, Poussin added",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 556,
+   "text": "He silently took a chair at the other end of the room.",
+   "prop": "according to Man And Wife, he silently take chair",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 176,
+   "text": "Her spirit rose hot within her in the moment.",
+   "prop": "according to A Lady Of Quality, her spirit rise hot",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 355,
+   "text": "\"He loves me no longer!\" thought Gillette, when she was once more alone.",
+   "prop": "according to The Hidden Masterpiece, Gillette thought",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 280,
+   "text": "It likewise manifests the frankness of men who do not dilly-dally with terms, but who say what they mean, and who mean to settle down to a long, hard fight.",
+   "prop": "according to War Of The Classes, it likewise manifest frankness of men",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 162,
+   "text": "Neolithic skulls with disks of bone removed have been found in nearly all parts of the world.",
+   "prop": "according to The Evolution Of Modern Medicine, Neolithic skull disks of bone",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 66,
+   "text": "Theirs was the giant race, before the flood; And thus, when Charles returned, our empire stood.",
+   "prop": "according to The Double-Dealer, Theirs is the giant race",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 125,
+   "text": "The red ruby, the brown falcon, the white maids, \"the scarlet roofs of the good town,\" in \"The Sailing of the Sword,\" make the poem a vivid picture.",
+   "prop": "according to Letters On Literature, a speaker (not resolved)'s words, the scarlet roof good town",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 35,
+   "text": "She died in 1627, apparently without any surviving children, and before the year was half-way through, on the 23rd of the following May, he was married a second time to Margaret Bentley.",
+   "prop": "according to The Life Of John Bunyan, She (referent not resolved) die 1627",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 219,
+   "text": "In the later periods, specialism reached a remarkable development, and Herodotus remarks that the country was full of physicians;--\"One treats only the diseases of the eye, another those of the head, the teeth, the abdomen, or the internal organs.\"",
+   "prop": "according to The Evolution Of Modern Medicine, Herodotus remarks",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 276,
+   "text": "They were but \"hints, touches, and short visits,\" sweet when present, but \"like Peter's sheet, suddenly caught up again into heaven.\" But, though transient, they helped the burdened Pilgrim onward.",
+   "prop": "according to The Life Of John Bunyan, a speaker (not resolved)'s words, They (referent not resolved) is but",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 471,
+   "text": "'Superfluous kings,' 'A lass unparalleled,' 'Multitudinous seas:' we needed not to wait for the eighteenth century or for the nineteenth to learn the splendour of such encounters, of such differences, of such nuptial unlikeness and union.",
+   "prop": "according to The Rhythm Of Life, Superfluous king",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 194,
+   "text": "Egypt became a centre from which civilization spread to the other peoples of the Mediterranean.",
+   "prop": "according to The Evolution Of Modern Medicine, Egypt became a centre",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 524,
+   "text": "INDUSTRY AVERAGE AVERAGE NUMBER AVERAGE YEARLY INDIVIDUAL OF WEEKS EARNINGS WEEKLY WAGES EMPLOYED Dressmakers $.90 42.",
+   "prop": "according to War Of The Classes, INDUSTRY AVERAGE AVERAGE NUMBER AVERAGE YEARLY INDIVIDUAL OF WEEKS EARNINGS WEEKLY employ Dressmakers",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 203,
+   "text": "The recital is wearisome, but the retribution of the flower is precisely weariness.",
+   "prop": "according to The Rhythm Of Life, The recital is wearisome",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 332,
+   "text": "\"The white pavilions rose and fell On the alarmed air;\"",
+   "prop": "according to Letters On Literature, a speaker (not resolved)'s words, the white pavilion",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 274,
+   "text": "Bunyan had his intervals of \"sunshine-weather\" when Giant Despair's fits came on him, and the giant \"lost the use of his hand.\" Texts of Scripture would give him a \"sweet glance,\" and flood his soul with comfort.",
+   "prop": "according to The Life Of John Bunyan, Bunyan had his intervals",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 452,
+   "text": "THE medicine of the Old Testament betrays both Egyptian and Babylonian influences; the social hygiene is a reflex of regulations the origin of which may be traced in the Pyramid Texts and in the papyri.",
+   "prop": "according to The Evolution Of Modern Medicine, the medicine of the Old Testament betray Egyptian and Babylonian",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 410,
+   "text": "This surplus labor acts as a check upon all employed labor.",
+   "prop": "according to War Of The Classes, this surplus labor act check",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 259,
+   "text": "She is handsome and cunning and naturally wanton.",
+   "prop": "according to The Double-Dealer, She (referent not resolved) is handsome and cunning and naturally wanton",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 238,
+   "text": "We put ourselves on record as committed to the programme of independent political action.",
+   "prop": "according to War Of The Classes, We (referent not resolved) put ourselves",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 171,
+   "text": "In his first volume Mr. Bridges offered a few rondeaux and triolets, turning his back on all these things as soon as they became popular.",
+   "prop": "according to Letters On Literature, . Bridges offered",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 19,
+   "text": "I made the plot as strong as I could because it was single, and I made it single because I would avoid confusion, and was resolved to preserve the three unities of the drama.",
+   "prop": "according to The Double-Dealer, I (referent not resolved) make plot",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 119,
+   "text": "Three days later Montrose was totally defeated at Philiphaugh; and after a vain attempt to relieve Chester, Charles shut himself up in Oxford.",
+   "prop": "according to The Life Of John Bunyan, Charles shut",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 242,
+   "text": "At this crisis Bunyan took the step which he would have been wise if he had taken long before.",
+   "prop": "according to The Life Of John Bunyan, Bunyan took the step",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 385,
+   "text": "\"I shall forthwith begin my 'Endymion,' which I hope I shall have got some way with before you come, when we will read our verses in a delightful place I have set my heart upon, near the castle.\" Keats ends \"your sincere friend,\" and a man to whom Keats was a sincere friend had some occasion for pride.",
+   "prop": "according to Letters On Literature, Keats ends",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 370,
+   "text": "He was received into the church by baptism, which, according to his earliest biographer, Charles Doe \"the Struggler,\" was performed publicly by Mr. Gifford, in the river Ouse, the \"Bedford river\" into which Bunyan tells us he once fell out of a boat, and barely escaped drowning.",
+   "prop": "according to The Life Of John Bunyan, Bunyan tells",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 175,
+   "text": "He reigns as centrally in the blue sky as in the clouds.",
+   "prop": "according to The Rhythm Of Life, He (referent not resolved) reign centrally",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 29,
+   "text": "It oftentimes happens to a man to have designs which require him to himself, and in their nature cannot admit of a confidant.",
+   "prop": "according to The Double-Dealer, it oftentimes happen man",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 103,
+   "text": "Certain words were dreadful once in the mouth of desperate old age.",
+   "prop": "according to The Rhythm Of Life, Certain word dreadful",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 241,
+   "text": "Despair began to give way to hopefulness.",
+   "prop": "according to The Life Of John Bunyan, Despair begin give way",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 75,
+   "text": "No language is too strong to describe it.",
+   "prop": "according to The Life Of John Bunyan, No language is too strong to describe it",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 321,
+   "text": "Among the Babylonians, the word \"liver\" was used in hymns and other compositions precisely as we use the word \"heart,\" and Jastrow gives a number of illustrations from Hebrew, Greek and Latin sources illustrating this usage.",
+   "prop": "according to The Evolution Of Modern Medicine, Jastrow gives a number of illustrations",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 10,
+   "text": "Charles was steadily sowing the wind, and destined to reap the whirlwind which was to sweep him from his throne, and involve the monarchy and the Church in the same overthrow.",
+   "prop": "according to The Life Of John Bunyan, Charles is steadily sowing the wind",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 50,
+   "text": "The capitalist press of the country confirms me in my opinion, and herewith I give a few post-election utterances of the capitalist press:--",
+   "prop": "according to War Of The Classes, the capitalist press of the country confirm",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 31,
+   "text": "He stole my thunder, and the community applauded the theft.",
+   "prop": "according to War Of The Classes, He (referent not resolved) steal thunder",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 188,
+   "text": "They opened a new and blessed land to which he was a complete stranger.",
+   "prop": "according to The Life Of John Bunyan, They (referent not resolved) open new",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 28,
+   "text": "Our old English essays, the papers in the _Tatler_ and _Spectator_, were originally nothing but letters.",
+   "prop": "according to Letters On Literature, our old English essay",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 61,
+   "text": "He writes, and recites, poems about ranches and canyons; they are designed to betray the recklessness of his nature and to reveal the good that lurks in the lawless ways of a young society.",
+   "prop": "according to The Rhythm Of Life, He (referent not resolved) write",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 149,
+   "text": "His darkening eyes said in the extreme hour: 'I have compassion on the multitude.'",
+   "prop": "according to The Rhythm Of Life, his darkening eye",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 247,
+   "text": "'I prefer houses to the open air.",
+   "prop": "according to The Rhythm Of Life, I (referent not resolved) house open air",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 244,
+   "text": "He began to speak his mind to the poor people in Bedford whose words of religious experiences had first revealed to him his true condition.",
+   "prop": "according to The Life Of John Bunyan, He (referent not resolved) begin speak",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 388,
+   "text": "He went to the Bar.",
+   "prop": "according to Letters On Literature, He (referent not resolved) go Bar",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 145,
+   "text": "MEDICINE arose out of the primal sympathy of man with man; out of the desire to help those in sorrow, need and sickness.",
+   "prop": "according to The Evolution Of Modern Medicine, MEDICINE arise",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 578,
+   "text": "Every Act passed for the disestablishment and disendowment of the Church was declared a dead letter.",
+   "prop": "according to The Life Of John Bunyan, every Act pass disestablishment and disendowment of the Church",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 305,
+   "text": "Disease was due to evil spirits or demons.",
+   "prop": "according to The Evolution Of Modern Medicine, Disease is due to evil spirits or demons",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 515,
+   "text": "The trust advertised for girls.",
+   "prop": "according to War Of The Classes, the trust advertise girls",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 667,
+   "text": "I dare swear you won't guess--_The Sillabub_, ha, ha, ha.",
+   "prop": "according to The Double-Dealer, I (referent not resolved) dare swear",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 279,
+   "text": "\"I was now so taken with the love and mercy of God that I thought I could have spoken of it even to the very crows that sat upon the ploughed lands before me, had they been capable to have understood me.\" \"Surely,\" he cried with gladness, \"I will not forget this forty years hence.\" \"But, alas!",
+   "prop": "according to The Life Of John Bunyan, God (he) cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 224,
+   "text": "Having disarmed her, in a gust of passion she left me, and in a resolution, confirmed by a thousand curses, not to close her eyes till they had seen my ruin.",
+   "prop": "according to The Double-Dealer, Having disarm",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 609,
+   "text": "[_He bows profoundly low_, _then kisses the glass_.]",
+   "prop": "according to The Double-Dealer, He (referent not resolved) bow profoundly low",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 63,
+   "text": "\"The wickedness of the tinker,\" writes Southey, \"has been greatly overrated, and it is taking the language of self-accusation too literally to pronounce of John Bunyan that he was at any time depraved.\" The justice of this verdict of acquittal is fully accepted by Coleridge.",
+   "prop": "according to The Life Of John Bunyan, Southey writes",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 206,
+   "text": "The designer of cheap patterns is no more inevitably ridden by the flower than is the vain and transitory author by the phrase.",
+   "prop": "according to The Rhythm Of Life, the designer of cheap pattern",
+   "kind": "event",
+   "check": null,
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 393,
+   "text": "This was a momentous year for Bunyan, for in it Dr. Brown has shown, by a \"comparison of dates,\" that we may probably place the beginning of Bunyan's ministerial life.",
+   "prop": "according to The Life Of John Bunyan, Dr. Brown has shown",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": null
+  }
+ ],
+ "control": [
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 283,
+   "text": "My train drew near to the Via Reggio platform on a day between two of the harvests of a hot September; the sea was burning blue, and there were a sombreness and a gravity in the very excesses of the sun as his fires brooded deeply over the serried, hardy, shabby, seaside ilex-woods.",
+   "prop": "fires | serry | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 216,
+   "text": "So I proposed that he should come to tea again, on the next Monday evening, the thirteenth, and should make such inquiries in the meantime, as might enable him to dispose triumphantly of Trottle's objection.",
+   "prop": "come | dispose | triumphantly of Trottle",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 416,
+   "text": "No one will take from him his conviction that at our birth are fixed for us the things that shall be.",
+   "prop": "birth | fix | stands",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 136,
+   "text": "They reproached him with the selflessness that made him somewhat languid.",
+   "prop": "selflessness | make | somewhat languid",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 510,
+   "text": "She had been too long a boy to them for that to have entered any mind, and when she finished her song, sprang down, and made for the door, Sir John beheld his long-looked-for chance, and was there before her to open it with a great bow, made with his hand upon his heart and his fair locks falling.",
+   "prop": "heart and his fair | lock | falling",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 158,
+   "text": "The unnatural brightness of his eyes, the convulsive movements which seemed the result of some mental resistance, gave to this fancy of the youth a semblance of truth which reacted upon his lively imagination.",
+   "prop": "convulsive movements | seem | result of some mental resistance",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 556,
+   "text": "For sure my Lord Froth is as fine a gentleman and as much a man of quality!",
+   "prop": "Lord Froth | be | fine",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 134,
+   "text": "Perhaps, indeed, his own fine negatives made him only the more sensible of any lack of those literary qualities that are bound in their full complement to hold themselves at the disposal of the consummate author--to stand and wait, if they may do no more.",
+   "prop": "fine | negative | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 203,
+   "text": "if I were not so feeble,\" resumed Porbus, \"and if you would consent to let me see your Beautiful Nut-girl, I too could paint some lofty picture, grand and yet profound, where the forms should have the living life.\"",
+   "prop": "consent | let | see",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 562,
+   "text": "\"I will speak louder if you wish it,\" she said.",
+   "prop": "wish | it | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 425,
+   "text": "But obviously, literature is not--as is the craft and mystery of painting--so at the mercy of a half-imposture, so guarded by unprovable honour.",
+   "prop": "literature | guard | unprovable honour",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 39,
+   "text": "For full recognition is expressed in one only way--silence.",
+   "prop": "full recognition | express | metrical absence of their Muse",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 105,
+   "text": "Primitive man recognized many of these superhuman agencies relating to disease, such as the spirits of the dead, either human or animal, independent disease demons, or individuals who might act by controlling the spirits or agencies of disease.",
+   "prop": "Primitive man | act | controlling",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 151,
+   "text": "Mabuse alone knew the secret of giving life to form.",
+   "prop": "secret of giving life | form | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 426,
+   "text": "\"Hold thy tongue a bit, Dad,\" she cried, when he had reached his loudest, \"and let his reverence tell us what his message is.",
+   "prop": "tongue | let | reverence tell",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 398,
+   "text": "Every one knows how Byron took lessons from Jackson the boxer; how Shelley had a fight at Eton in which he quoted Homer, but was licked by a smaller boy; how Christopher North whipped the professional pugilist; how Keats himself never had enough of fighting at school, and beat the butcher afterwards.",
+   "prop": "Christopher North | whip | professional pugilist",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 392,
+   "text": "He was not used to female beauty which deigned to cast great smiling eyes upon him, for at my Lord Twemlow's table he sat so far below the salt that women looked not his way.",
+   "prop": "women | look | way",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 362,
+   "text": "A fugitive writer wrote but lately on the fugitive page of a minor magazine: 'For our part, the drunken tinker [Christopher Sly] is the most real personage of the piece, and not without some hints of the pathos that is worked out more fully, though by different ways, in Bottom and Malvolio.' Has it indeed come to this?",
+   "prop": "fugitive writer | work | fully",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 196,
+   "text": "The front part of the house she barely knew the outside of, as she was kept safely in the west wing and below stairs, and when taken out for the air was always led privately by a side way--never passing through the great hall, where her father might chance to encounter her.",
+   "prop": "father | may | chance",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 467,
+   "text": "They are all miraculous, and the same power was granted to the apostles--\"power against unclean spirits, to cast them out, to heal all manner of sickness and all manner of disease.\" And more than this, not only the blind received their sight, the lame walked, the lepers were cleansed, the deaf heard, but even the dead were raised up.",
+   "prop": "lame | walk | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 261,
+   "text": "\"Thus,\" he writes, \"I continued a long while, even for some years together.\"",
+   "prop": "forsaken of God and given | write | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 192,
+   "text": "He sat out all the changes, and then he come off.",
+   "prop": "fear and trembling | come | like",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 525,
+   "text": "Strangely enough, by the way, this watchfulness is for once as much at fault as would be the slovenly observation of an ordinary man, in the description of a horse's gallop, 'skimming along within a yard of the ground.' Who shall trust a man's nimble eyes after this, when habit and credulity have taught him?",
+   "prop": "watchfulness | be | reporter",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 546,
+   "text": "He sat down and wept.",
+   "prop": "Frenhofer | sit | picture",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 59,
+   "text": "\"You are floating between two systems,--between drawing and color, between the patient phlegm and honest stiffness of the old Dutch masters and the dazzling warmth and abounding joy of the Italians.",
+   "prop": "patient phlegm and honest stiffness of the old Dutch | master | dazzling warmth and abounding joy of the Italians",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 490,
+   "text": "To adopt Coleridge's expression concerning Bunyan's greater and world-famous work, it is an admirable \"_Summa Theologiae Evangelicae_,\" which, notwithstanding its obsolete style and old-fashioned arrangement, may be read even now with advantage.",
+   "prop": "notwithstanding | fashion | arrangement",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 231,
+   "text": "Perhaps it would be better not to sketch a single line.",
+   "prop": "am | sketch | single line",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 547,
+   "text": "Let us come out of the murky night of the East, heavy with phantoms, into the bright daylight of the West, into the company of men whose thoughts made our thoughts, and whose ways made our ways--the men who first dared to look on nature with the clear eyes of the mind.",
+   "prop": "clear | eye | mind",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 305,
+   "text": "The _Outlook_, February 14, 1903, in reference to the rioting at Waterbury, remarks, \"That all this disorder should have occurred in a city of the character and intelligence of Waterbury indicates that the industrial war spirit is by no means confined to the immigrant or ignorant working classes.\"",
+   "prop": "disorder | shall | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 546,
+   "text": "Do you know whom he reminds me of?",
+   "prop": "man | remind | old",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 211,
+   "text": "To win the trade unions was well-nigh to win the war, and recent events show that they have done far more winning in this direction than have the capitalists.",
+   "prop": "recent | event | show",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 126,
+   "text": "But the child Clorinda, it seemed, was of lustier stock than her older sisters, and this those about her soon found out to their grievous disturbance.",
+   "prop": "older | sister | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 90,
+   "text": "The ancient history of man--only now beginning to be studied--dates from the Pliocene or Miocene period; the modern history, as we know it, embraces that brief space of time that has elapsed since the earliest Egyptian and Babylonian records were made.",
+   "prop": "men | begin | tragedy of the glacial period",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 306,
+   "text": "She was afraid that he would be damned for his blasphemies; and as to this her fear was mortal fear.",
+   "prop": "sobs lifting | damn | blasphemies",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 136,
+   "text": "In this they but followed the example of their betters, of whom we know that it is not to the most virtuous they submit or to the most learned, but to those who, being crossed, can conduct themselves in a manner so disagreeable, shrewish or violent, that life is a burden until they have their will.",
+   "prop": "being | cross | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 509,
+   "text": "And in a like mood Nature made New England and endowed her with purpose, with mortuary frivolities, with long views, with energetic provincialism.",
+   "prop": "long | view | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 469,
+   "text": "He who went about doing good was a physician of the body as well as of the soul, and could the rich promises of the Gospel have been fulfilled, there would have been no need of a new dispensation of science.",
+   "prop": "rich | fulfil | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 126,
+   "text": "Where he found her, who her parents were, where they were married, even her christian name, were all deemed so many irrelevant details.",
+   "prop": "orphan girl | detail | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 176,
+   "text": "\"All this while,\" he writes, \"poor wretch as I was, I was ignorant of Jesus Christ, and going about to establish my own righteousness, and had perished therein had not God in mercy showed me more of my state by nature.\"",
+   "prop": "mercy | show | God",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 189,
+   "text": "\"There is life in the form,\" he remarked.",
+   "prop": "latter | remark | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 499,
+   "text": "The Wu, as exorcising physicians and practitioners of the medical art, may be traced in classical literature to the time of Confucius.",
+   "prop": "ism | trace | classical literature",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 76,
+   "text": "The sarser was a little income, bringing him in so many halfpence that he'd carry 'em for a week together, tied up in a pocket- handkercher.",
+   "prop": "week | tie | round",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 432,
+   "text": "Copies of this were set up in Babylon \"that anyone oppressed or injured, who had a tale of woe to tell, might come and stand before his image, that of a king of righteousness, and there read the priceless orders of the King, and from the written monument solve his problem\" (Jastrow).",
+   "prop": "extraordinary document | set | Babylon",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 304,
+   "text": "Here, too, we find medicine ancillary to religion.",
+   "prop": "find medicine ancillary | religion | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 378,
+   "text": "Our own language is rich in words of astral significance derived from the Greek, e.g., disaster.",
+   "prop": "words of astral significance | derive | Greek",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 357,
+   "text": "\"What do you mean?\" he asked, sternly.",
+   "prop": "Kendrew | ask | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 302,
+   "text": "This proposition has been favorably regarded by some other labor organizations.",
+   "prop": "favorably | regard | other labor organizations",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 199,
+   "text": "I'll tell you, I would have mirth continued this day at any rate; though patience purchase folly, and attention be paid with noise, there are times when sense may be unseasonable as well as truth.",
+   "prop": "mirth | continue | day",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 87,
+   "text": "At another time, in his wild contempt of danger, he tore out, while his companions looked on with admiration, what he mistakenly supposed to be an adder's sting.",
+   "prop": "tidal | tear | Wash",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 510,
+   "text": "She is so credulous that way naturally, and likes him so well, that she will believe it faster than I can persuade her.",
+   "prop": "believe | persuade | None",
+   "ok": null
+  }
+ ],
+ "pronouns": [
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 225,
+   "prev": "His big laugh broke in two, as one might say.",
+   "text": "He looked down at the young fury and stared.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) look",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 103,
+   "prev": "They was all dressed like May- Day--gorgeous!--And as to Wine, they swam in all sorts.",
+   "text": "I made the round of the bottles, first separate (to say I had done it), and then mixed 'em all together (to say I had done it), and then tried two of 'em as half-and-half, and then t'other two.",
+   "prop": "according to Going Into Society, I (narrator) made the round of the bottles",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 71,
+   "prev": "Your outlines are false; they do not round upon themselves; they suggest nothing behind them.",
+   "text": "There is truth here,\" said the old man, pointing to the bosom of the saint; \"and here,\" showing the spot where the shoulder ended against the background; \"but there,\" he added, returning to the throat, \"it is all false.",
+   "prop": "according to The Hidden Masterpiece, a speaker (not resolved)'s words, he (referent not resolved) add",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 304,
+   "prev": "Haydon saw it on the face of a woman whose child had just been run over in a London street.",
+   "text": "I remembered the note in his journal as the woman at Via Reggio, in her intolerable hour, turned her head my way, her sobs lifting it.",
+   "prop": "according to The Rhythm Of Life, I (referent not resolved) remember note",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 194,
+   "prev": "Joy in believing was a new thing to him.",
+   "text": "\"They spake as if joy did make them speak; they spake with such pleasantness of Scripture language, and with such appearance of grace in all they said, that they were to me as if they had found a new world,\" a veritable \"El Dorado,\" stored with the true riches.",
+   "prop": "according to The Life Of John Bunyan, a speaker (not resolved)'s words, They (referent not resolved) speak joy",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 16,
+   "prev": "Not at all; why should he?",
+   "text": "He left it, along of a Dwarf.",
+   "prop": "according to Going Into Society, He (referent not resolved) leave",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 132,
+   "prev": "Mr. Vanborough's sullen humor resisted his friend as obstinately as it had resisted his wife.",
+   "text": "\"I dare say,\" he answered.",
+   "prop": "according to Man And Wife, he (referent not resolved)'s words, I (the speaker) dare say",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 330,
+   "prev": "\"You were formally received into the Roman Catholic Church?\"",
+   "text": "\"I went through the whole ceremony.\"",
+   "prop": "according to Man And Wife, a speaker (not resolved)'s words, I (the speaker) go whole ceremony",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 303,
+   "prev": "It seemed to wake his spirit and put him in good-humour.",
+   "text": "He started off with her down the avenue at a light, spirited trot, while she, clinging with her little legs and sitting firm and fearless, made him change into canter and gallop, having actually learned all his paces like a lesson, and knowing his mouth as did his groom, who was her familiar and slave.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) start",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 197,
+   "prev": "The front part of the house she barely knew the outside of, as she was kept safely in the west wing and below stairs, and when taken out for the air was always led privately by a side way--never passing through the great hall, where her father might chance to encounter her.",
+   "text": "She knew best this side-entrance, and made her way to it, meaning to search until she found the front.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) know best",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 341,
+   "prev": "'Twas but rarely he went up to town, having neither money to waste, nor finding great attraction in the more civilised quarters of the world.",
+   "text": "He brought her back such clothes as for richness and odd, unsuitable fashion child never wore before.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) bring back",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 315,
+   "prev": "They won't take long.\"",
+   "text": "He referred to the manuscript, and put the first question.",
+   "prop": "according to Man And Wife, He (referent not resolved) refer manuscript",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 622,
+   "prev": "He first recognized the brain as the organ of the mind, and made careful dissections of the nerves, which he traced to the brain.",
+   "text": "He described the optic nerves and the Eustachian tubes, made correct observations upon vision, and refuted the common view that the sperma came from the spinal cord.",
+   "prop": "according to The Evolution Of Modern Medicine, He (referent not resolved) describe optic",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 298,
+   "prev": "\"That will I--and see what thou wilt do.\"",
+   "text": "He lifted her, she springing as he set his hands beneath her arms, and flinging her legs over astride across the saddle when she reached it.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) lift",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 95,
+   "prev": "They went into Society, in a chay and four grays with silk jackets.",
+   "text": "They took lodgings in Pall Mall, London, and they blazed away.",
+   "prop": "according to Going Into Society, They (referent not resolved) take lodgings",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 226,
+   "prev": "He looked down at the young fury and stared.",
+   "text": "She was out of breath with beating him, and had ceased and fallen back apace, and was staring up at him also, breathing defiance and hatred.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) is out of breath with beating him",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 475,
+   "prev": "Porbus and Poussin, seized with wild curiosity, rushed into the middle of a vast atelier filled with dust, where everything lay in disorder, and where they saw a few paintings hanging here and there upon the walls.",
+   "text": "They stopped before the figure of a woman, life-sized and half nude, which filled them with eager admiration.",
+   "prop": "according to The Hidden Masterpiece, They (referent not resolved) stop figure of a woman",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 245,
+   "prev": "Never was there a finer sight!",
+   "text": "She feared him no more than if he had been a spaniel--and he roaring and laughing till he was like to burst.\"",
+   "prop": "according to A Lady Of Quality, a speaker (not resolved)'s words, She (referent not resolved) fear",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 388,
+   "prev": "\"In the dining-hall,\" answered the servant.",
+   "text": "\"He went there but a moment past, Mistress.\"",
+   "prop": "according to A Lady Of Quality, a speaker (not resolved)'s words, He (referent not resolved) go",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 320,
+   "prev": "From that hour the child's fate was sealed.",
+   "text": "He made himself her playfellow, and romped with and indulged her until she became fonder of him than of any groom or stable-boy she had been companions with before.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) make playfellow",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 521,
+   "prev": "Her figures were published in the American Journal of Sociology, and commented upon by the Literary Digest.",
+   "text": "She found women working ten hours a day, six days a week, for forty cents per week (a rate of two-thirds of a cent an hour).",
+   "prop": "according to War Of The Classes, She (referent not resolved) find women working ten hours",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 185,
+   "prev": "He got wiser every day; his views of Society and the Public was luminous, bewilderin, awful; and his Ed got bigger and bigger as his Wisdom expanded it.",
+   "text": "He took well, and pulled 'em in most excellent for nine weeks.",
+   "prop": "according to Going Into Society, He (referent not resolved) take",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 465,
+   "prev": "When the men trooped into the black oak wainscotted dining-hall on the eventful night, they found their audacious young hostess awaiting them in greater and more daring beauty than they had ever before beheld.",
+   "text": "She wore knee-breeches of white satin, a pink satin coat embroidered with silver roses, white silk stockings, and shoes with great buckles of brilliants, revealing a leg so round and strong and delicately moulded, and a foot so arched and slender, as surely never before, they swore one and all, woman had had to display.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) wear knee",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 204,
+   "prev": "Of course it stands empty now.",
+   "text": "Who would think of taking it after it had been turned into a caravan?\" I looked at Trottle, as I said those last words, and Jarber waved his hand indulgently in the same direction.",
+   "prop": "according to Going Into Society, I (narrator) looked",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 260,
+   "prev": "Wilt have my crop and trounce thy Dad again!\"",
+   "text": "He picked up the crop from the place where she had thrown it, and forthwith gave it in her hand.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) pick crop",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 551,
+   "prev": "Have I indeed produced nothing?\"",
+   "text": "He gazed at the canvas through tears.",
+   "prop": "according to The Hidden Masterpiece, He (referent not resolved) gaze canvas",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 95,
+   "prev": "In an upward path man has had to work out for himself a relationship with his fellows and with nature.",
+   "text": "He sought in the supernatural an explanation of the pressing phenomena of life, peopling the world with spiritual beings, deifying objects of nature, and assigning to them benign or malign influences, which might be invoked or propitiated.",
+   "prop": "according to The Evolution Of Modern Medicine, He (referent not resolved) seek supernatural",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 49,
+   "prev": "The lady had reached the mature age of forty-two.",
+   "text": "She was still a rarely beautiful woman.",
+   "prop": "according to Man And Wife, She (referent not resolved) is still a rarely beautiful woman",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 365,
+   "prev": "It was her habit to leave others to languish, and herself to lead them with disdainful vivacity to doing so.",
+   "text": "She was the talk, and, it must be admitted, the scandal, of the county by the day she was fifteen.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) is the talk",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 275,
+   "prev": "And the next instant hearing the beast's restless feet grinding into the gravel outside as he fretted at having been kept waiting so long, she remembered what the stable-boy had said of having seen her favourite standing before the door, and struggling and dropping from the settle, she ran to look out; whereupon having done so, she shouted in triumph.",
+   "text": "\"He is here!\" she said.",
+   "prop": "according to A Lady Of Quality, she (referent not resolved)'s words, He (referent not resolved) is here",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 458,
+   "prev": "IV.",
+   "text": "She was tall and elegant; beautifully dressed, in the happiest combination of simplicity and splendor.",
+   "prop": "according to Man And Wife, She (referent not resolved) is tall and elegant",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 546,
+   "prev": "after toiling ten years!\"",
+   "text": "He sat down and wept.",
+   "prop": "according to The Hidden Masterpiece, He (referent not resolved) sit",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 667,
+   "prev": "And what do you think I call it?",
+   "text": "I dare swear you won't guess--_The Sillabub_, ha, ha, ha.",
+   "prop": "according to The Double-Dealer, I (referent not resolved) dare swear",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 126,
+   "prev": "It warn't long after that, that I read in the newspaper of Mr. Chops's being presented at court.",
+   "text": "It was printed, \"It will be recollected\"--and I've noticed in my life, that it is sure to be printed that it _will_ be recollected, whenever it won't--\"that Mr. Chops is the individual of small stature, whose brilliant success in the last State Lottery attracted so much attention.\" Well, I says to myself, Such is Life!",
+   "prop": "according to Going Into Society, I (narrator) says",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 608,
+   "prev": "[_Gives him a pocket-glass_.] Pray mind, my lord; ah!",
+   "text": "he bows charmingly; nay, my lord, you shan't kiss it so much; I shall grow jealous, I vow now.",
+   "prop": "according to The Double-Dealer, he (referent not resolved) bow charmingly",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 400,
+   "prev": "Such a foot and such--!",
+   "text": "He felt it more becoming and safer to lift his eyes to the ceiling and keep them there, which gave him somewhat the aspect of one praying.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) feel becoming and safer",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 348,
+   "prev": "She cared more for dogs and horses than for finery, and when she was not in the humour to be made a puppet of, neither tirewoman nor devil could put her into her brocades; but she liked the excitement of the dining-room, and, as time went on, would be dressed in her flowered petticoats in a passion of eagerness to go and show herself, and coquet in her lace and gewgaws with men old enough to be her father, and loose enough to find her premature airs and graces a fine joke indeed.",
+   "text": "She ruled them all with her temper and her shrewish will.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) rule",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 103,
+   "prev": "But 'twas the sad ill fortune of the children Anne and Barbara to have been treated by Nature in a way but niggardly.",
+   "text": "They were pale young misses, with insignificant faces and snub noses, resembling an aunt who died a spinster, as they themselves seemed most likely to.",
+   "prop": "according to A Lady Of Quality, They (referent not resolved) is pale young misses",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 380,
+   "prev": "He was playing with a dog, making it leap over his crop, and both laughing and swearing at its clumsiness.",
+   "text": "He glanced at the chaplain with a laughing, brilliant eye, returning the poor man's humble bow with a slight nod as he plainly hearkened to what he said as he explained his errand.",
+   "prop": "according to A Lady Of Quality, He (referent not resolved) glance chaplain",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 101,
+   "prev": "Yet it is before this prospect that the provincial overseas lifts up his voice in a boast or a promise common enough among the incapable young, but pardonable only in senility.",
+   "text": "He promises the world a literature, an art, that shall be new because his forest is untracked and his town just built.",
+   "prop": "according to The Rhythm Of Life, He (referent not resolved) promise world",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 321,
+   "prev": "Poussin bent his head upon his breast like a man succumbing to joy or grief too great for his spirit to bear.",
+   "text": "\"Listen,\" she said, pulling him by the sleeve of his worn doublet, \"I told you, Nick, that I would give my life for you; but I never said--never!--that I, a living woman, would renounce my love.\"",
+   "prop": "according to The Hidden Masterpiece, a speaker (not resolved)'s words, I (the speaker) tell",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 491,
+   "prev": "She did not fear to meet the full battery of his enamoured glances, but she did not choose to return them.",
+   "text": "She played her part of the pretty young fellow who was a high-spirited beauty, with more of wit and fire than she had ever played it before.",
+   "prop": "according to A Lady Of Quality, She (referent not resolved) play part of the pretty young fellow",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 526,
+   "prev": "She had her double privilege of familiarity with the men whom she liked--her privilege as a woman of high rank, and her privilege as a young widow.",
+   "text": "She bowed to Mrs. Vanborough, with all the highly-finished politeness of the order to which she belonged.",
+   "prop": "according to Man And Wife, She (referent not resolved) bow Mrs",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 193,
+   "prev": "\"The man hath him at the door before the great steps now.",
+   "text": "I saw him stand there waiting but a moment ago.",
+   "prop": "according to A Lady Of Quality, I (referent not resolved) see stand",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 402,
+   "prev": "Thus may each of us to whom he appeals take praise from the praised: He leaves my educated eyes to do a little of the work.",
+   "text": "He respects my responsibility no less--though he respects it less explicitly--than I do his.",
+   "prop": "according to The Rhythm Of Life, He (referent not resolved) respect responsibility",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 234,
+   "prev": "To my surprise Peggy answered the bell, and told me, that Trottle had stepped out without saying where.",
+   "text": "I instantly felt the strongest possible conviction that he was at his old tricks: and that his stepping out in the evening, without leave, meant--Philandering.",
+   "prop": "according to Going Into Society, I (referent not resolved) feel strongest possible conviction",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 378,
+   "prev": "And not only ready but anxious.",
+   "text": "They fought for a chance to work.",
+   "prop": "according to War Of The Classes, They (referent not resolved) fight chance",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 72,
+   "prev": "Lady Lundie is now on her way back to England, for the first time since she left it--I am afraid to say how many years since.",
+   "text": "I expected her yesterday; I expect her to-day--she may come at any moment.",
+   "prop": "according to Man And Wife, I (referent not resolved) expect yesterday",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 498,
+   "prev": "Mastering in a moment his first natural astonishment at the liberty taken with him, Mr. Delamayn drew the inevitable conclusion that there was something wrong, and that there was an attempt (not to be permitted for a moment) to mix him up in it.",
+   "text": "He advanced, resolute to contradict his client, to his client's own face.",
+   "prop": "according to Man And Wife, He (referent not resolved) advance",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 510,
+   "prev": "LADY TOUCH.",
+   "text": "She is so credulous that way naturally, and likes him so well, that she will believe it faster than I can persuade her.",
+   "prop": "according to The Double-Dealer, She (referent not resolved) is so credulous that way naturally",
+   "ok": null
+  }
+ ],
+ "checks": [],
+ "bridges": [
+  {
+   "group": "others",
+   "book": "1187",
+   "name": "Belgium",
+   "item": "Q31",
+   "label": "Belgium",
+   "evidence_name": "germany",
+   "evidence_item": "Q183",
+   "evidence_label": "Germany",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "name": "Elizabeth",
+   "item": "Q235849",
+   "label": "Elizabeth",
+   "evidence_name": "mary",
+   "evidence_item": "Q345",
+   "evidence_label": "Mary",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Oxford",
+   "item": "Q20986484",
+   "label": "Oxford",
+   "evidence_name": "museum",
+   "evidence_item": "Q636400",
+   "evidence_label": "Ashmolean Museum",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "name": "September",
+   "item": "Q123",
+   "label": "September",
+   "evidence_name": "august",
+   "evidence_item": "Q122",
+   "evidence_label": "August",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Venice",
+   "item": "Q641",
+   "label": "Venice",
+   "evidence_name": "italy",
+   "evidence_item": "Q38",
+   "evidence_label": "Italy",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Bologna",
+   "item": "Q1891",
+   "label": "Bologna",
+   "evidence_name": "italy",
+   "evidence_item": "Q38",
+   "evidence_label": "Italy",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "name": "Germany",
+   "item": "Q183",
+   "label": "Germany",
+   "evidence_name": "belgium",
+   "evidence_item": "Q31",
+   "evidence_label": "Belgium",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Aristotle",
+   "item": "Q868",
+   "label": "Aristotle",
+   "evidence_name": "plato",
+   "evidence_item": "Q859",
+   "evidence_label": "Plato",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "British Museum",
+   "item": "Q636400",
+   "label": "Ashmolean Museum",
+   "evidence_name": "oxford",
+   "evidence_item": "Q20986484",
+   "evidence_label": "Oxford",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Padua",
+   "item": "Q617",
+   "label": "Padua",
+   "evidence_name": "italy",
+   "evidence_item": "Q38",
+   "evidence_label": "Italy",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Rome",
+   "item": "Q220",
+   "label": "Rome",
+   "evidence_name": "italy",
+   "evidence_item": "Q38",
+   "evidence_label": "Italy",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "name": "August",
+   "item": "Q122",
+   "label": "August",
+   "evidence_name": "september",
+   "evidence_item": "Q123",
+   "evidence_label": "September",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Egypt",
+   "item": "Q79",
+   "label": "Egypt",
+   "evidence_name": "alexandria",
+   "evidence_item": "Q87",
+   "evidence_label": "Alexandria",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Pavia",
+   "item": "Q6259",
+   "label": "Pavia",
+   "evidence_name": "italy",
+   "evidence_item": "Q38",
+   "evidence_label": "Italy",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "name": ". Burne Jones",
+   "item": "Q313315",
+   "label": "Tom Jones",
+   "evidence_name": "fielding",
+   "evidence_item": "Q34190",
+   "evidence_label": "Henry Fielding",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Empedocles",
+   "item": "Q83375",
+   "label": "Empedocles",
+   "evidence_name": "aristotle",
+   "evidence_item": "Q868",
+   "evidence_label": "Aristotle",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "name": "Mary",
+   "item": "Q345",
+   "label": "Mary",
+   "evidence_name": "christ",
+   "evidence_item": "Q642420",
+   "evidence_label": "Christ",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "name": "Scripture",
+   "item": "Q2375917",
+   "label": "Scripture",
+   "evidence_name": "bible",
+   "evidence_item": "Q1845",
+   "evidence_label": "Bible",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Italy",
+   "item": "Q38",
+   "label": "Italy",
+   "evidence_name": "padua",
+   "evidence_item": "Q617",
+   "evidence_label": "Padua",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "name": "Bible",
+   "item": "Q1845",
+   "label": "Bible",
+   "evidence_name": "scripture",
+   "evidence_item": "Q2375917",
+   "evidence_label": "Scripture",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "name": "Christ",
+   "item": "Q642420",
+   "label": "Christ",
+   "evidence_name": "mary",
+   "evidence_item": "Q345",
+   "evidence_label": "Mary",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "name": "Satan",
+   "item": "Q35230",
+   "label": "Satan",
+   "evidence_name": "bible",
+   "evidence_item": "Q1845",
+   "evidence_label": "Bible",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Alexandria",
+   "item": "Q87",
+   "label": "Alexandria",
+   "evidence_name": "egypt",
+   "evidence_item": "Q79",
+   "evidence_label": "Egypt",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "name": "Henry Fielding",
+   "item": "Q34190",
+   "label": "Henry Fielding",
+   "evidence_name": "jones",
+   "evidence_item": "Q313315",
+   "evidence_label": "Tom Jones",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "name": "Plato",
+   "item": "Q859",
+   "label": "Plato",
+   "evidence_name": "aristotle",
+   "evidence_item": "Q868",
+   "evidence_label": "Aristotle",
+   "ok": null
+  }
+ ],
+ "judged_by": "builder (main loop), 2026-10-07; strict; novels only; a quotation's speaker must be right or said unresolved"
+}

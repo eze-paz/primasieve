@@ -136,13 +136,62 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
     return hook
 
 
+QUOTES = '"“”'
+
+
+def quote_hook(R, inner):
+    """bookquote_prereg.md: quoted segments of still-unread sentences read as sentences of their own, said as a speaker's
+    words inside the book; the speaker from the words next to the marks, "I" the speaker, "you" the one addressed"""
+    class One:                                     # a one-sentence book for the inner readers
+        def __init__(self, sent, title): self.sents = [sent]; self.title = title
+    def speaker_of(sent, a, b):
+        """name or pronoun next to a verb right after the closing mark (a "said Porbus") or right before the opening"""
+        after = [t for t in tokens(sent[b:]) if t[:1].isalnum()][:2]
+        before = [t for t in tokens(sent[:a]) if t[:1].isalnum()][-2:]
+        for pair in (after, before[::-1] if before else []):
+            if len(pair) == 2:
+                v = [x for x in pair if x.lower() in R.verbs]; n = [x for x in pair if x not in v]
+                if v and n:
+                    w = n[0]
+                    if w[:1].isupper() and w.lower() not in R.closed: return w, None
+                    if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
+        return None, None
+    def hook(B, per):
+        per = inner(B, per)
+        for i in sorted(per):
+            if per[i]: continue
+            sent = B.sents[i]
+            if not any(q in sent for q in QUOTES): continue
+            marks = [j for j, ch in enumerate(sent) if ch in QUOTES]
+            segs = []
+            if marks and sent[:marks[0]].strip() and not any(ch in sent[:marks[0]] for ch in ",;:"):   # opens inside a quote
+                segs.append((0, marks[0])); marks = marks[1:]
+            for a, b in zip(marks[0::2], marks[1::2]): segs.append((a + 1, b))
+            got = []
+            for a, b in segs:
+                text = sent[a:b].strip().rstrip(",")
+                if len([t for t in tokens(text) if t[:1].isalnum()]) < 3: continue
+                spk, how = speaker_of(sent, a, b + 1)
+                ctx = f"{B.title}, {spk + (' (' + how + ')' if how else '') if spk else 'a speaker (not resolved)'}'s words"
+                sub = inner(One(text, ctx), {0: []})[0]
+                for p in sub:
+                    if p["subj"].lower() == "i": p["subj"] = "I"; p["via"] = "the speaker"
+                    elif p["subj"].lower() == "you": p["via"] = "the one addressed"
+                    p["quoted"] = True; got.append(p)
+            per[i] = got
+        return per
+    return hook
+
+
 def units(B, n=500):
     return [i for i, s in enumerate(B.sents) if 4 <= len(s.split()) <= 60][:n]
 
 
 def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_ids=None, chains=True):
     R, L = KB.build(); abbr = set(L["abbreviations"])
-    if it >= 7 and not hooks: hooks = {"after_read": describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)}
+    if it >= 7 and not hooks:
+        h = describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)
+        hooks = {"after_read": quote_hook(R, h) if it >= 11 else h}
     base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
