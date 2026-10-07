@@ -42,7 +42,32 @@ def word_index(et, k):
     return sum(1 for x in et[:k] if x[:1].isalnum())
 
 
-def describe_hook(R, strict=False, pronouns=False):
+def copula_forms(R):
+    """copula_prereg.md (B): the closed form the verb table gives the lemma of the commonest finite closed verb ("is" ->
+    be), plus the closed symbols sharing its two-sided slots that have a dictionary verb sense and no OTHER lemma in the
+    verb table, with >= 10 % of the top one's shared slots (learned: was, are, were)"""
+    import sqlite3, json as _j
+    from core.textmodel import TextModel
+    from core.synonyms import Synonyms
+    from textmodel import MODEL
+    import kb_events as KE
+    db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
+    closed = R.closed
+    finite_closed = [w for w in _j.load(open(KE.CLOSED_CACHE, encoding="utf-8"))
+                     if R.verbs.get(w) not in (None, w) and KE.pos_senses(db, w).get("verb")]     # a form of ANOTHER lemma
+    if not finite_closed: return set()
+    c0 = finite_closed[0]; lem = R.verbs[c0]
+    sims = [(w, n) for w, n in Synonyms(TextModel.load(MODEL)).two_sided(c0, 60) if w in closed]
+    if not sims: return {c0}
+    top = sims[0][1]
+    def mostly_verb(w):
+        ps = KE.pos_senses(db, w); return ps.get("verb", 0) >= 0.5 * max(1, sum(ps.values()))
+    out = {c0} | {w for w, n in sims if n >= 0.1 * top and mostly_verb(w) and R.verbs.get(w) in (None, lem)}
+    say(f"copula forms learned: {sorted(out)} (from {c0!r})")
+    return out
+
+
+def describe_hook(R, strict=False, pronouns=False, copula=None):
     """bookdescribe_prereg.md: for a unit the book reader leaves unread, the story reader's realis events whose doer is
     written in the sentence and begins with a learned determiner or a capital, in sentences without a quotation mark"""
     dets = set(getattr(R, "dets", ()))
@@ -85,6 +110,27 @@ def describe_hook(R, strict=False, pronouns=False):
                         if vt not in R.verbs or vt in R.closed or ev["verb"] in R.closed: continue
                         got.append(dict(kind="event", subj=et[f0], rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])), title=B.title,
                                         via="referent not resolved", described=True)); break
+            if not got and copula and words_at:            # copula_prereg.md (B): "<doer> is <predicate>"
+                wl = [et[j] for j in words_at]; low_w = [x.lower() for x in wl]
+                negs = getattr(R, "negatives", ()); subj = None; cpos = None
+                for c in range(1, min(6, len(wl))):
+                    if low_w[c] in copula: cpos = c; break
+                if cpos is not None:
+                    head = wl[:cpos]
+                    if cpos == 1 and low_w[0] in getattr(R, "subjects", ()) and low_w[0] != "who": subj = (wl[0], "referent not resolved")
+                    elif all(x[:1].isupper() for x in head) and head[0].lower() not in R.closed: subj = (" ".join(head), None)
+                    elif low_w[0] in dets and cpos >= 2 and all(x not in R.closed and x not in R.verbs for x in low_w[1:cpos]): subj = (" ".join(head), None)
+                if subj is not None:
+                    # the predicate: the words after the copula up to the next punctuation, 1-6 of them, not negated, not
+                    # opened by a participle (passive / progressive) or a verb
+                    k = words_at[cpos]; pred = []
+                    for j in range(k + 1, len(et)):
+                        if not et[j][:1].isalnum(): break
+                        pred.append(et[j])
+                    pl = [x.lower() for x in pred]
+                    if (1 <= len(pred) <= 6 and pl[0] not in negs and pl[0] not in R.participles and pl[0] not in R.verbs
+                            and not any(x in negs for x in pl)):
+                        got.append(dict(kind="event", subj=subj[0], rel="is", obj=" ".join(pred), title=B.title, via=subj[1], described=True))
             per[i] = got
         return per
     return hook
@@ -96,7 +142,7 @@ def units(B, n=500):
 
 def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_ids=None, chains=True):
     R, L = KB.build(); abbr = set(L["abbreviations"])
-    if it >= 7 and not hooks: hooks = {"after_read": describe_hook(R, strict=it >= 8, pronouns=it >= 9)}
+    if it >= 7 and not hooks: hooks = {"after_read": describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)}
     base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
