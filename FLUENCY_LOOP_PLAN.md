@@ -157,3 +157,7 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 44 | B6 | number words as quantifiers (numwords_prereg.md) | NOT PASSED, reverted | dictionary lacks small numbers' sense; slot rescue noisy |
 | 2026-10-07 | 45 | B6 | a text model of the story books for slot sharing; number words learned again (booktm_prereg.md) | PASS | **B6 61 -> 63** |
 | 2026-10-07 | 46 | B6 | the chat's sentence splitter respects learned abbreviations (abbrsplit_prereg.md) | PASS | **B6 63 -> 64** |
+
+### Iteration 47 (proverb_prereg.md) -- PASS
+"What did X do?" answered from X's latest realis event (pro-verb: the auxiliary's lemma recurs as the main verb); learned
+adverb particles ("flew away") no longer borrow the last patient. B6 64 -> 65; all else held; book propositions identical.

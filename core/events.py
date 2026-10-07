@@ -191,7 +191,8 @@ class EventReader:
                     if r2: recipient = patient; patient = self.phrase(toks, *r2[0]); pa = (r2[0], False)
             if pa is None:                                                             # events3_prereg.md (2): "found them" -> the last patient
                 nxt = k + 1
-                if nxt < len(toks) and self.is_word(toks[nxt]) and toks[nxt].lower() in self.closed and toks[nxt].lower() not in getattr(self, "auxiliaries", ()):
+                if (nxt < len(toks) and self.is_word(toks[nxt]) and toks[nxt].lower() in self.closed and toks[nxt].lower() not in getattr(self, "auxiliaries", ())
+                        and toks[nxt].lower() not in getattr(self, "adverbs", ())):      # proverb: "flew away" has no patient
                     patient = getattr(self, "last_patient", None)
             elif patient: self.last_patient = patient
             adj = []; i = (pa[0][1] if pa else k + 1)
@@ -304,6 +305,20 @@ class EventMemory:
             B_ = {base(w) for w in b_.split() if w.lower() not in self.reader.closed}
             if A_ & content and not B_ & content: content = content | B_
             elif B_ & content and not A_ & content: content = content | A_
+        # proverb_prereg.md: "did ... do" -- the auxiliary's lemma is the main verb's lemma -> answer an event, not a role
+        aux_lem = self.reader.verbs.get(lw[1]) if len(lw) > 1 else None
+        lem_of = lambda t: self.reader.verbs.get(t) or self.reader.base.get(t)
+        if aux_lem and any(lem_of(t) == aux_lem for t in lw[2:]) and all(l == aux_lem for l in lemmas):
+            for ev in reversed(self.events):
+                if ev.get("status", "realis") != "realis" or not ev.get("agent"): continue
+                if {base(w) for w in ev["agent"].split()} & content:
+                    toks_e = tokens(ev.get("text", ""))
+                    vform = toks_e[ev["pos"]] if ev.get("pos") is not None and ev["pos"] < len(toks_e) else ev["verb"]
+                    p_ = ev.get("pos")
+                    if p_ is not None and p_ + 1 < len(toks_e) and toks_e[p_ + 1].lower() in getattr(self.reader, "adverbs", ()):
+                        vform += " " + toks_e[p_ + 1]                           # the particle belongs to the verb ("flew away")
+                    rest = " ".join(x for x in [ev.get("patient") or ""] + list(ev.get("adjuncts", [])) if x)
+                    return (vform + (" " + rest if rest else "")), ev
         # appos_prereg.md (C): "Was the wind calm?" -> yes, from a fact whose two sides each share the question's words
         if lw and lw[0] in getattr(self.reader, "copula", ()) and getattr(self, "facts", None):
             qc = {base(t) for t in words[1:] if t.lower() not in self.reader.closed}

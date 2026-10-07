@@ -493,6 +493,12 @@ def _build(closed, uni=None, same=None):
         def _detshare(w):
             ps = pos_senses(_db, w); d = sum(v for p_, v in ps.items() if p_ in ("det", "article"))
             return d, sum(ps.values())
+        # proverb_prereg.md: closed symbols whose dictionary senses are mostly adverbs ("away", "down") are particles,
+        # never a pronoun object standing for the last patient
+        R.adverbs = set()
+        for w in order:
+            ps = pos_senses(_db, w)
+            if ps and ps.get("adv", 0) >= 0.5 * sum(ps.values()): R.adverbs.add(w)
         R.dets = set()
         for i, w in enumerate(order):
             d, n = _detshare(w)
