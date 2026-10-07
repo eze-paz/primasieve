@@ -266,6 +266,89 @@ def learn_negatives(closed, knockout=False):
 
 
 @_disk_memo
+def learn_gender(closed, subjects, n_books=60):
+    """gender_prereg.md (A)-(C): name classes (a name's dominant subject-like symbol in the next sentence), pronoun-form
+    classes (closed symbols following one class's names), and gloss words predicting the class of an unseen name ->
+    (name_class, pron_class, gloss_class)"""
+    import sqlite3
+    sent_names = []; capc = collections.Counter()
+    for b in books(False)[:n_books]:
+        text = open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read()
+        for s in re.split(r"(?<=[.!?])\s+", text):
+            raw = [x for x in tokens(s) if x[:1].isalnum()]
+            if len(raw) < 3: continue
+            names = {x for i, x in enumerate(raw) if i > 0 and x[:1].isupper() and x.lower() not in closed and not x.isupper()}
+            capc.update(names); sent_names.append((names, [x.lower() for x in raw]))
+    # amended before the run: pronouns counted after the name in the same sentence AND in the next one, and classes chosen
+    # by LIFT over the base rate (raw majority put every form with the commonest class)
+    pairs = collections.defaultdict(collections.Counter); base_p = collections.Counter()
+    for (names, cur), (_, nxt) in zip(sent_names, sent_names[1:]):
+        if len(names) != 1: continue
+        n = next(iter(names)); nl = n.lower()
+        after = cur[cur.index(nl) + 1:] if nl in cur else []
+        for x in after + nxt:
+            if x in subjects: pairs[n][x] += 1; base_p[x] += 1
+    totp = sum(base_p.values()) or 1
+    name_class = {}
+    for n, c in pairs.items():
+        tot = sum(c.values())
+        if capc[n] < 10 or tot < 8: continue
+        lift = {p: (k / tot) / (base_p[p] / totp) for p, k in c.items() if k >= 3}
+        if not lift: continue
+        p = max(sorted(lift), key=lift.get)
+        if lift[p] >= 1.5 and c[p] >= 0.5 * tot: name_class[n.lower()] = p
+    form = collections.defaultdict(collections.Counter); base_c = collections.Counter()
+    for (names, cur), (_, nxt) in zip(sent_names, sent_names[1:]):
+        if len(names) != 1: continue
+        cl = name_class.get(next(iter(names)).lower())
+        if cl is None: continue
+        base_c[cl] += 1
+        for x in set(cur[1:] + nxt):
+            if x in closed and x not in subjects: form[x][cl] += 1
+    totc = sum(base_c.values()) or 1
+    pron_class = {s_: s_ for s_ in subjects}
+    for x, c in form.items():
+        tot = sum(c.values())
+        if tot < 30: continue
+        big = {cl_ for cl_, n_ in collections.Counter(name_class.values()).items() if n_ >= 20}
+        lift = sorted(((k / tot) / (base_c[cl] / totc), cl) for cl, k in c.items() if cl in big)[::-1]
+        if not lift: continue
+        second = lift[1][0] if len(lift) > 1 else 0.0
+        if lift[0][0] >= 1.2 and lift[0][0] >= 1.5 * second: pron_class[x] = lift[0][1]     # amended: lift and margin
+    db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+    gw = collections.defaultdict(collections.Counter)
+    for n, cl in name_class.items():
+        r = db.execute("select v from e where w=?", (n.capitalize(),)).fetchone() or db.execute("select v from e where w=?", (n,)).fetchone()
+        if not r: continue
+        try: words = {w for x in json.loads(r[0]).get("senses", []) for w in re.findall(r"[^\W\d_]+", str(x.get("gloss", "")).lower())}
+        except Exception: continue
+        for w in words: gw[w][cl] += 1
+    # amended: gloss words weigh evidence per class (smoothed log-odds over the classes with >= 20 named names); an unseen
+    # name's class is decided by the sum over its gloss words only when it favours one class 3 : 1 (see name_of_gloss)
+    ncls = collections.Counter(name_class.values())
+    # only classes whose names are third-person in the books' own counts would be compared; with no word list, the classes
+    # kept are those with >= 20 names whose NAMES' glosses are mostly given-name entries -- simplified to: >= 20 names
+    gloss_class = {"__classes__": {cl: n for cl, n in ncls.items() if n >= 20}}
+    for w, c in gw.items():
+        if sum(c.values()) >= 3: gloss_class[w] = dict(c)
+    return name_class, pron_class, gloss_class
+
+
+def class_of_gloss(gloss_class, words):
+    """gender_prereg.md (C), amended: the class an unseen name's gloss words favour by >= 3 : 1 (naive Bayes, add-one), or None"""
+    import math
+    classes = gloss_class.get("__classes__", {})
+    if len(classes) < 2: return None
+    score = {cl: math.log(n) for cl, n in classes.items()}
+    for w in set(words):
+        c = gloss_class.get(w)
+        if not isinstance(c, dict): continue
+        for cl, n in classes.items(): score[cl] += math.log((c.get(cl, 0) + 1) / (n + 2))
+    best = sorted(score.items(), key=lambda x: -x[1])
+    return best[0][0] if best[0][1] - best[1][1] >= math.log(3) else None
+
+
+@_disk_memo
 def learn_conditional(closed, markers, n_books=60, min_n=1000):
     """reality_prereg.md (A): the closed sentence-initial symbol (>= min_n uses) whose sentences most often hold a marker
     after a comma, relative to all sentences -> {symbol}, and the lifts measured"""
