@@ -142,6 +142,9 @@ def describe_hook(R, strict=False, pronouns=False, copula=None, resolve_on=False
     # amended (run 2): >= 30 % pronoun senses ("at" has a minor one)
     pron_sense = {w for w in R.closed if _share(w, "pron") >= 0.3} - set(getattr(R, "subjects", ())) - set(getattr(R, "negatives", ()))
     existential = existential_word(R) if copula else None
+    try: comps = set(KB.build()[1].get("complementizers", ()))
+    except Exception: comps = set()
+    closed_lemmas = {R.verbs[w] for w in R.closed if w in R.verbs}
     copula_lemma = R.verbs.get(next(iter(sorted(copula))), None) if copula else None
     def hook(B, per):
         R.last_agent = None; R.last_patient = None
@@ -172,6 +175,7 @@ def describe_hook(R, strict=False, pronouns=False, copula=None, resolve_on=False
                                and k + 1 < len(et) and et[k + 1].lower() in dets)          # bookhave (A): "has a soul"
                     if vt not in R.verbs or ((vt in R.closed or ev["verb"] in R.closed) and not possess): continue
                     if k > 0 and et[k - 1].lower() in getattr(R, "auxiliaries", ()): continue
+                    if k + 1 < len(et) and et[k + 1].lower() in R.closed and et[k + 1].lower() in R.verbs: continue   # bookprec (5): "girls have"
                 if " " + " ".join(aw).lower() + " " not in low: continue
                 k = low.split().index(aw[0].lower()) if aw[0].lower() in low.split() else -1
                 prev = low.split()[k - 1] if k > 0 else ""
@@ -230,6 +234,10 @@ def describe_hook(R, strict=False, pronouns=False, copula=None, resolve_on=False
     def keep_prop(p, sent):
         """bookhave guards: a verb is needed; an object-less 'do' is empty; an object cut at a hyphen is dropped"""
         if not p.get("rel"): return False
+        sw = [w.lower() for w in str(p.get("subj", "")).split()]
+        if sw and sw[0] in comps: return False                                   # bookprec (3): "that life is ..."
+        if any(w in R.participles and w not in R.verbs for w in sw[1:]): return False   # bookprec (4): "Her marriage having ..."
+        if p["rel"] in closed_lemmas and not p.get("obj"): return False          # bookprec (1)(5): "... be", an empty auxiliary
         if p.get("obj") and p.get("rel") != "is":                # bookposs (B): an object opened by a verb form is not one
             f = p["obj"].split()[0].lower()
             if f in R.participles or f in R.verbs: p["obj"] = ""
@@ -394,7 +402,9 @@ def quote_hook(R, inner):
                     ps0 = KE.pos_senses(_db, v0)
                     if (v0 in R.base and v0 not in R.verbs and v0 not in R.closed and v0 not in R.participles
                             and not (len(tw) > 1 and tw[1][:1].isupper())             # bookshapes guard: "Mother Posset" is a vocative
-                            and ps0.get("verb", 0) >= 0.5 * max(1, sum(ps0.values()))):   # amended: mostly a verb ("wise", "long" are not)
+                            and ps0.get("verb", 0) >= 0.5 * max(1, sum(ps0.values()))   # amended: mostly a verb ("wise", "long" are not)
+                            and ps0.get("verb", 0) > max([v for k_, v in ps0.items() if k_ != "verb"] or [0])   # bookprec (2): strictly dominant
+                            and not (len(tw) > 1 and tw[1].lower() in set(getattr(R, "coords", ())) | set(getattr(R, "linkers", ())))):
                         rest = [t for t in tw[1:6]]
                         obj = " ".join(rest[:3]) if rest else ""
                         sub = [dict(kind="event", subj="(an order to the one addressed)", rel=R.base[v0], obj=obj, title=ctx,
