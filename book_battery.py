@@ -41,7 +41,9 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
         if hooks and "after_build" in hooks: hooks["after_build"](B)
         g = "novels" if b in NOVELS else "others"
         if it >= 5:
-            for key, (q, kb_, qb) in B.bridge(lookup, related, common).items():
+            from core.reason import symbols
+            for key, (q, kb_, qb) in B.bridge(lookup, related, common, label=lambda q: ST.lab.get(q, ""),
+                                              norm=lambda t: " ".join(symbols(t, "LN"))).items():
                 ex = next(n[3] for ns in B._names for n in ns if n[2] == key)
                 bridges.append(dict(group=g, book=b, name=ex, item=q, label=ST.lab.get(q), evidence_name=" ".join(kb_),
                                     evidence_item=qb, evidence_label=ST.lab.get(qb), ok=None))

@@ -64,7 +64,7 @@ class Book:
         self.verbish = set(verbish); self.skip = set(skippable); self.nounish = set(nounish); self.prep = set(preplike)
         self.bid = bid; self.closed = set(closed); self.R = reader; self.det = set(determiners); self.heads = set(chain_heads)
         self.det2 = set(det2); self.subjects = set(subjects) & self.closed
-        self.v = version; self.comp = set(complementizers); self.chains = chains and version >= 3; self._resolved = {}
+        self.abbr = set(abbr); self.v = version; self.comp = set(complementizers); self.chains = chains and version >= 3; self._resolved = {}
         self.speaker = speaker; self.narrator_label = narrator_label; self.narrated = False
         self.use_pronouns = pronouns; self.knockout = knockout; self.use_quotes = quotes; self.quote = None
         self.title = title or ("book " + str(bid)); self.real = False
@@ -139,7 +139,8 @@ class Book:
                 j = k
                 while j + 1 < len(ts) and (cap(ts[j + 1]) or (ts[j + 1] == "." and j + 2 < len(ts) and cap(ts[j + 2])
                                                               and (ts[j].lower() in self.titles
-                                                                   or (self.v >= 5 and ts[j].lower() in self.closed)))):
+                                                                   or (self.v == 5 and ts[j].lower() in self.closed)
+                                                                   or (self.v >= 6 and ts[j] in self.abbr)))):
                     j += 1 if cap(ts[j + 1]) else 2
                 run = list(range(k, j + 1))
                 ents = [i for i in run if ts[i].lower() in self.entities]
@@ -147,7 +148,9 @@ class Book:
                 if key:
                     s = k
                     while s < ents[0] and (ts[s].lower() in self.closed or (s == 0 and ts[s].lower() not in self.entities)): s += 1
-                    out.append((s, j + 1, key, " ".join(ts[s:j + 1]).replace(" .", "."), k))
+                    text = " ".join(ts[s:j + 1]).replace(" .", ".")
+                    if self.v >= 6: text = text.lstrip(". ")                       # bookbridge2 (2)
+                    out.append((s, j + 1, key, text, k))
                 k = j + 1
             else: k += 1
         return out
@@ -337,13 +340,15 @@ class Book:
                 if i - d < 0: continue
                 ents = [(pos, n) for pos, n in self._doers[i - d]] + ([(-1, n) for n in self._resolved.get(i - d, [])] if self.chains else [])
                 seq += [n for _, n in sorted(ents, key=lambda x: x[0])]
-            seq += [n for n in self._names[i] if n[1] <= pos]
+            seq += [n for n in self._names[i] if n[1] <= pos and not (self.v >= 6 and self.inside(self.toks[i], n[0], i))]
             for n in reversed(seq):
                 if self.doer_count[n[2]] < 5: continue
                 t = self.top_pronoun(n[2])
                 if t is None: return None
                 if t == p:
                     if self.v >= 5 and any(m[2] != n[2] and self.doer_count[m[2]] >= 5 and self.top_pronoun(m[2]) == p for m in seq):
+                        return None
+                    if self.v >= 6 and any(m[2] != n[2] and self.doer_count[m[2]] >= 5 and self.top_pronoun(m[2]) is None for m in seq):
                         return None                                       # bookbridge (b): two names share the pronoun
                     return n
             return None
@@ -354,7 +359,7 @@ class Book:
         return next(iter(hits.values())) if len(hits) == 1 else None
 
     # ---- the bridge to the real world (bookbridge_prereg.md)
-    def bridge(self, lookup, related, common, max_cands=20):
+    def bridge(self, lookup, related, common, max_cands=20, label=None, norm=None):
         """lookup(name text) -> candidate items; related(a, b) -> the store relates items a and b. A name is bridged
         when exactly one of its candidates is related to a candidate of another name it shares a sentence with."""
         texts = collections.defaultdict(set); co = collections.defaultdict(set)
@@ -375,6 +380,16 @@ class Book:
                 for qa in ca:
                     for qb in cand.get(b, ()):
                         if qa != qb and related(qa, qb): ev.setdefault(qa, (b, qb))
+            if self.v >= 6 and label is not None:
+                # bookbridge2 (1): the item's own label must be one of the name's texts; a one-symbol name needs two
+                # different partner names as evidence
+                ev2 = {}
+                for b in co[a]:
+                    for qa in ca:
+                        if norm(label(qa)) not in {norm(t) for t in texts[a]}: continue
+                        for qb in cand.get(b, ()):
+                            if qa != qb and related(qa, qb): ev2.setdefault(qa, []).append((b, qb))
+                ev = {q: v[0] for q, v in ev2.items() if len(a) > 1 or any(len(b) > 1 for b, _ in v) or len({b for b, _ in v}) >= 2}
             if len(ev) == 1:
                 q, (b, qb) = next(iter(ev.items())); self.bridges[a] = (q, b, qb)
         return self.bridges
