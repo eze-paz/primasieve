@@ -1,0 +1,4527 @@
+{
+ "engine_commit": "0b820962",
+ "note": "engine = working tree at this commit WITH the uncommitted iteration-16 reader changes (core/events.py, emergence/kb_events.py) of the parallel loop session",
+ "em": [
+  {
+   "id": "S01.1",
+   "phen": "morph.past_regular",
+   "q": "Who painted the fence?",
+   "gold": [
+    "nadia"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Nadia",
+   "event": "Nadia paint fence",
+   "held": true
+  },
+  {
+   "id": "S01.2",
+   "phen": "morph.past_regular",
+   "q": "What did Omar wash?",
+   "gold": [
+    "car"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "car",
+   "event": "Later Omar wash car",
+   "held": true
+  },
+  {
+   "id": "S02.1",
+   "phen": "morph.irregular",
+   "q": "Who broke the vase?",
+   "gold": [
+    "kofi"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Kofi",
+   "event": "Kofi break vase",
+   "held": true
+  },
+  {
+   "id": "S02.2",
+   "phen": "morph.irregular",
+   "q": "What did Kofi sweep?",
+   "gold": [
+    "floor"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "floor",
+   "event": "Kofi sweep floor",
+   "held": true
+  },
+  {
+   "id": "S03.1",
+   "phen": "morph.top200_verbs",
+   "q": "What did Lena find?",
+   "gold": [
+    "coin"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "coin",
+   "event": "Lena find coin",
+   "held": true
+  },
+  {
+   "id": "S03.2",
+   "phen": "morph.top200_verbs",
+   "q": "What did Lena make?",
+   "gold": [
+    "wish"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S04.1",
+   "phen": "morph.third_sg",
+   "q": "Who feeds the chickens?",
+   "gold": [
+    "pablo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Every morning Pablo",
+   "event": "Every morning Pablo feed chickens",
+   "held": true
+  },
+  {
+   "id": "S04.2",
+   "phen": "morph.third_sg",
+   "q": "What does Pablo's sister milk?",
+   "gold": [
+    "cow"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "cow",
+   "event": "sister milk cow",
+   "held": true
+  },
+  {
+   "id": "S05.1",
+   "phen": "morph.noun_verb_homograph",
+   "q": "What did Sara lose?",
+   "gold": [
+    "watches"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "watches",
+   "event": "Sara lose watches",
+   "held": true
+  },
+  {
+   "id": "S05.2",
+   "phen": "morph.noun_verb_homograph",
+   "q": "Who watches the kids?",
+   "gold": [
+    "brother"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "brother",
+   "event": "brother watch kids",
+   "held": true
+  },
+  {
+   "id": "S06.1",
+   "phen": "morph.contraction",
+   "q": "Who saw the deer?",
+   "gold": [
+    "dog"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S06.2",
+   "phen": "morph.contraction",
+   "q": "Did Paco see the deer?",
+   "gold": [
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S07.1",
+   "phen": "q.whose",
+   "q": "Whose dog chased the cat?",
+   "gold": [
+    "maya"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S07.2",
+   "phen": "morph.possessive_s",
+   "q": "What did Maya's dog chase?",
+   "gold": [
+    "cat"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "cat",
+   "event": "dog chase cat",
+   "held": true
+  },
+  {
+   "id": "S08.1",
+   "phen": "np.article",
+   "q": "What did the dog bury?",
+   "gold": [
+    "bone"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "bone",
+   "event": "dog bury bone",
+   "held": true
+  },
+  {
+   "id": "S08.2",
+   "phen": "np.article",
+   "q": "What did the dog find?",
+   "gold": [
+    "bone"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "bone",
+   "event": "dog find bone",
+   "held": true
+  },
+  {
+   "id": "S09.1",
+   "phen": "np.adjective",
+   "q": "Who lifted the box?",
+   "gold": [
+    "woman"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "tall woman",
+   "event": "tall woman lift heavy box",
+   "held": true
+  },
+  {
+   "id": "S09.2",
+   "phen": "np.adjective",
+   "q": "What did the tall woman lift?",
+   "gold": [
+    "box"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "heavy box",
+   "event": "tall woman lift heavy box",
+   "held": true
+  },
+  {
+   "id": "S10.1",
+   "phen": "np.compound",
+   "q": "What blocked the bus stop?",
+   "gold": [
+    "fire truck"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "fire truck",
+   "event": "fire truck block bus stop",
+   "held": true
+  },
+  {
+   "id": "S10.2",
+   "phen": "np.compound",
+   "q": "What did the fire truck block?",
+   "gold": [
+    "bus stop"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "bus stop",
+   "event": "fire truck block bus stop",
+   "held": true
+  },
+  {
+   "id": "S11.1",
+   "phen": "np.of_phrase",
+   "q": "Who rang the bell?",
+   "gold": [
+    "captain"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S11.2",
+   "phen": "np.of_phrase",
+   "q": "What did the captain of the ship ring?",
+   "gold": [
+    "bell"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S12.1",
+   "phen": "np.appositive",
+   "q": "Who caught a huge fish?",
+   "gold": [
+    "sam",
+    "fisherman"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "fisherman",
+   "event": "fisherman catch huge fish",
+   "held": true
+  },
+  {
+   "id": "S12.2",
+   "phen": "np.appositive",
+   "q": "What did Sam catch?",
+   "gold": [
+    "fish"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S13.1",
+   "phen": "np.possessive_det",
+   "q": "Who found the keys?",
+   "gold": [
+    "mother"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S13.2",
+   "phen": "np.possessive_det",
+   "q": "Where did his mother find the keys?",
+   "gold": [
+    "under the sofa",
+    "sofa"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "keys",
+   "event": "mother find keys",
+   "held": true
+  },
+  {
+   "id": "S14.1",
+   "phen": "np.quantifier",
+   "q": "Who climbed the hill?",
+   "gold": [
+    "boys"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "boys",
+   "event": "boys climb hill",
+   "held": true
+  },
+  {
+   "id": "S14.2",
+   "phen": "q.how_many",
+   "q": "How many boys climbed the hill?",
+   "gold": [
+    "three",
+    "3"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S14.3",
+   "phen": "np.quantifier",
+   "q": "Who carried a flag?",
+   "gold": [
+    "boy"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "boy",
+   "event": "boy carry flag",
+   "held": true
+  },
+  {
+   "id": "S15.1",
+   "phen": "np.numeral",
+   "q": "What did Ana buy?",
+   "gold": [
+    "apples"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "12",
+   "event": "Ana buy 12",
+   "held": false
+  },
+  {
+   "id": "S15.2",
+   "phen": "np.numeral",
+   "q": "How many apples did Ana buy?",
+   "gold": [
+    "12"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "3 pears",
+   "event": "Ana apple 3 pears",
+   "held": false
+  },
+  {
+   "id": "S16.1",
+   "phen": "np.proper_name",
+   "q": "Who wrote a long novel?",
+   "gold": [
+    "mary ann evans"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Mary Ann Evans",
+   "event": "Mary Ann Evans write novel",
+   "held": true
+  },
+  {
+   "id": "S16.2",
+   "phen": "np.proper_name",
+   "q": "What did Mary Ann Evans write?",
+   "gold": [
+    "novel"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "novel",
+   "event": "Mary Ann Evans write novel",
+   "held": true
+  },
+  {
+   "id": "S17.1",
+   "phen": "np.title",
+   "q": "Who steered the ship?",
+   "gold": [
+    "reyes"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Captain Reyes",
+   "event": "Captain Reyes steer ship",
+   "held": true
+  },
+  {
+   "id": "S17.2",
+   "phen": "np.title",
+   "q": "Who treated the sailors?",
+   "gold": [
+    "lim"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Doctor Lim",
+   "event": "Doctor Lim treat sailors",
+   "held": true
+  },
+  {
+   "id": "S18.1",
+   "phen": "np.frequent_noun",
+   "q": "Who sold a horse?",
+   "gold": [
+    "a man",
+    "man"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Ivan",
+   "event": "Ivan sell horse",
+   "held": true
+  },
+  {
+   "id": "S18.2",
+   "phen": "np.frequent_noun",
+   "q": "Who walked to the fair?",
+   "gold": [
+    "ivan"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Ivan",
+   "event": "Ivan walk fair",
+   "held": true
+  },
+  {
+   "id": "S19.1",
+   "phen": "np.frequent_noun",
+   "q": "Who asked for water?",
+   "gold": [
+    "stranger"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "stranger",
+   "event": "stranger ask door",
+   "held": true
+  },
+  {
+   "id": "S19.2",
+   "phen": "np.frequent_noun",
+   "q": "What did the stranger ask for?",
+   "gold": [
+    "water"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "door",
+   "event": "stranger ask door",
+   "held": true
+  },
+  {
+   "id": "S20.1",
+   "phen": "np.coordination",
+   "q": "Who painted the barn?",
+   "gold": [
+    "eva and karl"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Eva and Karl",
+   "event": "Eva and Karl paint barn",
+   "held": true
+  },
+  {
+   "id": "S20.2",
+   "phen": "np.coordination",
+   "q": "What did Karl paint?",
+   "gold": [
+    "barn"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "barn",
+   "event": "Eva and Karl paint barn",
+   "held": true
+  },
+  {
+   "id": "S21.1",
+   "phen": "verb.transitive",
+   "q": "Who scratched the girl?",
+   "gold": [
+    "cat"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "cat",
+   "event": "cat scratch girl",
+   "held": true
+  },
+  {
+   "id": "S21.2",
+   "phen": "q.whom",
+   "q": "Whom did the cat scratch?",
+   "gold": [
+    "girl"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "girl",
+   "event": "cat scratch girl",
+   "held": true
+  },
+  {
+   "id": "S21.3",
+   "phen": "verb.transitive",
+   "q": "Who cried?",
+   "gold": [
+    "girl"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "girl",
+   "event": "girl cry",
+   "held": true
+  },
+  {
+   "id": "S22.1",
+   "phen": "verb.intransitive_pp",
+   "q": "Where did the baby sleep?",
+   "gold": [
+    "car"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "car",
+   "event": "baby sleep car",
+   "held": true
+  },
+  {
+   "id": "S22.2",
+   "phen": "verb.intransitive_pp",
+   "q": "Who slept in the car?",
+   "gold": [
+    "baby"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "baby",
+   "event": "baby sleep car",
+   "held": true
+  },
+  {
+   "id": "S23.1",
+   "phen": "verb.ditransitive",
+   "q": "What did Mia give Leo?",
+   "gold": [
+    "book"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "a book",
+   "event": "Mia give Leo",
+   "held": true
+  },
+  {
+   "id": "S23.2",
+   "phen": "verb.ditransitive",
+   "q": "Who gave Leo a book?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Mia",
+   "event": "Mia give Leo",
+   "held": true
+  },
+  {
+   "id": "S23.3",
+   "phen": "verb.ditransitive",
+   "q": "What did Mia give?",
+   "gold": [
+    "book"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Leo",
+   "event": "Mia give Leo",
+   "held": true
+  },
+  {
+   "id": "S23.4",
+   "phen": "inf.state_from_event",
+   "q": "Who has the book now?",
+   "gold": [
+    "leo"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S24.1",
+   "phen": "verb.dative_alternation",
+   "q": "Who did Nora give the scarf to?",
+   "gold": [
+    "sister"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "to her sister",
+   "event": "Nora give scarf",
+   "held": true
+  },
+  {
+   "id": "S24.2",
+   "phen": "verb.dative_alternation",
+   "q": "Who got the scarf?",
+   "gold": [
+    "sister"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S25.1",
+   "phen": "verb.particle",
+   "q": "What did Nina pick up?",
+   "gold": [
+    "phone"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "phone",
+   "event": "Nina pick phone",
+   "held": true
+  },
+  {
+   "id": "S25.2",
+   "phen": "verb.particle",
+   "q": "Who put down the cup?",
+   "gold": [
+    "nina"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Nina",
+   "event": "Nina put cup",
+   "held": true
+  },
+  {
+   "id": "S26.1",
+   "phen": "verb.light",
+   "q": "Where did Omar walk?",
+   "gold": [
+    "river"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S26.2",
+   "phen": "verb.light",
+   "q": "What did Omar take?",
+   "gold": [
+    "walk"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S27.1",
+   "phen": "verb.copula",
+   "q": "Who was a nurse?",
+   "gold": [
+    "hana"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S27.2",
+   "phen": "verb.copula",
+   "q": "What was Hana's husband?",
+   "gold": [
+    "pilot"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S28.1",
+   "phen": "verb.existential",
+   "q": "What was behind the house?",
+   "gold": [
+    "well"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S28.2",
+   "phen": "verb.existential",
+   "q": "Who lived in the well?",
+   "gold": [
+    "frog"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "frog",
+   "event": "frog live",
+   "held": true
+  },
+  {
+   "id": "S29.1",
+   "phen": "verb.control",
+   "q": "What did Sana want to learn?",
+   "gold": [
+    "violin"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "the violin",
+   "event": "Sana want learn",
+   "held": true
+  },
+  {
+   "id": "S30.1",
+   "phen": "verb.control",
+   "q": "Who did Mira tell to close the gate?",
+   "gold": [
+    "tomas"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Tomas",
+   "event": "Mira tell Tomas",
+   "held": true
+  },
+  {
+   "id": "S30.2",
+   "phen": "verb.control",
+   "q": "Who will close the gate?",
+   "gold": [
+    "tomas"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Mira",
+   "event": "Mira close gate",
+   "held": true
+  },
+  {
+   "id": "S31.1",
+   "phen": "verb.causative",
+   "q": "Who washed the dishes?",
+   "gold": [
+    "brother"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S31.2",
+   "phen": "verb.causative",
+   "q": "Who made her brother wash the dishes?",
+   "gold": [
+    "ella"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S32.1",
+   "phen": "verb.perception",
+   "q": "Who heard the dog?",
+   "gold": [
+    "lina"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Lina",
+   "event": "Lina hear dog bark",
+   "held": true
+  },
+  {
+   "id": "S32.2",
+   "phen": "verb.perception",
+   "q": "What barked?",
+   "gold": [
+    "dog"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S33.1",
+   "phen": "voice.passive_by",
+   "q": "What broke the window?",
+   "gold": [
+    "stone"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "stone",
+   "event": "window break stone",
+   "held": true
+  },
+  {
+   "id": "S33.2",
+   "phen": "voice.passive_by",
+   "q": "What was broken?",
+   "gold": [
+    "window"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "stone",
+   "event": "window break stone",
+   "held": true
+  },
+  {
+   "id": "S34.1",
+   "phen": "voice.passive_agentless",
+   "q": "What was burned?",
+   "gold": [
+    "letters"
+   ],
+   "pred": "W",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S34.2",
+   "phen": "voice.passive_agentless",
+   "q": "Where were the letters burned?",
+   "gold": [
+    "stove"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S35.1",
+   "phen": "voice.get_passive",
+   "q": "What bit Pedro?",
+   "gold": [
+    "snake"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S35.2",
+   "phen": "voice.get_passive",
+   "q": "Who got bitten?",
+   "gold": [
+    "pedro"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Pedro",
+   "event": "Pedro get bitten",
+   "held": true
+  },
+  {
+   "id": "S36.1",
+   "phen": "voice.passive_question",
+   "q": "When was the oak tree planted?",
+   "gold": [
+    "1950"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "in 1950",
+   "event": "Grandpa plant oak tree",
+   "held": true
+  },
+  {
+   "id": "S36.2",
+   "phen": "voice.passive_question",
+   "q": "By whom was the oak tree planted?",
+   "gold": [
+    "grandpa"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "in 1950",
+   "event": "Grandpa plant oak tree",
+   "held": true
+  },
+  {
+   "id": "S37.1",
+   "phen": "tam.progressive",
+   "q": "What was Lara reading?",
+   "gold": [
+    "letter"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "letter",
+   "event": "Lara read letter",
+   "held": true
+  },
+  {
+   "id": "S37.2",
+   "phen": "tam.progressive",
+   "q": "Where was the cat sleeping?",
+   "gold": [
+    "bed"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "bed",
+   "event": "cat sleep bed",
+   "held": true
+  },
+  {
+   "id": "S38.1",
+   "phen": "tam.perfect",
+   "q": "What has Tom fixed?",
+   "gold": [
+    "roof"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "roof",
+   "event": "Tom fix roof",
+   "held": true
+  },
+  {
+   "id": "S38.2",
+   "phen": "tam.perfect",
+   "q": "Who has fixed the roof?",
+   "gold": [
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S39.1",
+   "phen": "tam.future",
+   "q": "Who will Ada visit?",
+   "gold": [
+    "aunt"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S40.1",
+   "phen": "tam.future",
+   "q": "Did Ada wash the plates?",
+   "gold": [
+    "no",
+    "not yet",
+    "will"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "plates",
+   "event": "Ada wash plates",
+   "held": true
+  },
+  {
+   "id": "S41.1",
+   "phen": "tam.modal_epistemic",
+   "q": "Who took the ring?",
+   "gold": [
+    "thief"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Inspector Ross",
+   "event": "Inspector Ross take ring",
+   "held": true
+  },
+  {
+   "id": "S41.2",
+   "phen": "tam.modal_epistemic",
+   "q": "What did Inspector Ross search?",
+   "gold": [
+    "house"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "house",
+   "event": "Inspector Ross search house",
+   "held": true
+  },
+  {
+   "id": "S42.1",
+   "phen": "tam.conditional",
+   "q": "Who will buy a boat?",
+   "gold": [
+    "father"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Leo",
+   "event": "Leo buy boat",
+   "held": true
+  },
+  {
+   "id": "S42.2",
+   "phen": "tam.conditional",
+   "q": "Did his father buy a boat?",
+   "gold": [
+    "no",
+    "not yet",
+    "if"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Leo",
+   "event": "Leo buy boat",
+   "held": true
+  },
+  {
+   "id": "S43.1",
+   "phen": "tam.counterfactual",
+   "q": "Who passed the exam?",
+   "gold": [
+    "@ABSTAIN",
+    "nobody",
+    "no one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Ben",
+   "event": "Ben pass exam",
+   "held": true
+  },
+  {
+   "id": "S43.2",
+   "phen": "tam.counterfactual",
+   "q": "Did Ben pass the exam?",
+   "gold": [
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S44.1",
+   "phen": "tam.tense_mismatch",
+   "q": "Who played the piano?",
+   "gold": [
+    "ivy"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Ivy",
+   "event": "Ivy play piano every evening",
+   "held": true
+  },
+  {
+   "id": "S44.2",
+   "phen": "tam.tense_mismatch",
+   "q": "What does Ivy play?",
+   "gold": [
+    "piano"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "piano every evening",
+   "event": "Ivy play piano every evening",
+   "held": true
+  },
+  {
+   "id": "S45.1",
+   "phen": "neg.not",
+   "q": "Who ate the soup?",
+   "gold": [
+    "@ABSTAIN",
+    "nobody",
+    "no one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Rosa",
+   "event": "Rosa eat soup",
+   "held": true
+  },
+  {
+   "id": "S45.2",
+   "phen": "neg.not",
+   "q": "Did Rosa eat the soup?",
+   "gold": [
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S46.1",
+   "phen": "neg.never",
+   "q": "Who visited Lima?",
+   "gold": [
+    "never",
+    "nobody",
+    "no one"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Kai never",
+   "event": "Kai never visit Lima",
+   "held": true
+  },
+  {
+   "id": "S46.2",
+   "phen": "neg.never",
+   "q": "Did Kai visit Lima?",
+   "gold": [
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S47.1",
+   "phen": "neg.no_det",
+   "q": "Who drank the wine?",
+   "gold": [
+    "no guest",
+    "nobody",
+    "no one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "guest",
+   "event": "guest drink wine",
+   "held": true
+  },
+  {
+   "id": "S48.1",
+   "phen": "neg.no_det",
+   "q": "Who opened the gift?",
+   "gold": [
+    "nobody",
+    "no one"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Nobody",
+   "event": "Nobody open gift",
+   "held": true
+  },
+  {
+   "id": "S49.1",
+   "phen": "q.which",
+   "q": "Which dog dug a hole?",
+   "gold": [
+    "black"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S50.1",
+   "phen": "q.where",
+   "q": "Where did Bea hide the key?",
+   "gold": [
+    "mat"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "under the mat",
+   "event": "Bea hide key",
+   "held": true
+  },
+  {
+   "id": "S50.2",
+   "phen": "inf.state_from_event",
+   "q": "Where is the key?",
+   "gold": [
+    "mat"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S51.1",
+   "phen": "q.when",
+   "q": "When did the family visit the zoo?",
+   "gold": [
+    "sunday"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S52.1",
+   "phen": "q.why",
+   "q": "Why did Tim stay home?",
+   "gold": [
+    "sick"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "he was sick",
+   "event": "Tim stay home",
+   "held": true
+  },
+  {
+   "id": "S53.1",
+   "phen": "q.why",
+   "q": "Why did Dan take the bus?",
+   "gold": [
+    "closed"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S54.1",
+   "phen": "q.how_manner",
+   "q": "How did Rita open the jar?",
+   "gold": [
+    "knife"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "with a knife",
+   "event": "Rita open jar",
+   "held": true
+  },
+  {
+   "id": "S55.1",
+   "phen": "q.how_manner",
+   "q": "How did Leo win the race?",
+   "gold": [
+    "easily"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S56.1",
+   "phen": "clause.coord_vp",
+   "q": "Who peeled the pears?",
+   "gold": [
+    "ines"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Ines",
+   "event": "Ines peel pears",
+   "held": true
+  },
+  {
+   "id": "S56.2",
+   "phen": "clause.coord_vp",
+   "q": "What did Ines peel?",
+   "gold": [
+    "pears"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "pears",
+   "event": "Ines peel pears",
+   "held": true
+  },
+  {
+   "id": "S57.1",
+   "phen": "clause.coord_clauses",
+   "q": "Who milked the cows?",
+   "gold": [
+    "wife"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "wife",
+   "event": "wife milk cows",
+   "held": true
+  },
+  {
+   "id": "S57.2",
+   "phen": "clause.coord_clauses",
+   "q": "What did Ali feed?",
+   "gold": [
+    "goats"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S58.1",
+   "phen": "clause.temporal_sub",
+   "q": "Who ran outside?",
+   "gold": [
+    "children"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "children",
+   "event": "children run outside",
+   "held": true
+  },
+  {
+   "id": "S58.2",
+   "phen": "clause.temporal_sub",
+   "q": "What rang?",
+   "gold": [
+    "bell"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S59.1",
+   "phen": "clause.temporal_sub",
+   "q": "When did Nora call her friend?",
+   "gold": [
+    "homework"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S60.1",
+   "phen": "clause.open_class_connective",
+   "q": "Who waited?",
+   "gold": [
+    "max"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Max",
+   "event": "Max wait until",
+   "held": true
+  },
+  {
+   "id": "S60.2",
+   "phen": "clause.open_class_connective",
+   "q": "What did Max wait for?",
+   "gold": [
+    "rain"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "until",
+   "event": "Max wait until",
+   "held": true
+  },
+  {
+   "id": "S61.1",
+   "phen": "clause.relative_subject",
+   "q": "Who broke the window?",
+   "gold": [
+    "boy"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "teacher",
+   "event": "teacher break window",
+   "held": true
+  },
+  {
+   "id": "S61.2",
+   "phen": "clause.relative_subject",
+   "q": "Who ran away?",
+   "gold": [
+    "boy"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "teacher",
+   "event": "teacher run away",
+   "held": true
+  },
+  {
+   "id": "S62.1",
+   "phen": "clause.relative_object",
+   "q": "What did Mia bake?",
+   "gold": [
+    "cake"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "delicious",
+   "event": "Mia bake delicious",
+   "held": true
+  },
+  {
+   "id": "S62.2",
+   "phen": "clause.relative_object",
+   "q": "Who baked the cake?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S63.1",
+   "phen": "clause.reduced_relative",
+   "q": "Who stole the bag?",
+   "gold": [
+    "woman"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "red coat",
+   "event": "red coat steal bag",
+   "held": true
+  },
+  {
+   "id": "S63.2",
+   "phen": "clause.reduced_relative",
+   "q": "What was the woman wearing?",
+   "gold": [
+    "red coat",
+    "coat"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S64.1",
+   "phen": "clause.complement_that",
+   "q": "What did Tom say?",
+   "gold": [
+    "bridge was closed"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "bridge",
+   "event": "Tom say bridge",
+   "held": true
+  },
+  {
+   "id": "S64.2",
+   "phen": "clause.complement_that",
+   "q": "Was the bridge closed?",
+   "gold": [
+    "said",
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S65.1",
+   "phen": "clause.direct_speech",
+   "q": "Who said the soup is cold?",
+   "gold": [
+    "ada"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S66.1",
+   "phen": "clause.direct_speech",
+   "q": "Who saw a wolf?",
+   "gold": [
+    "boy"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S67.1",
+   "phen": "clause.purpose",
+   "q": "Why did Lia go to the shop?",
+   "gold": [
+    "buy milk"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "to buy milk",
+   "event": "Lia go shop",
+   "held": true
+  },
+  {
+   "id": "S67.2",
+   "phen": "clause.purpose",
+   "q": "What did Lia buy?",
+   "gold": [
+    "milk"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "milk",
+   "event": "Lia buy milk",
+   "held": true
+  },
+  {
+   "id": "S68.1",
+   "phen": "ref.pronoun_gender",
+   "q": "Who carried the bag?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Leo",
+   "event": "Leo carry bag",
+   "held": true
+  },
+  {
+   "id": "S68.2",
+   "phen": "ref.pronoun_gender",
+   "q": "Where did Leo meet Mia?",
+   "gold": [
+    "station"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "at the station",
+   "event": "Leo meet Mia",
+   "held": true
+  },
+  {
+   "id": "S69.1",
+   "phen": "ref.pronoun_object",
+   "q": "What did Ken adopt?",
+   "gold": [
+    "puppy"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "puppy",
+   "event": "Ken adopt puppy",
+   "held": true
+  },
+  {
+   "id": "S69.2",
+   "phen": "ref.pronoun_object",
+   "q": "Who adopted the puppy?",
+   "gold": [
+    "ken"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Ken",
+   "event": "Ken adopt puppy",
+   "held": true
+  },
+  {
+   "id": "S70.1",
+   "phen": "ref.reflexive",
+   "q": "Who did Zoe cut?",
+   "gold": [
+    "herself",
+    "zoe"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "herself",
+   "event": "Zoe cut herself",
+   "held": true
+  },
+  {
+   "id": "S70.2",
+   "phen": "ref.reflexive",
+   "q": "What did Zoe cut herself on?",
+   "gold": [
+    "glass"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "on the glass",
+   "event": "Zoe cut herself",
+   "held": true
+  },
+  {
+   "id": "S71.1",
+   "phen": "ref.possessive_pronoun",
+   "q": "What did Lily lend Sam?",
+   "gold": [
+    "pen"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "hers",
+   "event": "Lily lend hers",
+   "held": true
+  },
+  {
+   "id": "S71.2",
+   "phen": "ref.possessive_pronoun",
+   "q": "Who lent Sam a pen?",
+   "gold": [
+    "lily"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S72.1",
+   "phen": "ref.one_anaphora",
+   "q": "What did Tom give Kim?",
+   "gold": [
+    "green apple",
+    "green one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "green",
+   "event": "Tom give green",
+   "held": true
+  },
+  {
+   "id": "S72.2",
+   "phen": "ref.one_anaphora",
+   "q": "Who gave Kim an apple?",
+   "gold": [
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S73.1",
+   "phen": "ref.vp_ellipsis",
+   "q": "Who else bought a ticket?",
+   "gold": [
+    "joe"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Mara",
+   "event": "Mara buy ticket",
+   "held": true
+  },
+  {
+   "id": "S73.2",
+   "phen": "ref.vp_ellipsis",
+   "q": "Did Joe buy a ticket?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Mara",
+   "event": "Mara buy ticket",
+   "held": true
+  },
+  {
+   "id": "S74.1",
+   "phen": "ref.gapping",
+   "q": "What did Olga order?",
+   "gold": [
+    "salad"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S74.2",
+   "phen": "ref.gapping",
+   "q": "What did Ivan order?",
+   "gold": [
+    "soup"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "soup",
+   "event": "Ivan order soup",
+   "held": true
+  },
+  {
+   "id": "S75.1",
+   "phen": "ref.cataphora",
+   "q": "Who left?",
+   "gold": [
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S75.2",
+   "phen": "ref.cataphora",
+   "q": "Who locked the door?",
+   "gold": [
+    "tom"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Tom",
+   "event": "Tom lock door",
+   "held": true
+  },
+  {
+   "id": "S76.1",
+   "phen": "ref.first_person",
+   "q": "What did I lend Omar?",
+   "gold": [
+    "bike"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S76.2",
+   "phen": "ref.first_person",
+   "q": "Who has my bike?",
+   "gold": [
+    "omar"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S77.1",
+   "phen": "quant.comparative",
+   "q": "Who is taller?",
+   "gold": [
+    "ana"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S78.1",
+   "phen": "quant.only",
+   "q": "Who finished the race?",
+   "gold": [
+    "ravi"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Ravi",
+   "event": "Ravi finish race",
+   "held": true
+  },
+  {
+   "id": "S78.2",
+   "phen": "quant.only",
+   "q": "Did Sita finish the race?",
+   "gold": [
+    "no"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Ravi",
+   "event": "Ravi finish race",
+   "held": true
+  },
+  {
+   "id": "S79.1",
+   "phen": "quant.universal",
+   "q": "Who brought a gift?",
+   "gold": [
+    "guest"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Every guest",
+   "event": "Every guest bring gift",
+   "held": true
+  },
+  {
+   "id": "S80.1",
+   "phen": "disc.story_world_collision",
+   "q": "What did Alice give Bob?",
+   "gold": [
+    "present"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": false
+  },
+  {
+   "id": "S80.2",
+   "phen": "disc.story_world_collision",
+   "q": "Who gave Bob a present?",
+   "gold": [
+    "alice"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Alice",
+   "event": "Alice give Bob",
+   "held": true
+  },
+  {
+   "id": "S81.1",
+   "phen": "disc.topic_continuity",
+   "q": "Who sold the roses?",
+   "gold": [
+    "grace"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Grace",
+   "event": "Grace sell roses",
+   "held": true
+  },
+  {
+   "id": "S81.2",
+   "phen": "disc.topic_continuity",
+   "q": "Where did Grace sell the roses?",
+   "gold": [
+    "market"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "roses",
+   "event": "Grace sell roses",
+   "held": true
+  },
+  {
+   "id": "S82.1",
+   "phen": "lex.synonym_verb",
+   "q": "What did Pam buy?",
+   "gold": [
+    "lamp"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "lamp",
+   "event": "Pam purchase lamp",
+   "held": true
+  },
+  {
+   "id": "S82.2",
+   "phen": "lex.synonym_verb",
+   "q": "Who fixed the fence?",
+   "gold": [
+    "jon"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Jon",
+   "event": "Jon repair fence",
+   "held": true
+  },
+  {
+   "id": "S83.1",
+   "phen": "lex.converse",
+   "q": "Who bought Mia's bike?",
+   "gold": [
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S83.2",
+   "phen": "lex.converse",
+   "q": "Who sold the bike?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Mia",
+   "event": "Mia sell bike",
+   "held": true
+  },
+  {
+   "id": "S84.1",
+   "phen": "lex.hypernym",
+   "q": "What did the dog chase?",
+   "gold": [
+    "sheep"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S84.2",
+   "phen": "lex.hypernym",
+   "q": "What chased the sheep?",
+   "gold": [
+    "collie"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "collie",
+   "event": "collie chase sheep",
+   "held": true
+  },
+  {
+   "id": "S85.1",
+   "phen": "lex.idiom",
+   "q": "Did Grandpa die?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S85.2",
+   "phen": "lex.idiom",
+   "q": "When did Grandpa die?",
+   "gold": [
+    "last winter",
+    "winter"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S86.1",
+   "phen": "lex.idiom",
+   "q": "Did Ravi stop smoking?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S88.1",
+   "phen": "inf.consequence",
+   "q": "Who lost the race?",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "abstained",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S88.2",
+   "phen": "inf.consequence",
+   "q": "Who came first?",
+   "gold": [
+    "juan"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S89.1",
+   "phen": "inf.temporal_order",
+   "q": "Where did Kira go after breakfast?",
+   "gold": [
+    "school"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "school",
+   "event": "Kira go school",
+   "held": true
+  },
+  {
+   "id": "S89.2",
+   "phen": "inf.temporal_order",
+   "q": "What did Kira do before school?",
+   "gold": [
+    "breakfast"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S90.1",
+   "phen": "inf.cause",
+   "q": "Why did the ice melt?",
+   "gold": [
+    "sun was hot",
+    "hot"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "sun",
+   "event": "ice melt sun",
+   "held": true
+  },
+  {
+   "id": "S90.2",
+   "phen": "inf.cause",
+   "q": "What melted?",
+   "gold": [
+    "ice"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "ice",
+   "event": "ice melt sun",
+   "held": true
+  },
+  {
+   "id": "S91.1",
+   "phen": "inf.unasked",
+   "q": "What color did Omar paint the door?",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "abstained",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S91.2",
+   "phen": "inf.unasked",
+   "q": "Who painted the window?",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "abstained",
+   "answer": null,
+   "event": null,
+   "held": true
+  },
+  {
+   "id": "S92.1",
+   "phen": "orth.casing",
+   "q": "who bit tom?",
+   "gold": [
+    "dog"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "dog",
+   "event": "dog bite tom",
+   "held": true
+  },
+  {
+   "id": "S93.1",
+   "phen": "orth.missing_punct",
+   "q": "Who washed the dishes?",
+   "gold": [
+    "ava"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Ava",
+   "event": "Ava wash dishes",
+   "held": true
+  },
+  {
+   "id": "S94.1",
+   "phen": "orth.abbreviation",
+   "q": "Who examined the patient?",
+   "gold": [
+    "patel"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "",
+   "answer": "Patel",
+   "event": "Patel examine patient",
+   "held": true
+  },
+  {
+   "id": "S94.2",
+   "phen": "orth.abbreviation",
+   "q": "Who did Mrs. Gomez thank?",
+   "gold": [
+    "patel"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "answer": "Dr",
+   "event": "Gomez thank Dr",
+   "held": true
+  }
+ ],
+ "door": [
+  {
+   "id": "S01.1",
+   "phen": "morph.past_regular",
+   "q": "Who painted the fence?",
+   "gold": [
+    "nadia"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "By your account: Nadia (Nadia paint fence).",
+   "judged": "Nadia",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S01.2",
+   "phen": "morph.past_regular",
+   "q": "What did Omar wash?",
+   "gold": [
+    "car"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: car (Later Omar wash car).",
+   "judged": "car",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S03.1",
+   "phen": "morph.top200_verbs",
+   "q": "What did Lena find?",
+   "gold": [
+    "coin"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: coin (Lena find coin).",
+   "judged": "coin",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S03.2",
+   "phen": "morph.top200_verbs",
+   "q": "What did Lena make?",
+   "gold": [
+    "wish"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what lena is: (WORDNET-noun): a Russian river in Siberia; flows northward into the Laptev Sea Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what lena is: (WORDNET-noun): a Russian river in Siberia; flows northward into the Laptev Sea Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S07.1",
+   "phen": "q.whose",
+   "q": "Whose dog chased the cat?",
+   "gold": [
+    "maya"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what chased is: (WORDNET-noun): a person who is being chased; \"the film jumped back and forth from the pursuer to the pursued\" Otherwise say wrong, and I will offer what I can do.",
+   "judged": "Taking this as what chased is: (WORDNET-noun): a person who is being chased; \"the film jumped back and forth from the pursuer to the pursued\" Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S07.2",
+   "phen": "morph.possessive_s",
+   "q": "What did Maya's dog chase?",
+   "gold": [
+    "cat"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "From what you told me: cat (dog chase cat).",
+   "judged": "cat",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S11.1",
+   "phen": "np.of_phrase",
+   "q": "Who rang the bell?",
+   "gold": [
+    "captain"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what rang is: (KAIKKI): simple past of ring (only in senses related to a bell — etymology 2) ; (KAIKKI): A long strip of rectangular lots of land in Quebec. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what rang is: (KAIKKI): simple past of ring (only in senses related to a bell — etymology 2) ; (KAIKKI): A long strip of rectangular lots of land in Quebec. If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S11.2",
+   "phen": "np.of_phrase",
+   "q": "What did the captain of the ship ring?",
+   "gold": [
+    "bell"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what captain is: (WORDNET-noun): an officer holding a rank below a major but above a lieutenant ; (WORDNET-noun): the naval officer in command of a military ship ; (WORDNET-noun): a policeman in charge of a precinct ; (WORDNET-noun): an officer who is licensed to command a merchant ship ; (WORDNET-noun): the leader of a group of people; \"a captain of industry\" ; (WORDNET-noun): the pilot in charge of an airship ; (WORDNET-noun): a dining-room attendant who is in charge of the waiters and the seating of customers Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what captain is: (WORDNET-noun): an officer holding a rank below a major but above a lieutenant ; (WORDNET-noun): the naval officer in command of a military ship ; (WORDNET-noun): a policeman in charge of a precinct ; (WORDNET-noun): an officer who is licensed to command a merchant ship ; (WORDNET-noun): the leader of a group of people; \"a captain of industry\" ; (WORDNET-noun): the pilot in charge of an airship ; (WORDNET-noun): a dining-room attendant who is in charge of the waiters and the seating of customers Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S12.1",
+   "phen": "np.appositive",
+   "q": "Who caught a huge fish?",
+   "gold": [
+    "sam",
+    "fisherman"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: fisherman (fisherman catch huge fish).",
+   "judged": "fisherman",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S12.2",
+   "phen": "np.appositive",
+   "q": "What did Sam catch?",
+   "gold": [
+    "fish"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Understood (catch: a break or check in the voice (usually a sign of strong emotion)). I can answer about Wikidata ; records employees/departments ; sales 0 ; exec ; dictionary WORDNET-noun/WORDNET-verb/WORDNET-adj/KAIKKI ; transcript ; store.",
+   "judged": "I can answer about Wikidata ; records employees/departments ; sales 0 ; exec ; dictionary WORDNET-noun/WORDNET-verb/WORDNET-adj/KAIKKI ; transcript ; store.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S13.1",
+   "phen": "np.possessive_det",
+   "q": "Who found the keys?",
+   "gold": [
+    "mother"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what keys is: (KAIKKI): plural of key ; (KAIKKI): keyboard ; (KAIKKI): third-person singular simple present indicative of key ; (KAIKKI): Filter-avoidance spelling of kys (“kill yourself”). ; (KAIKKI): A surname. ; (KAIKKI): The Florida Keys. ; (KAIKKI): The House of Keys. ; (KAIKKI): A census-designated place in Cherokee County, Oklahoma, United States. ; (KAIKKI): A rural municipality, the Rural Municipality of Keys No. 303, in eastern Saskatchewan, Canada. Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what keys is: (KAIKKI): plural of key ; (KAIKKI): keyboard ; (KAIKKI): third-person singular simple present indicative of key ; (KAIKKI): Filter-avoidance spelling of kys (“kill yourself”). ; (KAIKKI): A surname. ; (KAIKKI): The Florida Keys. ; (KAIKKI): The House of Keys. ; (KAIKKI): A census-designated place in Cherokee County, Oklahoma, United States. ; (KAIKKI): A rural municipality, the Rural Municipality of Keys No. 303, in eastern Saskatchewan, Canada. Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S13.2",
+   "phen": "np.possessive_det",
+   "q": "Where did his mother find the keys?",
+   "gold": [
+    "under the sofa",
+    "sofa"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "By your account: keys (mother find keys).",
+   "judged": "keys",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S18.1",
+   "phen": "np.frequent_noun",
+   "q": "Who sold a horse?",
+   "gold": [
+    "a man",
+    "man"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "From what you told me: Ivan (Ivan sell horse).",
+   "judged": "Ivan",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S18.2",
+   "phen": "np.frequent_noun",
+   "q": "Who walked to the fair?",
+   "gold": [
+    "ivan"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "By your account: Ivan (Ivan walk fair).",
+   "judged": "Ivan",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S23.1",
+   "phen": "verb.ditransitive",
+   "q": "What did Mia give Leo?",
+   "gold": [
+    "book"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "From what you told me: a book (Mia give Leo).",
+   "judged": "a book",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S23.2",
+   "phen": "verb.ditransitive",
+   "q": "Who gave Leo a book?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "By your account: Mia (Mia give Leo).",
+   "judged": "Mia",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S23.3",
+   "phen": "verb.ditransitive",
+   "q": "What did Mia give?",
+   "gold": [
+    "book"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: Leo (Mia give Leo).",
+   "judged": "Leo",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S23.4",
+   "phen": "inf.state_from_event",
+   "q": "Who has the book now?",
+   "gold": [
+    "leo"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what book is: (WORDNET-noun): a written work or composition that has been published (printed on pages bound together); \"I am reading a good book on economics\" ; (WORDNET-noun): physical objects consisting of a number of pages bound together; \"he used a large book as a doorstop\" ; (WORDNET-noun): a compilation of the known facts regarding something or someone; \"Al Smith used to say, `Let's look at the record'\"; \"his name is in all the record books\" ; (WORDNET-noun): a written version of a play or other dramatic composition; used in preparing for a performance ; (WORDNET-noun): a record in which commercial accounts are recorded; \"they got a subpoena to examine our books\" ; (WORDNET-noun): a collection of playing cards satisfying the rules of a card game ; (WORDNET-noun): a collection of rules or prescribed standards on the basis of which decisions are made; \"they run things by the book around here\" ; (WORDNET-noun): the sacred writings of Islam revealed by God to the prophet Muhammad during his life at Mecca and Medina ; (WORDNET-noun): the sacred writings of the Christian religions; \"he went to carry the Word to the heathen\" ; (WORDNET-noun): a major division of a long written composition; \"the book of Isaiah\" ; (WORDNET-noun): a number of sheets (ticket or stamps etc.) bound together on one edge; \"he bought a book of stamps\" Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what book is: (WORDNET-noun): a written work or composition that has been published (printed on pages bound together); \"I am reading a good book on economics\" ; (WORDNET-noun): physical objects consisting of a number of pages bound together; \"he used a large book as a doorstop\" ; (WORDNET-noun): a compilation of the known facts regarding something or someone; \"Al Smith used to say, `Let's look at the record'\"; \"his name is in all the record books\" ; (WORDNET-noun): a written version of a play or other dramatic composition; used in preparing for a performance ; (WORDNET-noun): a record in which commercial accounts are recorded; \"they got a subpoena to examine our books\" ; (WORDNET-noun): a collection of playing cards satisfying the rules of a card game ; (WORDNET-noun): a collection of rules or prescribed standards on the basis of which decisions are made; \"they run things by the book around here\" ; (WORDNET-noun): the sacred writings of Islam revealed by God to the prophet Muhammad during his life at Mecca and Medina ; (WORDNET-noun): the sacred writings of the Christian religions; \"he went to carry the Word to the heathen\" ; (WORDNET-noun): a major division of a long written composition; \"the book of Isaiah\" ; (WORDNET-noun): a number of sheets (ticket or stamps etc.) bound together on one edge; \"he bought a book of stamps\" Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S27.1",
+   "phen": "verb.copula",
+   "q": "Who was a nurse?",
+   "gold": [
+    "hana"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what nurse is: (WORDNET-noun): one skilled in caring for young children or the sick (usually under the supervision of a physician) ; (WORDNET-noun): a woman who is the custodian of children Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what nurse is: (WORDNET-noun): one skilled in caring for young children or the sick (usually under the supervision of a physician) ; (WORDNET-noun): a woman who is the custodian of children Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S27.2",
+   "phen": "verb.copula",
+   "q": "What was Hana's husband?",
+   "gold": [
+    "pilot"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what hana is: (KAIKKI): A census-designated place in Maui County, Hawaii, United States. Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what hana is: (KAIKKI): A census-designated place in Maui County, Hawaii, United States. Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S30.1",
+   "phen": "verb.control",
+   "q": "Who did Mira tell to close the gate?",
+   "gold": [
+    "tomas"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: Tomas (Mira tell Tomas).",
+   "judged": "Tomas",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S30.2",
+   "phen": "verb.control",
+   "q": "Who will close the gate?",
+   "gold": [
+    "tomas"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: Mira (Mira close gate).",
+   "judged": "Mira",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S33.1",
+   "phen": "voice.passive_by",
+   "q": "What broke the window?",
+   "gold": [
+    "stone"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: stone (window break stone).",
+   "judged": "stone",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S33.2",
+   "phen": "voice.passive_by",
+   "q": "What was broken?",
+   "gold": [
+    "window"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "From what you told me: stone (window break stone).",
+   "judged": "stone",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S36.1",
+   "phen": "voice.passive_question",
+   "q": "When was the oak tree planted?",
+   "gold": [
+    "1950"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: in 1950 (Grandpa plant oak tree).",
+   "judged": "in 1950",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S36.2",
+   "phen": "voice.passive_question",
+   "q": "By whom was the oak tree planted?",
+   "gold": [
+    "grandpa"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "From what you told me: in 1950 (Grandpa plant oak tree).",
+   "judged": "in 1950",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S40.1",
+   "phen": "tam.future",
+   "q": "Did Ada wash the plates?",
+   "gold": [
+    "no",
+    "not yet",
+    "will"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: plates (Ada wash plates).",
+   "judged": "plates",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S41.1",
+   "phen": "tam.modal_epistemic",
+   "q": "Who took the ring?",
+   "gold": [
+    "thief"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: Inspector Ross (Inspector Ross take ring).",
+   "judged": "Inspector Ross",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S41.2",
+   "phen": "tam.modal_epistemic",
+   "q": "What did Inspector Ross search?",
+   "gold": [
+    "house"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "Reading 'ross' as 'rows'. By your account: house (Inspector Ross search house).",
+   "judged": "house",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S43.1",
+   "phen": "tam.counterfactual",
+   "q": "Who passed the exam?",
+   "gold": [
+    "@ABSTAIN",
+    "nobody",
+    "no one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: Ben (Ben pass exam).",
+   "judged": "Ben",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S43.2",
+   "phen": "tam.counterfactual",
+   "q": "Did Ben pass the exam?",
+   "gold": [
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "If you mean what ben is: (WORDNET-noun): a mountain or tall hill; \"they were climbing the ben\" Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S45.1",
+   "phen": "neg.not",
+   "q": "Who ate the soup?",
+   "gold": [
+    "@ABSTAIN",
+    "nobody",
+    "no one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: Rosa (Rosa eat soup).",
+   "judged": "Rosa",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S45.2",
+   "phen": "neg.not",
+   "q": "Did Rosa eat the soup?",
+   "gold": [
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "If you mean what rosa is: (WORDNET-noun): large genus of erect or climbing prickly shrubs including roses Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S47.1",
+   "phen": "neg.no_det",
+   "q": "Who drank the wine?",
+   "gold": [
+    "no guest",
+    "nobody",
+    "no one"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: guest (guest drink wine).",
+   "judged": "guest",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S50.1",
+   "phen": "q.where",
+   "q": "Where did Bea hide the key?",
+   "gold": [
+    "mat"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: under the mat (Bea hide key).",
+   "judged": "under the mat",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S50.2",
+   "phen": "inf.state_from_event",
+   "q": "Where is the key?",
+   "gold": [
+    "mat"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "If you mean what key is: (WORDNET-noun): metal device shaped in such a way that when it is inserted into the appropriate lock the lock's mechanism can be rotated ; (WORDNET-noun): something crucial for explaining; \"the key to development is economic integration\" ; (WORDNET-noun): pitch of the voice; \"he spoke in a low key\" ; (WORDNET-noun): any of 24 major or minor diatonic scales that provide the tonal framework for a piece of music ; (WORDNET-noun): a kilogram of a narcotic drug; \"they were carrying two keys of heroin\" ; (WORDNET-noun): a winged often one-seed indehiscent fruit as of the ash or elm or maple ; (WORDNET-noun): United States lawyer and poet who wrote a poem after witnessing the British attack on Baltimore during the War of 1812; the poem was later set to music and entitled `The Star-Spangled Banner' (1779-1843) ; (WORDNET-noun): a coral reef off the southern coast of Florida ; (WORDNET-noun): (basketball) a space (including the foul line) in front of the basket at each end of a basketball court; usually painted a different color from the rest of the court; \"he hit a jump shot from the top of the key\"; \"he dominates play in the paint\" ; (WORDNET-noun): a list of answers to a test; \"some students had stolen the key to the final exam\" ; (WORDNET-noun): a list of words or phrases that explain symbols or abbreviations ; (WORDNET-noun): a generic term for any device whose possession entitles the holder to a means of access; \"a safe-deposit box usually requires two keys to open it\" ; (WORDNET-noun): mechanical device used to wind another device that is driven by a spring (as a clock) ; (WORDNET-noun): the central building block at the top of an arch or vault ; (WORDNET-noun): a lever (as in a keyboard) that actuates a mechanism when depressed Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S51.1",
+   "phen": "q.when",
+   "q": "When did the family visit the zoo?",
+   "gold": [
+    "sunday"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I do not know the word 'visit'. Did you mean 'research'? (they share 3 contexts in what I have read) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S52.1",
+   "phen": "q.why",
+   "q": "Why did Tim stay home?",
+   "gold": [
+    "sick"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "From what you told me: he was sick (Tim stay home).",
+   "judged": "he was sick",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S57.1",
+   "phen": "clause.coord_clauses",
+   "q": "Who milked the cows?",
+   "gold": [
+    "wife"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "Reading 'cows' as 'rows'. From what you told me: wife (wife milk cows).",
+   "judged": "wife",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S57.2",
+   "phen": "clause.coord_clauses",
+   "q": "What did Ali feed?",
+   "gold": [
+    "goats"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what ali is: (WORDNET-noun): United States prizefighter who won the world heavyweight championship three times (born in 1942) ; (WORDNET-noun): the fourth caliph of Islam who is considered to be the first caliph by Shiites; he was a cousin and son-in-law of Muhammad; after his assassination Islam was divided into Shiite and Sunnite sects Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what ali is: (WORDNET-noun): United States prizefighter who won the world heavyweight championship three times (born in 1942) ; (WORDNET-noun): the fourth caliph of Islam who is considered to be the first caliph by Shiites; he was a cousin and son-in-law of Muhammad; after his assassination Islam was divided into Shiite and Sunnite sects Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S59.1",
+   "phen": "clause.temporal_sub",
+   "q": "When did Nora call her friend?",
+   "gold": [
+    "homework"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what nora is: (KAIKKI): A female given name. ; (KAIKKI): A town and municipality in Västmanland, Örebro county, Sweden. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what nora is: (KAIKKI): A female given name. ; (KAIKKI): A town and municipality in Västmanland, Örebro county, Sweden. If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S61.1",
+   "phen": "clause.relative_subject",
+   "q": "Who broke the window?",
+   "gold": [
+    "boy"
+   ],
+   "pred": "W",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I do not know the word 'broke'. Did you mean 'in'? (they share 2 contexts in what I have read) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S61.2",
+   "phen": "clause.relative_subject",
+   "q": "Who ran away?",
+   "gold": [
+    "boy"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you mean what ran is: (KAIKKI): simple past of run ; (KAIKKI): simple past of rin ; (KAIKKI): past participle of run ; (KAIKKI): Yarns coiled on a spun-yarn winch. ; (KAIKKI): Initialism of Royal Australian Navy ; (KAIKKI): Initialism of radio access network (“the underlying physical connection method for a radio based communication network”). ; (KAIKKI): A male given name from Hebrew. ; (KAIKKI): A female given name from Japanese. ; (KAIKKI): A surname. Say wrong if that is not it, and I will say what I can do.",
+   "judged": "If you mean what ran is: (KAIKKI): simple past of run ; (KAIKKI): simple past of rin ; (KAIKKI): past participle of run ; (KAIKKI): Yarns coiled on a spun-yarn winch. ; (KAIKKI): Initialism of Royal Australian Navy ; (KAIKKI): Initialism of radio access network (“the underlying physical connection method for a radio based communication network”). ; (KAIKKI): A male given name from Hebrew. ; (KAIKKI): A female given name from Japanese. ; (KAIKKI): A surname.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S62.1",
+   "phen": "clause.relative_object",
+   "q": "What did Mia bake?",
+   "gold": [
+    "cake"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: delicious (Mia bake delicious).",
+   "judged": "delicious",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S62.2",
+   "phen": "clause.relative_object",
+   "q": "Who baked the cake?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "If you mean what baked is: (WORDNET-adj): dried out by heat or excessive exposure to sunlight; \"a vast desert all adust\"; \"land lying baked in the heat\"; \"parched soil\"; \"the earth was scorched and bare\"; \"sunbaked salt flats\" ; (WORDNET-adj): (bread and pastries) cooked by dry heat (as in an oven); \"baked goods\" Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S64.1",
+   "phen": "clause.complement_that",
+   "q": "What did Tom say?",
+   "gold": [
+    "bridge was closed"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: bridge (Tom say bridge).",
+   "judged": "bridge",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S64.2",
+   "phen": "clause.complement_that",
+   "q": "Was the bridge closed?",
+   "gold": [
+    "said",
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I cannot read 'closed'. Did you mean 'in'? (they share 2 contexts in what I have read) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S65.1",
+   "phen": "clause.direct_speech",
+   "q": "Who said the soup is cold?",
+   "gold": [
+    "ada"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what soup is: (WORDNET-noun): liquid food especially of meat or fish or vegetable stock often containing pieces of solid food ; (WORDNET-noun): any composition having a consistency suggestive of soup ; (WORDNET-noun): an unfortunate situation; \"we're in the soup now\" If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what soup is: (WORDNET-noun): liquid food especially of meat or fish or vegetable stock often containing pieces of solid food ; (WORDNET-noun): any composition having a consistency suggestive of soup ; (WORDNET-noun): an unfortunate situation; \"we're in the soup now\" If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S68.1",
+   "phen": "ref.pronoun_gender",
+   "q": "Who carried the bag?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "By your account: Leo (Leo carry bag).",
+   "judged": "Leo",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S68.2",
+   "phen": "ref.pronoun_gender",
+   "q": "Where did Leo meet Mia?",
+   "gold": [
+    "station"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: at the station (Leo meet Mia).",
+   "judged": "at the station",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S73.1",
+   "phen": "ref.vp_ellipsis",
+   "q": "Who else bought a ticket?",
+   "gold": [
+    "joe"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "As you told it: Mara (Mara buy ticket).",
+   "judged": "Mara",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S73.2",
+   "phen": "ref.vp_ellipsis",
+   "q": "Did Joe buy a ticket?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "From what you told me: Mara (Mara buy ticket).",
+   "judged": "Mara",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S76.1",
+   "phen": "ref.first_person",
+   "q": "What did I lend Omar?",
+   "gold": [
+    "bike"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what omar is: (KAIKKI): Omar bin al-Khattab, second Sunni Islamic caliph and a companion of Muhammad ; (KAIKKI): A male given name from Arabic. ; (KAIKKI): A glacial erratic piece of (typically smooth) dark siliceous greywacke that exhibits a hemispherical pit or hole (as a result of selective dissolution of carbonate concretions within the greywacke), originating in the Omarolluk Formation and carried by glaciers throughout Canada and the United States. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what omar is: (KAIKKI): Omar bin al-Khattab, second Sunni Islamic caliph and a companion of Muhammad ; (KAIKKI): A male given name from Arabic. ; (KAIKKI): A glacial erratic piece of (typically smooth) dark siliceous greywacke that exhibits a hemispherical pit or hole (as a result of selective dissolution of carbonate concretions within the greywacke), originating in the Omarolluk Formation and carried by glaciers throughout Canada and the United States. If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S76.2",
+   "phen": "ref.first_person",
+   "q": "Who has my bike?",
+   "gold": [
+    "omar"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what bike is: (WORDNET-noun): a motor vehicle with two wheels and a strong frame ; (WORDNET-noun): a wheeled vehicle that has two wheels and is moved by foot pedals Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what bike is: (WORDNET-noun): a motor vehicle with two wheels and a strong frame ; (WORDNET-noun): a wheeled vehicle that has two wheels and is moved by foot pedals Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S80.1",
+   "phen": "disc.story_world_collision",
+   "q": "What did Alice give Bob?",
+   "gold": [
+    "present"
+   ],
+   "pred": "W",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: bob.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S80.2",
+   "phen": "disc.story_world_collision",
+   "q": "Who gave Bob a present?",
+   "gold": [
+    "alice"
+   ],
+   "pred": "W",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "From what you told me: Alice (Alice give Bob).",
+   "judged": "Alice",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": false
+  },
+  {
+   "id": "S81.1",
+   "phen": "disc.topic_continuity",
+   "q": "Who sold the roses?",
+   "gold": [
+    "grace"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: Grace (Grace sell roses).",
+   "judged": "Grace",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S81.2",
+   "phen": "disc.topic_continuity",
+   "q": "Where did Grace sell the roses?",
+   "gold": [
+    "market"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "recall",
+   "reply": "From what you told me: roses (Grace sell roses).",
+   "judged": "roses",
+   "recall": true,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S82.1",
+   "phen": "lex.synonym_verb",
+   "q": "What did Pam buy?",
+   "gold": [
+    "lamp"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "By your account: lamp (Pam purchase lamp).",
+   "judged": "lamp",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S82.2",
+   "phen": "lex.synonym_verb",
+   "q": "Who fixed the fence?",
+   "gold": [
+    "jon"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: Jon (Jon repair fence).",
+   "judged": "Jon",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S83.1",
+   "phen": "lex.converse",
+   "q": "Who bought Mia's bike?",
+   "gold": [
+    "tom"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what mia is: (KAIKKI): Initialism of missing in action. ; (KAIKKI): Absent for a long time. ; (KAIKKI): Initialism of Mutual Improvement Association. ; (KAIKKI): Initialism of missing in action, a service member that did not return from action and was not found in the field. ; (KAIKKI): Initialism of Middle Indo-Aryan. ; (KAIKKI): Abbreviation of Miami. ; (KAIKKI): Initialism of Miami International Airport. ; (KAIKKI): An ancient bluffing game played with dice. ; (KAIKKI): Bulimia nervosa. ; (KAIKKI): A female given name from German, Dutch, Swedish, Norwegian, or Danish. ; (KAIKKI): A surname from Bengali. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what mia is: (KAIKKI): Initialism of missing in action. ; (KAIKKI): Absent for a long time. ; (KAIKKI): Initialism of Mutual Improvement Association. ; (KAIKKI): Initialism of missing in action, a service member that did not return from action and was not found in the field. ; (KAIKKI): Initialism of Middle Indo-Aryan. ; (KAIKKI): Abbreviation of Miami. ; (KAIKKI): Initialism of Miami International Airport. ; (KAIKKI): An ancient bluffing game played with dice. ; (KAIKKI): Bulimia nervosa. ; (KAIKKI): A female given name from German, Dutch, Swedish, Norwegian, or Danish. ; (KAIKKI): A surname from Bengali. If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S83.2",
+   "phen": "lex.converse",
+   "q": "Who sold the bike?",
+   "gold": [
+    "mia"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "By your account: Mia (Mia sell bike).",
+   "judged": "Mia",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S85.1",
+   "phen": "lex.idiom",
+   "q": "Did Grandpa die?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what grandpa is: (WORDNET-noun): the father of your father or mother If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what grandpa is: (WORDNET-noun): the father of your father or mother If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S85.2",
+   "phen": "lex.idiom",
+   "q": "When did Grandpa die?",
+   "gold": [
+    "last winter",
+    "winter"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what grandpa is: (WORDNET-noun): the father of your father or mother Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what grandpa is: (WORDNET-noun): the father of your father or mother Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S88.1",
+   "phen": "inf.consequence",
+   "q": "Who lost the race?",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what lost is: (WORDNET-noun): people who are destined to die soon; \"the agony of the doomed was in his voice\" Otherwise say wrong, and I will offer what I can do.",
+   "judged": "Taking this as what lost is: (WORDNET-noun): people who are destined to die soon; \"the agony of the doomed was in his voice\" Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S88.2",
+   "phen": "inf.consequence",
+   "q": "Who came first?",
+   "gold": [
+    "juan"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you mean what came is: (KAIKKI): simple past of come ; (KAIKKI): past participle of come ; (KAIKKI): simple past of cum ; (KAIKKI): Used to indicate that the following event, period, or change in state occurred in the past, after a time of waiting, enduring, or anticipation ; (KAIKKI): A grooved strip of metal, traditionally usually lead or brass and today sometimes stainless steel, used to hold panes of glass together in glazing. ; (KAIKKI): A surname. ; (KAIKKI): A commune in Pyrénées-Atlantiques department, Nouvelle-Aquitaine, France. Say wrong if that is not it, and I will say what I can do.",
+   "judged": "If you mean what came is: (KAIKKI): simple past of come ; (KAIKKI): past participle of come ; (KAIKKI): simple past of cum ; (KAIKKI): Used to indicate that the following event, period, or change in state occurred in the past, after a time of waiting, enduring, or anticipation ; (KAIKKI): A grooved strip of metal, traditionally usually lead or brass and today sometimes stainless steel, used to hold panes of glass together in glazing. ; (KAIKKI): A surname. ; (KAIKKI): A commune in Pyrénées-Atlantiques department, Nouvelle-Aquitaine, France.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S89.1",
+   "phen": "inf.temporal_order",
+   "q": "Where did Kira go after breakfast?",
+   "gold": [
+    "school"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "By your account: school (Kira go school).",
+   "judged": "school",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S89.2",
+   "phen": "inf.temporal_order",
+   "q": "What did Kira do before school?",
+   "gold": [
+    "breakfast"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I do not know the word 'school'. Did you mean 'department'? (the dictionary gives them as the same) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  },
+  {
+   "id": "S91.1",
+   "phen": "inf.unasked",
+   "q": "What color did Omar paint the door?",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what omar is: (KAIKKI): Omar bin al-Khattab, second Sunni Islamic caliph and a companion of Muhammad ; (KAIKKI): A male given name from Arabic. ; (KAIKKI): A glacial erratic piece of (typically smooth) dark siliceous greywacke that exhibits a hemispherical pit or hole (as a result of selective dissolution of carbonate concretions within the greywacke), originating in the Omarolluk Formation and carried by glaciers throughout Canada and the United States. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what omar is: (KAIKKI): Omar bin al-Khattab, second Sunni Islamic caliph and a companion of Muhammad ; (KAIKKI): A male given name from Arabic. ; (KAIKKI): A glacial erratic piece of (typically smooth) dark siliceous greywacke that exhibits a hemispherical pit or hole (as a result of selective dissolution of carbonate concretions within the greywacke), originating in the Omarolluk Formation and carried by glaciers throughout Canada and the United States. If not, say wrong and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S91.2",
+   "phen": "inf.unasked",
+   "q": "Who painted the window?",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what painted is: (WORDNET-adj): coated with paint; \"freshly painted lawn furniture\" ; (WORDNET-adj): lacking substance or vitality as if produced by painting; \"in public he wore a painted smile\" ; (WORDNET-adj): having makeup applied; \"brazen painted faces\" ; (WORDNET-adj): having sections or patches colored differently and usually brightly; \"a jester dressed in motley\"; \"the painted desert\"; \"a particolored dress\"; \"a piebald horse\"; \"pied daisies\" Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what painted is: (WORDNET-adj): coated with paint; \"freshly painted lawn furniture\" ; (WORDNET-adj): lacking substance or vitality as if produced by painting; \"in public he wore a painted smile\" ; (WORDNET-adj): having makeup applied; \"brazen painted faces\" ; (WORDNET-adj): having sections or patches colored differently and usually brightly; \"a jester dressed in motley\"; \"the painted desert\"; \"a particolored dress\"; \"a piebald horse\"; \"pied daisies\" Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": false
+  },
+  {
+   "id": "S93.1",
+   "phen": "orth.missing_punct",
+   "q": "Who washed the dishes?",
+   "gold": [
+    "ava"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "As you told it: Ava (Ava wash dishes).",
+   "judged": "Ava",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S94.1",
+   "phen": "orth.abbreviation",
+   "q": "Who examined the patient?",
+   "gold": [
+    "patel"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "recall",
+   "reply": "From what you told me: Patel (Patel examine patient).",
+   "judged": "Patel",
+   "recall": true,
+   "whole_reply_hit": true,
+   "held": true
+  },
+  {
+   "id": "S94.2",
+   "phen": "orth.abbreviation",
+   "q": "Who did Mrs. Gomez thank?",
+   "gold": [
+    "patel"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Understood (mrs: a form of address for a married woman). I can answer about Wikidata ; records employees/departments ; sales 0 ; exec ; dictionary WORDNET-noun/WORDNET-verb/WORDNET-adj/KAIKKI ; transcript ; store. If you are asking what gomez is: (KAIKKI): An unincorporated community in Elliott County, Kentucky, United States. ; (KAIKKI): A surname from Spanish. Otherwise say wrong, and I will offer what I can do.",
+   "judged": "I can answer about Wikidata ; records employees/departments ; sales 0 ; exec ; dictionary WORDNET-noun/WORDNET-verb/WORDNET-adj/KAIKKI ; transcript ; store. If you are asking what gomez is: (KAIKKI): An unincorporated community in Elliott County, Kentucky, United States. ; (KAIKKI): A surname from Spanish. Otherwise say wrong, and I will offer what I can do.",
+   "recall": false,
+   "whole_reply_hit": false,
+   "held": true
+  }
+ ],
+ "questions": [
+  {
+   "id": "Q001",
+   "phen": "morph.contraction",
+   "q": "what's the capital of egypt",
+   "gold": [
+    "cairo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Cairo s the capital of egypt. (Wikidata)",
+   "judged": "Cairo s the capital of egypt. (Wikidata)",
+   "held": true
+  },
+  {
+   "id": "Q002",
+   "phen": "morph.possessive_s",
+   "q": "what is ken's salary",
+   "gold": [
+    "110"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "110 is ken s salary. (records)",
+   "judged": "110 is ken s salary. (records)",
+   "held": true
+  },
+  {
+   "id": "Q003",
+   "phen": "morph.derivation",
+   "q": "what does kindness mean",
+   "gold": [
+    "@DICT"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "quote",
+   "reply": "If you mean what kindness is: (WORDNET-noun): the quality of being warmhearted and considerate and humane and sympathetic ; (WORDNET-noun): tendency to be kind and forgiving ; (WORDNET-noun): a kind act Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you mean what kindness is: (WORDNET-noun): the quality of being warmhearted and considerate and humane and sympathetic ; (WORDNET-noun): tendency to be kind and forgiving ; (WORDNET-noun): a kind act Otherwise say wrong, and I will offer what I can do.",
+   "held": true
+  },
+  {
+   "id": "Q004",
+   "phen": "morph.derivation",
+   "q": "what does unbloggable mean",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what unbloggable is: (KAIKKI): Not bloggable. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what unbloggable is: (KAIKKI): Not bloggable. If not, say wrong and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q005",
+   "phen": "morph.degree_forms",
+   "q": "which employee has the biggest salary",
+   "gold": [
+    "dave"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: employee, significant person.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q006",
+   "phen": "morph.degree_forms",
+   "q": "who earns the least",
+   "gold": [
+    "heidi"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what earns is: (KAIKKI): third-person singular simple present indicative of earn Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what earns is: (KAIKKI): third-person singular simple present indicative of earn Otherwise say wrong, and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q007",
+   "phen": "tam.imperative",
+   "q": "Tell me the capital of Japan",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "No world of mine reads 'me'. Did you mean 'in'? (they share 39 contexts in what I have read) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "held": false
+  },
+  {
+   "id": "Q008",
+   "phen": "tam.imperative",
+   "q": "Give me the salary of Grace",
+   "gold": [
+    "95"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The salary of grace is 95, but I could not apply give ; me.",
+   "judged": "The salary of grace is 95, but I could not apply give ; me.",
+   "held": true
+  },
+  {
+   "id": "Q009",
+   "phen": "neg.world",
+   "q": "how many employees are not in support",
+   "gold": [
+    "9"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The number of employees of support is 2 (records).",
+   "judged": "The number of employees of support is 2 (records).",
+   "held": true
+  },
+  {
+   "id": "Q010",
+   "phen": "neg.world",
+   "q": "what is the total salary outside engineering",
+   "gold": [
+    "1100"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The total salary of engineering is 380, but I did not use outside.",
+   "judged": "The total salary of engineering is 380, but I did not use outside.",
+   "held": true
+  },
+  {
+   "id": "Q011",
+   "phen": "q.yes_no",
+   "q": "is tokyo the capital of japan",
+   "gold": [
+    "yes"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "Tokyo capital japan is Japan (Wikidata).",
+   "judged": "Tokyo capital japan is Japan (Wikidata).",
+   "held": false
+  },
+  {
+   "id": "Q012",
+   "phen": "q.yes_no",
+   "q": "is rome the capital of japan",
+   "gold": [
+    "no"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The capital of rome is Metropolitan City of Rome, but I could not apply japan.",
+   "judged": "The capital of rome is Metropolitan City of Rome, but I could not apply japan.",
+   "held": true
+  },
+  {
+   "id": "Q013",
+   "phen": "q.who_subject",
+   "q": "who wrote hamlet",
+   "gold": [
+    "shakespeare"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you mean what wrote is: (KAIKKI): simple past of write ; (KAIKKI): past participle of write Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you mean what wrote is: (KAIKKI): simple past of write ; (KAIKKI): past participle of write Otherwise say wrong, and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q014",
+   "phen": "q.who_subject",
+   "q": "who directed jaws",
+   "gold": [
+    "spielberg"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what jaws is: (KAIKKI): plural of jaw ; (KAIKKI): The mouth. ; (KAIKKI): The borders of anything which has a mouthlike aspect. ; (KAIKKI): A contrarian. ; (KAIKKI): third-person singular simple present indicative of jaw ; (KAIKKI): Acronym of JavaWS. Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what jaws is: (KAIKKI): plural of jaw ; (KAIKKI): The mouth. ; (KAIKKI): The borders of anything which has a mouthlike aspect. ; (KAIKKI): A contrarian. ; (KAIKKI): third-person singular simple present indicative of jaw ; (KAIKKI): Acronym of JavaWS. Otherwise say wrong, and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q015",
+   "phen": "q.what_object",
+   "q": "what currency does japan use",
+   "gold": [
+    "yen"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The currency of japan is yen, but I did not use does ; use.",
+   "judged": "The currency of japan is yen, but I did not use does ; use.",
+   "held": true
+  },
+  {
+   "id": "Q016",
+   "phen": "q.what_object",
+   "q": "what language do people speak in brazil",
+   "gold": [
+    "portuguese"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The currency of brazil is Brazilian real, but I could not apply language ; do ; speak.",
+   "judged": "The currency of brazil is Brazilian real, but I could not apply language ; do ; speak.",
+   "held": false
+  },
+  {
+   "id": "Q017",
+   "phen": "q.whom",
+   "q": "whom does carol manage",
+   "gold": [
+    "bob"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "Reading 'manage' as 'manager'. The manager of carol is dave, but I could not apply whom ; does.",
+   "judged": "Reading 'manage' as 'manager'. The manager of carol is dave, but I could not apply whom ; does.",
+   "held": true
+  },
+  {
+   "id": "Q018",
+   "phen": "q.whose",
+   "q": "whose manager is frank",
+   "gold": [
+    "erin",
+    "grace"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The manager of frank is dave (records).",
+   "judged": "The manager of frank is dave (records).",
+   "held": true
+  },
+  {
+   "id": "Q019",
+   "phen": "q.which",
+   "q": "which department is in berlin",
+   "gold": [
+    "research"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The department of berlin is research (records).",
+   "judged": "The department of berlin is research (records).",
+   "held": true
+  },
+  {
+   "id": "Q020",
+   "phen": "q.where",
+   "q": "where was napoleon born",
+   "gold": [
+    "ajaccio"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "Taking this as what napoleon is: (WORDNET-noun): French general who became emperor of the French (1769-1821) ; (WORDNET-noun): a rectangular piece of pastry with thin flaky layers and filled with custard cream ; (WORDNET-noun): a card game similar to whist; usually played for stakes Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q021",
+   "phen": "q.when",
+   "q": "when did judy start",
+   "gold": [
+    "2012"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The start of judy is 2012, but I found no way to apply did.",
+   "judged": "The start of judy is 2012, but I found no way to apply did.",
+   "held": true
+  },
+  {
+   "id": "Q022",
+   "phen": "q.how_many",
+   "q": "how many people work in sales",
+   "gold": [
+    "2"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "It could be 2 [the number of employees of sales] ; 1 [the number of departments of sales]. Say which one. one of: 2 / 1",
+   "judged": "one of: 2 / 1",
+   "held": true
+  },
+  {
+   "id": "Q023",
+   "phen": "q.embedded",
+   "q": "can you tell me what the capital of egypt is",
+   "gold": [
+    "cairo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The capital of egypt is Cairo (Wikidata).",
+   "judged": "The capital of egypt is Cairo (Wikidata).",
+   "held": true
+  },
+  {
+   "id": "Q024",
+   "phen": "q.embedded",
+   "q": "do you know who directed jaws",
+   "gold": [
+    "spielberg"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you mean what jaws is: (KAIKKI): plural of jaw ; (KAIKKI): The mouth. ; (KAIKKI): The borders of anything which has a mouthlike aspect. ; (KAIKKI): A contrarian. ; (KAIKKI): third-person singular simple present indicative of jaw ; (KAIKKI): Acronym of JavaWS. Say wrong if that is not it, and I will say what I can do.",
+   "judged": "If you mean what jaws is: (KAIKKI): plural of jaw ; (KAIKKI): The mouth. ; (KAIKKI): The borders of anything which has a mouthlike aspect. ; (KAIKKI): A contrarian. ; (KAIKKI): third-person singular simple present indicative of jaw ; (KAIKKI): Acronym of JavaWS.",
+   "held": false
+  },
+  {
+   "id": "Q025",
+   "phen": "q.ellipsis",
+   "q": "what about frank?",
+   "gold": [
+    "130"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The salary of frank is 130 (records).",
+   "judged": "The salary of frank is 130 (records).",
+   "held": true
+  },
+  {
+   "id": "Q026",
+   "phen": "q.ellipsis",
+   "q": "and italy?",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The capital of italy is Rome (Wikidata).",
+   "judged": "The capital of italy is Rome (Wikidata).",
+   "held": true
+  },
+  {
+   "id": "Q027",
+   "phen": "q.tag",
+   "q": "tokyo is the capital of japan, isn't it?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "Tokyo capital japan is Japan, but I did not use isn.",
+   "judged": "Tokyo capital japan is Japan, but I did not use isn.",
+   "held": false
+  },
+  {
+   "id": "Q028",
+   "phen": "q.tag",
+   "q": "alice works in sales, doesn't she?",
+   "gold": [
+    "no",
+    "engineering"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: doesn, sales, total revenue.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q029",
+   "phen": "q.declarative",
+   "q": "the capital of brazil is brasilia?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The capital of brazil is Brasília, but I found no way to apply brasilia.",
+   "judged": "The capital of brazil is Brasília, but I found no way to apply brasilia.",
+   "held": true
+  },
+  {
+   "id": "Q030",
+   "phen": "q.declarative",
+   "q": "bob earns 150?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "No world of mine reads 'earns'. Did you mean '1616'? (they share 1 contexts in what I have read) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q031",
+   "phen": "q.alternative",
+   "q": "is the capital of japan tokyo or kyoto",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Japan capital tokyo is Tokyo, but I did not use kyoto.",
+   "judged": "Japan capital tokyo is Tokyo, but I did not use kyoto.",
+   "held": true
+  },
+  {
+   "id": "Q032",
+   "phen": "q.alternative",
+   "q": "is alice in engineering or sales",
+   "gold": [
+    "engineering"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: engineering, sales, total revenue.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q033",
+   "phen": "q.inverse_relation",
+   "q": "who is managed by carol",
+   "gold": [
+    "bob"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "Reading 'managed' as 'manager'. The manager of carol is dave (records).",
+   "judged": "Reading 'managed' as 'manager'. The manager of carol is dave (records).",
+   "held": true
+  },
+  {
+   "id": "Q034",
+   "phen": "q.inverse_relation",
+   "q": "which country has paris as its capital",
+   "gold": [
+    "france"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The capital of the country of paris is Paris (Wikidata).",
+   "judged": "The capital of the country of paris is Paris (Wikidata).",
+   "held": false
+  },
+  {
+   "id": "Q035",
+   "phen": "quant.comparative",
+   "q": "does alice earn more than ken",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: ken.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q036",
+   "phen": "quant.superlative",
+   "q": "who has the highest salary in sales",
+   "gold": [
+    "frank"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "130 has the highest salary in sales. (records)",
+   "judged": "130 has the highest salary in sales. (records)",
+   "held": false
+  },
+  {
+   "id": "Q037",
+   "phen": "quant.superlative",
+   "q": "which product has the highest price",
+   "gold": [
+    "doohickey"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The product with the highest price is doohickey (sales).",
+   "judged": "The product with the highest price is doohickey (sales).",
+   "held": true
+  },
+  {
+   "id": "Q038",
+   "phen": "quant.universal",
+   "q": "what is the salary of each employee in support",
+   "gold": [
+    "70",
+    "75"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "What is the salary of each employee in support is row 0 price=11, row 1 price=5, row 2 price=36, row 3 price=25, row 4 price=5, row 5 price=15, +43 cells, but I found no way to apply base salary ; employee ; salary ; significant person.",
+   "judged": "What is the salary of each employee in support is row 0 price=11, row 1 price=5, row 2 price=36, row 3 price=25, row 4 price=5, row 5 price=15, +43 cells, but I found no way to apply base salary ; employee ; salary ; significant person.",
+   "held": false
+  },
+  {
+   "id": "Q039",
+   "phen": "quant.counting_condition",
+   "q": "how many employees started after 2015",
+   "gold": [
+    "5"
+   ],
+   "pred": "W",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The number of employees is 11, but I could not apply started ; 2015.",
+   "judged": "The number of employees is 11, but I could not apply started ; 2015.",
+   "held": false
+  },
+  {
+   "id": "Q040",
+   "phen": "quant.counting_condition",
+   "q": "how many departments are in lisbon",
+   "gold": [
+    "1"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The number of departments of lisbon is 1 (records).",
+   "judged": "The number of departments of lisbon is 1 (records).",
+   "held": true
+  },
+  {
+   "id": "Q041",
+   "phen": "quant.arithmetic_words",
+   "q": "what is twice the salary of bob",
+   "gold": [
+    "300"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "No world of mine reads 'twice'. Did you mean 'double'? (the dictionary gives them as the same) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q042",
+   "phen": "quant.arithmetic_words",
+   "q": "what is six times seven",
+   "gold": [
+    "42"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I cannot read 'six'. Did you mean '18'? (they share 7 contexts in what I have read) Say correct to have it answered, or wrong to decline.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q043",
+   "phen": "disc.courtesy",
+   "q": "Hello! Could you please tell me the capital of Brazil?",
+   "gold": [
+    "brasilia",
+    "brasília"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "The dictionary says (WORDNET-noun): an expression of greeting; \"every morning they exchanged polite hellos\" I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: capital of.",
+   "judged": "",
+   "held": false
+  },
+  {
+   "id": "Q044",
+   "phen": "disc.courtesy",
+   "q": "thanks, and what is the currency of brazil",
+   "gold": [
+    "real"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The currency of brazil is Brazilian real (Wikidata).",
+   "judged": "The currency of brazil is Brazilian real (Wikidata).",
+   "held": true
+  },
+  {
+   "id": "Q045",
+   "phen": "disc.user_belief",
+   "q": "I think the capital of Egypt is Alexandria, right?",
+   "gold": [
+    "cairo",
+    "no"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "guess",
+   "reply": "Probably Alexandria Governorate (per store; record 0 confirmed, 0 contradicted). Correct me if wrong.",
+   "judged": "Probably Alexandria Governorate (per store; record 0 confirmed, 0 contradicted). Correct me if wrong.",
+   "held": true
+  },
+  {
+   "id": "Q046",
+   "phen": "disc.user_belief",
+   "q": "maybe ken's salary is 200?",
+   "gold": [
+    "110",
+    "no"
+   ],
+   "pred": "S",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Actually: ken s salary is 200 is 110 (according to records), and not maybe.",
+   "judged": "Actually: ken s salary is 200 is 110 (according to records), and not maybe.",
+   "held": false
+  },
+  {
+   "id": "Q047",
+   "phen": "disc.marker",
+   "q": "Well, who is the manager of Ken?",
+   "gold": [
+    "bob"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The manager of ken is bob (records).",
+   "judged": "The manager of ken is bob (records).",
+   "held": true
+  },
+  {
+   "id": "Q048",
+   "phen": "disc.marker",
+   "q": "So what is the city of the sales department?",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Rome what is the city of the sales department. (records)",
+   "judged": "Rome what is the city of the sales department. (records)",
+   "held": true
+  },
+  {
+   "id": "Q049",
+   "phen": "disc.multi_sentence",
+   "q": "My name is Sam. What is the capital of Italy?",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "quote",
+   "reply": "Understood (name: a language unit by which a person or thing is known). I can answer about Wikidata ; records employees/departments ; sales 0 ; exec ; dictionary WORDNET-noun/WORDNET-verb/WORDNET-adj/KAIKKI ; transcript ; store. Rome is the capital of Italy. (Wikidata)",
+   "judged": "I can answer about Wikidata ; records employees/departments ; sales 0 ; exec ; dictionary WORDNET-noun/WORDNET-verb/WORDNET-adj/KAIKKI ; transcript ; store. Rome is the capital of Italy. (Wikidata)",
+   "held": true
+  },
+  {
+   "id": "Q050",
+   "phen": "disc.multi_sentence",
+   "q": "I work in sales. How many employees are in my department?",
+   "gold": [
+    "2"
+   ],
+   "pred": "W",
+   "outcome": "WRONG",
+   "sub": "fact",
+   "reply": "The city of the department of sales is rome, but I did not use work. The number of employees of the department of is 11 (records).",
+   "judged": "The city of the department of sales is rome, but I did not use work. The number of employees of the department of is 11 (records).",
+   "held": true
+  },
+  {
+   "id": "Q051",
+   "phen": "disc.correction",
+   "q": "no, I meant Ken",
+   "gold": [
+    "110"
+   ],
+   "pred": "S",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The salary of ken is 110, but I found no way to apply meant.",
+   "judged": "The salary of ken is 110, but I found no way to apply meant.",
+   "held": false
+  },
+  {
+   "id": "Q052",
+   "phen": "disc.correction",
+   "q": "sorry, I meant Spain",
+   "gold": [
+    "madrid"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "Taking this as what sorry is: (WORDNET-adj): feeling or expressing regret or sorrow or a sense of loss over something done or undone; \"felt regretful over his vanished youth\"; \"regretful over mistakes she had made\"; \"he felt bad about breaking the vase\" ; (WORDNET-adj): bad; unfortunate; \"my finances were in a deplorable state\"; \"a lamentable decision\"; \"her clothes were in sad shape\"; \"a sorry state of affairs\" ; (WORDNET-adj): without merit; of little or no value or use; \"a sorry horse\"; \"a sorry excuse\"; \"a lazy no-count, good-for-nothing goldbrick\"; \"the car was a no-good piece of junk\" ; (WORDNET-adj): causing dejection; \"a blue day\"; \"the dark days of the war\"; \"a week of rainy depressing weather\"; \"a disconsolate winter landscape\"; \"the first dismal dispiriting days of November\"; \"a dark gloomy day\"; \"grim rainy weather\" Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "held": false
+  },
+  {
+   "id": "Q053",
+   "phen": "lex.synonym_noun",
+   "q": "what is the wage of alice",
+   "gold": [
+    "120"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what alice is: (KAIKKI): A female given name from the Germanic languages popular in England since the Middle Ages. ; (KAIKKI): The person or system that sends a message to another person or system conventionally known as Bob. ; (KAIKKI): The city of Alice Springs, Australia. ; (KAIKKI): A locality in the Clarence Valley council area, north eastern New South Wales, Australia. ; (KAIKKI): A city in North Dakota. ; (KAIKKI): A city, the county seat of Jim Wells County, Texas. ; (KAIKKI): Acronym of All-purpose lightweight individual carrying equipment. ; (KAIKKI): Acronym of Artificial Linguistic Internet Computer Entity. If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what alice is: (KAIKKI): A female given name from the Germanic languages popular in England since the Middle Ages. ; (KAIKKI): The person or system that sends a message to another person or system conventionally known as Bob. ; (KAIKKI): The city of Alice Springs, Australia. ; (KAIKKI): A locality in the Clarence Valley council area, north eastern New South Wales, Australia. ; (KAIKKI): A city in North Dakota. ; (KAIKKI): A city, the county seat of Jim Wells County, Texas. ; (KAIKKI): Acronym of All-purpose lightweight individual carrying equipment. ; (KAIKKI): Acronym of Artificial Linguistic Internet Computer Entity. If not, say wrong and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q054",
+   "phen": "lex.synonym_noun",
+   "q": "what is the pay of erin",
+   "gold": [
+    "90"
+   ],
+   "pred": "S",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "If you are asking what erin is: (WORDNET-noun): an early name of Ireland that is now used in poetry Otherwise say wrong, and I will offer what I can do.",
+   "judged": "If you are asking what erin is: (WORDNET-noun): an early name of Ireland that is now used in poetry Otherwise say wrong, and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q055",
+   "phen": "lex.converse",
+   "q": "who reports to bob",
+   "gold": [
+    "alice",
+    "ken"
+   ],
+   "pred": "S",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "If you mean what bob is: (WORDNET-noun): a former monetary unit in Great Britain ; (WORDNET-noun): a hair style for women and children; a short haircut all around ; (WORDNET-noun): a long racing sled (for 2 or more people) with a steering mechanism ; (WORDNET-noun): a hanging weight, especially a metal ball on a string ; (WORDNET-noun): a small float usually made of cork; attached to a fishing line ; (WORDNET-noun): a short or shortened tail of certain animals ; (WORDNET-noun): a short abrupt inclination (as of the head); \"he gave me a short bob of acknowledgement\" Say wrong if that is not it, and I will say what I can do.",
+   "judged": "",
+   "held": true
+  },
+  {
+   "id": "Q056",
+   "phen": "lex.polysemy",
+   "q": "what does bank mean",
+   "gold": [
+    "@DICT"
+   ],
+   "pred": "R",
+   "outcome": "WRONG",
+   "sub": "quote",
+   "reply": "Taking this as what mean is: (WORDNET-noun): an average of n numbers computed by adding some function of the numbers and dividing by some function of n Otherwise say wrong, and I will offer what I can do.",
+   "judged": "Taking this as what mean is: (WORDNET-noun): an average of n numbers computed by adding some function of the numbers and dividing by some function of n Otherwise say wrong, and I will offer what I can do.",
+   "held": false
+  },
+  {
+   "id": "Q057",
+   "phen": "lex.polysemy",
+   "q": "what is a bat",
+   "gold": [
+    "@DICT"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "quote",
+   "reply": "Taking this as what bat is: (WORDNET-noun): nocturnal mouselike mammal with forelimbs modified to form membranous wings and anatomical adaptations for echolocation by which they navigate ; (WORDNET-noun): (baseball) a turn trying to get a hit; \"he was at bat when it happened\"; \"he got four hits in four at-bats\" ; (WORDNET-noun): a small racket with a long handle used for playing squash ; (WORDNET-noun): the club used in playing cricket; \"a cricket bat has a narrow handle and a broad flat end for hitting\" ; (WORDNET-noun): a club used for hitting a ball in various games If not, say wrong and I will offer what I can do.",
+   "judged": "Taking this as what bat is: (WORDNET-noun): nocturnal mouselike mammal with forelimbs modified to form membranous wings and anatomical adaptations for echolocation by which they navigate ; (WORDNET-noun): (baseball) a turn trying to get a hit; \"he was at bat when it happened\"; \"he got four hits in four at-bats\" ; (WORDNET-noun): a small racket with a long handle used for playing squash ; (WORDNET-noun): the club used in playing cricket; \"a cricket bat has a narrow handle and a broad flat end for hitting\" ; (WORDNET-noun): a club used for hitting a ball in various games If not, say wrong and I will offer what I can do.",
+   "held": true
+  },
+  {
+   "id": "Q058",
+   "phen": "orth.typo",
+   "q": "what is the captial of italy",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Reading 'captial' as 'capital'. The capital of italy is Rome (Wikidata).",
+   "judged": "Reading 'captial' as 'capital'. The capital of italy is Rome (Wikidata).",
+   "held": true
+  },
+  {
+   "id": "Q059",
+   "phen": "orth.typo",
+   "q": "waht is the salray of bob",
+   "gold": [
+    "150"
+   ],
+   "pred": "R",
+   "outcome": "SILENT",
+   "sub": "",
+   "reply": "I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it: salray, waht.",
+   "judged": "",
+   "held": false
+  },
+  {
+   "id": "Q060",
+   "phen": "orth.casing",
+   "q": "WHO IS THE MANAGER OF KEN",
+   "gold": [
+    "bob"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Bob IS THE MANAGER OF KEN. (records)",
+   "judged": "Bob IS THE MANAGER OF KEN. (records)",
+   "held": true
+  },
+  {
+   "id": "Q061",
+   "phen": "orth.missing_punct",
+   "q": "capital of japan",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The capital of japan is Tokyo (Wikidata).",
+   "judged": "The capital of japan is Tokyo (Wikidata).",
+   "held": true
+  },
+  {
+   "id": "Q062",
+   "phen": "orth.apostrophe_missing",
+   "q": "whats the capital of japan",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The capital of japan is Tokyo, but I did not use whats.",
+   "judged": "The capital of japan is Tokyo, but I did not use whats.",
+   "held": true
+  },
+  {
+   "id": "Q063",
+   "phen": "orth.apostrophe_missing",
+   "q": "what is alices salary",
+   "gold": [
+    "120"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Reading 'alices' as 'alice'. The salary of alice is 120 (records).",
+   "judged": "Reading 'alices' as 'alice'. The salary of alice is 120 (records).",
+   "held": true
+  },
+  {
+   "id": "Q064",
+   "phen": "orth.noise_punct",
+   "q": "what is the capital of japan ?!!",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "Tokyo is the capital of japan. (Wikidata)",
+   "judged": "Tokyo is the capital of japan. (Wikidata)",
+   "held": true
+  },
+  {
+   "id": "Q065",
+   "phen": "orth.noise_punct",
+   "q": "capital of france???",
+   "gold": [
+    "paris"
+   ],
+   "pred": "R",
+   "outcome": "RIGHT",
+   "sub": "fact",
+   "reply": "The capital of france is Paris (Wikidata).",
+   "judged": "The capital of france is Paris (Wikidata).",
+   "held": true
+  }
+ ],
+ "time_s": 3377,
+ "rescored": "2026-10-07 10:57"
+}

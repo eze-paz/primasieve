@@ -497,3 +497,216 @@ Predicted totals -- event memory: RIGHT 92, WRONG 30, SILENT 49 (of 171); door s
 - **Largest silent areas:** copula and existential sentences (20 % and 3 % of sentences), the commonest verbs (22 % of sentences contain one of *made, said, found, take, make, see, do, ...*), quotations and speaker attribution (25 % of sentences hold a quotation mark), counting, comparison, synonyms/converses/hypernyms, and every verb a world was not taught (*wrote, directed, born, earns*).
 - **Frequency x failure** therefore points first at: the closed-class definition itself (frequent content words), copula/predication, pronoun resolution, quotations, polarity/modality, and passive voice -- not at the rarer constructions (gapping, one-anaphora, tag questions) that the battery happened to expose.
 
+## 6. Results (english_probe.py)
+
+Run 2026-10-07 10:57, HEAD 0b820962 (engine code = cdbf193b; the map commit added only its own files) **with the uncommitted iteration-16 reader changes** (core/events.py, emergence/kb_events.py) of the parallel loop session; 3377 s. A probe's counted outcome is the live door's where it ran there, else the event memory's.
+
+| run | probes | RIGHT | WRONG | SILENT | predictions held |
+|---|---|---|---|---|---|
+| event memory, all stories | 171 | 85 | 31 | 55 | 162/171 |
+| live door, door stories | 73 | 24 | 40 | 9 | 51/73 |
+| live door, question probes | 65 | 31 | 21 | 13 | 44/65 |
+| counted (live where run) | 236 | 113 | 72 | 51 | 188/236 |
+| all predictions | 309 | 140 | 92 | 77 | 257/309 |
+
+Prediction vs outcome (all runs; rows = predicted, columns = observed):
+
+| predicted | RIGHT | WRONG | SILENT |
+|---|---|---|---|
+| RIGHT | 136 | 13 | 10 |
+| WRONG | 2 | 57 | 3 |
+| SILENT | 2 | 22 | 64 |
+
+### Per family
+
+| family | phenomena | probes | RIGHT | WRONG | SILENT | predictions held | mean frequency | priority (sum) |
+|---|---|---|---|---|---|---|---|---|
+| noun phrase | 12 | 26 | 17 | 9 | 0 | 26/34 | 0.205 | 1.463 |
+| questions | 17 | 34 | 13 | 12 | 9 | 30/38 | 0.079 | 1.433 |
+| reference | 9 | 18 | 7 | 7 | 4 | 22/24 | 0.149 | 1.019 |
+| clause linkage | 10 | 21 | 7 | 8 | 6 | 25/31 | 0.111 | 0.815 |
+| negation | 4 | 8 | 2 | 4 | 2 | 11/11 | 0.110 | 0.669 |
+| tense, aspect, mood | 8 | 16 | 7 | 5 | 4 | 20/21 | 0.059 | 0.388 |
+| voice | 4 | 8 | 3 | 2 | 3 | 10/12 | 0.080 | 0.321 |
+| morphology | 9 | 19 | 13 | 3 | 3 | 21/24 | 0.208 | 0.318 |
+| discourse and dialogue | 7 | 14 | 9 | 2 | 3 | 11/18 | 0.058 | 0.311 |
+| verb and argument structure | 11 | 24 | 13 | 4 | 7 | 31/31 | 0.060 | 0.299 |
+| quantification and comparison | 6 | 12 | 5 | 3 | 4 | 9/12 | 0.055 | 0.290 |
+| inference | 5 | 10 | 2 | 6 | 2 | 13/18 | 0.060 | 0.258 |
+| lexical semantics | 6 | 14 | 5 | 6 | 3 | 14/20 | 0.067 | 0.241 |
+| orthography and noise | 6 | 12 | 10 | 1 | 1 | 14/15 | 0.053 | 0.039 |
+
+### Priority ranking (frequency x (2 x wrong share + silent share), counted outcomes)
+
+A WRONG that is an off-target dictionary quotation in a hedged frame ("If you are asking what X is: ... Otherwise say wrong") or a labelled guess weighs 1, like a silence; a WRONG stated as fact or recalled from the story weighs 2.
+
+| rank | phenomenon | family | frequency | probes | R/W/S | priority | component |
+|---|---|---|---|---|---|---|---|
+| 1 | np.possessive_det -- possessive determiners | noun phrase | 0.419 | 2 | 0/2/0 | 0.628 | core/events.py + emergence/kb_events.py (event memory) |
+| 2 | q.declarative -- declarative (rising) questions | questions | 0.345 | 2 | 0/1/1 | 0.518 | chat.py statement path (kb_constructions reader, filled-question check) |
+| 3 | ref.pronoun_gender -- pronoun resolution needing gender/number | reference | 0.446 | 2 | 1/1/0 | 0.446 | core/events.py + emergence/kb_events.py (event memory) |
+| 4 | np.of_phrase -- of-phrases (genitive/partitive) | noun phrase | 0.392 | 2 | 0/2/0 | 0.392 | core/events.py + emergence/kb_events.py (event memory) |
+| 5 | ref.first_person -- first/second person in a told story | reference | 0.376 | 2 | 0/2/0 | 0.376 | core/events.py + emergence/kb_events.py (event memory) |
+| 6 | np.numeral -- cardinal numerals | noun phrase | 0.164 | 2 | 0/2/0 | 0.328 | core/events.py + emergence/kb_events.py (event memory) |
+| 7 | neg.world -- negation in questions over worlds | negation | 0.163 | 2 | 0/2/0 | 0.325 | core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) |
+| 8 | q.inverse_relation -- relation asked from the other end | questions | 0.149 | 2 | 0/2/0 | 0.298 | core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py |
+| 9 | clause.direct_speech -- direct speech with attribution | clause linkage | 0.249 | 2 | 0/1/1 | 0.249 | core/events.py + emergence/kb_events.py (event memory) |
+| 10 | neg.not -- clausal negation (not / n't) | negation | 0.163 | 2 | 0/1/1 | 0.244 | core/events.py + emergence/kb_events.py (event memory) |
+| 11 | q.yes_no -- polar questions over worlds | questions | 0.242 | 2 | 1/1/0 | 0.242 | chat.py statement path (kb_constructions reader, filled-question check); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) |
+| 12 | verb.copula -- copula and predicative complements | verb and argument structure | 0.211 | 2 | 0/2/0 | 0.211 | core/events.py + emergence/kb_events.py (event memory); chat.py Door (sentence split, recall vs world answer) |
+| 13 | disc.topic_continuity -- topic continuity across sentences | discourse and dialogue | 0.154 | 2 | 1/1/0 | 0.154 | core/events.py + emergence/kb_events.py (event memory) |
+| 14 | morph.derivation -- derivational morphology | morphology | 0.306 | 2 | 1/1/0 | 0.153 | core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) (dictionary) |
+| 15 | voice.passive_question -- passive question over an active story | voice | 0.149 | 2 | 1/1/0 | 0.149 | core/events.py + emergence/kb_events.py (event memory) |
+| 16 | voice.passive_agentless -- agentless passive | voice | 0.149 | 2 | 0/0/2 | 0.149 | core/events.py + emergence/kb_events.py (event memory) |
+| 17 | clause.coord_clauses -- coordinated clauses | clause linkage | 0.298 | 2 | 1/1/0 | 0.149 | core/events.py + emergence/kb_events.py (event memory) |
+| 18 | disc.multi_sentence -- several sentences in one turn | discourse and dialogue | 0.129 | 2 | 1/1/0 | 0.129 | chat.py Door (sentence split, recall vs world answer) |
+| 19 | tam.conditional -- conditionals | tense, aspect, mood | 0.061 | 2 | 0/2/0 | 0.121 | core/events.py + emergence/kb_events.py (event memory) |
+| 20 | clause.temporal_sub -- temporal subordinate clauses (when/after/before) | clause linkage | 0.179 | 3 | 1/1/1 | 0.119 | core/events.py + emergence/kb_events.py (event memory) |
+| 21 | quant.universal -- universal quantifiers | quantification and comparison | 0.117 | 2 | 1/1/0 | 0.117 | core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) |
+| 22 | clause.open_class_connective -- connectives outside the closed class (until, since, across, near) | clause linkage | 0.117 | 2 | 1/1/0 | 0.117 | core/events.py + emergence/kb_events.py (event memory) |
+| 23 | np.frequent_noun -- very frequent common nouns | noun phrase | 0.113 | 4 | 2/2/0 | 0.113 | core/events.py + emergence/kb_events.py (event memory) |
+| 24 | q.embedded -- embedded questions | questions | 0.223 | 2 | 1/1/0 | 0.112 | core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) |
+| 25 | morph.top200_verbs -- forms of the very commonest verbs | morphology | 0.222 | 2 | 1/1/0 | 0.111 | core/events.py + emergence/kb_events.py (event memory) |
+| 26 | tam.future -- future / will + infinitive | tense, aspect, mood | 0.074 | 2 | 0/1/1 | 0.111 | core/events.py + emergence/kb_events.py (event memory) |
+| 27 | clause.relative_subject -- subject relative clauses | clause linkage | 0.095 | 2 | 0/1/1 | 0.095 | core/events.py + emergence/kb_events.py (event memory) |
+| 28 | ref.vp_ellipsis -- VP ellipsis | reference | 0.045 | 2 | 0/2/0 | 0.090 | core/events.py + emergence/kb_events.py (event memory) |
+| 29 | quant.only -- focus particle only | quantification and comparison | 0.089 | 2 | 1/1/0 | 0.089 | core/events.py + emergence/kb_events.py (event memory) |
+| 30 | neg.no_det -- negative determiners and pronouns (no, nobody) | negation | 0.087 | 2 | 1/1/0 | 0.087 | core/events.py + emergence/kb_events.py (event memory) |
+
+### WRONG outcomes: 72 counted -- 41 stated as fact or recalled (honesty risks, listed), 31 off-target hedged quotations or labelled guesses
+
+Off-target quotations (the door quoted a gloss of some word of the question instead of answering or abstaining): S03.2, S07.1, S11.1, S11.2, S12.2, S13.1, S23.4, S27.1, S27.2, S57.2, S59.1, S61.2, S65.1, S76.1, S76.2, S83.1, S85.1, S85.2, S88.1, S88.2, S91.1, S91.2, S94.2, Q004, Q006, Q013, Q014, Q024, Q053, Q054, Q056.
+
+| id | phenomenon | question | gold | said | kind |
+|---|---|---|---|---|---|
+| S13.2 | np.possessive_det | Where did his mother find the keys? | under the sofa, sofa | keys | recall |
+| S18.1 | np.frequent_noun | Who sold a horse? | a man, man | Ivan | recall |
+| S23.3 | verb.ditransitive | What did Mia give? | book | Leo | recall |
+| S30.2 | verb.control | Who will close the gate? | tomas | Mira | recall |
+| S33.2 | voice.passive_by | What was broken? | window | stone | recall |
+| S36.2 | voice.passive_question | By whom was the oak tree planted? | grandpa | in 1950 | recall |
+| S40.1 | tam.future | Did Ada wash the plates? | no, not yet, will | plates | recall |
+| S41.1 | tam.modal_epistemic | Who took the ring? | thief | Inspector Ross | recall |
+| S43.1 | tam.counterfactual | Who passed the exam? | @ABSTAIN, nobody, no one | Ben | recall |
+| S45.1 | neg.not | Who ate the soup? | @ABSTAIN, nobody, no one | Rosa | recall |
+| S47.1 | neg.no_det | Who drank the wine? | no guest, nobody, no one | guest | recall |
+| S62.1 | clause.relative_object | What did Mia bake? | cake | delicious | recall |
+| S64.1 | clause.complement_that | What did Tom say? | bridge was closed | bridge | recall |
+| S68.1 | ref.pronoun_gender | Who carried the bag? | mia | Leo | recall |
+| S73.1 | ref.vp_ellipsis | Who else bought a ticket? | joe | Mara | recall |
+| S73.2 | ref.vp_ellipsis | Did Joe buy a ticket? | yes | Mara | recall |
+| S81.2 | disc.topic_continuity | Where did Grace sell the roses? | market | roses | recall |
+| Q009 | neg.world | how many employees are not in support | 9 | The number of employees of support is 2 (records). | fact |
+| Q010 | neg.world | what is the total salary outside engineering | 1100 | The total salary of engineering is 380, but I did not use outside. | fact |
+| Q011 | q.yes_no | is tokyo the capital of japan | yes | Tokyo capital japan is Japan (Wikidata). | fact |
+| Q016 | q.what_object | what language do people speak in brazil | portuguese | The currency of brazil is Brazilian real, but I could not apply language ; do ; speak. | fact |
+| Q017 | q.whom | whom does carol manage | bob | Reading 'manage' as 'manager'. The manager of carol is dave, but I could not apply whom ; does. | fact |
+| Q018 | q.whose | whose manager is frank | erin, grace | The manager of frank is dave (records). | fact |
+| Q027 | q.tag | tokyo is the capital of japan, isn't it? | yes | Tokyo capital japan is Japan, but I did not use isn. | fact |
+| Q029 | q.declarative | the capital of brazil is brasilia? | yes | The capital of brazil is Brasília, but I found no way to apply brasilia. | fact |
+| Q033 | q.inverse_relation | who is managed by carol | bob | Reading 'managed' as 'manager'. The manager of carol is dave (records). | fact |
+| Q034 | q.inverse_relation | which country has paris as its capital | france | The capital of the country of paris is Paris (Wikidata). | fact |
+| Q036 | quant.superlative | who has the highest salary in sales | frank | 130 has the highest salary in sales. (records) | fact |
+| Q038 | quant.universal | what is the salary of each employee in support | 70, 75 | What is the salary of each employee in support is row 0 price=11, row 1 price=5, row 2 price=36, row 3 price=25, row 4 p | fact |
+| Q050 | disc.multi_sentence | I work in sales. How many employees are in my department? | 2 | The city of the department of sales is rome, but I did not use work. The number of employees of the department of is 11  | fact |
+| S15.1 | np.numeral | What did Ana buy? | apples | 12 (Ana buy 12) | recall |
+| S15.2 | np.numeral | How many apples did Ana buy? | 12 | 3 pears (Ana apple 3 pears) | recall |
+| S19.2 | np.frequent_noun | What did the stranger ask for? | water | door (stranger ask door) | recall |
+| S42.1 | tam.conditional | Who will buy a boat? | father | Leo (Leo buy boat) | recall |
+| S42.2 | tam.conditional | Did his father buy a boat? | no, not yet, if | Leo (Leo buy boat) | recall |
+| S60.2 | clause.open_class_connective | What did Max wait for? | rain | until (Max wait until) | recall |
+| S63.1 | clause.reduced_relative | Who stole the bag? | woman | red coat (red coat steal bag) | recall |
+| S71.1 | ref.possessive_pronoun | What did Lily lend Sam? | pen | hers (Lily lend hers) | recall |
+| S72.1 | ref.one_anaphora | What did Tom give Kim? | green apple, green one | green (Tom give green) | recall |
+| S78.2 | quant.only | Did Sita finish the race? | no | Ravi (Ravi finish race) | recall |
+| S90.1 | inf.cause | Why did the ice melt? | sun was hot, hot | sun (ice melt sun) | recall |
+
+Kinds: recall = the story memory's answer; fact = a world's answer stated as fact; quote = an off-target dictionary quotation; guess = a labelled guess.
+
+**Scoring note:** 4 door story replies that are NOT right would be credited by a scorer that searches the whole reply (battery.hit), because a RECALL reply prints the event in brackets or an abstention contains the gold word: S33.2 'What was broken?' -> 'From what you told me: stone (window break stone).'; S36.2 'By whom was the oak tree planted?' -> 'From what you told me: in 1950 (Grandpa plant oak tree).'; S43.2 'Did Ben pass the exam?' -> 'If you mean what ben is: (WORDNET-noun): a mountain or tall hill; "they were cli'; S45.2 'Did Rosa eat the soup?' -> 'If you mean what rosa is: (WORDNET-noun): large genus of erect or climbing prick'
+
+### Predictions that failed (52 of 309)
+
+| id | run | phenomenon | question | predicted | observed | what was said |
+|---|---|---|---|---|---|---|
+| S11.1 | memory | np.of_phrase | Who rang the bell? | RIGHT | SILENT | None (None) |
+| S11.2 | memory | np.of_phrase | What did the captain of the ship ring? | RIGHT | SILENT | None (None) |
+| S15.1 | memory | np.numeral | What did Ana buy? | RIGHT | WRONG | 12 (Ana buy 12) |
+| S15.2 | memory | np.numeral | How many apples did Ana buy? | SILENT | WRONG | 3 pears (Ana apple 3 pears) |
+| S34.1 | memory | voice.passive_agentless | What was burned? | WRONG | SILENT | None (None) |
+| S34.2 | memory | voice.passive_agentless | Where were the letters burned? | RIGHT | SILENT | None (None) |
+| S57.2 | memory | clause.coord_clauses | What did Ali feed? | RIGHT | SILENT | None (None) |
+| S58.2 | memory | clause.temporal_sub | What rang? | RIGHT | SILENT | None (None) |
+| S80.1 | memory | disc.story_world_collision | What did Alice give Bob? | RIGHT | SILENT | None (None) |
+| S03.2 | door | morph.top200_verbs | What did Lena make? | SILENT | WRONG | If you are asking what lena is: (WORDNET-noun): a Russian river in Siberia; flows northward into the Laptev Se |
+| S07.1 | door | q.whose | Whose dog chased the cat? | SILENT | WRONG | Taking this as what chased is: (WORDNET-noun): a person who is being chased; "the film jumped back and forth f |
+| S11.1 | door | np.of_phrase | Who rang the bell? | RIGHT | WRONG | Taking this as what rang is: (KAIKKI): simple past of ring (only in senses related to a bell — etymology 2) ;  |
+| S11.2 | door | np.of_phrase | What did the captain of the ship ring? | RIGHT | WRONG | If you are asking what captain is: (WORDNET-noun): an officer holding a rank below a major but above a lieuten |
+| S12.2 | door | np.appositive | What did Sam catch? | SILENT | WRONG | Understood (catch: a break or check in the voice (usually a sign of strong emotion)). I can answer about Wikid |
+| S13.1 | door | np.possessive_det | Who found the keys? | SILENT | WRONG | If you are asking what keys is: (KAIKKI): plural of key ; (KAIKKI): keyboard ; (KAIKKI): third-person singular |
+| S23.4 | door | inf.state_from_event | Who has the book now? | SILENT | WRONG | If you are asking what book is: (WORDNET-noun): a written work or composition that has been published (printed |
+| S57.2 | door | clause.coord_clauses | What did Ali feed? | RIGHT | WRONG | If you are asking what ali is: (WORDNET-noun): United States prizefighter who won the world heavyweight champi |
+| S59.1 | door | clause.temporal_sub | When did Nora call her friend? | SILENT | WRONG | Taking this as what nora is: (KAIKKI): A female given name. ; (KAIKKI): A town and municipality in Västmanland |
+| S61.1 | door | clause.relative_subject | Who broke the window? | WRONG | SILENT | I do not know the word 'broke'. Did you mean 'in'? (they share 2 contexts in what I have read) Say correct to  |
+| S65.1 | door | clause.direct_speech | Who said the soup is cold? | SILENT | WRONG | Taking this as what soup is: (WORDNET-noun): liquid food especially of meat or fish or vegetable stock often c |
+| S76.1 | door | ref.first_person | What did I lend Omar? | SILENT | WRONG | Taking this as what omar is: (KAIKKI): Omar bin al-Khattab, second Sunni Islamic caliph and a companion of Muh |
+| S76.2 | door | ref.first_person | Who has my bike? | SILENT | WRONG | If you are asking what bike is: (WORDNET-noun): a motor vehicle with two wheels and a strong frame ; (WORDNET- |
+| S80.1 | door | disc.story_world_collision | What did Alice give Bob? | WRONG | SILENT | I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it:  |
+| S80.2 | door | disc.story_world_collision | Who gave Bob a present? | WRONG | RIGHT | From what you told me: Alice (Alice give Bob). |
+| S83.1 | door | lex.converse | Who bought Mia's bike? | SILENT | WRONG | Taking this as what mia is: (KAIKKI): Initialism of missing in action. ; (KAIKKI): Absent for a long time. ; ( |
+| S85.1 | door | lex.idiom | Did Grandpa die? | SILENT | WRONG | Taking this as what grandpa is: (WORDNET-noun): the father of your father or mother If not, say wrong and I wi |
+| S85.2 | door | lex.idiom | When did Grandpa die? | SILENT | WRONG | If you are asking what grandpa is: (WORDNET-noun): the father of your father or mother Otherwise say wrong, an |
+| S88.1 | door | inf.consequence | Who lost the race? | RIGHT | WRONG | Taking this as what lost is: (WORDNET-noun): people who are destined to die soon; "the agony of the doomed was |
+| S88.2 | door | inf.consequence | Who came first? | SILENT | WRONG | If you mean what came is: (KAIKKI): simple past of come ; (KAIKKI): past participle of come ; (KAIKKI): simple |
+| S91.1 | door | inf.unasked | What color did Omar paint the door? | RIGHT | WRONG | Taking this as what omar is: (KAIKKI): Omar bin al-Khattab, second Sunni Islamic caliph and a companion of Muh |
+| S91.2 | door | inf.unasked | Who painted the window? | RIGHT | WRONG | If you are asking what painted is: (WORDNET-adj): coated with paint; "freshly painted lawn furniture" ; (WORDN |
+| Q004 | question | morph.derivation | what does unbloggable mean | RIGHT | WRONG | Taking this as what unbloggable is: (KAIKKI): Not bloggable. If not, say wrong and I will offer what I can do. |
+| Q006 | question | morph.degree_forms | who earns the least | SILENT | WRONG | If you are asking what earns is: (KAIKKI): third-person singular simple present indicative of earn Otherwise s |
+| Q007 | question | tam.imperative | Tell me the capital of Japan | RIGHT | SILENT | No world of mine reads 'me'. Did you mean 'in'? (they share 39 contexts in what I have read) Say correct to ha |
+| Q011 | question | q.yes_no | is tokyo the capital of japan | RIGHT | WRONG | Tokyo capital japan is Japan (Wikidata). |
+| Q013 | question | q.who_subject | who wrote hamlet | SILENT | WRONG | If you mean what wrote is: (KAIKKI): simple past of write ; (KAIKKI): past participle of write Otherwise say w |
+| Q014 | question | q.who_subject | who directed jaws | SILENT | WRONG | If you are asking what jaws is: (KAIKKI): plural of jaw ; (KAIKKI): The mouth. ; (KAIKKI): The borders of anyt |
+| Q016 | question | q.what_object | what language do people speak in brazil | SILENT | WRONG | The currency of brazil is Brazilian real, but I could not apply language ; do ; speak. |
+| Q024 | question | q.embedded | do you know who directed jaws | SILENT | WRONG | If you mean what jaws is: (KAIKKI): plural of jaw ; (KAIKKI): The mouth. ; (KAIKKI): The borders of anything w |
+| Q027 | question | q.tag | tokyo is the capital of japan, isn't it? | RIGHT | WRONG | Tokyo capital japan is Japan, but I did not use isn. |
+| Q034 | question | q.inverse_relation | which country has paris as its capital | RIGHT | WRONG | The capital of the country of paris is Paris (Wikidata). |
+| Q036 | question | quant.superlative | who has the highest salary in sales | RIGHT | WRONG | 130 has the highest salary in sales. (records) |
+| Q038 | question | quant.universal | what is the salary of each employee in support | SILENT | WRONG | What is the salary of each employee in support is row 0 price=11, row 1 price=5, row 2 price=36, row 3 price=2 |
+| Q039 | question | quant.counting_condition | how many employees started after 2015 | WRONG | RIGHT | The number of employees is 11, but I could not apply started ; 2015. |
+| Q043 | question | disc.courtesy | Hello! Could you please tell me the capital of Brazil? | RIGHT | SILENT | The dictionary says (WORDNET-noun): an expression of greeting; "every morning they exchanged polite hellos" I  |
+| Q046 | question | disc.user_belief | maybe ken's salary is 200? | SILENT | RIGHT | Actually: ken s salary is 200 is 110 (according to records), and not maybe. |
+| Q051 | question | disc.correction | no, I meant Ken | SILENT | RIGHT | The salary of ken is 110, but I found no way to apply meant. |
+| Q052 | question | disc.correction | sorry, I meant Spain | RIGHT | SILENT | Taking this as what sorry is: (WORDNET-adj): feeling or expressing regret or sorrow or a sense of loss over so |
+| Q053 | question | lex.synonym_noun | what is the wage of alice | SILENT | WRONG | Taking this as what alice is: (KAIKKI): A female given name from the Germanic languages popular in England sin |
+| Q054 | question | lex.synonym_noun | what is the pay of erin | SILENT | WRONG | If you are asking what erin is: (WORDNET-noun): an early name of Ireland that is now used in poetry Otherwise  |
+| Q056 | question | lex.polysemy | what does bank mean | RIGHT | WRONG | Taking this as what mean is: (WORDNET-noun): an average of n numbers computed by adding some function of the n |
+| Q059 | question | orth.typo | waht is the salray of bob | RIGHT | SILENT | I could not find that in what I hold. What would help: name the thing you mean, or give a source that has it:  |
+
+## 7. Findings (hand-written after the run)
+
+**Prediction accuracy.** 257 of 309 predictions held (83 %): the event memory 162/171 (95 %), the live door on stories
+51/73 (70 %), the door on world questions 44/65 (68 %). Code reading predicts the event reader almost exactly; the door
+is harder to predict for one main reason: where the memory is silent, the door does not abstain but quotes a dictionary
+gloss of some word of the question in a hedged frame ("If you are asking what lena is: ... Otherwise say wrong") -- 22 of
+the 52 misses are predicted SILENT, observed such a quotation. It is not a false fact, but it is never an answer.
+
+**New defects the misses exposed (not in the theory of Section 1):**
+- the verb table lacks some irregular pasts ("rang" -> no event at all);
+- a plural after a numeral is read as a verb ("12 apples" -> event apple(Ana, 3 pears)), because the numeral counts as a
+  noun before a third-person form;
+- base and past forms of OTHER verbs: "stove" -> stave (the patient is lost), "feed" in a question -> lemma "fee";
+- the closed class (200 commonest symbols of a DICTIONARY text model) holds dictionary metalanguage: present, past,
+  form, person, plural, singular, county, species ... ("a present" is skipped as a function word);
+- door: "Tell me the capital of Japan" -> did-you-mean for "me"; "Hello! ..." -> a gloss of "hello" before the answer
+  is reached; "is tokyo the capital of japan" -> "Tokyo capital japan is Japan"; "who has the highest salary in sales"
+  -> "130"; "salary of each employee in support" -> sales-table rows; a story name the dictionary knows (Lena, Omar, Ali,
+  Nora, Hana) is glossed instead of the story being consulted.
+- gold error (mine): "unbloggable" IS in the dictionary (KAIKKI: "Not bloggable"); the engine's quotation was right.
+
+**What the ranking says.** The top of the priority list is dominated by FREQUENT structure inside ordinary narrative --
+possessive and of-phrase noun phrases, pronoun resolution (gender, first person), the copula, quotations, polarity
+(not/no) and numerals -- and, on the question side, polar/declarative/tag questions, inverse relations and negation in
+world questions. The rare constructions the battery happened to expose (gapping, one-anaphora) rank low. The cheapest
+broad fix is the closed class itself: it should be function words learned from PROSE (and by distribution, not rank),
+since 22 % of book sentences contain one of the commonest verbs and 11 % one of the commonest nouns that are now
+invisible or read as pronouns.
