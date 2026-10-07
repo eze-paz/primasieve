@@ -31,6 +31,42 @@ class EventReader:
         lt = t.lower()
         return self.is_word(t) and lt not in self.closed and lt not in self.verbs
 
+    def verb_at(self, toks, k):
+        """events6_prereg.md (A): a third-person present form is a verb only right after a subject-like symbol or a noun
+        ("the miller owns" / "a pair of boots")"""
+        lt = toks[k].lower()
+        if lt not in self.verbs or lt in self.closed: return lt in self.verbs and lt not in self.closed
+        if lt not in getattr(self, "third", ()) or lt in getattr(self, "past", ()): return True
+        if k == 0: return False
+        p = toks[k - 1].lower()
+        return p in getattr(self, "subjects", ()) or (self.is_word(toks[k - 1]) and p not in self.closed and p not in self.verbs)
+
+    def noun_at(self, toks, k):
+        lt = toks[k].lower()
+        return self.is_word(toks[k]) and lt not in self.closed and not self.verb_at(toks, k)
+
+    def extend(self, toks, s, e):
+        """events6_prereg.md (C): a noun run continued across the learned linker / coordinator ("a pair of boots and a
+        bag", "Eva and her uncle Karl")"""
+        joins = set(getattr(self, "linkers", ())) | set(getattr(self, "coords", ()))
+        if not joins: return s, e
+        while e < len(toks) and toks[e].lower() in joins:
+            n = e + 1
+            if n < len(toks) and toks[n].lower() in self.closed and toks[n].lower() not in joins: n += 1
+            if n < len(toks) and self.noun_at(toks, n):
+                while n + 1 < len(toks) and self.noun_at(toks, n + 1): n += 1
+                e = n + 1
+            else: break
+        while True:
+            q = s - 1
+            if q >= 0 and toks[q].lower() in self.closed and toks[q].lower() not in joins: q -= 1
+            if q >= 1 and toks[q].lower() in joins and self.noun_at(toks, q - 1):
+                q -= 1
+                while q - 1 >= 0 and self.noun_at(toks, q - 1): q -= 1
+                s = q
+            else: break
+        return s, e
+
     def run_at(self, toks, k, step, limit, pronoun=False):
         """the noun run nearest to position k in direction `step`, skipping at most `limit` closed symbols, inside the
         clause -> ((start, end), is_pronoun) or None. With `pronoun`, a closed symbol right beside k is returned as one."""
@@ -39,11 +75,11 @@ class EventReader:
             t = toks[i]
             if not self.is_word(t) and pronoun and not crossed and i == k + step:      # events3_prereg.md (1): one comma beside the verb
                 crossed = True; i += step; continue
-            if not self.is_word(t) or self.is_verb(t): break
-            if self.is_noun(t):
+            if not self.is_word(t) or self.verb_at(toks, i): break
+            if self.noun_at(toks, i):
                 j = i
-                while 0 <= j + step < len(toks) and self.is_noun(toks[j + step]): j += step
-                return (min(i, j), max(i, j) + 1), False
+                while 0 <= j + step < len(toks) and self.noun_at(toks, j + step): j += step
+                return self.extend(toks, min(i, j), max(i, j) + 1), False
             skipped += 1
             if skipped > limit: break
             i += step
@@ -55,6 +91,7 @@ class EventReader:
         toks = tokens(text); out = []
         for k, t in enumerate(toks):
             lemma = self.verbs.get(t.lower())
+            if lemma is not None and not self.verb_at(toks, k) and t.lower() not in self.closed: lemma = None    # events6 (A)
             inf = (lemma is None and k > 0 and toks[k - 1].lower() in (getattr(self, "to_marker", None) or ()) and t[:1].islower()
                    and t.lower() in self.base and t.lower() not in self.closed)          # events5_prereg.md (D): "to fix"
             if inf:
@@ -76,6 +113,8 @@ class EventReader:
                 lemma = lp
             a_step, p_step = (-1, 1) if self.side == "L" else (1, -1)
             ag = self.run_at(toks, k, a_step, 1, pronoun=True); pa = self.run_at(toks, k, p_step, 2)
+            if 0 <= k + a_step < len(toks) and toks[k + a_step].lower() in getattr(self, "subjects", ()):     # events6 (B)
+                ag = ((min(k, k + a_step), min(k, k + a_step) + 1), True)
             agent = None
             if ag:
                 (s0, e0), pron = ag

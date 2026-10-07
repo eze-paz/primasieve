@@ -14,7 +14,7 @@ def verb_forms(uni=None):
     """-> (finite form -> lemma, non-finite form -> lemma) from UniMorph (past tense and third-person present are finite);
     a form with several lemmas takes the lemma most frequent in the text model's counts"""
     fin, base = {}, {}; cand = collections.defaultdict(set); uni = uni or {}; pcand = collections.defaultdict(set)
-    ppst = set(); cells = []
+    ppst = set(); cells = []; pst = set(); third = set()
     for line in open(UNIMORPH, encoding="utf-8", errors="replace"):
         f = line.rstrip("\n").split("\t")
         if len(f) < 3 or not f[2].startswith("V"): continue
@@ -22,13 +22,15 @@ def verb_forms(uni=None):
         if " " in form: continue
         if ("PST" in feats and "PTCP" not in feats) or ("PRS" in feats and "3" in feats):
             cand[form].add(lemma); cells.append((form, lemma, "PST" if "PST" in feats else "3"))
+            (pst if "PST" in feats else third).add(form)
         if "PTCP" in feats:
             pcand[form].add(lemma); cells.append((form, lemma, "PTCP" if "PST" in feats else "PRSPTCP"))
             if "PST" in feats: ppst.add(form)
         base.setdefault(lemma, lemma)
+    verb_forms.um_base = set(base)          # events6_prereg.md: the morphology table's own lemmas (the gloss pass adds odd ones: "they")
     # events5_prereg.md (A): the cells UniMorph lacks, from the dictionary's inflection glosses (templates learned)
     for form, lemma, cell in gloss_forms(cells, knockout=getattr(verb_forms, "knockout", False)):
-        if cell in ("PST", "3"): cand[form].add(lemma)
+        if cell in ("PST", "3"): cand[form].add(lemma); (pst if cell == "PST" else third).add(form)
         if cell == "PTCP": pcand[form].add(lemma); ppst.add(form)
         if cell == "PRSPTCP": pcand[form].add(lemma)
         base.setdefault(lemma, lemma)
@@ -39,6 +41,7 @@ def verb_forms(uni=None):
     fin = {f: l for f, ls in cand.items() for l in [keep(f, ls)] if l}
     verb_forms.participles = {f: l for f, ls in pcand.items() for l in [keep(f, ls)] if l}
     verb_forms.past_participles = {f for f in ppst if f in verb_forms.participles}
+    verb_forms.past = {f for f in pst if f in fin}; verb_forms.third = {f for f in third if f in fin}     # events6_prereg.md
     return fin, base
 
 
@@ -133,6 +136,29 @@ def learn_marker(closed, base, fin, n_books=60):
     return {a for a, v in share.items() if v >= 0.25}      # amended before the run: every such symbol (to, may, will ...)
 
 
+def learn_classes(closed, fin, base, participles, past, third, n_books=60, markers=()):
+    """events6_prereg.md: SUBJECT-LIKE closed symbols (not verb forms; followed by a past-only finite form in >= 20 % of
+    uses), the LINKER (both neighbours noun-like in >= 45 % of uses) and the COORDINATOR (most often between two capitalised
+    names, linkers excluded) -> (subjects, linkers, coords, measured)"""
+    tot = collections.Counter(); fv = collections.Counter(); link = collections.Counter(); betw = collections.Counter(); pm = collections.Counter()
+    def nounish(x): return x.isalpha() and x not in closed and x not in fin
+    for b in books(False)[:n_books]:
+        raw = tokens(open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read()); t = [x.lower() for x in raw]
+        for k in range(2, len(t) - 2):
+            a = t[k]
+            if a not in closed: continue
+            tot[a] += 1; fv[a] += t[k + 1] in past and t[k + 1] not in closed and t[k + 1] not in third; pm[a] += t[k - 1] in markers
+            if nounish(t[k - 1]) and (nounish(t[k + 1]) or (t[k + 1] in closed and nounish(t[k + 2]))): link[a] += 1
+            if raw[k - 1][:1].isupper() and raw[k + 1][:1].isupper() and t[k - 1] not in closed and t[k + 1] not in closed and raw[k - 2][:1].isalpha():
+                betw[a] += 1
+    big = [a for a in tot if tot[a] >= 1000]
+    # a symbol that follows a learned marker ("to be", "will be") in >= 20 % of uses is a verb form, not a subject
+    subjects = {a for a in big if a not in fin and a not in base and a not in participles and fv[a] >= 0.2 * tot[a] and pm[a] < 0.2 * tot[a]}
+    linkers = {a for a in big if link[a] >= 0.45 * tot[a]}
+    coords = {next((a for a, _ in betw.most_common() if a not in linkers), None)} - {None}
+    return subjects, linkers, coords
+
+
 def learn_auxiliaries(closed, participles, n_books=60, share=0.15):
     """events2_prereg.md: closed-class symbols followed by a participle in >= `share` of their occurrences"""
     tot = collections.Counter(); hit = collections.Counter()
@@ -157,5 +183,7 @@ def build(closed, uni=None, same=None):
     R.auxiliaries = aux
     R.past_participles = verb_forms.past_participles
     R.to_marker = learn_marker(closed, base, fin)            # events5_prereg.md (D)
+    R.past, R.third = verb_forms.past, verb_forms.third                                  # events6_prereg.md
+    R.subjects, R.linkers, R.coords = learn_classes(closed, fin, verb_forms.um_base, verb_forms.participles, R.past, R.third, markers=R.to_marker)
     R.determiners = set()     # events5_prereg.md (F) dropped before the run: the learned set held modals and prepositions, not "a"/"the"
     return R, side, counts
