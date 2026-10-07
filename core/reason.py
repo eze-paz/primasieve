@@ -123,6 +123,20 @@ def _spans(w, st):
     return list(w.spans_of(st))
 
 
+def _leaf(w, st):
+    """scope_prereg.md: the spans a structure's readings actually cover -- a composite's substituted region (the inner's
+    whole range) is not itself read (session._leaf_spans, now also the ranking's coverage)"""
+    if isinstance(st, Composite):
+        out = []
+        for wi, sti, _ in st.inners: out += _leaf(wi, sti)
+        regions = {(a, b) for a, b, L in st.regions}
+        for i, j in _spans(st.outer[0], st.outer[1]):
+            ij = st.back(i, j)
+            if ij not in regions: out.append(ij)
+        return out
+    return _spans(w, st)
+
+
 def _key(w, st):
     """the identity of a CLAIM: the structure AND the world that made it. Two sources asserting the same
     structure with different values are two claims in contest, never one multi-valued claim."""
@@ -357,12 +371,22 @@ def reason(text, world, df=None, cats="L", context=(), pipe=None, ledger=None, s
 
     def covered(sp): return len({p for i, j in sp for p in range(i, j) if p < n and p not in function})
 
+    content_reads = {(r[0], r[1]) for ww, r in readings if r[0] < n and not getattr(ww, "quotes", False)
+                     and r[2] in getattr(ww, "content_kinds", set())}
+    def unread_elsewhere(w, st):
+        """scope_prereg.md: content readings of ANY world that the structure's readings leave untouched -- at equal
+        coverage, a structure that leaves another world's name unread ("alice", read by the records) is the worse reading"""
+        lf = [(i, j) for i, j in _leaf(w, st) if i < n]
+        return sum(1 for i, j in content_reads if not any(a < j and i < b for a, b in lf))
+
     def rank(w, st):
         """coverage (content positions); a computed value over a quoted text; fewer unused content readings; fewer explicit
         spans; specificity; the world's own key; recency of context."""
         sp = _spans(w, st); real = [(i, j) for i, j in sp if i < n]
         own = _rank_key(w, st)                                    # a world's own structural preference
-        return (covered(sp), 0 if _quotes(w, st) else 1, -unused_content(w, st), -len(real), -spec(w, st), own, -sum(i for i, j in sp if i >= n))
+        # scope_prereg.md: coverage counts only what readings used (a composite's region is not read); and at equal
+        # coverage a route that is not a guess outranks one that is
+        return (covered(_leaf(w, st)), -unread_elsewhere(w, st), 0 if _conjectured(w, st) else 1, 0 if _quotes(w, st) else 1, -unused_content(w, st), -len(real), -spec(w, st), own, -sum(i for i, j in sp if i >= n))
 
     top = max(rank(w, st) for w, st, _ in survivors)
     best = [(w, st, res) for w, st, res in survivors if rank(w, st) == top]

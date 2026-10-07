@@ -122,6 +122,7 @@ class Researcher:
             # chained through a fetched world beat the real one (research2_prereg.md run 2's defect)
             w.rank_key = lambda st: -10 ** 6
         w.fetched = path
+        w.fetched_symbol = d.get("symbol")       # scope_prereg.md: the name it was fetched for
         session.worlds.append(w)
         return w
 

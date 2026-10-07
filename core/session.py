@@ -89,6 +89,20 @@ class Session:
         return out
 
     def turn(self, text):
+        """-> frame dict. scope_prereg.md: a world the researcher attached takes part only while the name it was fetched for
+        occurs in this turn or the last `depth` turns; it is kept, and back when its name is used again."""
+        window = " " + " ".join(symbols(" ".join([t for t, _ in self.history[-self.depth:]] + [text]), "LN")) + " "
+        def live(w):
+            nm = getattr(w, "fetched_symbol", None)
+            return nm is None or (" " + " ".join(symbols(nm, "LN")) + " ") in window
+        everything = self.worlds
+        self.worlds = [w for w in everything if live(w)]
+        try:
+            return self._turn(text)
+        finally:
+            self.worlds = everything + [w for w in self.worlds if w not in everything]
+
+    def _turn(self, text):
         """-> frame dict (core.reason's, plus 'chosen' when a READINGS option was picked)."""
         syms = symbols(text, "LN")
         prev = self.history[-1][1] if self.history else None
