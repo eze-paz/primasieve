@@ -203,9 +203,66 @@ class EventMemory:
     """events read from a conversation's statements, and questions answered from them (events_prereg.md)"""
     def __init__(self, reader):
         self.reader = reader; self.events = []; reader.last_agent = None; reader.last_patient = None     # a new conversation starts with no referent
+        self.facts = []                     # identity_prereg.md: (side, side) identity facts from appositions and copulas
 
     def ingest(self, text):
+        # identity_prereg.md amendment: a statement cut after a learned abbreviation ("Her teacher, Mrs.") is held and
+        # joined to the next one -- a sentence splitter that cuts at every full stop split "Mrs. Kato"
+        text = (getattr(self, "pending", "") + " " + text).strip(); self.pending = ""
+        last = tokens(text)[-2:] if len(tokens(text)) >= 2 else []
+        if len(last) == 2 and last[1] == "." and last[0] in getattr(self.reader, "abbr", ()):
+            self.pending = text; return
         self.events += self.reader.read(text)
+        self.facts += self.identities(text)
+
+    def identities(self, text):
+        """identity_prereg.md (B): appositions "<det phrase> , <Name> ," / "<Name> , <det phrase> ," and copular clauses"""
+        R = self.reader; toks = tokens(text); dets = getattr(R, "dets", ()); cop = getattr(R, "copula", ()); out = []
+        ab = getattr(R, "abbr", ()); merged = []        # amendment: "Mrs . Kato" is one name (a learned abbreviation's full stop)
+        for t in toks:
+            if merged and t == "." and merged[-1] in ab: merged[-1] += "."; continue
+            if merged and merged[-1].endswith(".") and merged[-1][:-1] in ab and t[:1].isupper(): merged[-1] += " " + t; continue
+            merged.append(t)
+        toks = merged
+        def run(i, step):            # a noun/name run from i in direction step -> (s, e) or None
+            j = i
+            while 0 <= j < len(toks) and R.is_word(toks[j]) and (toks[j].lower() not in R.closed or toks[j].lower() in dets)                     and toks[j].lower() not in R.verbs:
+                j += step
+            s, e = (i, j) if step == 1 else (j + 1, i + 1)
+            return (s, e) if e > s else None
+        for k, t in enumerate(toks):
+            if t != ",": continue
+            a = run(k - 1, -1); b = run(k + 1, 1)
+            if not a or not b or not (b[1] < len(toks) and toks[b[1]] in ",."): continue
+            A = toks[a[0]:a[1]]; B = toks[b[0]:b[1]]
+            if A and B and A[0].lower() in dets and B[0][:1].isupper(): out.append((" ".join(B), " ".join(A)))
+            elif A and B and A[0][:1].isupper() and B[0].lower() in dets: out.append((" ".join(A), " ".join(B)))
+        for k, t in enumerate(toks):
+            if t.lower() not in cop or k == 0: continue
+            j = k - 1
+            while j >= 0 and R.is_word(toks[j]): j -= 1
+            subj = toks[j + 1:k]
+            if not subj and j >= 0 and toks[j] == ",":          # "The youngest, Elin, was": the name before the comma
+                jj = j - 1
+                while jj >= 0 and R.is_word(toks[jj]): jj -= 1
+                subj = toks[jj + 1:j]
+            pred = []
+            m = k + 1
+            while m < len(toks) and R.is_word(toks[m]): pred.append(toks[m]); m += 1
+            # amendment: a subject or predicate holding a verb form is not a phrase ("please tell me what is the country ...",
+            # "... is do you know what"): questions the turn splitter took for statements made junk identities
+            verbish = lambda w: w.lower() in R.verbs or w.lower() in getattr(R, "base", {}) and w.lower() not in R.closed and not w[:1].isupper()
+            def verb_use(i_, w):                # a finite form, or a bare form with a word after it inside the phrase ("tell me")
+                lw_ = w.lower()
+                if w[:1].isupper() or lw_ in R.closed: return False
+                return lw_ in R.verbs or (lw_ in getattr(R, "base", {}) and i_ + 1 < len(subj))
+            if subj and any(verb_use(i_, w) for i_, w in enumerate(subj)): continue
+            content_ = lambda ws: any(w.lower() not in R.closed for w in ws)           # each side needs an open-class word
+            if not (subj and pred and content_(subj) and content_(pred)): continue
+            if subj and pred and (pred[0].lower() in R.verbs or pred[0].lower() in getattr(R, "base", {})) and pred[0].lower() not in R.closed: continue
+            if subj and pred and pred[0].lower() not in getattr(R, "participles", {}) and pred[0].lower() not in getattr(R, "negatives", ()):
+                out.append((" ".join(subj), " ".join(pred)))
+        return out
 
     def ask(self, text):
         """-> (answer text, event) or None. The question's first symbol must be closed-class (a question word); its verb
@@ -223,6 +280,18 @@ class EventMemory:
         lw = [t.lower() for t in words]
         aux_at = [i for i, t in enumerate(lw) if i > 0 and t in getattr(self.reader, "auxiliaries", ())]
         passive = bool(aux_at) and any(t in getattr(self.reader, "past_participles", ()) for t in lw[aux_at[0] + 1:])
+        # identity_prereg.md (C): "Who/What was X?" from identity facts (not a passive: no past participle)
+        if len(lw) > 2 and lw[1] in getattr(self.reader, "copula", ()) and not passive and self.facts:
+            ql = [base(t) for t in words[2:] if t.lower() not in self.reader.closed]; q = set(ql)
+            head = ql[-1] if ql else None            # amendment: the question's head noun ("Hana's HUSBAND") outweighs a possessor
+            bestf = None
+            for a, b in reversed(self.facts):
+                for x, y in ((a, b), (b, a)):
+                    xs = {base(w) for w in x.split()}
+                    ov = len(xs & q) + (0.5 if head in xs else 0) if xs & q else 0
+                    if ov and (bestf is None or ov > bestf[0] or (ov == bestf[0] and y[:1].isupper() and not bestf[1][:1].isupper())):
+                        bestf = (ov, y, x)
+            if bestf: return bestf[1], dict(verb="be", agent=bestf[2], patient=bestf[1], adjuncts=[], text="")
         best = None
         irr_ok = any(t in (getattr(self.reader, "to_marker", None) or ()) for t in lw[1:])   # reality_prereg.md (B)
         for ev in reversed(self.events):

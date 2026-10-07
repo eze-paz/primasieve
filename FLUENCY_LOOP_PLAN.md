@@ -146,3 +146,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 33 (novel 18) | B4-book | clauses of a long sentence read one by one; questions and verb-less readings refused (booksegment_prereg.md) | PASS (C1 36.6 %, C2 0.96) | **real novels 31.9 -> 36.6 %** |
 | 2026-10-07 | 34 (novel 19) | B4-book | clause cuts at dashes, colons, a new subject after a comma (booksegment2_prereg.md) | D2 PASS (0.94), D1 miss (38.2 vs 39 %) | real novels 36.6 -> 38.2 % |
 | 2026-10-07 | 35 (novel 20) | B4-book precision | possessives kept whole, no object opened by a verb form, plural before a finite verb is a noun (bookposs_prereg.md) | PASS (0.96 at 38.0 %) | precision held at higher coverage |
+| 2026-10-07 | 36 | B6 (from the novel line) | identity facts from copulas and appositions in the story memory; abbreviation-split statements rejoined (identity_prereg.md) | PASS | **B6 49 -> 53**; probes RIGHT 104; B2 held after two amendments |

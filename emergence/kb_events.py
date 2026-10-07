@@ -349,6 +349,13 @@ def class_of_gloss(gloss_class, words):
 
 
 @_disk_memo
+def learn_abbr(n_books=60):
+    """identity_prereg.md amendment: abbreviations learned as core/bookworld.abbreviations does ("Mrs", "Dr")"""
+    from core.bookworld import abbreviations
+    return set(abbreviations([open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read() for b in books(False)[:n_books]]))
+
+
+@_disk_memo
 def learn_conditional(closed, markers, n_books=60, min_n=1000):
     """reality_prereg.md (A): the closed sentence-initial symbol (>= min_n uses) whose sentences most often hold a marker
     after a comma, relative to all sentences -> {symbol}, and the lifts measured"""
@@ -493,5 +500,25 @@ def _build(closed, uni=None, same=None):
     except Exception:
         R.dets = set()
     R.plural = noun_plurals(uni)                                                          # phrases_prereg.md amendment
+    R.abbr = learn_abbr()                                                                # identity_prereg.md amendment
+    try:                      # identity_prereg.md (A): copula forms, learned as book_battery.copula_forms does
+        import sqlite3
+        from core.textmodel import TextModel
+        from core.synonyms import Synonyms
+        _db4 = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+        order = json.load(open(CLOSED_CACHE, encoding="utf-8")) if os.path.exists(CLOSED_CACHE) else sorted(closed)
+        fc = [w for w in order if R.verbs.get(w) not in (None, w) and pos_senses(_db4, w).get("verb")]
+        if fc:
+            c0 = fc[0]; lem = R.verbs[c0]
+            def mostly_verb(w):
+                ps = pos_senses(_db4, w); return ps.get("verb", 0) >= 0.5 * max(1, sum(ps.values()))
+            tmm = TextModel.load(os.path.join(HERE, "..", "_nldata", "textmodel.json"))
+            sims = [(w, n) for w, n in Synonyms(tmm).two_sided(c0, 60) if w in R.closed]
+            top = sims[0][1] if sims else 1
+            R.copula = {c0} | {w for w, n in sims if n >= 0.1 * top and mostly_verb(w) and R.verbs.get(w) in (None, lem)}
+        else:
+            R.copula = set()
+    except Exception:
+        R.copula = set()
     R.determiners = set()     # events5_prereg.md (F) dropped before the run: the learned set held modals and prepositions, not "a"/"the"
     return R, side, counts
