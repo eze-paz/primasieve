@@ -1,0 +1,1419 @@
+{
+ "note": "labels are the BUILDER's judgement (disclosed): ok = the sentence says this",
+ "it": 14,
+ "items": [
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 403,
+   "text": "\"Make my apologies to my aunt,\" he said.",
+   "prop": "according to My Lady'S Money, he (referent not resolved)'s words, (an order to the one addressed) make my apologies to",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 155,
+   "text": "It is a glorious idea.",
+   "prop": "according to Heart Of Darkness, It (referent not resolved) is a glorious idea",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 405,
+   "text": "I discovered that a lot of imported drainage-pipes for the settlement had been tumbled in there.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) discover",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 257,
+   "text": ".' I hastened to assure him I was not in the least typical.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) hasten",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 446,
+   "text": "Excited and merry, yet with her heart aching, she felt a sort of anguish seize her at the idea that this country had now become her own again.",
+   "prop": "according to An Iceland Fisherman, she (referent not resolved) feel",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 251,
+   "text": "Impassible and lofty in public, the Count betrayed the man only on rare intervals when, alone in his garden or his study, he supposed himself unobserved; but then he was a child again, he gave course to the tears hidden beneath the toga, to the excitement which, if wrongly interpreted, might have damaged his credit for perspicacity as a statesman.",
+   "prop": "according to Honorine, Count betrayed the man",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 304,
+   "text": "He walked and walked!",
+   "prop": "according to Honorine, Count (he) walked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 482,
+   "text": "He crossed the room gently to look at the sick man, and returning, said to me, 'He does not hear.' 'What!",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) cross the room gently",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 267,
+   "text": "The expenditure for housekeeping, not including purchases, was no more than thirty thousand francs a year; we had two additional men-servants, whose care restored the poetical aspect of the house; for this old palace, splendid even in its rust, had an air of dignity which neglect had dishonored.",
+   "prop": "according to Honorine, whose care restore the poetical aspect of the house",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 373,
+   "text": "The throne served as a hotbed for adultery, and the increase of this inviting crime marks the decline of the dogmas of the Catholic Church.",
+   "prop": "according to Honorine, The throne serve",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 472,
+   "text": "The flies buzzed in a great peace.",
+   "prop": "according to Heart Of Darkness, The flies buzz",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 295,
+   "text": "\"Am I in the way?\" inquired Felix.",
+   "prop": "according to My Lady'S Money, Felix inquired",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 293,
+   "text": "Odd thing that I, who used to clear out for any part of the world at twenty-four hours' notice, with less thought than most men give to the crossing of a street, had a moment--I won't say of hesitation, but of startled pause, before this commonplace affair.",
+   "prop": "according to Heart Of Darkness, who (referent not resolved) use",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 250,
+   "text": "When they had finished their feast, celebrating the Assumption of their patron saint, it was a little past midnight.",
+   "prop": "according to An Iceland Fisherman, it (referent not resolved) is a little past midnight",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 412,
+   "text": "I foresaw some strange drama indeed, for I understood that there could be no vulgar difference between the woman that Count could choose and such a character as his.",
+   "prop": "according to Honorine, I (narrator) foresaw",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 289,
+   "text": "Still rather sleepy, drinking in chestfuls of the fresh, chill air, they stepped up, drawing their long sea-boots higher, and having to shut their eyes, dazzled at first by a light so pale, yet in such abundance.",
+   "prop": "according to An Iceland Fisherman, they (referent not resolved) step",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 348,
+   "text": "He kept on looking out watchfully.",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) keep",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 123,
+   "text": "A poet of the sea had been born, and his genius still bears a trace of the shudder of fear experienced that evening by Pierre Loti the little child.",
+   "prop": "according to An Iceland Fisherman, his genius still bear",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 116,
+   "text": "He has related to us how, when still a little child, he first beheld the sea.",
+   "prop": "according to An Iceland Fisherman, he first behold the sea",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 448,
+   "text": "Hardyman pressed his advantage without mercy.",
+   "prop": "according to My Lady'S Money, Hardyman pressed his advantage",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 277,
+   "text": "\"Comte Octave had introduced me to the best houses in Paris, whither I went in his stead, with his servants and carriage, on the too frequent occasions when, on the point of starting, he changed his mind, and sent for a hackney cab to take him--Where?--that was the mystery.",
+   "prop": "according to Honorine, he (referent not resolved) change his mind",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 184,
+   "text": "Small eyes, of turquoise blue, were as keen and bright as those of the Prince de Talleyrand--which I admired at a later time--and endowed, like the Prince's, with the faculty of becoming expressionless to the verge of gloom; and they added to the singularity of a face that was not pale but yellow.",
+   "prop": "according to Honorine, I (narrator) admired",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 451,
+   "text": "Our respect for my father and mother, old folks of the Bourbon Court, hindered us from making this house fashionable, or renewing the furniture; we lived on, as we had done in the past, as children.",
+   "prop": "according to Honorine, we (referent not resolved) live",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 9,
+   "text": "Zola and his school stood at the head of the literary movement.",
+   "prop": "according to An Iceland Fisherman, Zola and his school stand",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 275,
+   "text": "The Count pronounced sentence on me, to use a legal phrase, as supreme and royal judge; he took my head in his hands, and kissed me on the forehead.",
+   "prop": "according to Honorine, Count pronounced sentence",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 24,
+   "text": "His success was great.",
+   "prop": "according to An Iceland Fisherman, His success is great",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 203,
+   "text": "He shook hands, I fancy, murmured vaguely, was satisfied with my French.",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) shake",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 202,
+   "text": "He was five feet six, I should judge, and had his grip on the handle-end of ever so many millions.",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) is five feet six",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 413,
+   "text": "But she hardly regretted Paris, although there were many splendid and amusing sights there.",
+   "prop": "according to An Iceland Fisherman, there is many splendid and amusing sights there",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 528,
+   "text": "Absorbed in the dog, Lady Lydiard answered, \"Isabel is doing nothing, let Isabel seal it.",
+   "prop": "according to My Lady'S Money, Lady Lydiard answered",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 549,
+   "text": "Isabel clasped her hands with a faint cry of horror.",
+   "prop": "according to My Lady'S Money, Isabel clasped",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 508,
+   "text": "And how good and honest was his look, as he told her all these short-comings, so that she might well understand that he was not rich!",
+   "prop": "according to An Iceland Fisherman, he (referent not resolved) tell",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 304,
+   "text": "Some, I heard, got drowned in the surf; but whether they did or not, nobody seemed particularly to care.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) hear",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 300,
+   "text": "The sun was fierce, the land seemed to glisten and drip with steam.",
+   "prop": "according to Heart Of Darkness, The sun is fierce",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 324,
+   "text": "\"Though the Comtes de Grandville and de Serizy, whose habits were much the same as my patron's, never dined away from home, we were still discussing the matter at a late hour, when we were startled by the man-servant calling me aside to say, 'MM.",
+   "prop": "according to Honorine, we (referent not resolved) is still discussing the matter at a late hour",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 13,
+   "text": "Emigration is counter to the instincts of the French nation.",
+   "prop": "according to Honorine, Emigration is counter to the instincts of the French nation",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 90,
+   "text": "ROBERT MOODY was at this time nearly forty years of age.",
+   "prop": "according to My Lady'S Money, ROBERT MOODY is at this time nearly forty years of age",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 290,
+   "text": "if I could only have held _my_ tongue--when I was in the diplomatic service, you know--what a position I might have occupied by this time!",
+   "prop": "according to My Lady'S Money, I (referent not resolved) is in the diplomatic service",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 463,
+   "text": "She tried to get back to the door of the boudoir.",
+   "prop": "according to My Lady'S Money, She (referent not resolved) try",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 89,
+   "text": "\"Mind,\" he began again, lifting one arm from the elbow, the palm of the hand outwards, so that, with his legs folded before him, he had the pose of a Buddha preaching in European clothes and without a lotus-flower--\"Mind, none of us would feel exactly like this.",
+   "prop": "according to Heart Of Darkness, the palm of the hand outward",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 508,
+   "text": "\"'As to the drama--it is this.",
+   "prop": "according to Honorine, it (referent not resolved) is this",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 132,
+   "text": "\"No subscription!\" protested Lady Lydiard.",
+   "prop": "according to My Lady'S Money, Lady Lydiard protested",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 325,
+   "text": "Felix sauntered back slowly towards the picture-gallery, for the third time.",
+   "prop": "according to My Lady'S Money, Felix sauntered back",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 316,
+   "text": "They formed a committee of three, of which I was the secretary.",
+   "prop": "according to Honorine, They (referent not resolved) form",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 141,
+   "text": "I had glimpses of some chance of getting into society, and seeking for what my heart desired most, a protectress, who would rescue me from the paths of danger, which a young man of two-and-twenty can hardly help treading, however prudent and well brought up he may be.",
+   "prop": "according to Honorine, I (narrator) had glimpses of some chance of getting",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 85,
+   "text": "The poor people who dwell here are silent and tenacious: their heart is full of tenderness and of dreams.",
+   "prop": "according to An Iceland Fisherman, their heart is full of tenderness and of dreams",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 133,
+   "text": "It was only later that he became acquainted with Brittany.",
+   "prop": "according to An Iceland Fisherman, It (referent not resolved) is only later that he became acquainted with Brittany",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 36,
+   "text": "It had known and served all the men of whom the nation is proud, from Sir Francis Drake to Sir John Franklin, knights all, titled and untitled--the great knights-errant of the sea.",
+   "prop": "according to Heart Of Darkness, the great knight",
+   "kind": "event",
+   "check": null,
+   "ok": 0
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 223,
+   "text": "Yann let him drink out of his own glass before he was sent to bed.",
+   "prop": "according to An Iceland Fisherman, Yann let",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": 1
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 127,
+   "text": "But there was one yet--the biggest, the most blank, so to speak--that I had a hankering after.",
+   "prop": "according to Heart Of Darkness, there is one yet",
+   "kind": "event",
+   "check": null,
+   "ok": 1
+  }
+ ],
+ "control": [
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 21,
+   "text": "The developments of human industry have brought the extremities of the world nearer together; but the soul of each race continues to cloak itself in its own individuality and to remain a mystery to the rest of the world.",
+   "prop": "the soul of each race | continue | cloak",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 531,
+   "text": "She lighted the taper, and closed and sealed the open envelope, without feeling curiosity enough even to look at the address.",
+   "prop": "even | look | the address",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 357,
+   "text": "She well remembered that part of her life; neither wealth nor town life had altered it; and like a far-off dream of wild freedom it came back to her, or as the remembrance of an undefined and mysterious previous existence, where the sandy shores seemed longer, and the cliffs higher and nobler.",
+   "prop": "the sandy shores | seem | longer",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 32,
+   "text": "Without going back to the Duke of Orleans and to Villon, one need only read a few of the poets of the sixteenth century to be struck by the prominence given to Nature in their writings.",
+   "prop": "that this mode of thinking | strike | the prominence given",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 270,
+   "text": "\"Isabel is an addition to my household since you were here last,\" she answered shortly.",
+   "prop": "Isabel | answer | shortly",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 219,
+   "text": "A secretary necessarily watches the man who makes use of him.",
+   "prop": "secretary necessarily | make | use",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 584,
+   "text": "When he went home on leave he rioted on a large scale--pompously.",
+   "prop": "leave | riot | large scale",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 223,
+   "text": "Yann let him drink out of his own glass before he was sent to bed.",
+   "prop": "Yann | let | drink",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 366,
+   "text": "He was a finely made, sinewy man, with clearly cut, regular features.",
+   "prop": "finely | make | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 464,
+   "text": "How quiet and empty Paimpol seemed to-night in the warm long twilight of May, which kept her still at her window alone, lulled in her love's young dream!",
+   "prop": "her window alone | lull | her love",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 362,
+   "text": "Living in large towns, her dress had become more modified than herself.",
+   "prop": "become | modify | the obstinate nature of her childhood",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 33,
+   "text": "Camille Maupin, who knew her Genoa down to its smallest chapels, had left her landscape painter to the care of the diplomate and the two Genoese marquises, and was miserly of her minutes.",
+   "prop": "smallest | leave | her landscape painter",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 520,
+   "text": "Having closed the drawing-room door on him, Isabel waited a little, absorbed in her own thoughts.",
+   "prop": "Having | close | the drawing",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 306,
+   "text": "Every day the coast looked the same, as though we had not moved; but we passed various places--trading places--with names like Gran' Bassam Little Popo, names that seemed to belong to some sordid farce acted in front of a sinister backcloth.",
+   "prop": "names | act | front of a sinister backcloth",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 536,
+   "text": "\"Did you see the saucy minx, what eyes she made at him?\" queried two or three girls, with their own eyes timidly bent under their golden or black brows, though they had among the dancers one or two lovers, to say the least.",
+   "prop": "eyes timidly | bend | their golden",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 47,
+   "text": "the expression might raise a smile at Genoa, where, in consequence of the inability of daughters to inherit, a woman is rarely rich; but Onorina Pedrotti, the only child of a banker without heirs male, was an exception.",
+   "prop": "expression | raise | smile",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 248,
+   "text": "He expected to marry Yann's sister soon, but never yet had answered any girl's love advances.",
+   "prop": "boyish tones | marry | Yann",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 455,
+   "text": "On the evening of this same _Pardon_, Sylvestre and he, walking arm-in-arm, had crossed her father and herself, and had stopped to wish them good-day.",
+   "prop": "the back of his head and his black hair | cross | her father",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 180,
+   "text": "In a very few hours I arrived in a city that always makes me think of a whited sepulcher.",
+   "prop": "few hours | arrive | city",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 303,
+   "text": "We pounded along, stopped, landed soldiers; went on, landed custom-house clerks to levy toll in what looked like a God-forsaken wilderness, with a tin shed and a flag-pole lost in it; landed more soldiers--to take care of the custom-house clerks, presumably.",
+   "prop": "tin | shed | flag",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 520,
+   "text": "Then to hide my wife, to secure her against discovery, to find her a housekeeper who would be devoted to me and be my intelligent confidante--it was a task worthy of Figaro!",
+   "prop": "which the Countess | devote | an act of charity",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 389,
+   "text": "\"Instead of going up, I turned and descended to the left.",
+   "prop": "his charge | turn | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 490,
+   "text": "And I had to keep silence.",
+   "prop": "man of sixty | keep | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 351,
+   "text": "Even her hands, without being conventionally small, were white and delicate, never having touched rough work.",
+   "prop": "having | touch | rough work",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 253,
+   "text": "Around them stretched an immense colourless waste, and excepting the planks of their ship, all seemed transparent, ethereal, and fairy-like.",
+   "prop": "the three others | except | the planks of their ship",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 538,
+   "text": "Almost at the same moment the boudoir-door opened, and Robert Moody, released at last from attendance on Tommie, entered the drawing-room.",
+   "prop": "Tommie | enter | the drawing",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 444,
+   "text": "The quiet, dreary monotone in which he habitually spoke quickened a little under his present excitement.",
+   "prop": "which he habitually | speak | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 139,
+   "text": "In those days I always went to sleep as Grand Duke of Tuscany,--as a millionaire,--as beloved by a princess,--or famous!",
+   "prop": "that the True Wonderful Lamp | sleep | Grand Duke of Tuscany",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 55,
+   "text": "It is none the less a fact that the author of _La Nouvelle Heloise_ was the first to blend the moral life of man with his exterior surroundings.",
+   "prop": "first | blend | the moral life of man",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 386,
+   "text": "And was it really possible and true, that her last darling was to be torn from her?",
+   "prop": "her thoughts | tear | alone",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 261,
+   "text": "If these spurts of temper offended me, he could get over it without thinking of asking my pardon; but then his manners were gracious to the point of Christian humility.",
+   "prop": "these spurts of temper | offend | say",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 368,
+   "text": "That is the real question so far as we are concerned.",
+   "prop": "The Catholic Church | concern | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 389,
+   "text": "\"Instead of going up, I turned and descended to the left.",
+   "prop": "his charge | descend | trust",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 376,
+   "text": "\"Aha, _la belle_, when must I call to take your measure?\"",
+   "prop": "his sons | take | your measure",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 460,
+   "text": "But we spell it with an _i e_ at the end, which makes it less vulgar than Tommy with a _y_.",
+   "prop": "we spell | it | Tommie",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 162,
+   "text": "As we went up the marble steps, as cold as tombstones, and wide enough for eight persons to walk abreast, our tread echoed under sonorous vaulting.",
+   "prop": "our tread | echo | sonorous vaulting",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 545,
+   "text": "\"He lifted the dog's eyelid and looked at his eyes, and then he told us the bath was useless.\"",
+   "prop": "Hardyman | lift | the dog",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 240,
+   "text": "These ways of Yann greatly pained and surprised Sylvestre.",
+   "prop": "These ways of Yann greatly | surprise | Sylvestre",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 347,
+   "text": "The proud beautiful girl had blushed very red when she wrote those words.",
+   "prop": "The proud beautiful girl | write | those words",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 356,
+   "text": "And what did he see?",
+   "prop": "the picture gallery | do | he see",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 438,
+   "text": "And then, she felt that she was weak and destined to obedience, and she awaited marriage without wishing for it.",
+   "prop": "Shame and grief | feel | even inquire",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 178,
+   "text": "However, through this glorious affair I got my appointment, before I had fairly begun to hope for it.",
+   "prop": "this glorious affair | get | my appointment",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 459,
+   "text": "We are obliged to call him by it, because he won't answer to any other than the name he had when my Lady bought him.",
+   "prop": "His name | win | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 140,
+   "text": "Amid so many works wherein the luxuries of the Orient, the quasi animal life of the Pacific, the burning passions of Africa, are painted with a vigour of imagination never witnessed before his advent, _An Iceland Fisherman_ shines forth with incomparable brilliancy.",
+   "prop": "the burning | paint | vigour of imagination",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 370,
+   "text": "With great care and good management she managed to appear pretty well dressed, although her gowns were much darned, and hardly held together.",
+   "prop": "great care and good management | manage | appear pretty",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 488,
+   "text": "This way, sir, if you please, I am sure I heard my Lady call.\"",
+   "prop": "am sure | hear | my Lady",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 470,
+   "text": "From the day when she left me I have lived on memory; one by one I recall the pleasures for which Honorine no doubt had no taste.",
+   "prop": "no doubt | have | no taste",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 539,
+   "text": "There she lives under the name of her housekeeper, Madame Gobain, the old woman of impeccable discretion whom I was so lucky as to find, and whose affection Honorine has won.",
+   "prop": "Honorine | find | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 422,
+   "text": "Must not supreme grief always come at last to stagnation?",
+   "prop": "supreme grief | come | last",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 205,
+   "text": "\"In about forty-five seconds I found myself again in the waiting-room with the compassionate secretary, who, full of desolation and sympathy, made me sign some document.",
+   "prop": "full of desolation and sympathy | make | sign",
+   "ok": null
+  }
+ ],
+ "pronouns": [
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 14,
+   "prev": "On the whole river there was nothing that looked half so nautical.",
+   "text": "He resembled a pilot, which to a seaman is trustworthiness personified.",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) resemble",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 486,
+   "prev": "Then, alluding with a toss of the head to the tumult in the station-yard, 'When one has got to make correct entries, one comes to hate those savages--hate them to the death.' He remained thoughtful for a moment.",
+   "text": "'When you see Mr. Kurtz,' he went on, 'tell him from me that everything here'--he glanced at the desk--'is very satisfactory.",
+   "prop": "according to Heart Of Darkness, he (referent not resolved) go",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 136,
+   "prev": "Thus was formed and developed, far from literary circles and from Parisian coteries, one of the most original writers that had appeared for a long time.",
+   "text": "He noted his impressions while touring the world; one fine morning he published them, and from the very first the reading public was won.",
+   "prop": "according to An Iceland Fisherman, He (referent not resolved) note his impressions",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 293,
+   "prev": "Before disappearing through the aperture they stopped to play with Turc, the ship's dog, a young Newfoundland with great clumsy paws.",
+   "text": "They sparred at him, and he pretended to bite them like a young wolf, until he bit too hard and hurt them, whereupon Yann, with a frown and anger in his quick-changing eyes, pushed him aside with an impatient blow that sent him flying and made him howl.",
+   "prop": "according to An Iceland Fisherman, They (referent not resolved) spar",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 520,
+   "prev": "I induced the priest of the parish in which the Countess was living to supply her needs as though he were performing an act of charity.",
+   "text": "Then to hide my wife, to secure her against discovery, to find her a housekeeper who would be devoted to me and be my intelligent confidante--it was a task worthy of Figaro!",
+   "prop": "according to Honorine, it (referent not resolved) is a task worthy of Figaro",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 315,
+   "prev": "They wanted no excuse for being there.",
+   "text": "They were a great comfort to look at.",
+   "prop": "according to Heart Of Darkness, They (referent not resolved) is a great comfort to look at",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 113,
+   "prev": "\"I had then, as you remember, just returned to London after a lot of Indian Ocean, Pacific, China Seas--a regular dose of the East--six years or so, and I was loafing about, hindering you fellows in your work and invading your homes, just as though I had got a heavenly mission to civilize you.",
+   "text": "It was very fine for a time, but after a bit I did get tired of resting.",
+   "prop": "according to Heart Of Darkness, It (referent not resolved) is very fine for a time",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 368,
+   "prev": "The good old dame, poor but tidy, left Gaud with cordial thanks as soon as the letter had been read again and the envelope closed.",
+   "text": "She lived rather far away, at the other end of Ploubazlanec, in a hamlet on the coast, in the same cottage where she first had seen the light of day, and where her sons and grandsons had been born.",
+   "prop": "according to An Iceland Fisherman, She (referent not resolved) live",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 283,
+   "prev": "\"I decided on the second alternative.",
+   "text": "\"'Yesterday,' said I, when he was at breakfast, 'I lost persistently at play; I was provoked, and went on; I owe two thousand francs.",
+   "prop": "according to Honorine, I (narrator) said",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 281,
+   "prev": "On this special morning, around the small plank platform occupied by Yann and Sylvestre, the shifting outer world had an appearance of deep meditation, as though this were an altar recently raised; and the sheaves of sun-rays, which darted like arrows under the sacred arch, spread in a long glimmering stream over the motionless waves, as over a marble floor.",
+   "text": "Then, slowly and more slowly yet loomed still another wonder; a high, majestic, pink profile--it was a promontory of gloomy Iceland.",
+   "prop": "according to An Iceland Fisherman, it (referent not resolved) is a promontory of gloomy Iceland",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 290,
+   "prev": "Ah!",
+   "text": "if I could only have held _my_ tongue--when I was in the diplomatic service, you know--what a position I might have occupied by this time!",
+   "prop": "according to My Lady'S Money, I (referent not resolved) is in the diplomatic service",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 421,
+   "prev": "He seemed to me sublime.",
+   "text": "I read a poem of melancholy, I saw perpetual activity in the heart I had accused of being torpid.",
+   "prop": "according to Honorine, I (narrator) read a poem of melancholy",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 272,
+   "prev": "He had never spoken to me of my future prospects, but he had taken an interest, both as a master and as a father, in training me.",
+   "text": "He often required me to collect materials for his most arduous labors; I drew up some of his reports, and he corrected them, showing the difference between his interpretation of the law, his views and mine.",
+   "prop": "according to Honorine, I (narrator) drew",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 412,
+   "prev": "\"I went to bed greatly agitated; for the mystery, far from being explained, seemed to me more obscure than ever.",
+   "text": "I foresaw some strange drama indeed, for I understood that there could be no vulgar difference between the woman that Count could choose and such a character as his.",
+   "prop": "according to Honorine, I (narrator) foresaw",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 496,
+   "prev": "Hardyman's last imbecile question had opened her eyes to the true state of the case.",
+   "text": "Still, Tommie's future was in this strange gentleman's hands; she felt bound to consider that.",
+   "prop": "according to My Lady'S Money, she (referent not resolved) feel",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 394,
+   "prev": "I've seen the devil of violence, and the devil of greed, and the devil of hot desire; but, by all the stars!",
+   "text": "these were strong, lusty, red-eyed devils, that swayed and drove men--men, I tell you.",
+   "prop": "according to Heart Of Darkness, these (referent not resolved) is strong",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 193,
+   "prev": "His profession, rank, luxury, fortune, and style of living were the same; all these details are true, but I would not be false to my benefactor, nor to my usual habits of discretion.",
+   "text": "\"Instead of feeling--as I really was, socially speaking--an insect in the presence of an eagle,\" the narrator went on after a pause, \"I felt I know not what indefinable impression from the Count's appearance, which, however, I can now account for.",
+   "prop": "according to Honorine, I (narrator) felt",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 463,
+   "prev": "\"I remember only the broad outlines of the reproaches the Count addressed to himself, with all the good faith of an anatomist seeking the cause of a disease which might be overlooked by his brethren; but his merciful indulgence struck me then as really worthy of that of Jesus Christ when He rescued the woman taken in adultery.",
+   "text": "\"'It was eighteen months after my father's death--my mother followed him to the tomb in a few months--when the fearful night came which surprised me by Honorine's farewell letter.",
+   "prop": "according to Honorine, a speaker (not resolved)'s words, It (referent not resolved) is eighteen months after my father",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 343,
+   "prev": "'So-o-o!' he exclaimed.",
+   "text": "He shuffled athwart, keeping one eye ahead vigilantly.",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) shuffle athwart",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 145,
+   "prev": "I always went my own road and on my own legs where I had a mind to go.",
+   "text": "I wouldn't have believed it of myself; but, then--you see--I felt somehow I must get there by hook or by crook.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) feel somehow",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 219,
+   "prev": "Two youths with foolish and cheery countenances were being piloted over, and she threw at them the same quick glance of unconcerned wisdom.",
+   "text": "She seemed to know all about them and about me too.",
+   "prop": "according to Heart Of Darkness, She (referent not resolved) seem",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 369,
+   "prev": "I blinked, the path was steep.",
+   "text": "A horn tooted to the right, and I saw the black people run.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) see the black people run",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 359,
+   "prev": "That was the picture, to the footman's eye.",
+   "text": "He took a gloomy view of the state of Mr. Sweetsir's brains on his return to the servants' hall.",
+   "prop": "according to My Lady'S Money, He (referent not resolved) take",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 558,
+   "prev": "Otherwise there was only an indefinable, faint expression of his lips, something stealthy--a smile--not a smile--I remember it, but I can't explain.",
+   "text": "It was unconscious, this smile was, though just after he had said something it got intensified for an instant.",
+   "prop": "according to Heart Of Darkness, It (referent not resolved) is unconscious",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 306,
+   "prev": "And he rubbed his hands enough to rub the skin off.",
+   "text": "And then, if I met him unexpectedly as he came to the angle of a path, I saw his face beaming.",
+   "prop": "according to Honorine, I (narrator) saw his face beaming",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 269,
+   "prev": ".",
+   "text": "He lifted a warning forefinger.",
+   "prop": "according to Heart Of Darkness, He (referent not resolved) lift",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 190,
+   "prev": "Her dress was as plain as an umbrella-cover, and she turned round without a word and preceded me into a waiting-room.",
+   "text": "I gave my name, and looked about.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) give my name",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 421,
+   "prev": "I began to distinguish the gleam of eyes under the trees.",
+   "text": "Then, glancing down, I saw a face near my hand.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) see",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 377,
+   "prev": "He was always the same grave, quiet, obstinately resolute man--true to the few friends whom he admitted to his intimacy, and sincere to a fault in the expression of his feelings among persons whom he distrusted or disliked.",
+   "text": "As he entered the picture-gallery and paused for a moment looking at Felix on the sofa, his large, cold, steady gray eyes rested on the little man with an indifference that just verged on contempt.",
+   "prop": "according to My Lady'S Money, he (referent not resolved) enter the picture",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 144,
+   "prev": "\"The persistent study of other people's rights into which I had plunged was not always enough to repress painful imaginings.",
+   "text": "Yes, sometimes in fancy I threw myself into theatrical life; I thought I could be a great actor; I dreamed of endless triumphs and loves, knowing nothing of the disillusion hidden behind the curtain, as everywhere else--for every stage has its reverse behind the scenes.",
+   "prop": "according to Honorine, I (referent not resolved) dream",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 380,
+   "prev": "Another report from the cliff made me think suddenly of that ship of war I had seen firing into a continent.",
+   "text": "It was the same kind of ominous voice; but these men could by no stretch of imagination be called enemies.",
+   "prop": "according to Heart Of Darkness, It (referent not resolved) is the same kind of ominous voice",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 122,
+   "prev": "above was stretched out full a sky all of one piece, of a dark gray colour like a heavy mantle; very, very far away, in unmeasurable depths of horizon, could be seen a break, an opening between sea and sky, a long empty crack, of a light pale yellow.\" He felt a sadness unspeakable, a sense of desolate solitude, of abandonment, of exile.",
+   "text": "He ran back in haste to unburden his soul upon his mother's bosom, and, as he says, \"to seek consolation with her for a thousand anticipated, indescribable pangs, which had wrung my heart at the sight of that vast green, deep expanse.\"",
+   "prop": "according to An Iceland Fisherman, He (referent not resolved) run back",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 303,
+   "prev": "Settlements some centuries old, and still no bigger than pin-heads on the untouched expanse of their background.",
+   "text": "We pounded along, stopped, landed soldiers; went on, landed custom-house clerks to levy toll in what looked like a God-forsaken wilderness, with a tin shed and a flag-pole lost in it; landed more soldiers--to take care of the custom-house clerks, presumably.",
+   "prop": "according to Heart Of Darkness, We (referent not resolved) pound",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 366,
+   "prev": "The thing looked as dead as the carcass of some animal.",
+   "text": "I came upon more pieces of decaying machinery, a stack of rusty rails.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) come",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 156,
+   "prev": "While taking part as a naval officer in the Tonquin war, Loti had exposed in a Parisian newspaper a series of scandals which succeeded on the capture of Hue, and, being recalled, he was now suspended from the service for more than a year.",
+   "text": "He continued for some time nearly silent, but in 1886, he published a novel of life among the Breton fisher-folk, entitled \"Pecheurs d'Islande\"; this has been the most popular of all his writings.",
+   "prop": "according to An Iceland Fisherman, He (referent not resolved) continue",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 251,
+   "prev": "His motto seemed to be, 'I suffer, and am silent.' The escort of respect and admiration which attended him; the friendship of workers as valiant as himself--Grandville and Serizy, both presiding judges--had no hold over the Count: either he told them nothing, or they knew all.",
+   "text": "Impassible and lofty in public, the Count betrayed the man only on rare intervals when, alone in his garden or his study, he supposed himself unobserved; but then he was a child again, he gave course to the tears hidden beneath the toga, to the excitement which, if wrongly interpreted, might have damaged his credit for perspicacity as a statesman.",
+   "prop": "according to Honorine, Count (he) gave course",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 350,
+   "prev": "Standing, she was rather tall; her waist was modelled in a clinging bodice, as perfectly fitting as that of a fashionable dame.",
+   "text": "In spite of her cap, she looked like a real lady.",
+   "prop": "according to An Iceland Fisherman, she (referent not resolved) look like",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 472,
+   "prev": "Time passed, yet he did not come, and they talked of giving up any further waiting for him.",
+   "text": "Then it was she discovered that it was for his pleasure, and his alone, that she had donned her best dress; with any other of the young men present at the ball, the evening's enjoyment would be spoiled.",
+   "prop": "according to An Iceland Fisherman, it (referent not resolved) is she discovered that it was for his pleasure",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 381,
+   "prev": "He had made this joke several times; but, to-day, she could scarcely take it good-naturedly.",
+   "text": "She felt more tired than ever of her hard-working life, and her thoughts flew back to her dear grandson--the last of them all, who, upon his return from Iceland, was to enter the navy for five years!",
+   "prop": "according to An Iceland Fisherman, She (referent not resolved) feel",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 124,
+   "prev": "\"Certainly not, my Lady.",
+   "text": "I followed my instructions, and described you as a benevolent person in search of cases of real distress.",
+   "prop": "according to My Lady'S Money, I (referent not resolved) follow my instructions",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 304,
+   "prev": "We pounded along, stopped, landed soldiers; went on, landed custom-house clerks to levy toll in what looked like a God-forsaken wilderness, with a tin shed and a flag-pole lost in it; landed more soldiers--to take care of the custom-house clerks, presumably.",
+   "text": "Some, I heard, got drowned in the surf; but whether they did or not, nobody seemed particularly to care.",
+   "prop": "according to Heart Of Darkness, I (referent not resolved) hear",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 454,
+   "prev": "\"What his name is?--what his temper is?--what his illness is?",
+   "text": "what diseases his father and mother had?--what--\"",
+   "prop": "according to My Lady'S Money, a speaker (not resolved)'s words, what (referent not resolved) disease his father and mother",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 509,
+   "prev": "And how good and honest was his look, as he told her all these short-comings, so that she might well understand that he was not rich!",
+   "text": "And she smiled also, as she gazed at him full in the face; answering seldom, but listening with her whole soul, more and more astonished and more and more drawn towards him.",
+   "prop": "according to An Iceland Fisherman, she (referent not resolved) gaze",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "sent": 276,
+   "prev": "The Count pronounced sentence on me, to use a legal phrase, as supreme and royal judge; he took my head in his hands, and kissed me on the forehead.",
+   "text": "\"'Maurice,' he exclaimed, 'you are no longer my apprentice; I know not yet what you will be to me--but if no change occurs in my life, perhaps you will take the place of a son.'",
+   "prop": "according to Honorine, Count (he) exclaimed",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 518,
+   "prev": "As he weighed sixteen stone I had no end of rows with the carriers.",
+   "text": "They jibbed, ran away, sneaked off with their loads in the night--quite a mutiny.",
+   "prop": "according to Heart Of Darkness, They (referent not resolved) jib",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 279,
+   "prev": "The lower-lying clouds were grouped round in a belt of intense shadow, encircling the waters and screening the far-off distance in darkness.",
+   "text": "They hinted as of a space in a boundary; they were as curtains veiling the infinite, or as draperies drawn to hide the too majestic mysteries, which would have perturbed the imagination of mortals.",
+   "prop": "according to An Iceland Fisherman, They (referent not resolved) hint",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "526",
+   "sent": 305,
+   "prev": "Some, I heard, got drowned in the surf; but whether they did or not, nobody seemed particularly to care.",
+   "text": "They were just flung out there, and on we went.",
+   "prop": "according to Heart Of Darkness, They (referent not resolved) is just flung out there",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "2196",
+   "sent": 377,
+   "prev": "\"Aha, _la belle_, when must I call to take your measure?\"",
+   "text": "But she declined with thanks; she had not yet quite decided to have that dress made.",
+   "prop": "according to An Iceland Fisherman, she (referent not resolved) decline",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 148,
+   "prev": "\"When I read the newspaper notice of Mr. Tollmidge's death, I searched among his Lordship's papers to see if they really were related.",
+   "text": "I discovered some letters from Mr. Tollmidge, which showed me that he and Lord Lydiard were cousins.",
+   "prop": "according to My Lady'S Money, I (referent not resolved) discover some letters",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 172,
+   "prev": "The visitor was not a person easily discouraged.",
+   "text": "He took Lady Lydiard's hand, and kissed it with easy grace.",
+   "prop": "according to My Lady'S Money, He (referent not resolved) take Lady Lydiard",
+   "ok": null
+  }
+ ],
+ "checks": [
+  {
+   "group": "novels",
+   "book": "1628",
+   "sent": 306,
+   "text": "Moody produced a slip of paper from his waistcoat pocket.",
+   "prop": "according to My Lady'S Money, Moody produced a slip of paper",
+   "other": 1107,
+   "other_text": "Moody produced his slip of paper with the number on it.",
+   "ok": null
+  }
+ ],
+ "bridges": [
+  {
+   "group": "novels",
+   "book": "1683",
+   "name": "Countess",
+   "item": "Q5177051",
+   "label": "countess",
+   "evidence_name": "count",
+   "evidence_item": "Q3519259",
+   "evidence_label": "count",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "name": "French Ambassador",
+   "item": "Q121998",
+   "label": "ambassador",
+   "evidence_name": "consul",
+   "evidence_item": "Q207978",
+   "evidence_label": "consul",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "name": "French Consul",
+   "item": "Q207978",
+   "label": "consul",
+   "evidence_name": "ambassador",
+   "evidence_item": "Q121998",
+   "evidence_label": "ambassador",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1683",
+   "name": "Count",
+   "item": "Q3519259",
+   "label": "count",
+   "evidence_name": "countess",
+   "evidence_item": "Q5177051",
+   "evidence_label": "countess",
+   "ok": null
+  }
+ ],
+ "judged_by": "builder (main loop), 2026-10-07; strict; UNSEEN novels 1628, 1683, 2196, 526; full text / context consulted for items 6, 8, 20, 22, 47"
+}

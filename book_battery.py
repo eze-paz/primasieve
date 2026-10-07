@@ -21,7 +21,11 @@ def say(s=""): print(str(s).encode("ascii", "replace").decode(), flush=True)
 def held_book(bid): return int(hashlib.sha256(f"book:{bid}".encode()).hexdigest(), 16) % 10 == 0
 
 
+TEST_OVERRIDE = []
+
+
 def test_books():
+    if TEST_OVERRIDE: return list(TEST_OVERRIDE)
     books = sorted(f[:-4] for f in os.listdir(GUT) if f.endswith(".txt"))
     return [b for b in books if held_book(b)][:10]
 
@@ -516,4 +520,6 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
 
 if __name__ == "__main__":
     it = int(sys.argv[sys.argv.index("--it") + 1]) if "--it" in sys.argv else 1
+    if "--books" in sys.argv:            # generalize_prereg.md: other held-out books, all counted as novels
+        ids = sys.argv[sys.argv.index("--books") + 1].split(","); NOVELS.clear(); NOVELS.update(ids); TEST_OVERRIDE[:] = ids
     run(it, knockout="--knockout" in sys.argv, chains="--nochains" not in sys.argv)
