@@ -30,13 +30,13 @@ def units(B, n=500):
     return [i for i, s in enumerate(B.sents) if 4 <= len(s.split()) <= 60][:n]
 
 
-def run(it=1, judged_n=(50, 50), control_n=50, hooks=None):
+def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_ids=None):
     R, L = KB.build(); abbr = set(L["abbreviations"])
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
     stats = collections.defaultdict(collections.Counter); props_all = []; control = []; books = {}
-    for b in test_books():
-        B = KB.book(b, R, L); books[b] = B
+    for b in (book_ids or test_books()):
+        B = KB.book(b, R, L, it=it, knockout=knockout); books[b] = B
         if hooks and "after_build" in hooks: hooks["after_build"](B)
         g = "novels" if b in NOVELS else "others"
         U = set(units(B)); per = {}
@@ -64,14 +64,20 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None):
     honesty = sum(1 for g, b, i, p in props_all if p.get("real") or not Book.say(p).startswith("according to "))
     say(f"K3 honesty: book propositions said without context or marked real: {honesty} of {len(props_all)}")
     # judged samples (fixed seeds; the file keeps the builder's labels)
-    path = os.path.join(HERE, "tests", f"bookworld_judged_it{it}.json")
+    path = os.path.join(HERE, "tests", f"bookworld_judged_it{it}{'ko' if knockout else ''}.json")
+    pron = [x for x in props_all if x[3].get("via")]
+    say(f"pronoun-resolved propositions: {len(pron)}; units read only through a pronoun: "
+        f"{len({(b, i) for g, b, i, p in pron} - {(b, i) for g, b, i, p in props_all if not p.get('via')})}")
     rnd = random.Random(it)
     nov = [x for x in props_all if x[0] == "novels"]; oth = [x for x in props_all if x[0] == "others"]
     samp = rnd.sample(nov, min(judged_n[0], len(nov))) + rnd.sample(oth, min(judged_n[1], len(oth)))
     csamp = random.Random(100 + it).sample(control, min(control_n, len(control)))
+    psamp = random.Random(200 + it).sample(pron, min(30 if knockout else 50, len(pron))) if it >= 2 else []
+    if knockout: samp, csamp = [], []
     if os.path.exists(path):
         J = json.load(open(path, encoding="utf-8"))
-        for name in ("items", "control"):
+        for name in ("items", "control", "pronouns"):
+            if name not in J: continue
             lab = [x for x in J[name] if x.get("ok") is not None]
             for grp in ("novels", "others"):
                 lg = [x for x in lab if x["group"] == grp]
@@ -81,7 +87,9 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None):
         J = dict(note="labels are the BUILDER's judgement (disclosed): ok = the sentence says this", it=it,
                  items=[dict(group=g, book=b, sent=i, text=books[b].sents[i], prop=Book.say(p), kind=p["kind"],
                              check=p.get("check"), ok=None) for g, b, i, p in samp],
-                 control=[dict(group=g, book=b, sent=i, text=books[b].sents[i], prop=e, ok=None) for g, b, i, e in csamp])
+                 control=[dict(group=g, book=b, sent=i, text=books[b].sents[i], prop=e, ok=None) for g, b, i, e in csamp],
+                 pronouns=[dict(group=g, book=b, sent=i, prev=books[b].sents[i - 1] if i else "", text=books[b].sents[i],
+                                prop=Book.say(p), ok=None) for g, b, i, p in psamp])
         json.dump(J, open(path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
         say(f"wrote {path} for judging")
     return stats, props_all, books
@@ -89,4 +97,4 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None):
 
 if __name__ == "__main__":
     it = int(sys.argv[sys.argv.index("--it") + 1]) if "--it" in sys.argv else 1
-    run(it)
+    run(it, knockout="--knockout" in sys.argv)

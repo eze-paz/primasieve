@@ -1,0 +1,279 @@
+{
+ "note": "labels are the BUILDER's judgement (disclosed): ok = the sentence says this",
+ "it": 2,
+ "items": [],
+ "control": [],
+ "pronouns": [
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 325,
+   "prev": "Looking round the room her eye fell on Mr. Vanborough.",
+   "text": "She started, with a loud exclamation of astonishment.",
+   "prop": "according to Man And Wife, Vanborough (she) started",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 91,
+   "prev": "Mr. Chops, to git him convenient to the table, had his chair on a throne (much of the form of George the Fourth's in the canvass), but he hardly appeared to me to be King there in any other pint of view, for his two gentlemen ordered about like Emperors.",
+   "text": "They was all dressed like May- Day--gorgeous!--And as to Wine, they swam in all sorts.",
+   "prop": "according to Going Into Society, Fourth (they) swam",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 377,
+   "prev": "\"Ah!\" she cried, \"let us go in; he never looked at me like that!\" \"Old man!\" said Poussin, roused from his meditation by Gillette's voice, \"see this sword.",
+   "text": "I will plunge it into your heart at the first cry of that young girl.",
+   "prop": "according to The Hidden Masterpiece, Gillette (i) will plunge",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 83,
+   "prev": "They were pale young misses, with insignificant faces and snub noses, resembling an aunt who died a spinster, as they themselves seemed most likely to.",
+   "text": "Sir Jeoffry could not bear the sight of them, and they fled at the sound of his footsteps, if it so happened that by chance they heard it, huddling together in corners, and slinking behind doors or anything big enough to hide them.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry (they) fled",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 120,
+   "prev": "It was arter he had made a clean sweep of the sassages (beef, and to the best of my calculations two pound and a quarter), that the wisdom as was in that little man began to come out of him like prespiration.",
+   "text": "\"Magsman,\" he says, \"look upon me!",
+   "prop": "according to Going Into Society, Magsman (he) says",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 802,
+   "prev": "Why, hark'ee--come hither, Thy--hark'ee, I had it from his aunt, my sister Touchwood.",
+   "text": "Gadsbud, he does not care a farthing for anything of thee but thy portion.",
+   "prop": "according to The Double-Dealer, Touchwood (he) does",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 710,
+   "prev": "I.",
+   "text": "Cynthia frowns whene'er I woo her, Yet she's vext if I give over; Much she fears I should undo her, But much more to lose her lover: Thus, in doubting, she refuses; And not winning, thus she loses.",
+   "prop": "according to The Double-Dealer, Cynthia (she) refuses",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 262,
+   "prev": "This has been studied by Elliot Smith, Wood Jones, Ruffer and Rietti.",
+   "text": "The majority of the lesions appear to have been the common osteo-arthritis, which involved not only the men, but many of the pet animals kept in the temples.",
+   "prop": "according to The Evolution Of Modern Medicine, Elliot Smith (which) involved",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 107,
+   "prev": "It warn't long after that, that I read in the newspaper of Mr. Chops's being presented at court.",
+   "text": "It was printed, \"It will be recollected\"--and I've noticed in my life, that it is sure to be printed that it _will_ be recollected, whenever it won't--\"that Mr. Chops is the individual of small stature, whose brilliant success in the last State Lottery attracted so much attention.\" Well, I says to myself, Such is Life!",
+   "prop": "according to Going Into Society, Chops (i) says",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 207,
+   "prev": "Would it not be better just to go under the hedge and pray that God would enable him?",
+   "text": "This pause saved him from a rash venture, which might have landed him in despair.",
+   "prop": "according to The Life Of John Bunyan, God (which) might have landed",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 153,
+   "prev": "He got wiser every day; his views of Society and the Public was luminous, bewilderin, awful; and his Ed got bigger and bigger as his Wisdom expanded it.",
+   "text": "He took well, and pulled 'em in most excellent for nine weeks.",
+   "prop": "according to Going Into Society, Ed (he) took",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 178,
+   "prev": "For the rest of the week I would not encourage Trottle by allowing him to refer to the House at all.",
+   "text": "I suspected he was making his own inquiries about dates, but I put no questions to him.",
+   "prop": "according to Going Into Society, Trottle (i) suspected",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 190,
+   "prev": "She had never called for it; and the poem had been lent to Jarber, at his express request, to read to me.",
+   "text": "Before he began, I rang the bell for Trottle; being determined to have him present at the new reading, as a wholesome check on his obstinacy.",
+   "prop": "according to Going Into Society, Trottle (being) determined",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 143,
+   "prev": "Sunday therefore was the day on which he \"did especially solace himself\" with them.",
+   "text": "He had yet to learn the identification of diversions with \"all manner of vice.\" The teaching came in this way.",
+   "prop": "according to The Life Of John Bunyan, Sunday (he) had yet",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 291,
+   "prev": "She would have her way in all things, or there should be no sport with her, and she would sing no songs for them, but would flout them bitterly, and sit in a great chair with her black brows drawn down, and her whole small person breathing rancour and disdain.",
+   "text": "Sir Jeoffry, who had bullied his wife, had now the pleasurable experience of being henpecked by his daughter; for so, indeed, he was.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry (who) had bullied his wife",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 471,
+   "prev": "And he rose up from his bed, And went back to his own place Sound and strong, and fair of face.\" Thus Aucassin makes a Legend of his lady, as it were, assigning to her beauty such miracles as faith attributes to the excellence of the saints.",
+   "text": "Meanwhile, Nicolette had slipped from the window of her prison chamber, and let herself down into the garden, where she heard the song of the nightingales.",
+   "prop": "according to Letters On Literature, Nicolette (she) heard the song",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 154,
+   "prev": "It is organic.",
+   "text": "Moreover, how truly relation is the condition of life may be understood from the extinct state of the English stage, which resembles nothing so much as a Royal Academy picture.",
+   "prop": "according to The Rhythm Of Life, English (which) resembles nothing",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 76,
+   "prev": "\"The Scholar Gipsy,\" \"Obermann,\" \"Switzerland,\" the melancholy majesty of the close of \"Sohrab and Rustum,\" the tenderness of those elegiacs on two kindred graves beneath the Himalayas and by the Midland Sea; the surge and thunder of \"Dover Beach,\" with its \"melancholy, long-withdrawing roar;\" these can only cease to whisper to us and console us in that latest hour when life herself ceases to \"moan round with many voices.\" My friends tell me that Mr. Arnold is too doubting, and too didactic, that he protests too much, and considers too curiously, that his best poems are, at most, \"a chain of highly valuable thoughts.\" It may be so; but he carries us back to \"wet, bird-haunted English lawns;\" like him \"we know what white and purple fritillaries the grassy harvest of the river yields,\" with him we try to practise resignation, and to give ourselves over to that spirit \"Whose purpose is not missed, While life endures, while things subsist.\" Mr. Arnold's poetry is to me, in brief, what Wordsworth's was to his generation.",
+   "text": "He has not that inspired greatness of Wordsworth, when nature does for him what his \"_lutin_\" did for Corneille, \"takes the pen from his hand and writes for him.\" But he has none of the creeping prose which, to my poor mind, invades even \"Tintern Abbey.\" He is, as Mr. Swinburne says, \"the surest-footed\" of our poets.",
+   "prop": "according to Letters On Literature, Wordsworth (he) has none",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 131,
+   "prev": "She dare not reprove the servants who were ruining her by their treatment, and whose manners were forming her own.",
+   "text": "Sir Jeoffry's servants were no more moral than their master, and being brought up as she was among them, their young mistress became strangely familiar with many sights and sounds it is not the fortune of most young misses of breeding to see and hear.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry (being) brought",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 290,
+   "prev": "\"He loves me no longer!\" thought Gillette, when she was once more alone.",
+   "text": "She regretted her promise.",
+   "prop": "according to The Hidden Masterpiece, Gillette (she) regretted",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 149,
+   "prev": "Nobody will thank us for what is underneath, remember that!\" At last the demon paused; the old man turned to Porbus and Poussin, who stood mute with admiration, and said to them,-- \"It is not yet equal to my Beautiful Nut-girl; still, one can put one's name to such a work.",
+   "text": "Yes, I will sign it,\" he added, rising to fetch a mirror in which to look at what he had done.",
+   "prop": "according to The Hidden Masterpiece, Beautiful Nut (i) will sign",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 249,
+   "prev": "If Mr. Kendrew wanted information, why should Mr. Kendrew ask for it in that way?",
+   "text": "\"Do you wish me to go into the law of the case?\" he inquired.",
+   "prop": "according to Man And Wife, Kendrew (he) inquired",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 376,
+   "prev": "\"The fruits of love wither in a day; those of art are immortal.\" \"Can it be,\" said Gillette, looking steadily at Poussin and at Porbus, \"that I am nothing more than a woman to him?\" She raised her head proudly; and as she glanced at Frenhofer with flashing eyes she saw her lover gazing once more at the picture he had formerly taken for a Giorgione.",
+   "text": "\"Ah!\" she cried, \"let us go in; he never looked at me like that!\" \"Old man!\" said Poussin, roused from his meditation by Gillette's voice, \"see this sword.",
+   "prop": "according to The Hidden Masterpiece, Frenhofer (she) cried",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 255,
+   "prev": "I love thee, wench--hang me if I do not!\" She made him play with her and with Rake for a good hour, and then took him back to the stables, and there ordered him about finely among the dogs and horses, perceiving that somehow this great man she had got hold of was a creature who was in power and could be made use of.",
+   "text": "When they returned to the house, he had her to eat her mid-day meal with him, when she called for ale, and drank it, and did good trencher duty, making him the while roar with laughter at her impudent child-talk.",
+   "prop": "according to A Lady Of Quality, Rake (they) returned",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 568,
+   "prev": "LADY FROTH.",
+   "text": "Some distinguishing quality, as, for example, the _bel air_ or _brillant_ of Mr. Brisk; the solemnity, yet complaisance of my lord, or something of his own that should look a little _Je-ne-sais-quoish_; he is too much a mediocrity, in my mind.",
+   "prop": "according to The Double-Dealer, Brisk (he) is too",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 113,
+   "prev": "\"Halloa!\" I says to the young man, \"what's up!\" He rubs his eyebrows with his toes, and he says, \"I can't imagine, Mr. Magsman\"--which he never could imagine nothin, and was monotonous company.",
+   "text": "The noise not leavin off, I laid down my pipe, and I took up a candle, and I went down and opened the door.",
+   "prop": "according to Going Into Society, Magsman (i) laid",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 473,
+   "prev": "\"Then caught she up her kirtle in both hands, behind and before, and flitted over the dew that lay deep on the grass, and fled out of the garden, and the daisy flowers bending below her tread seemed dark against her feet, so white was the maiden.\" Can't you see her stealing with those \"feet of ivory,\" like Bombyca's, down the dark side of the silent moonlit streets of Beaucaire?",
+   "text": "Then she came where Aucassin was lamenting in his cell, and she whispered to him how she was fleeing for her life.",
+   "prop": "according to Letters On Literature, Aucassin (she) whispered",
+   "ok": false
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 90,
+   "prev": "She lived in fear of Sir Jeoffry, and in fear of the servants, who knew full well that she was an humble dependant, and treated her as one.",
+   "text": "She hid away with her pupils in the bare school-room in the west wing, and taught them to spell and write and work samplers.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry (she) hid away",
+   "ok": false
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 588,
+   "prev": "Bunyan requested to be allowed to say a few parting words of encouragement to the terrified flock.",
+   "text": "This was granted, and he comforted the little company with the reflection that it was a mercy to suffer in so good a cause; and that it was better to be the persecuted than the persecutors; better to suffer as Christians than as thieves or murderers.",
+   "prop": "according to The Life Of John Bunyan, Bunyan (he) comforted",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 145,
+   "prev": "His Ed was so heavy, and he knocked it so hard, and he fell so stoney, and the sassagerial disturbance in him must have been so immense, that I thought he was gone.",
+   "text": "But, he soon come round with care, and he sat up on the floor, and he said to me, with wisdom comin out of his eyes, if ever it come: \"Magsman!",
+   "prop": "according to Going Into Society, Ed (he) sat",
+   "ok": false
+  }
+ ],
+ "judged": "2026-10-07 by the builder (Claude)"
+}

@@ -77,7 +77,7 @@ def learn(R, n=60, n_closed=150):
     preplike = sorted(a for a in cn if cn[a] >= 50 and cv[a] < 0.15 * cn[a] and share(a, "closed") >= 0.35)
     abbr = sorted(abbreviations(texts, share=0.8))     # amended before the scored run: "Mr" is 87 %
     out = dict(closed=closed, determiners=det, chain_heads=sorted(heads), abbreviations=abbr, subjects=sorted(subj),
-               verbish=sorted(verbish), skippable=sorted(skippable), nounish=nounish, preplike=preplike)
+               verbish=sorted(verbish), skippable=sorted(skippable), nounish=nounish, preplike=preplike, det2=sorted(det2))
     json.dump(out, open(CACHE, "w", encoding="utf-8"), indent=0)
     return out
 
@@ -99,7 +99,8 @@ def title_of(text):
     return None
 
 
-def book(bid, R, L, text=None):
+def book(bid, R, L, text=None, it=1, knockout=False):
     text = text if text is not None else open(os.path.join(GUT, bid + ".txt"), encoding="utf-8", errors="replace").read()
     return Book(bid, text, L["closed"], set(L["abbreviations"]), R, L["determiners"], L["chain_heads"], title=title_of(text),
-                verbish=L["verbish"], skippable=L["skippable"], nounish=L["nounish"], preplike=L["preplike"])
+                verbish=L["verbish"], skippable=L["skippable"], nounish=L["nounish"], preplike=L["preplike"],
+                det2=L.get("det2", ()), subjects=L.get("subjects", ()), pronouns=it >= 2, quotes=it >= 2, knockout=knockout)
