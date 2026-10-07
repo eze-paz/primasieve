@@ -49,10 +49,13 @@ def heading(t): return len(t) > 1 and t.isupper()
 
 class Book:
     def __init__(self, bid, text, closed, abbr, reader, determiners=(), chain_heads=(), title=None, least=5, verbish=(),
-                 skippable=(), nounish=(), preplike=(), det2=(), subjects=(), pronouns=False, knockout=False, quotes=False):
+                 skippable=(), nounish=(), preplike=(), det2=(), subjects=(), pronouns=False, knockout=False, quotes=False,
+                 version=1, complementizers=(), chains=True, speaker=None, narrator_label=None):
         self.verbish = set(verbish); self.skip = set(skippable); self.nounish = set(nounish); self.prep = set(preplike)
         self.bid = bid; self.closed = set(closed); self.R = reader; self.det = set(determiners); self.heads = set(chain_heads)
         self.det2 = set(det2); self.subjects = set(subjects) & self.closed
+        self.v = version; self.comp = set(complementizers); self.chains = chains and version >= 3; self._resolved = {}
+        self.speaker = speaker; self.narrator_label = narrator_label; self.narrated = False
         self.use_pronouns = pronouns; self.knockout = knockout; self.use_quotes = quotes; self.quote = None
         self.title = title or ("book " + str(bid)); self.real = False
         self.sents = split(text, abbr); self.toks = [tokens(s) for s in self.sents]
@@ -69,6 +72,18 @@ class Book:
                     if j < len(ts) and ts[j][:1].isupper() and is_word(ts[j]): nxt[t.lower()] += 1
         self.titles = {e for e in cap if nxt[e] >= 0.8 * cap[e]}
         self.low = low
+        if version >= 3:
+            # bookcheck (2): a capital followed by a lower-case open-class non-verb symbol in >= 50 % of its capitalised
+            # uses is an adjective ("English essays"), not a name head
+            adj = collections.Counter()
+            for ts in self.toks:
+                for k, t in enumerate(ts[:-1]):
+                    if t.lower() in self.entities and t[:1].isupper():
+                        n = ts[k + 1]
+                        if (n[:1].islower() and n.isalpha() and n.lower() not in self.closed and n.lower() not in reader.verbs
+                                and n.lower() not in reader.participles): adj[t.lower()] += 1
+            self.adjectives = {e for e in cap if adj[e] >= 0.5 * cap[e]}
+            self.entities -= self.adjectives
         self._names = [self.names(ts) for ts in self.toks]
         if quotes: self.quote = self.learn_quote()
         self.aff = collections.defaultdict(collections.Counter)
@@ -158,7 +173,9 @@ class Book:
         j = s - 1
         if self.use_pronouns:
             while j >= 0 and ts[j][:1].islower() and ts[j].lower() in self.det2: j -= 1
-        return j >= 0 and ts[j][:1].islower() and ts[j].lower() in self.prep
+        if j < 0: return False
+        if self.v >= 3 and ts[j].lower() in self.comp and (ts[j][:1].islower() or j == 0): return True   # bookcheck (3)
+        return (ts[j][:1].islower() or (self.v >= 3 and j == 0)) and ts[j].lower() in self.prep
 
     def doer_of(self, ts, k, vp, ends, starts):
         """-> (doer, end of the doer, how): (a) a name ending before the verb chain, at most two learned skippable symbols
@@ -227,8 +244,31 @@ class Book:
             if len(keys) != 1: continue
             pd = self.pronoun_doers(i)
             if pd and not any(n[0] < pd[0][0] for n in self._names[i]): self.aff[next(iter(keys))][pd[0][1]] += 1
+        if self.v >= 3 and self.speaker:
+            # bookcheck, amended before the run: the first-person symbol (learned: the commonest subject opening a
+            # quotation) used as a doer OUTSIDE quotations in >= 15 % of the pronoun doers -> the book has a narrator
+            outside = collections.Counter(p for i in range(len(self.toks)) for _, p in self.pronoun_doers(i))
+            self.narrated = outside[self.speaker] >= 0.15 * max(1, sum(outside.values()))
+        if self.v >= 3:
+            # bookcheck, amended before the run: a name's pronoun from SAME-SENTENCE evidence -- a sentence whose only
+            # named doer is e, with a later pronoun doer p ("Temple bowed; ... he left the house"); a story told around
+            # one character fills the next sentence with her pronoun whoever was named
+            self.aff3 = collections.defaultdict(collections.Counter)
+            for i in range(len(self.toks)):
+                ds = self._doers[i]
+                if len({n[2] for _, n in ds}) != 1: continue
+                later = [p for pos, p in self.pronoun_doers(i) if pos > ds[0][0]]
+                if later: self.aff3[ds[0][1][2]][later[0]] += 1
 
     def top_pronoun(self, key):
+        if self.v >= 3:
+            a = self.aff3.get(key)
+            if not a: return None
+            p, n = a.most_common(1)[0]
+            return p if n >= 3 and n >= 0.6 * sum(a.values()) else None
+        return self.top_pronoun2(key)
+
+    def top_pronoun2(self, key):
         """the pronoun whose share after this name most exceeds its share after any name (lift), seen >= 5 times and
         >= 40 % of this name's sightings, lift >= 1.1"""
         a = self.aff.get(key)
@@ -250,6 +290,22 @@ class Book:
         # bookdoers run 2 (declared): the previous sentence's named DOERS and this sentence's names before pos; only
         # person-like names count; any person-like name whose pronoun is unknown makes the reading abstain
         window = ([n for _, n in self._doers[i - 1]] if i > 0 else []) + [n for n in self._names[i] if n[1] <= pos]
+        if self.v >= 3:
+            # bookcheck (1), amended before the run: the last three sentences' named doers and resolved pronouns, then
+            # this sentence's names before pos, walked from the most recent: names that are not person-like are passed;
+            # a person-like name with an unknown pronoun stops the walk (abstain); the first whose pronoun is p is it
+            seq = []
+            for d in (3, 2, 1):
+                if i - d < 0: continue
+                ents = [(pos, n) for pos, n in self._doers[i - d]] + ([(-1, n) for n in self._resolved.get(i - d, [])] if self.chains else [])
+                seq += [n for _, n in sorted(ents, key=lambda x: x[0])]
+            seq += [n for n in self._names[i] if n[1] <= pos]
+            for n in reversed(seq):
+                if self.doer_count[n[2]] < 5: continue
+                t = self.top_pronoun(n[2])
+                if t is None: return None
+                if t == p: return n
+            return None
         window = [n for n in window if self.doer_count[n[2]] >= 5]
         tops = {n[2]: self.top_pronoun(n[2]) for n in window}
         if not window or None in tops.values(): return None
@@ -270,26 +326,39 @@ class Book:
             if how is None or self.asked(ts, vp) or self.inside(ts, k): continue
             via = None
             if doer is None:
-                p = how.split(":")[1]; doer = self.resolve(i, k, p)
-                if doer is None: continue
-                via = p
+                p = how.split(":")[1]
+                if self.narrated and p == self.speaker:
+                    at = e - 1 if how.startswith("pronoun") else k + 1
+                    doer = (at, at + 1, ("#" + p,), ts[at], at); via = self.narrator_label
+                else:
+                    doer = self.resolve(i, k, p)
+                    if doer is None: continue
+                    via = p; self._resolved.setdefault(i, []).append(doer)
+
             used.update(range(k, vp + 1))
-            obj = None; dialogue = how.startswith("dialogue")
-            if not dialogue:
-                pa = self.R.run_at(ts, vp, 1 if self.R.side == "L" else -1, 2)
-                if pa:
-                    between = ts[vp + 1:pa[0][0]]
-                    if not self.use_pronouns or all(x.lower() in self.det2 for x in between):
-                        obj = " ".join(ts[vp + 1:pa[0][1]])
+            dialogue = how.startswith("dialogue")
+            obj = None if dialogue else self.object(ts, vp, starts)
             if self.use_pronouns and obj is None and not dialogue and ts[vp].lower() in self.closed: continue   # "she could", "Royall had once"
-            if self.use_pronouns and not dialogue and vp + 1 < len(ts):
-                j = vp + 1
-                while j < len(ts) and ts[j][:1].islower() and ts[j].lower() in self.det2: j += 1
-                if j in starts: obj = " ".join(ts[vp + 1:j]) + (" " if j > vp + 1 else "") + starts[j][3]
             rel = " ".join(ts[e:vp + 1]) if (self.use_pronouns and not dialogue) else " ".join(ts[k:vp + 1])
             out.append(self.prop("event", doer, rel, obj, i, lemma=lemma, via=via))
         out += self.roles(ts, ns, starts, i)
         return out
+
+    def object(self, ts, vp, starts):
+        """the patient after the content verb at vp (or None)"""
+        obj = None
+        pa = self.R.run_at(ts, vp, 1 if self.R.side == "L" else -1, 2)
+        if pa:
+            between = ts[vp + 1:pa[0][0]]; end = pa[0][1]
+            if self.v >= 3:                                                  # bookcheck (4): "several references"
+                while end < len(ts) and ts[end].lower() in self.nounish: end += 1
+            if not self.use_pronouns or all(x.lower() in self.det2 for x in between):
+                obj = " ".join(ts[vp + 1:end])
+        if self.use_pronouns and vp + 1 < len(ts):
+            j = vp + 1
+            while j < len(ts) and ts[j][:1].islower() and ts[j].lower() in self.det2: j += 1
+            if j in starts: obj = " ".join(ts[vp + 1:j]) + (" " if j > vp + 1 else "") + starts[j][3]
+        return obj
 
     def roles(self, ts, ns, starts, i):
         """roles by apposition: NAME , [closed] w1..w3 <closed> NAME2 ; NAME , <determiner> w1..w3 ,"""
@@ -314,8 +383,28 @@ class Book:
                     context=self.bid, title=self.title, real=self.real)
 
     @staticmethod
-    def say(p):
-        """a book proposition is always said in its book's context; a resolved pronoun is shown"""
+    def claim_key(p):
+        """what a repetition must share: subject key, verb lemma (or role relation), patient head (or object key)"""
+        if p["kind"] == "event": return ("event", p["skey"], p["lemma"], " ".join((p["obj"] or "").split()[-1:]).lower())
+        return ("role", p["skey"], p["rel"].lower(), p["okey"] or (p["obj"] or "").lower())
+
+    @staticmethod
+    def check(by_sentence):
+        """bookcheck (6): {sentence: [propositions]} of one book -> each proposition gets check = SUPPORTED (with the
+        other sentence) when another sentence of the book yields the same claim key, else UNCHECKED"""
+        where = collections.defaultdict(set)
+        for i, ps in by_sentence.items():
+            for p in ps: where[Book.claim_key(p)].add(i)
+        for i, ps in by_sentence.items():
+            for p in ps:
+                others = sorted(where[Book.claim_key(p)] - {i})
+                p["check"] = "SUPPORTED" if others else "UNCHECKED"
+                if others: p["support"] = min(others, key=lambda j: abs(j - i))
+
+    @staticmethod
+    def say(p, template="{title}: {body}"):
+        """a book proposition is always said in its book's context (the template, with its words, is data from
+        emergence/kb_bookworld.py); a resolved pronoun is shown"""
         subj = p["subj"] + (f" ({p['via']})" if p.get("via") else "")
         body = " ".join(x for x in (subj, p["rel"], p["obj"]) if x)
-        return body if p.get("real") else f"according to {p['title']}, {body}"
+        return body if p.get("real") else template.format(title=p["title"], body=body)

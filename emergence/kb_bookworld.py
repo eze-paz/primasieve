@@ -11,6 +11,11 @@ import kb_events as KE
 
 GUT = KE.GUT
 CACHE = os.path.join(HERE, "..", "_nldata", "bookworld_learned.json")
+CONTEXT = "according to {title}, {body}"          # how a book-local proposition is said (English data, not core/)
+NARRATOR = "narrator"
+
+
+def say(p): return Book.say(p, CONTEXT)
 
 
 def training_texts(n=60):
@@ -74,10 +79,29 @@ def learn(R, n=60, n_closed=150):
                 j = k + 1
                 while j < len(ts) and ts[j][:1].isupper(): j += 1
                 cn[a] += 1; cv[a] += j < len(ts) and ts[j].lower() in finite_any
+    # bookcheck (3), amended before the run: complementizers -- closed symbols (>= 1,000 uses) preceded by a finite verb
+    # >= 12 % and followed by a subject symbol or a capitalised name >= 25 % of the time
+    pv = collections.Counter(); nsub = collections.Counter(); ctot = collections.Counter()
+    for t in texts:
+        ts = tokens(t)
+        for k in range(1, len(ts) - 1):
+            a = ts[k].lower()
+            if a in big and ts[k][:1].islower():
+                ctot[a] += 1; pv[a] += ts[k - 1].lower() in open_fin or ts[k - 1].lower() in verbish
+                nsub[a] += ts[k + 1].lower() in subj or (ts[k + 1][:1].isupper() and ts[k + 1].lower() not in cs)
+    comp = sorted(a for a in ctot if pv[a] >= 0.12 * ctot[a] and nsub[a] >= 0.25 * ctot[a])
+    # bookcheck (narrator, amended before the run): the first-person symbol -- the subject symbol that most often opens
+    # a quotation (the word right after a double quotation mark)
+    sp = collections.Counter()
+    for t in texts:
+        ts = tokens(t)
+        for k in range(len(ts) - 1):
+            if ts[k] == '"' and ts[k + 1].lower() in subj and (k == 0 or ts[k - 1] in ".!?,;:" or not ts[k - 1][:1].isalnum()): sp[ts[k + 1].lower()] += 1
+    speaker = sp.most_common(1)[0][0] if sp else None
     preplike = sorted(a for a in cn if cn[a] >= 50 and cv[a] < 0.15 * cn[a] and share(a, "closed") >= 0.35)
     abbr = sorted(abbreviations(texts, share=0.8))     # amended before the scored run: "Mr" is 87 %
     out = dict(closed=closed, determiners=det, chain_heads=sorted(heads), abbreviations=abbr, subjects=sorted(subj),
-               verbish=sorted(verbish), skippable=sorted(skippable), nounish=nounish, preplike=preplike, det2=sorted(det2))
+               verbish=sorted(verbish), skippable=sorted(skippable), nounish=nounish, preplike=preplike, det2=sorted(det2), complementizers=comp, speaker=speaker)
     json.dump(out, open(CACHE, "w", encoding="utf-8"), indent=0)
     return out
 
@@ -99,8 +123,10 @@ def title_of(text):
     return None
 
 
-def book(bid, R, L, text=None, it=1, knockout=False):
+def book(bid, R, L, text=None, it=1, knockout=False, chains=True):
     text = text if text is not None else open(os.path.join(GUT, bid + ".txt"), encoding="utf-8", errors="replace").read()
     return Book(bid, text, L["closed"], set(L["abbreviations"]), R, L["determiners"], L["chain_heads"], title=title_of(text),
                 verbish=L["verbish"], skippable=L["skippable"], nounish=L["nounish"], preplike=L["preplike"],
-                det2=L.get("det2", ()), subjects=L.get("subjects", ()), pronouns=it >= 2, quotes=it >= 2, knockout=knockout)
+                det2=L.get("det2", ()), subjects=L.get("subjects", ()), pronouns=it >= 2, quotes=it >= 2, knockout=knockout,
+                version=it, complementizers=L.get("complementizers", ()), chains=chains,
+                speaker=L.get("speaker"), narrator_label=NARRATOR)
