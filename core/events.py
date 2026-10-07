@@ -77,6 +77,9 @@ class EventReader:
             if toks[i].lower() in negs: return "negated"                     # negation_prereg.md (C)
             if toks[i].lower() in marks: return "irrealis"
             i -= 1
+        # bookpronoun run 2: a negative right after the verb ("did not possess", "does not mention")
+        for j in (k + 1, k + 2):
+            if j < len(toks) and toks[j].lower() in negs and (j == k + 1 or toks[k + 1] in "'’"): return "negated"
         words = [j for j, x in enumerate(toks) if self.is_word(x)]
         if words and toks[words[0]].lower() in getattr(self, "cond", ()) and "," not in toks[:k]: return "irrealis"
         return "realis"

@@ -455,6 +455,7 @@ class Book:
             s, e = n[0], n[1]
             if not (e < len(ts) and ts[e] == ",") or self.outside(ts, n[4] if self.use_pronouns else s): continue
             j = e + 1
+            if j < len(ts) and ts[j].lower() in getattr(self.R, "negatives", ()): continue   # ", not listening to Porbus": no role
             if j < len(ts) and ts[j].lower() in self.closed: j += 1
             w = j
             while (w < len(ts) and w - j < 3 and is_word(ts[w]) and ts[w][:1].islower() and ts[w].lower() not in self.closed

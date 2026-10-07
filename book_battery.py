@@ -26,7 +26,23 @@ def test_books():
     return [b for b in books if held_book(b)][:10]
 
 
-def describe_hook(R, strict=False):
+def in_sent(patient, low, verb_at=None):
+    """bookpronoun run 2: a patient carried over from another sentence (a resolved "them") is not this sentence's; run 3:
+    the patient must begin within 3 symbols after its verb (a later verb's object is not this one's)"""
+    if not patient: return ""
+    w = low.split(); pw = [x.lower() for x in patient.split()]
+    at = [j for j in range(len(w)) if w[j:j + len(pw)] == pw]
+    if not at: return ""
+    if verb_at is not None and not any(verb_at < j <= verb_at + 3 for j in at): return ""
+    return patient
+
+
+def word_index(et, k):
+    """position of token k among the sentence's word tokens (in_sent works on words)"""
+    return sum(1 for x in et[:k] if x[:1].isalnum())
+
+
+def describe_hook(R, strict=False, pronouns=False):
     """bookdescribe_prereg.md: for a unit the book reader leaves unread, the story reader's realis events whose doer is
     written in the sentence and begins with a learned determiner or a capital, in sentences without a quotation mark"""
     dets = set(getattr(R, "dets", ()))
@@ -36,7 +52,7 @@ def describe_hook(R, strict=False):
             if per[i]: continue
             sent = B.sents[i]
             if any(q in sent for q in '"“”'): continue
-            low = " " + " ".join(tokens(sent)).lower() + " "; got = []
+            low = " " + " ".join(t for t in tokens(sent) if t[:1].isalnum()).lower() + " "; got = []
             from core.events import tokens as etoks
             et = etoks(sent); words_at = [j for j, x in enumerate(et) if x[:1].isalnum()]
             for ev in R.read(sent):
@@ -57,8 +73,18 @@ def describe_hook(R, strict=False):
                 k = low.split().index(aw[0].lower()) if aw[0].lower() in low.split() else -1
                 prev = low.split()[k - 1] if k > 0 else ""
                 if not (prev in dets or aw[0][:1].isupper()): continue
-                got.append(dict(kind="event", subj=(prev + " " if prev in dets else "") + a, rel=ev["verb"], obj=ev.get("patient") or "",
+                got.append(dict(kind="event", subj=(prev + " " if prev in dets else "") + a, rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])),
                                 title=B.title, via=None, described=True))
+            if not got and pronouns and words_at:          # bookpronoun_prereg.md: the referent said as unresolved
+                f0 = words_at[0]; p0 = et[f0].lower()
+                if p0 in getattr(R, "subjects", ()) and not (p0 == "who" and sent.rstrip().endswith("?")):
+                    for ev in R.read(sent):
+                        k = ev["pos"]; vt = et[k].lower() if k < len(et) else ""
+                        if ev.get("status", "realis") != "realis": continue
+                        if not (k == f0 + 1 or (k == f0 + 2 and et[f0 + 1][:1].isalnum() and et[f0 + 1].lower() not in R.closed)): continue
+                        if vt not in R.verbs or vt in R.closed or ev["verb"] in R.closed: continue
+                        got.append(dict(kind="event", subj=et[f0], rel=ev["verb"], obj=in_sent(ev.get("patient"), low, word_index(et, ev["pos"])), title=B.title,
+                                        via="referent not resolved", described=True)); break
             per[i] = got
         return per
     return hook
@@ -70,7 +96,7 @@ def units(B, n=500):
 
 def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_ids=None, chains=True):
     R, L = KB.build(); abbr = set(L["abbreviations"])
-    if it >= 7 and not hooks: hooks = {"after_read": describe_hook(R, strict=it >= 8)}
+    if it >= 7 and not hooks: hooks = {"after_read": describe_hook(R, strict=it >= 8, pronouns=it >= 9)}
     base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
