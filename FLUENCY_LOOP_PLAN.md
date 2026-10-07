@@ -166,3 +166,7 @@ adverb particles ("flew away") no longer borrow the last patient. B6 64 -> 65; a
 A form between a determiner and a noun is a modifier ("a lost puppy"); a stranded final preposition asks for the adjunct it
 leads ("dry it with?" -> a towel). B6 65 -> 67, novels 37.7 %; a new judged sample (0.86) exposed pre-existing "Mr." unit
 splits in Man And Wife -- next target.
+
+### Iteration 49 (titlename_prereg.md) -- PASS
+Titles kept whole in book readings ("Mr. Vanborough"): malformed title propositions 34 -> 0; novels 37.7 -> 38.3 %, judged
+0.96; all else held.

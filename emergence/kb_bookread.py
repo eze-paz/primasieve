@@ -277,6 +277,22 @@ def clause_hook(R, inner):
     return hook
 
 
+def whole_titles(p, sent, abbr):
+    """titlename_prereg.md (amended): a role ending in a learned abbreviation that the sentence continues with "." and a
+    capitalised run takes that run ("on Mr" -> "on Mr. Vanborough")"""
+    ts = tokens(sent)
+    for f in ("subj", "obj"):
+        v = p.get(f)
+        if not isinstance(v, str) or not v.split() or v.split()[-1] not in abbr: continue
+        last = v.split()[-1]
+        for j in range(len(ts) - 2):
+            if ts[j] == last and ts[j + 1] == "." and ts[j + 2][:1].isupper():
+                e = j + 3
+                while e < len(ts) and ts[e][:1].isupper() and ts[e][:1].isalpha(): e += 1
+                p = dict(p, **{f: v + ". " + " ".join(ts[j + 2:e])}); break
+    return p
+
+
 def segment_hook(R, inner, cut2=False):
     """booksegment_prereg.md: unread non-question sentences cut at ';' and at ', <linking word | subject-like>' and read
     clause by clause by the whole chain; question sentences and verb-less readings dropped"""
@@ -288,6 +304,8 @@ def segment_hook(R, inner, cut2=False):
     def linking(w):
         ps = KE.pos_senses(_db, w); return (ps.get("conj", 0) + ps.get("adv", 0)) >= 0.5 * max(1, sum(ps.values()))
     subj = set(getattr(R, "subjects", ())); dets2 = set(getattr(R, "dets", ()))
+    try: abbr_t = {w for w in KB.build()[1]["abbreviations"] if w[:1].isupper()}     # titlename: capitalised ones (titles)
+    except Exception: abbr_t = set()
     def clauses(sent):
         out = []; cur = []; ts = tokens(sent)
         for j, t in enumerate(ts):
@@ -315,6 +333,8 @@ def segment_hook(R, inner, cut2=False):
                 if len([t for t in tokens(c) if t[:1].isalnum()]) < 3: continue
                 got += [dict(p, title=B.title if p.get("title") in (None, "") or p["title"].startswith(B.title) is False and False else p["title"]) for p in inner(One(c, B.title), {0: []})[0] if p.get("rel")]
             per[i] = got
+        if abbr_t:
+            for i in per: per[i] = [whole_titles(p, B.sents[i], abbr_t) for p in per[i]]
         return per
     return hook
 

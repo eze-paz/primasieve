@@ -147,7 +147,9 @@ class Book:
                 key = tuple(ts[i].lower() for i in ents if ts[i].lower() not in self.titles)
                 if key:
                     s = k
-                    while s < ents[0] and (ts[s].lower() in self.closed or (s == 0 and ts[s].lower() not in self.entities)): s += 1
+                    while s < ents[0] and (ts[s].lower() in self.closed or (s == 0 and ts[s].lower() not in self.entities)):
+                        if ts[s] in self.abbr and s + 1 < len(ts) and ts[s + 1] == ".": break    # titlename (A): "Mr. Vanborough"
+                        s += 1
                     text = " ".join(ts[s:j + 1]).replace(" .", ".")
                     if self.v >= 6: text = text.lstrip(". ")                       # bookbridge2 (2)
                     out.append((s, j + 1, key, text, k))
@@ -446,6 +448,9 @@ class Book:
                 while end < len(ts) and ts[end].lower() in self.nounish: end += 1
             if not self.use_pronouns or all(x.lower() in self.det2 for x in between):
                 obj = " ".join(ts[vp + 1:end])
+                n0 = starts.get(pa[0][0])
+                if n0 and n0[1] > end and ts[end:end + 1] == ["."]:          # titlename (B): "addressed Mr. Vanborough"
+                    obj = " ".join(ts[vp + 1:pa[0][0]] + [n0[3]])
         if self.use_pronouns and vp + 1 < len(ts):
             j = vp + 1
             while j < len(ts) and ts[j][:1].islower() and ts[j].lower() in self.det2: j += 1
