@@ -142,6 +142,29 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
 QUOTES = '"“”'
 
 
+def clause_hook(R, inner):
+    """bookclause_prereg.md (B): a sentence opened by a closed symbol (not subject-like, not a determiner, not the
+    conditional opener) and holding a comma is read from after its first comma as a clause of its own"""
+    class One:
+        def __init__(self, sent, title): self.sents = [sent]; self.title = title
+    dets = set(getattr(R, "dets", ()))
+    def hook(B, per):
+        per = inner(B, per)
+        for i in sorted(per):
+            if per[i]: continue
+            sent = B.sents[i]
+            if any(q in sent for q in QUOTES) or "," not in sent: continue
+            w = [t for t in tokens(sent) if t[:1].isalnum()]
+            if not w: continue
+            f = w[0].lower()
+            if f not in R.closed or f in getattr(R, "subjects", ()) or f in dets or f in getattr(R, "cond", ()): continue
+            rest = sent[sent.index(",") + 1:].strip()
+            if len([t for t in tokens(rest) if t[:1].isalnum()]) < 3: continue
+            per[i] = inner(One(rest, B.title), {0: []})[0]
+        return per
+    return hook
+
+
 def quote_hook(R, inner):
     """bookquote_prereg.md: quoted segments of still-unread sentences read as sentences of their own, said as a speaker's
     words inside the book; the speaker from the words next to the marks, "I" the speaker, "you" the one addressed"""
@@ -159,6 +182,15 @@ def quote_hook(R, inner):
                     if w[:1].isupper() and w.lower() not in R.closed: return w, None
                     if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
         return None, None
+    def text_ends_q(B, i, text):
+        """the run is followed in the sentence by a question mark before any other word ('"Can you see anything?" whispered')"""
+        sent = B.sents[i]; at = sent.find(text[-12:]) if text else -1
+        if at < 0: return False
+        rest = sent[at + len(text[-12:]):]
+        for ch in rest:
+            if ch == "?": return True
+            if ch.isalnum(): return False
+        return False
     def quoted_runs(B, i):
         """-> [(text, words before, words after)] for the token runs Book.inside marks as quoted (marks excluded)"""
         ts = B.toks[i]; flags = [B.inside(ts, k, i) and ts[k] not in QUOTES for k in range(len(ts))]
@@ -192,6 +224,7 @@ def quote_hook(R, inner):
             got = []
             for text, before, after in quoted_runs(B, i):        # bookquote2_prereg.md (A): the book's own quote state
                 if len([t for t in tokens(text) if t[:1].isalnum()]) < 3: continue
+                if text.rstrip().endswith("?") or "?" in "".join(after[:0]) or text_ends_q(B, i, text): continue   # bookclause (A)
                 spk, how = speaker_near(before, after)
                 ctx = f"{B.title}, {spk + (' (' + how + ')' if how else '') if spk else 'a speaker (not resolved)'}'s words"
                 saved = R.subjects; R.subjects = set(saved) | pron_subjects    # bookquote3 (A): dialogue's pronoun subjects
@@ -224,6 +257,7 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
     if it >= 7 and not hooks:
         h = describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)
         hooks = {"after_read": quote_hook(R, h) if it >= 11 else h}
+        if it >= 12: hooks = {"after_read": clause_hook(R, hooks["after_read"])}
     base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
