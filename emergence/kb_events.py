@@ -511,6 +511,25 @@ def _build(closed, uni=None, same=None):
             pass
     except Exception:
         R.dets = set()
+    try:                      # booktm_prereg.md: number words -- dictionary-labelled, grown by slot sharing in the BOOK model
+        import sqlite3
+        _db6 = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+        vocab = set(R.closed) | ({w for w, c in uni.most_common(5000)} if hasattr(uni, "most_common") else set())
+        R.numwords = {w for w in vocab if w.isalpha() and (lambda ps: ps.get("num", 0) >= 0.3 * max(1, sum(ps.values())))(pos_senses(_db6, w))}
+        from kb_booktm import book_tm
+        from core.synonyms import Synonyms as _SY6
+        _sy = _SY6(book_tm())
+        _anynum = {}
+        def anynum(w):                       # amended: a sharer with ANY numeral sense supports (small numbers lack the dominant one)
+            if w not in _anynum: _anynum[w] = bool(pos_senses(_db6, w).get("num"))
+            return _anynum[w]
+        for _round in range(3):
+            cands = {w for n0 in sorted(R.numwords) for w, _ in _sy.two_sided(n0, 15) if w.isalpha()} - R.numwords
+            for w in sorted(cands):
+                sh = [x for x, _ in _sy.two_sided(w, 15)]
+                if sh and anynum(w) and sum(1 for x in sh if x.isdigit() or x in R.numwords or anynum(x)) >= 0.4 * len(sh): R.numwords.add(w)
+    except Exception:
+        R.numwords = set()
     R.plural = noun_plurals(uni)                                                          # phrases_prereg.md amendment
     R.abbr = learn_abbr()                                                                # identity_prereg.md amendment
     try:                      # identity_prereg.md (A): copula forms, learned as book_battery.copula_forms does

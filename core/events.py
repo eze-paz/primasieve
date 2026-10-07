@@ -41,7 +41,7 @@ class EventReader:
         if k + 1 < len(toks) and toks[k + 1].lower() in self.verbs and toks[k + 1].lower() not in getattr(self, "third", ()):
             return False                 # bookposs run 2: "classes is", "locks scattered" -- two finite verbs do not stand together
         p = toks[k - 1].lower()
-        if p.isdigit(): return False                     # phrases_prereg.md (B): "12 apples" -- a numeral is never a subject
+        if p.isdigit() or p in getattr(self, "numwords", ()): return False   # phrases (B), booktm: "12 apples", "two oranges"
         return p in getattr(self, "subjects", ()) or (self.is_word(toks[k - 1]) and p not in self.closed and p not in self.verbs)
 
     def noun_at(self, toks, k):
@@ -102,7 +102,8 @@ class EventReader:
 
     def phrase(self, toks, s, e):
         """roles2_prereg.md (A): a role's words with the learned determiner or numeral right before its run ("a small boat")"""
-        while s > 0 and self.is_word(toks[s - 1]) and (toks[s - 1].lower() in getattr(self, "dets", ()) or toks[s - 1].isdigit()):
+        while s > 0 and self.is_word(toks[s - 1]) and (toks[s - 1].lower() in getattr(self, "dets", ()) or toks[s - 1].isdigit()
+                                                        or toks[s - 1].lower() in getattr(self, "numwords", ())):
             s -= 1
         return " ".join(toks[s:e])
 
@@ -287,7 +288,7 @@ class EventMemory:
         dets_q = getattr(self.reader, "dets", ())
         lemmas = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) or self.reader.participles.get(t.lower())
                   for j, t in enumerate(words) if j > 0 and t.lower() not in self.reader.closed
-                  and not (j >= 2 and words[j - 1].lower() in dets_q)]   # copq: a word after a determiner is a noun ("the keys");
+                  and not (j >= 2 and (words[j - 1].lower() in dets_q or words[j - 1].lower() in getattr(self.reader, "numwords", ())))]   # copq: a word after a determiner is a noun ("the keys");
                                                                           # not right after the question word ("What fell")
         lemmas = [l for l in lemmas if l]
         same = {x for l in lemmas for x in self.reader.same.get(l, ())}                 # events2_prereg.md: synonymous verbs, second
