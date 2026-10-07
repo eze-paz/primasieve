@@ -197,17 +197,24 @@ def clause_hook(R, inner):
     class One:
         def __init__(self, sent, title): self.sents = [sent]; self.title = title
     dets = set(getattr(R, "dets", ()))
+    import sqlite3, kb_events as KE
+    _db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
+    def linking(w):
+        ps = KE.pos_senses(_db, w); return (ps.get("conj", 0) + ps.get("adv", 0)) >= 0.5 * max(1, sum(ps.values()))
     def hook(B, per):
         per = inner(B, per)
         for i in sorted(per):
             if per[i]: continue
             sent = B.sents[i]
-            if any(q in sent for q in QUOTES) or "," not in sent: continue
+            if any(q in sent for q in QUOTES): continue
             w = [t for t in tokens(sent) if t[:1].isalnum()]
             if not w: continue
             f = w[0].lower()
             if f not in R.closed or f in getattr(R, "subjects", ()) or f in dets or f in getattr(R, "cond", ()): continue
-            rest = sent[sent.index(",") + 1:].strip()
+            if f in getattr(R, "negatives", ()): continue
+            if "," in sent: rest = sent[sent.index(",") + 1:].strip()
+            elif linking(f): rest = sent[sent.lower().index(f) + len(f):].strip()     # booklink: "And he caught up a brush"
+            else: continue
             if len([t for t in tokens(rest) if t[:1].isalnum()]) < 3: continue
             per[i] = inner(One(rest, B.title), {0: []})[0]
         return per
