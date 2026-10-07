@@ -221,7 +221,7 @@ def clause_hook(R, inner):
     return hook
 
 
-def segment_hook(R, inner):
+def segment_hook(R, inner, cut2=False):
     """booksegment_prereg.md: unread non-question sentences cut at ';' and at ', <linking word | subject-like>' and read
     clause by clause by the whole chain; question sentences and verb-less readings dropped"""
     class One:
@@ -231,12 +231,17 @@ def segment_hook(R, inner):
     _db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
     def linking(w):
         ps = KE.pos_senses(_db, w); return (ps.get("conj", 0) + ps.get("adv", 0)) >= 0.5 * max(1, sum(ps.values()))
-    subj = set(getattr(R, "subjects", ()))
+    subj = set(getattr(R, "subjects", ())); dets2 = set(getattr(R, "dets", ()))
     def clauses(sent):
         out = []; cur = []; ts = tokens(sent)
         for j, t in enumerate(ts):
             nxt = ts[j + 1].lower() if j + 1 < len(ts) else ""
-            if t == ";" or (t == "," and nxt and nxt in R.closed and (linking(nxt) or nxt in subj)):
+            nraw = ts[j + 1] if j + 1 < len(ts) else ""
+            cut = t == ";" or (t == "," and nxt and nxt in R.closed and (linking(nxt) or nxt in subj))
+            if cut2:                                     # booksegment2: dashes, colons, a comma before a new subject phrase
+                cut = cut or t == ":" or (t == "-" and nxt == "-") or (t == "-" and j > 0 and ts[j - 1] == "-")
+                cut = cut or (t == "," and nraw and (nxt in dets2 or (nraw[:1].isupper() and nxt not in R.closed)))
+            if cut:
                 if cur: out.append(" ".join(cur))
                 cur = []; continue
             cur.append(t)
@@ -361,7 +366,7 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
         h = describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)
         hooks = {"after_read": quote_hook(R, h) if it >= 11 else h}
         if it >= 12: hooks = {"after_read": clause_hook(R, hooks["after_read"])}
-        if it >= 13: hooks = {"after_read": segment_hook(R, hooks["after_read"])}
+        if it >= 13: hooks = {"after_read": segment_hook(R, hooks["after_read"], cut2=it >= 14)}
     base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")

@@ -144,3 +144,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 31 (novel 16) | B4-book, honesty | "have" as a main verb, longer predicates, "it" doers, guards; if-clauses anywhere are not told as happened (bookhave_prereg.md) | H2 PASS (0.94), H1 miss (31.8 vs 33 %) | conditional honesty fix in both readers |
 | 2026-10-07 | 32 (novel 17) | B4-book | a sentence opened by a linking word (booklink_prereg.md) | L2 PASS (0.92), L1 miss (31.9 vs 33 %) | +0.2: single shapes saturate |
 | 2026-10-07 | 33 (novel 18) | B4-book | clauses of a long sentence read one by one; questions and verb-less readings refused (booksegment_prereg.md) | PASS (C1 36.6 %, C2 0.96) | **real novels 31.9 -> 36.6 %** |
+| 2026-10-07 | 34 (novel 19) | B4-book | clause cuts at dashes, colons, a new subject after a comma (booksegment2_prereg.md) | D2 PASS (0.94), D1 miss (38.2 vs 39 %) | real novels 36.6 -> 38.2 % |
