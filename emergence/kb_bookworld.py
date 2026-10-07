@@ -130,3 +130,15 @@ def book(bid, R, L, text=None, it=1, knockout=False, chains=True):
                 det2=L.get("det2", ()), subjects=L.get("subjects", ()), pronouns=it >= 2, quotes=it >= 2, knockout=knockout,
                 version=it, complementizers=L.get("complementizers", ()), chains=chains,
                 speaker=L.get("speaker"), narrator_label=NARRATOR, quote_default='"')
+
+
+def bridger():
+    """bookbridge_prereg.md: the world store's label index and relations, and the 1,000 commonest symbols"""
+    import kb_constructions as KC
+    from core.reason import symbols
+    from core.textmodel import TextModel
+    from textmodel import MODEL
+    st = KC.Store(); common = {w for w, c in TextModel.load(MODEL).uni.most_common(1000)}
+    lookup = lambda t: st.index.get(" ".join(symbols(t, "LN")), ())
+    related = lambda a, b: bool(st.relations({a}, {b}))
+    return st, lookup, related, common

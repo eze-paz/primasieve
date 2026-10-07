@@ -138,7 +138,8 @@ class Book:
             if cap(ts[k]):
                 j = k
                 while j + 1 < len(ts) and (cap(ts[j + 1]) or (ts[j + 1] == "." and j + 2 < len(ts) and cap(ts[j + 2])
-                                                              and ts[j].lower() in self.titles)):
+                                                              and (ts[j].lower() in self.titles
+                                                                   or (self.v >= 5 and ts[j].lower() in self.closed)))):
                     j += 1 if cap(ts[j + 1]) else 2
                 run = list(range(k, j + 1))
                 ents = [i for i in run if ts[i].lower() in self.entities]
@@ -197,7 +198,10 @@ class Book:
                     r = self.verb_at(ts, j)
                     if r: return r
                 if t in self.heads and tj in R.base and tj not in self.closed: return R.base[tj], j
-                if tj not in self.skip: break
+                if tj not in self.skip:
+                    if (self.v >= 5 and t in auxs and j + 1 < len(ts) and ts[j + 1].lower() in R.participles
+                            and tj not in self.closed): continue            # bookbridge (c): "has never wholly abandoned"
+                    break
         if finite: return R.verbs[t], k
         return None
 
@@ -338,13 +342,42 @@ class Book:
                 if self.doer_count[n[2]] < 5: continue
                 t = self.top_pronoun(n[2])
                 if t is None: return None
-                if t == p: return n
+                if t == p:
+                    if self.v >= 5 and any(m[2] != n[2] and self.doer_count[m[2]] >= 5 and self.top_pronoun(m[2]) == p for m in seq):
+                        return None                                       # bookbridge (b): two names share the pronoun
+                    return n
             return None
         window = [n for n in window if self.doer_count[n[2]] >= 5]
         tops = {n[2]: self.top_pronoun(n[2]) for n in window}
         if not window or None in tops.values(): return None
         hits = {n[2]: n for n in window if tops[n[2]] == p}
         return next(iter(hits.values())) if len(hits) == 1 else None
+
+    # ---- the bridge to the real world (bookbridge_prereg.md)
+    def bridge(self, lookup, related, common, max_cands=20):
+        """lookup(name text) -> candidate items; related(a, b) -> the store relates items a and b. A name is bridged
+        when exactly one of its candidates is related to a candidate of another name it shares a sentence with."""
+        texts = collections.defaultdict(set); co = collections.defaultdict(set)
+        for ns in self._names:
+            keys = {n[2] for n in ns}
+            for n in ns: texts[n[2]].add(n[3])
+            for a in keys: co[a] |= keys - {a}
+        cand = {}
+        for key, ts in texts.items():
+            if len(key) == 1 and key[0] in common: continue
+            c = set()
+            for t in ts: c |= set(lookup(t))
+            if c: cand[key] = sorted(c)[:max_cands]
+        self.bridges = {}
+        for a, ca in cand.items():
+            ev = {}
+            for b in co[a]:
+                for qa in ca:
+                    for qb in cand.get(b, ()):
+                        if qa != qb and related(qa, qb): ev.setdefault(qa, (b, qb))
+            if len(ev) == 1:
+                q, (b, qb) = next(iter(ev.items())); self.bridges[a] = (q, b, qb)
+        return self.bridges
 
     # ---- propositions of one sentence
     def read(self, i):
@@ -416,7 +449,8 @@ class Book:
         return out
 
     def prop(self, kind, subj, rel, obj, i, lemma=None, okey=None, via=None):
-        return dict(kind=kind, subj=subj[3], skey=subj[2], rel=rel, obj=obj, okey=okey, lemma=lemma, sent=i, via=via,
+        br = getattr(self, "bridges", {}).get(subj[2])
+        return dict(ref=br[0] if br else None, ref_evidence=br[1:] if br else None,kind=kind, subj=subj[3], skey=subj[2], rel=rel, obj=obj, okey=okey, lemma=lemma, sent=i, via=via,
                     context=self.bid, title=self.title, real=self.real)
 
     @staticmethod

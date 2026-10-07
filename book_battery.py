@@ -34,11 +34,17 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
     R, L = KB.build(); abbr = set(L["abbreviations"])
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
-    stats = collections.defaultdict(collections.Counter); props_all = []; control = []; books = {}
+    stats = collections.defaultdict(collections.Counter); props_all = []; control = []; books = {}; bridges = []
+    if it >= 5: ST, lookup, related, common = KB.bridger(); say(f"store loaded  ({time.time() - T0:.0f} s)")
     for b in (book_ids or test_books()):
         B = KB.book(b, R, L, it=it, knockout=knockout, chains=chains); books[b] = B
         if hooks and "after_build" in hooks: hooks["after_build"](B)
         g = "novels" if b in NOVELS else "others"
+        if it >= 5:
+            for key, (q, kb_, qb) in B.bridge(lookup, related, common).items():
+                ex = next(n[3] for ns in B._names for n in ns if n[2] == key)
+                bridges.append(dict(group=g, book=b, name=ex, item=q, label=ST.lab.get(q), evidence_name=" ".join(kb_),
+                                    evidence_item=qb, evidence_label=ST.lab.get(qb), ok=None))
         U = set(units(B)); allps = {i: B.read(i) for i in range(len(B.sents))}
         if it >= 3: Book.check(allps, it)                                   # bookcheck (6): checks from the book's own text
         per = {i: allps[i] for i in U}
@@ -75,13 +81,16 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
     csamp = random.Random(100 + it).sample(control, min(control_n, len(control)))
     psamp = random.Random(200 + it).sample(pron, min(30 if knockout else 50, len(pron))) if it >= 2 else []
     if knockout or not chains: samp, csamp, psamp = [], [], []
+    for grp in ("novels", "others"):
+        say(f"G2 bridges {grp}: {sum(1 for x in bridges if x['group'] == grp)} names tied to a world-store item with evidence")
+    say(f"G3 bridged propositions: {sum(1 for x in props_all if x[3].get('ref'))}; marked real: {sum(1 for x in props_all if x[3].get('real'))}")
     sup = [x for x in props_all if x[3].get("check") == "SUPPORTED"]
     say(f"E4 checks: {len(sup)} of {len(props_all)} test-unit propositions SUPPORTED by another sentence of their book "
         f"({100 * len(sup) / max(1, len(props_all)):.1f} %)")
     ssamp = random.Random(300 + it).sample(sup, min(30, len(sup))) if it >= 3 and chains and not knockout else []
     if os.path.exists(path):
         J = json.load(open(path, encoding="utf-8"))
-        for name in ("items", "control", "pronouns", "checks"):
+        for name in ("items", "control", "pronouns", "checks", "bridges"):
             if name not in J: continue
             lab = [x for x in J[name] if x.get("ok") is not None]
             for grp in ("novels", "others"):
@@ -96,7 +105,8 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
                  pronouns=[dict(group=g, book=b, sent=i, prev=books[b].sents[i - 1] if i else "", text=books[b].sents[i],
                                 prop=KB.say(p), ok=None) for g, b, i, p in psamp],
                  checks=[dict(group=g, book=b, sent=i, text=books[b].sents[i], prop=KB.say(p), other=p["support"],
-                              other_text=books[b].sents[p["support"]], ok=None) for g, b, i, p in ssamp])
+                              other_text=books[b].sents[p["support"]], ok=None) for g, b, i, p in ssamp],
+                 bridges=random.Random(400 + it).sample(bridges, min(40, len(bridges))))
         json.dump(J, open(path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
         say(f"wrote {path} for judging")
     return stats, props_all, books
