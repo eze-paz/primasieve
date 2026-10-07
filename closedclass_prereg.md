@@ -38,3 +38,9 @@ function words; the dictionary may lack the sense); (iii) a learned subject must
 C1's WRONG bar (<= 20) is not met by the probes. Disclosed: "Kai never visited Lima" was RIGHT in iteration 17 only
 because "never", outside the old class, was read as a noun that matched the gold; it is now read as a function symbol and
 the event is told as happened (WRONG) -- negation by "never" is not handled (reality_prereg.md's prediction).
+
+## Run (2026-10-07, battery18): PASS on C2/C3; C1 missed (probes WRONG 23 vs <= 20)
+**B6 46 -> 49** (C2 bar 49). C3: B5 +11.6; B1 counted 1 (the "jurisdiction" item); **B2 90.2 -> 90.4 %**; B9 18/20.
+B10 398/500, B3 97.65/0.59 and 87.5/0, B7 15/18 at 0 %, B4 3/4,605 unchanged. C1: probes RIGHT 89 -> 95, WRONG 24 -> 23
+(bar <= 20 not met). C4 knockout not run separately (iteration 17's battery is the text-model-closed-class run: B6 46).
+(The battery imported kb_events at its first door, before iteration 19's edits; it measured iteration 18.)

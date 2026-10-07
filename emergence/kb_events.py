@@ -159,6 +159,62 @@ def learn_classes(closed, fin, base, participles, past, third, n_books=60, marke
     return subjects, linkers, coords
 
 
+NEG_CACHE = os.path.join(HERE, "..", "_nldata", "negatives.json")
+
+
+def learn_negatives(closed, knockout=False):
+    """negation_prereg.md: (A) the NEGATOR -- the commonest first word X of definitions "<X> <stem> ..." of prefixed
+    entries (an entry that is another entry with 2-3 leading letters added); (B) closed-class symbols with a definition
+    beginning with the negator, plus the negator -> (negator, negatives). knockout: the SECOND commonest X."""
+    path = NEG_CACHE.replace(".json", "_ko.json") if knockout else NEG_CACHE
+    if os.path.exists(path):
+        d = json.load(open(path, encoding="utf-8")); return d["negator"], set(d["negatives"])
+    import sqlite3
+    db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+    words = {}
+    for w, v in db.execute("select w, v from e"):
+        if " " in w or not w.isalpha() or not w.islower(): continue
+        try: words[w] = [str(x.get("gloss", "")).lower() for x in json.loads(v).get("senses", [])]
+        except Exception: pass
+    first = collections.Counter()
+    for w, gl in words.items():
+        for n in (2, 3):
+            stem = w[n:]
+            if len(stem) >= 4 and stem in words:
+                for g in gl:
+                    t = re.findall(r"[^\W\d_]+", g)
+                    if len(t) >= 2 and t[1] == stem: first[t[0]] += 1
+    ranked = [x for x, _ in first.most_common(2)]
+    if not ranked: return None, set()
+    neg = ranked[1] if knockout and len(ranked) > 1 else ranked[0]
+    # amended after measuring: >= 20 % of the symbol's definitions begin with the negator ("another: not the same" is one sense of six)
+    def share(w):
+        gl = words.get(w, [])
+        return sum(1 for g in gl if re.findall(r"[^\W\d_]+", g)[:1] == [neg]) / max(1, len(gl))
+    negatives = {neg} | {w for w in closed if share(w) >= 0.2}
+    json.dump(dict(negator=neg, negatives=sorted(negatives), first=first.most_common(5)), open(path, "w", encoding="utf-8"))
+    return neg, negatives
+
+
+def learn_conditional(closed, markers, n_books=60, min_n=1000):
+    """reality_prereg.md (A): the closed sentence-initial symbol (>= min_n uses) whose sentences most often hold a marker
+    after a comma, relative to all sentences -> {symbol}, and the lifts measured"""
+    first = collections.Counter(); firstm = collections.Counter(); n = m = 0
+    for b in books(False)[:n_books]:
+        text = open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read()
+        for s in re.split(r"(?<=[.!?])\s+", text):
+            t = [x.lower() for x in tokens(s)]
+            if len(t) < 4: continue
+            c = t.index(",") if "," in t else None
+            hasm = c is not None and any(x in markers for x in t[c + 1:])
+            n += 1; m += hasm
+            if t[0] in closed: first[t[0]] += 1; firstm[t[0]] += hasm
+    if not n or not m: return set()
+    lift = {a: (firstm[a] / first[a]) / (m / n) for a in first if first[a] >= min_n}
+    learn_conditional.lifts = sorted(lift.items(), key=lambda x: -x[1])[:6]
+    return {max(sorted(lift), key=lift.get)} if lift else set()
+
+
 def learn_auxiliaries(closed, participles, n_books=60, share=0.15):
     """events2_prereg.md: closed-class symbols followed by a participle in >= `share` of their occurrences"""
     tot = collections.Counter(); hit = collections.Counter()
@@ -169,8 +225,53 @@ def learn_auxiliaries(closed, participles, n_books=60, share=0.15):
     return {a for a, n in tot.items() if n >= 50 and hit[a] >= share * n}
 
 
+CLOSED_CACHE = os.path.join(HERE, "..", "_nldata", "closed_books.json")
+FUNCTION_POS = ("prep", "det", "pron", "conj", "article", "particle", "postp")     # the dictionary's own part-of-speech labels
+
+
+def pos_senses(db, w):
+    r = db.execute("select v from e where w=?", (w,)).fetchone()
+    if not r: return collections.Counter()
+    try: return collections.Counter(x.get("pos") for x in json.loads(r[0]).get("senses", []))
+    except Exception: return collections.Counter()
+
+
+def learn_closed(fin, participles, base, n=200, n_books=60, verb_share=0.15):
+    """closedclass_prereg.md: the closed class learned from the training books -- by frequency, skipping symbols whose
+    dictionary-dominant sense is a noun, adjective, proper name or numeral, and verbs followed by a verb form in under
+    `verb_share` of their uses (lexical verbs); symbols without an entry join by frequency"""
+    if os.path.exists(CLOSED_CACHE): return set(json.load(open(CLOSED_CACHE, encoding="utf-8")))
+    import sqlite3
+    db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+    uni = collections.Counter(); nxt_verb = collections.Counter(); texts = []
+    for b in books(False)[:n_books]:
+        t = [x.lower() for x in tokens(open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read()) if x[:1].isalnum()]
+        uni.update(t); texts.append(t)
+    # a verb form: a participle, a finite form, or a VERBAL base (its finite forms at least as frequent as the bare form)
+    finc = collections.Counter()
+    for f, l in fin.items(): finc[l] += uni.get(f, 0)
+    verbish = set(participles) | set(fin) | {l for l in base if l not in fin and finc[l] >= uni.get(l, 0) > 0}
+    for t in texts:
+        for a, c in zip(t, t[1:]): nxt_verb[a] += c in verbish
+    out = []; rank_of = {w: i for i, (w, _) in enumerate(uni.most_common(60))}; rank_of = collections.defaultdict(lambda: 10 ** 9, rank_of)
+    for w, c in uni.most_common():
+        if len(out) >= n: break
+        ps = pos_senses(db, w); d = ps.most_common(1)[0][0] if ps else None
+        # amended: a symbol with >= 30 % function senses joins ("one", "that"); the 50 most frequent always join -- the head
+        # of the frequency list is function words, and the dictionary's entry may lack the sense ("on": adj, adv only)
+        functional = sum(v for p, v in ps.items() if p in FUNCTION_POS) >= 0.3 * max(1, sum(ps.values()))
+        head = len(out) < 50 and rank_of[w] < 50
+        if not functional and not head and d in ("noun", "adj", "name", "num"): continue
+        if d == "verb" and nxt_verb[w] < verb_share * c: continue
+        out.append(w)
+    json.dump(out, open(CLOSED_CACHE, "w", encoding="utf-8"))
+    return set(out)
+
+
 def build(closed, uni=None, same=None):
     fin, base = verb_forms(uni)
+    if not getattr(build, "knockout_closed", False):                     # closedclass_prereg.md: stories' own closed class
+        closed = learn_closed(fin, verb_forms.participles, verb_forms.um_base)
     side, counts = learn_side(fin, closed)
     aux = learn_auxiliaries(closed, verb_forms.participles)
     if same is None:
@@ -185,5 +286,13 @@ def build(closed, uni=None, same=None):
     R.to_marker = learn_marker(closed, base, fin)            # events5_prereg.md (D)
     R.past, R.third = verb_forms.past, verb_forms.third                                  # events6_prereg.md
     R.subjects, R.linkers, R.coords = learn_classes(closed, fin, verb_forms.um_base, verb_forms.participles, R.past, R.third, markers=R.to_marker)
+    try:                                       # closedclass_prereg.md amendment: a subject has a pronoun sense in the dictionary
+        import sqlite3
+        _db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+        R.subjects = {a for a in R.subjects if pos_senses(_db, a).get("pron")}
+    except Exception:
+        pass
+    R.cond = learn_conditional(closed, R.to_marker)                                      # reality_prereg.md
+    R.negator, R.negatives = learn_negatives(closed, knockout=getattr(build, "knockout_neg", False))   # negation_prereg.md
     R.determiners = set()     # events5_prereg.md (F) dropped before the run: the learned set held modals and prepositions, not "a"/"the"
     return R, side, counts

@@ -127,3 +127,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 16 | B6 | plurals are not verbs, noun phrases whole (learned linker/coordinator), pronoun doers first (events6_prereg.md) | NOT PASSED (47 vs 48) | B6 43 -> 47; all else held |
 | 2026-10-07 | -- | all | ENGLISH MAP (forward, theory-driven): 114 phenomena, frequencies, 309 probes, predictions before running (83 % held) | -- | 41 confident WRONG answers found the battery never asks about |
 | 2026-10-07 | 17 | honesty (map) | what did not happen is not told as happened: learned markers and conditional opener mark events irrealis (reality_prereg.md) | PASS | probes WRONG 31 -> 24; B6 47 -> 46 (predicted honest price) |
+| 2026-10-07 | 18 | B6, map | the function words of stories learned from the books with the dictionary's part-of-speech labels (closedclass_prereg.md) | PASS on B6 (49); probe WRONG bar missed (23) | B6 46 -> 49; B2 90.4 %; probes RIGHT 89 -> 95 |
