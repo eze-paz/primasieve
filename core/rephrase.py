@@ -94,6 +94,9 @@ class Rephraser:
         for i in unread:
             for c in self.edits(syms[i]):
                 if (syms[i], c) in declined or not self.read_alone(session.worlds, c): continue
+                # worldhonesty_prereg.md (A), amended: a KNOWN word is never read as its own relative -- "managed" is not a
+                # slip for "manager" (same stem: a converse); a known word one edit from an unrelated word may be ("pairs")
+                if syms[i] in self._vocab() and family(syms[i], c) is not None: continue
                 text = " ".join(syms[:i] + [c] + syms[i + 1:])
                 try:
                     f2 = reason(text, session.worlds, session.df, cats="LN", context=session.context(), ledger=None,

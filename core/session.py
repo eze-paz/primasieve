@@ -285,7 +285,8 @@ class Session:
         common = getattr(self.integrate, "common", None) if not isinstance(self.integrate, bool) else None
         if common is None and not every: return fr
         # run 2: content = a symbol outside the corpus's commonest symbols (a count over all text read, not a per-turn median)
-        content = [p for p in range(n) if every or syms[p] not in common]
+        negs = getattr(self, "negatives", set())             # worldhonesty_prereg.md (B): a negator is never common
+        content = [p for p in range(n) if every or syms[p] not in common or syms[p] in negs]
         used = set()
         for a, w in zip(fr["answers"], fr["answer_worlds"]):
             for i, j in _leaf_spans(w, a[4]): used.update(range(i, j))
@@ -295,7 +296,8 @@ class Session:
         first_q = next((p for p, x in enumerate(syms) if x in qw), None)
         # natural2_prereg.md (2): symbols BEFORE the first learned question word frame the question ("tell me how many ...")
         # research3_prereg.md run 2: an unused NUMERAL is owed too ("2012 ad1" was answered as ".ad")
-        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalnum() and not (first_q is not None and p < first_q)]
+        missing = [syms[p] for p in content if p not in used and syms[p][:1].isalnum()
+                   and (syms[p] in negs or not (first_q is not None and p < first_q))]
         if not missing: return fr
         return dict(fr, kind=PARTIAL, missing=missing, integrated=False)
 

@@ -108,24 +108,36 @@ LEX_COMMUNICATION = 10
 #   sorry    "feeling or expressing regret or sorrow ..."   (an ADJECTIVE, so adjectives are checked too)
 
 
+_DATA_LINES = {}
+
+
+def _data_lines(pos):
+    """speed_prereg.md: the data file read once per process -> {offset: line} (the old loop re-read it on every call)"""
+    if pos not in _DATA_LINES:
+        p = os.path.join(DICT, f"data.{pos}"); d = {}
+        if os.path.exists(p):
+            for line in open(p, encoding="latin-1"): d.setdefault(line[:8], line)
+        _DATA_LINES[pos] = d
+    return _DATA_LINES[pos]
+
+
 def _synsets_with_gloss(word, pos):
     """(lex_filenum, gloss) for each synset of the word."""
     idx = _index(pos)
-    offs = set(idx.get(word.lower(), []))
-    if not offs: return []
-    out = []
-    p = os.path.join(DICT, f"data.{pos}")
-    if not os.path.exists(p): return []
-    order = {o: i for i, o in enumerate(idx.get(word.lower(), []))}     # the SOURCE's own listing order, kept as
-    found = []                                                           # data (NP-3: it carries no authority)
-    for line in open(p, encoding="latin-1"):
-        if line[:8] in offs:
-            head, _, gloss = line.partition("|")
-            f = head.split()
-            if len(f) > 1:
-                try: found.append((order.get(line[:8], 1 << 30), (int(f[1]), gloss.strip())))
-                except ValueError: pass
-    return [g for _, g in sorted(found, key=lambda x: x[0])]
+    listing = idx.get(word.lower(), [])
+    if not listing: return []
+    lines = _data_lines(pos)
+    if not lines: return []
+    out = []                                                             # the SOURCE's own listing order, kept as
+    for o in dict.fromkeys(listing):                                     # data (NP-3: it carries no authority)
+        line = lines.get(o)
+        if line is None: continue
+        head, _, gloss = line.partition("|")
+        f = head.split()
+        if len(f) > 1:
+            try: out.append((int(f[1]), gloss.strip()))
+            except ValueError: pass
+    return out
 
 
 def speech_act(word):

@@ -13,12 +13,18 @@ class Synonyms:
         self.model = model; self.uni = model.uni; self.same = same or {}; self.arms = tuple(arms)
         self._slots = None
 
+    _SHARED = {}           # speed_prereg.md: one index per text model, not per Synonyms object (a door makes several)
+
     def _index(self):
         if self._slots is None:
-            self._slots = collections.defaultdict(set); self._fillers = {}
-            for key, lst in self.model.both.items():
-                self._fillers[key] = [w for w, n in lst]
-                for w, n in lst: self._slots[w].add(key)
+            got = Synonyms._SHARED.get(id(self.model))
+            if got is None or got[0] is not self.model:
+                slots = collections.defaultdict(set); fillers = {}
+                for key, lst in self.model.both.items():
+                    fillers[key] = [w for w, n in lst]
+                    for w, n in lst: slots[w].add(key)
+                got = Synonyms._SHARED[id(self.model)] = (self.model, slots, fillers)
+            self._slots, self._fillers = got[1], got[2]
         return self._slots
 
     def two_sided(self, w, k=10):

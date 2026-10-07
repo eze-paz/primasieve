@@ -70,9 +70,10 @@ class EventReader:
     def status(self, toks, k):
         """reality_prereg.md: IRREALIS when a learned marker stands in the verb group (up to 3 symbols before the verb, no
         noun among them), or the verb lies in the first clause of a sentence opened by the learned conditional opener"""
-        marks = getattr(self, "to_marker", None) or ()
+        marks = getattr(self, "to_marker", None) or (); negs = getattr(self, "negatives", ())
         i = k - 1
         while i >= 0 and k - i <= 3 and self.is_word(toks[i]) and not self.noun_at(toks, i):
+            if toks[i].lower() in negs: return "negated"                     # negation_prereg.md (C)
             if toks[i].lower() in marks: return "irrealis"
             i -= 1
         words = [j for j, x in enumerate(toks) if self.is_word(x)]
@@ -154,7 +155,9 @@ class EventReader:
                     r = self.run_at(toks, i, 1, 1)
                     if r: adj.append(" ".join(toks[i:r[0][1]])); i = r[0][1]; continue
                 i += 1
-            out.append(dict(verb=lemma, pos=k, agent=agent, patient=patient, adjuncts=adj, text=text, status=self.status(toks, k)))
+            st_ = self.status(toks, k)
+            if ag and not ag[1] and ag[0][0] > 0 and toks[ag[0][0] - 1].lower() in getattr(self, "negatives", ()): st_ = "negated"   # "No guest drank"
+            out.append(dict(verb=lemma, pos=k, agent=agent, patient=patient, adjuncts=adj, text=text, status=st_))
         return out
 
 
@@ -185,6 +188,7 @@ class EventMemory:
         for ev in reversed(self.events):
             if ev["verb"] not in lemmas and ev["verb"] not in same: continue
             if ev.get("status") == "irrealis" and not irr_ok: continue
+            if ev.get("status") == "negated": continue                          # negation_prereg.md (C)
             roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or ""}
             filled = {r for r, v in roles.items() if v and set(v.lower().split()) & content}
             if passive and "agent" not in filled:

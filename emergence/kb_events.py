@@ -89,6 +89,31 @@ def gloss_forms(cells, knockout=False, min_n=20, share=0.3):
     return out
 
 
+MEMO_DIR = os.path.join(HERE, "..", "_nldata", "events_memo")
+
+
+def _disk_memo(fn):
+    """speed_prereg.md: a book scan's result kept on disk, keyed by the function, its arguments and this file's source
+    (any edit to the learner invalidates it). Sets/dicts/tuples restored by a type tag."""
+    import functools, hashlib, pickle
+    @functools.wraps(fn)
+    def wrapped(*a, **k):
+        def canon(x):
+            if isinstance(x, (set, frozenset)): return ("set", sorted(map(canon, x), key=repr))
+            if isinstance(x, dict): return ("dict", sorted(((canon(kk), canon(v)) for kk, v in x.items()), key=repr))
+            if isinstance(x, (list, tuple)): return ("seq", [canon(v) for v in x])
+            return x
+        src = open(os.path.abspath(__file__), "rb").read()
+        h = hashlib.sha256(repr((fn.__name__, canon(a), canon(sorted(k.items())))).encode() + src).hexdigest()[:24]
+        os.makedirs(MEMO_DIR, exist_ok=True); path = os.path.join(MEMO_DIR, f"{fn.__name__}-{h}.pkl")
+        if os.path.exists(path):
+            with open(path, "rb") as f: return pickle.load(f)
+        out = fn(*a, **k)
+        with open(path, "wb") as f: pickle.dump(out, f)
+        return out
+    return wrapped
+
+
 def held_book(bid): return int(hashlib.sha256(f"book:{bid}".encode()).hexdigest(), 16) % 10 == 0
 
 
@@ -97,6 +122,7 @@ def books(held=False):
     return sorted(f[:-4] for f in os.listdir(GUT) if f.endswith(".txt") and held_book(f[:-4]) == held)
 
 
+@_disk_memo
 def learn_side(fin, closed, n_books=60):
     """count capitalised non-initial names right before and right after finite verbs in training books"""
     c = collections.Counter()
@@ -111,6 +137,7 @@ def learn_side(fin, closed, n_books=60):
     return ("L" if c["L"] >= c["R"] else "R"), dict(c)
 
 
+@_disk_memo
 def learn_marker(closed, base, fin, n_books=60):
     """events5_prereg.md (D): the closed-class symbol whose next symbol is most often a VERBAL base form (a lemma whose
     finite forms occur in the books at least as often as the bare form), as a share of its occurrences (>= 1,000)"""
@@ -136,6 +163,7 @@ def learn_marker(closed, base, fin, n_books=60):
     return {a for a, v in share.items() if v >= 0.25}      # amended before the run: every such symbol (to, may, will ...)
 
 
+@_disk_memo
 def learn_classes(closed, fin, base, participles, past, third, n_books=60, markers=()):
     """events6_prereg.md: SUBJECT-LIKE closed symbols (not verb forms; followed by a past-only finite form in >= 20 % of
     uses), the LINKER (both neighbours noun-like in >= 45 % of uses) and the COORDINATOR (most often between two capitalised
@@ -196,6 +224,7 @@ def learn_negatives(closed, knockout=False):
     return neg, negatives
 
 
+@_disk_memo
 def learn_conditional(closed, markers, n_books=60, min_n=1000):
     """reality_prereg.md (A): the closed sentence-initial symbol (>= min_n uses) whose sentences most often hold a marker
     after a comma, relative to all sentences -> {symbol}, and the lifts measured"""
@@ -215,6 +244,7 @@ def learn_conditional(closed, markers, n_books=60, min_n=1000):
     return {max(sorted(lift), key=lift.get)} if lift else set()
 
 
+@_disk_memo
 def learn_auxiliaries(closed, participles, n_books=60, share=0.15):
     """events2_prereg.md: closed-class symbols followed by a participle in >= `share` of their occurrences"""
     tot = collections.Counter(); hit = collections.Counter()
@@ -268,7 +298,23 @@ def learn_closed(fin, participles, base, n=200, n_books=60, verb_share=0.15):
     return set(out)
 
 
+_MEMO = {}
+
+
 def build(closed, uni=None, same=None):
+    """speed_prereg.md: the learned reader is built once per process (and its book scans once per machine, _disk_memo);
+    every call gets its own shallow copy (fresh referents; the learned tables are shared read-only)"""
+    import copy
+    key = (frozenset(closed), getattr(build, "knockout_closed", False), getattr(build, "knockout_neg", False),
+           getattr(verb_forms, "knockout", False), len(uni or ()), same is None)
+    if os.environ.get("PRIMA_NOSHARE"): return _build(closed, uni, same)
+    if key not in _MEMO: _MEMO[key] = _build(closed, uni, same)
+    R, side, counts = _MEMO[key]
+    R2 = copy.copy(R); R2.last_agent = None; R2.last_patient = None
+    return R2, side, counts
+
+
+def _build(closed, uni=None, same=None):
     fin, base = verb_forms(uni)
     if not getattr(build, "knockout_closed", False):                     # closedclass_prereg.md: stories' own closed class
         closed = learn_closed(fin, verb_forms.participles, verb_forms.um_base)

@@ -128,3 +128,6 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | -- | all | ENGLISH MAP (forward, theory-driven): 114 phenomena, frequencies, 309 probes, predictions before running (83 % held) | -- | 41 confident WRONG answers found the battery never asks about |
 | 2026-10-07 | 17 | honesty (map) | what did not happen is not told as happened: learned markers and conditional opener mark events irrealis (reality_prereg.md) | PASS | probes WRONG 31 -> 24; B6 47 -> 46 (predicted honest price) |
 | 2026-10-07 | 18 | B6, map | the function words of stories learned from the books with the dictionary's part-of-speech labels (closedclass_prereg.md) | PASS on B6 (49); probe WRONG bar missed (23) | B6 46 -> 49; B2 90.4 %; probes RIGHT 89 -> 95 |
+| 2026-10-07 | 19 | honesty (map) | negation discovered from the dictionary ("not": first word of definitions of prefixed entries) (negation_prereg.md) | PASS | probes WRONG 23 -> 21; B6 49 held |
+| 2026-10-07 | 20 | honesty (map) | world answers: known words not read as their own relatives; negators owed; aligned value must fit the question word (worldhonesty_prereg.md) | PASS | 3 wrong-question answers removed; B2 90.4 % held |
+| 2026-10-07 | -- | speed | profile + caching that changes no reply (speed_prereg.md) | 0/100 B6 replies differ | **battery ~55-60 min -> 5 min 32 s**; door build 75 s -> 1 s |

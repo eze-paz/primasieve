@@ -313,6 +313,12 @@ class Door:
         if len(syms) < 3 or 0 in used or 1 in used: return None
         if self.fluent is not None and not (syms[0] in self.fluent and syms[1] in self.fluent): return None   # natural_prereg.md (7): question-shaped only
         value = str(fr["answers"][0][1]); rest = syms[2:]
+        # worldhonesty_prereg.md (C): the value's kind must fit the question word (a number where "who" asks for a thing
+        # read "130 has the highest salary in sales"); shares learned from the held-out questions' answers
+        isnum = bool(re.fullmatch(r"[\d.,/-]+", value.strip()))
+        sh = getattr(self, "qnum", {}).get(syms[0])
+        if sh is not None and ((isnum and sh < 0.1) or (not isnum and sh >= 0.9)): return None
+        if re.match(r"^\s*[^\W_]+'", text): return None     # a clitic on the question word ("what's"): no aligned rewrite
         vs = symbols(value, "LN")
         if vs and any(syms[i:i + len(vs)] == vs for i in range(len(syms))): return None     # the value is named: a check, not a lookup
         f2 = reason(" ".join(rest), self.S.worlds, self.S.df, cats="LN")
@@ -660,6 +666,17 @@ def gate(seeded=False):
 from core.textmodel import TextModel
 
 
+_SHARED = {}
+
+
+def _shared(key, make):
+    """speed_prereg.md: read-only pieces of the live door built once per process (text model, store index, statement
+    reader, guesser, the learned question words); everything a conversation can change is built fresh per door"""
+    if os.environ.get("PRIMA_NOSHARE"): return make()          # the equivalence check runs without sharing
+    if key not in _SHARED: _SHARED[key] = make()
+    return _SHARED[key]
+
+
 def live_door(seeded, online, store, path, seed):
     """the door the LIVE modes open (REPL and server): every ability on -- the store (default file), transfer, and when
     online the researcher over the live Wikidata and OpenStreetMap sources with their own cache files (research_prereg.md,
@@ -677,8 +694,8 @@ def live_door(seeded, online, store, path, seed):
         from kb_storefetch import StoreFetcher
         from core.textmodel import TextModel as _TM     # a local import later in this function shadowed the module-level name
         tmp = os.path.join(HERE, "_nldata", "textmodel.json")
-        closed100 = {w for w, c in _TM.load(tmp).uni.most_common(100)} if os.path.exists(tmp) else set()
-        if os.path.exists(CRAWL_DB): fetchers.append(StoreFetcher(closed=closed100))
+        closed100 = {w for w, c in _shared(("tm", tmp), lambda: _TM.load(tmp)).uni.most_common(100)} if os.path.exists(tmp) else set()
+        if os.path.exists(CRAWL_DB): fetchers.append(_shared(("storefetch", CRAWL_DB), lambda: StoreFetcher(closed=closed100)))
     except Exception as ex:
         print(f"  store fetcher not available: {type(ex).__name__}: {ex}", flush=True)
     if online:
@@ -694,11 +711,13 @@ def live_door(seeded, online, store, path, seed):
         from core.textmodel import TextModel
         from core.rephrase import Rephraser
         from core.session import Integrator
-        tm = TextModel.load(os.path.join(HERE, "_nldata", "textmodel.json"))
+        _tmp = os.path.join(HERE, "_nldata", "textmodel.json")
+        tm = _shared(("tm", _tmp), lambda: TextModel.load(_tmp))
         from core.synonyms import Synonyms
         from kb_synonyms import load_same
         integrator = Integrator(w for w, c in tm.uni.most_common(100))     # integrate_prereg.md (H3)
-        rephraser = Rephraser(Synonyms(tm, load_same(integrator.common)))    # synonyms_prereg.md (H5): the dictionary's synonyms first
+        _same = _shared(("same", frozenset(integrator.common)), lambda: load_same(integrator.common))
+        rephraser = Rephraser(Synonyms(tm, _same))    # synonyms_prereg.md (H5): the dictionary's synonyms first
         rephraser.spelling = True                                            # spelling_prereg.md: one slip, one reading
     events = None                                       # events_prereg.md: a memory of the person's own story
     try:
@@ -712,11 +731,12 @@ def live_door(seeded, online, store, path, seed):
     try:
         import kb_constructions as KC
         if os.path.exists(KC.SAVED) and integrator is not None:
-            reader = KC.Reader(KC.Store(), KC.load(), {w for w, c in tm.uni.most_common(1000)})
+            reader = _shared(("reader", KC.SAVED), lambda: KC.Reader(KC.Store(), KC.load(), {w for w, c in tm.uni.most_common(1000)}))
     except Exception:
         reader = None
-    qwords = set(); qcount = collections.Counter(); qecho = collections.Counter()      # natural_prereg.md run 3: question words LEARNED from the engine's own question set
-    try:
+    def _learn_qwords():
+      qwords = set(); qcount = collections.Counter(); qecho = collections.Counter(); qnumc = collections.Counter()      # natural_prereg.md run 3: question words LEARNED from the engine's own question set
+      try:
         for qtext, typ, gold in held_out():
             if typ == "STRESS" or gold is None: continue            # the stress items are commands and noise, not questions
             fq = reason(qtext, worlds, df, cats="LN")
@@ -725,15 +745,21 @@ def live_door(seeded, online, store, path, seed):
                 usedq = {p for a_, w_ in zip(fq["answers"], fq["answer_worlds"]) for i, j in _leaf_spans(w_, a_[4]) for p in range(i, j)}
                 if fq["syms"] and 0 not in usedq:
                     qcount[fq["syms"][0]] += 1
+                    qnumc[fq["syms"][0]] += bool(re.fullmatch(r"[\d.,/-]+", str(fq["answers"][0][1]).strip()))     # worldhonesty (C)
                     joined = " ".join(fq["syms"])     # natural2_prereg.md run 2: does this word's question NAME its answer (yes/no)?
                     qecho[fq["syms"][0]] += any(symbols(str(a_[1]), "LN") and " ".join(symbols(str(a_[1]), "LN")) in joined for a_ in fq["answers"])
         qwords = {w for w, c in qcount.items() if c >= 2}
-    except Exception:
+      except Exception:
         pass
-    D = Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=build_guesser(), rephraser=rephraser, integrate=integrator,
+      return qwords, qcount, qecho, qnumc
+    qwords, qcount, qecho, qnumc = _shared(("qwords", seeded, online), _learn_qwords)
+    qwords = set(qwords)
+    D = Door(worlds, df, transcript=path, seed=seed, store=store, transfer=True, researcher=researcher, guesser=_shared(("guesser",), build_guesser), rephraser=rephraser, integrate=integrator,
                 fluent=integrator.common if integrator is not None else None, reader=reader, events=events, brief=True)
     D.qwords = qwords; D.S.qwords = qwords
     D.whwords = {w for w in qwords if 2 * qecho[w] < qcount[w]}      # question words whose questions do not name the answer
+    D.qnum = {w: qnumc[w] / qcount[w] for w in qwords if qcount[w]}  # worldhonesty_prereg.md (C)
+    if events is not None: D.S.negatives = set(getattr(events.reader, "negatives", ()))   # worldhonesty_prereg.md (B)
     if integrator is not None: integrator.common |= qwords     # a learned question word is not content an answer owes
     return D        # align_prereg.md: replies in the person's words
 
@@ -857,6 +883,7 @@ def serve(port=8766, seeded=False, online=False, store=None):
                                          rephraser=d0.S.rephraser, integrate=d0.S.integrate, fluent=d0.fluent, reader=d0.reader,
                                          events=type(d0.events)(d0.events.reader) if d0.events is not None else None, brief=d0.brief)
                     state["door"].qwords = getattr(d0, "qwords", set()); state["door"].S.qwords = state["door"].qwords; state["door"].whwords = getattr(d0, "whwords", set())
+                    state["door"].qnum = getattr(d0, "qnum", {}); state["door"].S.negatives = getattr(d0.S, "negatives", set())
                 call(reset); self._send(200, "{}")
             else: self._send(404, "{}")
 

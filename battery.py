@@ -37,15 +37,27 @@ def door(guesser=None):
 def held_book(bid): return int(hashlib.sha256(f"book:{bid}".encode()).hexdigest(), 16) % 10 == 0
 
 
+_BG = {}
+
+
+def start(cmd):
+    """speed_prereg.md: the independent sub-gates (B3, B7) start at the battery's beginning and run beside it"""
+    _BG[tuple(cmd)] = subprocess.Popen([sys.executable] + cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                                       cwd=HERE, encoding="utf-8", errors="replace")
+
+
 def run(cmd, needle_re):
-    out = subprocess.run([sys.executable] + cmd, capture_output=True, text=True, cwd=HERE, encoding="utf-8", errors="replace").stdout
-    return re.findall(needle_re, out)
+    p = _BG.pop(tuple(cmd), None)
+    out = p.communicate()[0] if p is not None else subprocess.run([sys.executable] + cmd, capture_output=True, text=True, cwd=HERE, encoding="utf-8", errors="replace").stdout
+    return re.findall(needle_re, out or "")
 
 
 def main():
     res = {}; false_facts = 0; samples = []
     only = set(sys.argv[sys.argv.index("--only") + 1].split(",")) if "--only" in sys.argv else None
     want = lambda k: only is None or k in only
+    if "--fast" not in sys.argv and (only is None or "B3" in only or "B7" in only):
+        for c in (["statements.py", "--quick"], ["filled.py", "--quick"], ["chains.py"]): start(c)
     # ---- B2 ordinary phrasing
     q = json.load(open(os.path.join(TB, "questions.json"), encoding="utf-8"))["items"] if want("B2") else []
     D = door(); right = abst = 0

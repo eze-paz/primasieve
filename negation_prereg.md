@@ -24,3 +24,15 @@ them) or begins its agent's noun run ("No guest drank"). A negated event never a
 
 ## Prediction
 G1 met (S46, S47 become SILENT); nothing else moves.
+
+## Amendment and probe runs before the battery (2026-10-07)
+Negator discovered: "not" (15,134 vs "to" 4,301). (B) as registered ("a definition beginning with the negator") admitted
+few, by, off, own, another, same, yet, away, beyond (one sense of 6-12 each: "another: not the same"); amended AFTER
+measuring the shares, disclosed: a closed symbol is negative when >= 20 % of its definitions begin with the negator ->
+{not, no, never, none, neither, without} ("nobody", "nothing" are not in the learned closed class). Probes (event
+memory): RIGHT 95 -> 95, **WRONG 23 -> 21**, SILENT 53 -> 55; **G1 met** (neg.never, neg.no_det, neg.not: 0 WRONG).
+**G4 knockout** (negator "to"): RIGHT 92, WRONG 23, S46.1 and S47.1 WRONG again -- the change is the negator's.
+
+## Run (2026-10-07, battery19 -- with iteration 20 and the speed caching): PASS (G1-G4)
+G1 met (probes); G2 probes WRONG 23 -> 21, RIGHT 95 held; **G3 B6 49 (held)**, B5 +11.6, B1 counted 1 (the
+"jurisdiction" item); G4 knockout as above. The battery took 5 min 32 s (speed_prereg.md).
