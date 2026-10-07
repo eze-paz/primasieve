@@ -173,3 +173,8 @@ Titles kept whole in book readings ("Mr. Vanborough"): malformed title propositi
 
 ### Iteration 50 (pronobj_prereg.md) -- NOT PASSED, reverted
 Only a learned pronoun may stand for the last patient: no scored answer changed (B6 67, probes identical).
+
+### Iteration 51 (haveq_prereg.md) -- PASS
+Questions whose only verb is closed-class ("Who had a clever cat?", "How many daughters did the king have?") select events
+by that verb when no lexical verb is told of, with every content word required in the event; number words answer "how
+many". B6 67 -> 69, probes RIGHT 108; all else held.

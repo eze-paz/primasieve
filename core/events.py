@@ -295,7 +295,14 @@ class EventMemory:
                   and not (j >= 2 and (words[j - 1].lower() in dets_q or words[j - 1].lower() in getattr(self.reader, "numwords", ())))]   # copq: a word after a determiner is a noun ("the keys");
                                                                           # not right after the question word ("What fell")
         lemmas = [l for l in lemmas if l]
-        same = {x for l in lemmas for x in self.reader.same.get(l, ())}                 # events2_prereg.md: synonymous verbs, second
+        lex_lemmas = list(lemmas)
+        if not {ev["verb"] for ev in self.events if ev.get("status", "realis") == "realis"} & set(lemmas):   # haveq_prereg.md (A, amended: "cat" is a verb too) --
+                                               # no lexical lemma told of -> the closed verb forms ("Who had a clever cat?")
+            cop_l = {self.reader.verbs.get(c) for c in getattr(self.reader, "copula", ())}
+            cl = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) for j, t in enumerate(words)
+                  if j > 0 and t.lower() in self.reader.closed]
+            lemmas = lemmas + [l for l in cl if l and l not in cop_l]
+        same = {x for l in lex_lemmas for x in self.reader.same.get(l, ())}   # haveq: closed lemmas bring no synonyms                 # events2_prereg.md: synonymous verbs, second
         pl = getattr(self.reader, "plural", {})
         def base(x): x = x.lower(); return pl.get(x, x)                 # phrases amendment: "shelves" is "shelf"
         content = {base(t) for i, t in enumerate(words) if i > 0 and self.reader.noun_at(words, i)}    # phrases (B): by position ("apples")
@@ -353,6 +360,9 @@ class EventMemory:
         irr_ok = any(t in (getattr(self.reader, "to_marker", None) or ()) for t in lw[1:])   # reality_prereg.md (B)
         for ev in reversed(self.events):
             if ev["verb"] not in lemmas and ev["verb"] not in same: continue
+            if ev["verb"] not in lex_lemmas and ev["verb"] not in same:      # haveq (amended): a closed-verb match only when
+                allw = {base(x) for r in ("agent", "patient", "recipient") for x in (ev.get(r) or "").split()}   # every content
+                if not content or not content <= allw: continue                                             # word is in its roles
             if ev.get("status") == "irrealis" and not irr_ok: continue
             if ev.get("status") == "negated": continue                          # negation_prereg.md (C)
             roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or "", "recipient": ev.get("recipient") or ""}
@@ -361,7 +371,7 @@ class EventMemory:
             for r in ("patient", "agent"):
                 if r in filled:
                     rt = roles[r].split(); hit_i = next((i for i, x in enumerate(rt) if base(x) in content), None)
-                    nums = [i for i, x in enumerate(rt) if x.isdigit() and x not in lw and (hit_i is None or i < hit_i)]
+                    nums = [i for i, x in enumerate(rt) if (x.isdigit() or x.lower() in getattr(self.reader, "numwords", ())) and x.lower() not in lw and (hit_i is None or i < hit_i)]
                     if nums: num = rt[nums[-1]]
             strand = [a for a in ev["adjuncts"] if lw[-1] in self.reader.closed and a.lower().split()[0] == lw[-1]
                       and len(a.split()) > 1] if len(lw) > 2 else []     # lostdet (B): "dry it with?" -> the "with ..." adjunct
