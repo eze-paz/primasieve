@@ -124,9 +124,12 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                     # the predicate: the words after the copula up to the next punctuation, 1-6 of them, not negated, not
                     # opened by a participle (passive / progressive) or a verb
                     k = words_at[cpos]; pred = []
-                    for j in range(k + 1, len(et)):
+                    j = k + 1
+                    while j < len(et):
+                        if et[j] == "-" and pred and j + 1 < len(et) and et[j + 1][:1].isalnum():   # (B) "well-bred"
+                            pred[-1] += "-" + et[j + 1]; j += 2; continue
                         if not et[j][:1].isalnum(): break
-                        pred.append(et[j])
+                        pred.append(et[j]); j += 1
                     pl = [x.lower() for x in pred]
                     if (1 <= len(pred) <= 6 and pl[0] not in negs and pl[0] not in R.participles and pl[0] not in R.verbs
                             and not any(x in negs for x in pl)):
@@ -156,22 +159,37 @@ def quote_hook(R, inner):
                     if w[:1].isupper() and w.lower() not in R.closed: return w, None
                     if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
         return None, None
+    def quoted_runs(B, i):
+        """-> [(text, words before, words after)] for the token runs Book.inside marks as quoted (marks excluded)"""
+        ts = B.toks[i]; flags = [B.inside(ts, k, i) and ts[k] not in QUOTES for k in range(len(ts))]
+        out = []; k = 0
+        while k < len(ts):
+            if flags[k]:
+                j = k
+                while j < len(ts) and flags[j]: j += 1
+                text = " ".join(ts[k:j]).strip(" ,")
+                out.append((text, [t for t in ts[:k] if t[:1].isalnum()][-2:], [t for t in ts[j:] if t[:1].isalnum()][:2])); k = j
+            else: k += 1
+        return out
+    def speaker_near(before, after):
+        for pair in (after, before[::-1] if before else []):
+            if len(pair) == 2:
+                v = [x for x in pair if x.lower() in R.verbs]; n = [x for x in pair if x not in v]
+                if v and n:
+                    w = n[0]
+                    if w[:1].isupper() and w.lower() not in R.closed: return w, None
+                    if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
+        return None, None
     def hook(B, per):
         per = inner(B, per)
         for i in sorted(per):
             if per[i]: continue
             sent = B.sents[i]
             if not any(q in sent for q in QUOTES): continue
-            marks = [j for j, ch in enumerate(sent) if ch in QUOTES]
-            segs = []
-            if marks and sent[:marks[0]].strip() and not any(ch in sent[:marks[0]] for ch in ",;:"):   # opens inside a quote
-                segs.append((0, marks[0])); marks = marks[1:]
-            for a, b in zip(marks[0::2], marks[1::2]): segs.append((a + 1, b))
             got = []
-            for a, b in segs:
-                text = sent[a:b].strip().rstrip(",")
+            for text, before, after in quoted_runs(B, i):        # bookquote2_prereg.md (A): the book's own quote state
                 if len([t for t in tokens(text) if t[:1].isalnum()]) < 3: continue
-                spk, how = speaker_of(sent, a, b + 1)
+                spk, how = speaker_near(before, after)
                 ctx = f"{B.title}, {spk + (' (' + how + ')' if how else '') if spk else 'a speaker (not resolved)'}'s words"
                 sub = inner(One(text, ctx), {0: []})[0]
                 for p in sub:

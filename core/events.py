@@ -80,6 +80,14 @@ class EventReader:
         # bookpronoun run 2: a negative right after the verb ("did not possess", "does not mention")
         for j in (k + 1, k + 2):
             if j < len(toks) and toks[j].lower() in negs and (j == k + 1 or toks[k + 1] in "'’"): return "negated"
+        # bookquote2 run 2: a contraction piece that is a learned marker ("won't": won ' t) -- not told as happened; and a
+        # learned negative later in the same clause ("feared him no more than ...")
+        if k + 2 < len(toks) and toks[k + 1] in "'’" and toks[k + 2].lower() in marks: return "negated"
+        j = k + 1
+        clause_negs = getattr(self, "clause_negatives", negs)   # negatives with a preposition sense ("without") open a phrase
+        while j < len(toks) and j <= k + 4 and self.is_word(toks[j]):
+            if toks[j].lower() in clause_negs: return "negated"
+            j += 1
         words = [j for j, x in enumerate(toks) if self.is_word(x)]
         if words and toks[words[0]].lower() in getattr(self, "cond", ()) and "," not in toks[:k]: return "irrealis"
         return "realis"

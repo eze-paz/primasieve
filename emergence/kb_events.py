@@ -464,6 +464,12 @@ def _build(closed, uni=None, same=None):
         pass
     R.cond = learn_conditional(closed, R.to_marker)                                      # reality_prereg.md
     R.negator, R.negatives = learn_negatives(closed, knockout=getattr(build, "knockout_neg", False))   # negation_prereg.md
+    try:                      # bookquote2 run 2: in-clause negation only by negatives without a preposition sense ("without")
+        import sqlite3
+        _db2 = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+        R.clause_negatives = {w for w in R.negatives if not pos_senses(_db2, w).get("prep")}
+    except Exception:
+        R.clause_negatives = set(R.negatives)
     try:                      # phrases_prereg.md (A): determiners by the dictionary's labels (>= 30 % det/article senses, or
         import sqlite3        # any such sense among the 50 most frequent book symbols -- "a"'s entry is mostly a letter)
         _db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
