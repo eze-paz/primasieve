@@ -124,8 +124,10 @@ class Door:
     def sentences(text):
         """a text with two or more sentence-final marks and symbols between them -> its sentences (chat_acts_prereg.md)."""
         parts, cur = [], []
+        abbr = _abbreviations()
         for tok in segment(text):
             cur.append(tok)
+            if tok.rstrip(".") in abbr or (tok == "." and len(cur) >= 2 and cur[-2] in abbr): continue   # "Dr." ends no sentence
             if any(c in tok for c in ".?!"):
                 if symbols(" ".join(cur), "LN"): parts.append(" ".join(cur))
                 cur = []
@@ -689,6 +691,20 @@ def gate(seeded=False):
 
 
 from core.textmodel import TextModel
+
+
+_ABBR = {}
+
+
+def _abbreviations():
+    """the learned abbreviations (kb_events.learn_abbr, disk-memoised) -- a full stop after one ends no sentence"""
+    if "a" not in _ABBR:
+        try:
+            import kb_events as _KE
+            _ABBR["a"] = set(_KE.learn_abbr())
+        except Exception:
+            _ABBR["a"] = set()
+    return _ABBR["a"]
 
 
 _SHARED = {}
