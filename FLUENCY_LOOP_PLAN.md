@@ -170,3 +170,6 @@ splits in Man And Wife -- next target.
 ### Iteration 49 (titlename_prereg.md) -- PASS
 Titles kept whole in book readings ("Mr. Vanborough"): malformed title propositions 34 -> 0; novels 37.7 -> 38.3 %, judged
 0.96; all else held.
+
+### Iteration 50 (pronobj_prereg.md) -- NOT PASSED, reverted
+Only a learned pronoun may stand for the last patient: no scored answer changed (B6 67, probes identical).
