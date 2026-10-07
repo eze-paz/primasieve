@@ -221,6 +221,43 @@ def clause_hook(R, inner):
     return hook
 
 
+def segment_hook(R, inner):
+    """booksegment_prereg.md: unread non-question sentences cut at ';' and at ', <linking word | subject-like>' and read
+    clause by clause by the whole chain; question sentences and verb-less readings dropped"""
+    class One:
+        def __init__(self, sent, title): self.sents = [sent]; self.title = title; self.toks = [tokens(sent)]
+        def inside(self, ts, k, i=None): return False
+    import sqlite3, kb_events as KE
+    _db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
+    def linking(w):
+        ps = KE.pos_senses(_db, w); return (ps.get("conj", 0) + ps.get("adv", 0)) >= 0.5 * max(1, sum(ps.values()))
+    subj = set(getattr(R, "subjects", ()))
+    def clauses(sent):
+        out = []; cur = []; ts = tokens(sent)
+        for j, t in enumerate(ts):
+            nxt = ts[j + 1].lower() if j + 1 < len(ts) else ""
+            if t == ";" or (t == "," and nxt and nxt in R.closed and (linking(nxt) or nxt in subj)):
+                if cur: out.append(" ".join(cur))
+                cur = []; continue
+            cur.append(t)
+        if cur: out.append(" ".join(cur))
+        return out if len(out) > 1 else []
+    def hook(B, per):
+        per = inner(B, per)
+        for i in sorted(per):
+            sent = B.sents[i]
+            if sent.rstrip().rstrip('"”').endswith("?"): per[i] = []; continue     # (B): a question is not a claim
+            per[i] = [p for p in per[i] if p.get("rel")]                                     # (B): a reading needs a verb
+            if per[i]: continue
+            got = []
+            for c in clauses(sent):
+                if len([t for t in tokens(c) if t[:1].isalnum()]) < 3: continue
+                got += [dict(p, title=B.title if p.get("title") in (None, "") or p["title"].startswith(B.title) is False and False else p["title"]) for p in inner(One(c, B.title), {0: []})[0] if p.get("rel")]
+            per[i] = got
+        return per
+    return hook
+
+
 def quote_hook(R, inner):
     """bookquote_prereg.md: quoted segments of still-unread sentences read as sentences of their own, said as a speaker's
     words inside the book; the speaker from the words next to the marks, "I" the speaker, "you" the one addressed"""
@@ -324,6 +361,7 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
         h = describe_hook(R, strict=it >= 8, pronouns=it >= 9, copula=copula_forms(R) if it >= 10 else None)
         hooks = {"after_read": quote_hook(R, h) if it >= 11 else h}
         if it >= 12: hooks = {"after_read": clause_hook(R, hooks["after_read"])}
+        if it >= 13: hooks = {"after_read": segment_hook(R, hooks["after_read"])}
     base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
