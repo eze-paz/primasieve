@@ -67,6 +67,18 @@ class EventReader:
             else: break
         return s, e
 
+    def status(self, toks, k):
+        """reality_prereg.md: IRREALIS when a learned marker stands in the verb group (up to 3 symbols before the verb, no
+        noun among them), or the verb lies in the first clause of a sentence opened by the learned conditional opener"""
+        marks = getattr(self, "to_marker", None) or ()
+        i = k - 1
+        while i >= 0 and k - i <= 3 and self.is_word(toks[i]) and not self.noun_at(toks, i):
+            if toks[i].lower() in marks: return "irrealis"
+            i -= 1
+        words = [j for j, x in enumerate(toks) if self.is_word(x)]
+        if words and toks[words[0]].lower() in getattr(self, "cond", ()) and "," not in toks[:k]: return "irrealis"
+        return "realis"
+
     def run_at(self, toks, k, step, limit, pronoun=False):
         """the noun run nearest to position k in direction `step`, skipping at most `limit` closed symbols, inside the
         clause -> ((start, end), is_pronoun) or None. With `pronoun`, a closed symbol right beside k is returned as one."""
@@ -96,9 +108,15 @@ class EventReader:
                    and t.lower() in self.base and t.lower() not in self.closed)          # events5_prereg.md (D): "to fix"
             if inf:
                 ag0 = out[-1]["agent"] if out else self.last_agent
+                # reality_prereg.md: a doer right before the marker ("his father will buy", "she will wash") is this
+                # verb's own; otherwise the previous doer controls it ("Sana wanted to learn")
+                if k >= 2 and toks[k - 2].lower() in getattr(self, "subjects", ()): ag0 = self.last_agent
+                elif k >= 2 and self.noun_at(toks, k - 2):
+                    r0 = self.run_at(toks, k - 1, -1 if self.side == "L" else 1, 0)
+                    if r0: ag0 = " ".join(toks[r0[0][0]:r0[0][1]])
                 pa = self.run_at(toks, k, 1 if self.side == "L" else -1, 2)
                 patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
-                out.append(dict(verb=self.base[t.lower()], pos=k, agent=ag0, patient=patient, adjuncts=[], text=text))
+                out.append(dict(verb=self.base[t.lower()], pos=k, agent=ag0, patient=patient, adjuncts=[], text=text, status=self.status(toks, k)))
                 continue
             main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks)
                     and toks[k + 1].lower() not in self.participles and toks[k + 1].lower() not in self.verbs
@@ -136,7 +154,7 @@ class EventReader:
                     r = self.run_at(toks, i, 1, 1)
                     if r: adj.append(" ".join(toks[i:r[0][1]])); i = r[0][1]; continue
                 i += 1
-            out.append(dict(verb=lemma, pos=k, agent=agent, patient=patient, adjuncts=adj, text=text))
+            out.append(dict(verb=lemma, pos=k, agent=agent, patient=patient, adjuncts=adj, text=text, status=self.status(toks, k)))
         return out
 
 
@@ -163,8 +181,10 @@ class EventMemory:
         aux_at = [i for i, t in enumerate(lw) if i > 0 and t in getattr(self.reader, "auxiliaries", ())]
         passive = bool(aux_at) and any(t in getattr(self.reader, "past_participles", ()) for t in lw[aux_at[0] + 1:])
         best = None
+        irr_ok = any(t in (getattr(self.reader, "to_marker", None) or ()) for t in lw[1:])   # reality_prereg.md (B)
         for ev in reversed(self.events):
             if ev["verb"] not in lemmas and ev["verb"] not in same: continue
+            if ev.get("status") == "irrealis" and not irr_ok: continue
             roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or ""}
             filled = {r for r, v in roles.items() if v and set(v.lower().split()) & content}
             if passive and "agent" not in filled:
