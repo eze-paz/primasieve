@@ -38,6 +38,8 @@ class EventReader:
         if lt not in self.verbs or lt in self.closed: return lt in self.verbs and lt not in self.closed
         if lt not in getattr(self, "third", ()) or lt in getattr(self, "past", ()): return True
         if k == 0: return False
+        if k + 1 < len(toks) and toks[k + 1].lower() in self.verbs and toks[k + 1].lower() not in getattr(self, "third", ()):
+            return False                 # bookposs run 2: "classes is", "locks scattered" -- two finite verbs do not stand together
         p = toks[k - 1].lower()
         if p.isdigit(): return False                     # phrases_prereg.md (B): "12 apples" -- a numeral is never a subject
         return p in getattr(self, "subjects", ()) or (self.is_word(toks[k - 1]) and p not in self.closed and p not in self.verbs)

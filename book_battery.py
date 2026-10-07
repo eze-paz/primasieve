@@ -169,6 +169,8 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                     while j < len(et):
                         if et[j] == "-" and pred and j + 1 < len(et) and et[j + 1][:1].isalnum():   # (B) "well-bred"
                             pred[-1] += "-" + et[j + 1]; j += 2; continue
+                        if et[j] in "'’" and pred and j + 1 < len(et) and et[j + 1].lower() == "s":   # bookposs (A): "Jane's"
+                            pred[-1] += "'s"; j += 2; continue
                         if not et[j][:1].isalnum(): break
                         pred.append(et[j]); j += 1
                     pl = [x.lower() for x in pred]
@@ -180,6 +182,9 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
     def keep_prop(p, sent):
         """bookhave guards: a verb is needed; an object-less 'do' is empty; an object cut at a hyphen is dropped"""
         if not p.get("rel"): return False
+        if p.get("obj") and p.get("rel") != "is":                # bookposs (B): an object opened by a verb form is not one
+            f = p["obj"].split()[0].lower()
+            if f in R.participles or f in R.verbs: p["obj"] = ""
         if p["rel"] in ("do",) and not p.get("obj"): return False
         if p.get("obj"):
             last = p["obj"].split()[-1]
