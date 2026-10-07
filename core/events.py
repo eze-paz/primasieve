@@ -284,8 +284,11 @@ class EventMemory:
         lemma selects events; the role it leaves empty is the answer"""
         toks = tokens(text); words = [t for t in toks if self.reader.is_word(t)]
         if not words or (words[0].lower() not in self.reader.closed and not text.rstrip().endswith("?")): return None   # events5 (G): or a "?"-ended turn
-        lemmas = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) or self.reader.participles.get(t.lower()) for t in words[1:]
-                  if t.lower() not in self.reader.closed]
+        dets_q = getattr(self.reader, "dets", ())
+        lemmas = [self.reader.verbs.get(t.lower()) or self.reader.base.get(t.lower()) or self.reader.participles.get(t.lower())
+                  for j, t in enumerate(words) if j > 0 and t.lower() not in self.reader.closed
+                  and not (j >= 2 and words[j - 1].lower() in dets_q)]   # copq: a word after a determiner is a noun ("the keys");
+                                                                          # not right after the question word ("What fell")
         lemmas = [l for l in lemmas if l]
         same = {x for l in lemmas for x in self.reader.same.get(l, ())}                 # events2_prereg.md: synonymous verbs, second
         pl = getattr(self.reader, "plural", {})
@@ -319,6 +322,14 @@ class EventMemory:
                     if ov and (bestf is None or ov > bestf[0] or (ov == bestf[0] and y[:1].isupper() and not bestf[1][:1].isupper())):
                         bestf = (ov, y, x)
             if bestf: return bestf[1], dict(verb="be", agent=bestf[2], patient=bestf[1], adjuncts=[], text="")
+        # copq_prereg.md: a copular question with no lexical verb -> the adjuncts of the latest realis event whose role the
+        # question's content fills (patient first)
+        if len(lw) > 2 and lw[1] in getattr(self.reader, "copula", ()) and not passive and not lemmas:
+            for role in ("patient", "agent"):
+                for ev in reversed(self.events):
+                    if ev.get("status", "realis") != "realis" or not ev.get("adjuncts") or not ev.get(role): continue
+                    if {base(w) for w in ev[role].split()} & content:
+                        return " ".join(ev["adjuncts"]), ev
         best = None
         irr_ok = any(t in (getattr(self.reader, "to_marker", None) or ()) for t in lw[1:])   # reality_prereg.md (B)
         for ev in reversed(self.events):
