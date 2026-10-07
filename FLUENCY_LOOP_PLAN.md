@@ -161,3 +161,8 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 ### Iteration 47 (proverb_prereg.md) -- PASS
 "What did X do?" answered from X's latest realis event (pro-verb: the auxiliary's lemma recurs as the main verb); learned
 adverb particles ("flew away") no longer borrow the last patient. B6 64 -> 65; all else held; book propositions identical.
+
+### Iteration 48 (lostdet_prereg.md) -- PASS
+A form between a determiner and a noun is a modifier ("a lost puppy"); a stranded final preposition asks for the adjunct it
+leads ("dry it with?" -> a towel). B6 65 -> 67, novels 37.7 %; a new judged sample (0.86) exposed pre-existing "Mr." unit
+splits in Man And Wife -- next target.

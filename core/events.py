@@ -36,6 +36,9 @@ class EventReader:
         ("the miller owns" / "a pair of boots")"""
         lt = toks[k].lower()
         if lt not in self.verbs or lt in self.closed: return lt in self.verbs and lt not in self.closed
+        if (0 < k < len(toks) - 1 and toks[k - 1].lower() in getattr(self, "dets", ()) and self.is_word(toks[k + 1])
+                and toks[k + 1].lower() not in self.closed and toks[k + 1].lower() not in self.verbs):
+            return False                 # lostdet (A): "a lost puppy" -- a form between a determiner and a noun modifies it
         if lt not in getattr(self, "third", ()) or lt in getattr(self, "past", ()): return True
         if k == 0: return False
         if k + 1 < len(toks) and toks[k + 1].lower() in self.verbs and toks[k + 1].lower() not in getattr(self, "third", ()):
@@ -156,7 +159,7 @@ class EventReader:
             main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks)
                     and toks[k + 1].lower() not in self.participles and toks[k + 1].lower() not in self.verbs
                     and k > 0 and self.is_noun(toks[k - 1]))                          # events3_prereg.md (3): "the crow had the cheese"
-            if lemma is not None and k > 0 and toks[k - 1].lower() in getattr(self, "determiners", ()) and k + 1 < len(toks) and self.is_noun(toks[k + 1]):
+            if lemma is not None and k > 0 and toks[k - 1].lower() in (getattr(self, "determiners", None) or getattr(self, "dets", ())) and k + 1 < len(toks) and self.is_noun(toks[k + 1]):
                 continue                     # events5_prereg.md (F): "a lost puppy" -- after a symbol that never precedes a verb
             if (lemma is None or t.lower() in self.closed) and not main:
                 # events2_prereg.md: a closed-class finite symbol before a participle -> one event, the participle's verb
@@ -360,7 +363,10 @@ class EventMemory:
                     rt = roles[r].split(); hit_i = next((i for i, x in enumerate(rt) if base(x) in content), None)
                     nums = [i for i, x in enumerate(rt) if x.isdigit() and x not in lw and (hit_i is None or i < hit_i)]
                     if nums: num = rt[nums[-1]]
-            if num is not None: ans = num
+            strand = [a for a in ev["adjuncts"] if lw[-1] in self.reader.closed and a.lower().split()[0] == lw[-1]
+                      and len(a.split()) > 1] if len(lw) > 2 else []     # lostdet (B): "dry it with?" -> the "with ..." adjunct
+            if strand and filled: ans = strand[0].split(" ", 1)[1]
+            elif num is not None: ans = num
             elif passive and "agent" not in filled:
                 if "patient" in filled and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])
                 elif "patient" not in filled and ev["patient"]: ans = ev["patient"]
