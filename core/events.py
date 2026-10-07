@@ -39,6 +39,7 @@ class EventReader:
         if lt not in getattr(self, "third", ()) or lt in getattr(self, "past", ()): return True
         if k == 0: return False
         p = toks[k - 1].lower()
+        if p.isdigit(): return False                     # phrases_prereg.md (B): "12 apples" -- a numeral is never a subject
         return p in getattr(self, "subjects", ()) or (self.is_word(toks[k - 1]) and p not in self.closed and p not in self.verbs)
 
     def noun_at(self, toks, k):
@@ -119,6 +120,13 @@ class EventReader:
                 patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
                 out.append(dict(verb=self.base[t.lower()], pos=k, agent=ag0, patient=patient, adjuncts=[], text=text, status=self.status(toks, k)))
                 continue
+            lt_ = t.lower()                          # phrases_prereg.md amendment: "started eating the leaves" -- a present
+            if (lemma is None and out and out[-1]["pos"] == k - 1 and lt_ in self.participles          # participle right after
+                    and lt_ not in getattr(self, "past_participles", ()) and lt_ not in self.closed):      # a verb shares its doer
+                pa = self.run_at(toks, k, 1 if self.side == "L" else -1, 2)
+                out.append(dict(verb=self.participles[lt_], pos=k, agent=out[-1]["agent"], patient=" ".join(toks[pa[0][0]:pa[0][1]]) if pa else None,
+                                adjuncts=[], text=text, status=out[-1].get("status", "realis")))
+                continue
             main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks)
                     and toks[k + 1].lower() not in self.participles and toks[k + 1].lower() not in self.verbs
                     and k > 0 and self.is_noun(toks[k - 1]))                          # events3_prereg.md (3): "the crow had the cheese"
@@ -134,6 +142,10 @@ class EventReader:
             ag = self.run_at(toks, k, a_step, 1, pronoun=True); pa = self.run_at(toks, k, p_step, 2)
             if 0 <= k + a_step < len(toks) and toks[k + a_step].lower() in getattr(self, "subjects", ()):     # events6 (B)
                 ag = ((min(k, k + a_step), min(k, k + a_step) + 1), True)
+                rel = k + 2 * a_step
+                if 0 <= rel < len(toks) and self.noun_at(toks, rel):          # phrases_prereg.md (C): "the boy who broke" -> the boy
+                    r0 = self.run_at(toks, k + a_step, a_step, 0)
+                    if r0: ag = (r0[0], False)
             agent = None
             if ag:
                 (s0, e0), pron = ag
@@ -144,6 +156,13 @@ class EventReader:
                 elif not pron: self.last_agent = agent
             if agent is None and out: agent = out[-1]["agent"]       # events5_prereg.md (C): coordinated verbs share the doer
             patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
+            recipient = None
+            if pa is not None:                       # phrases_prereg.md (A): "gave Leo a book" -- a determiner and a second run
+                e = pa[0][1]
+                if (e + 1 < len(toks) and toks[e].lower() in getattr(self, "dets", ()) and self.noun_at(toks, e + 1)
+                        and pa[0][0] > 0 and toks[pa[0][0]][:1].isupper()):     # amended: the recipient is a name ("Leo", not "the piano")
+                    r2 = self.run_at(toks, e, 1, 0)
+                    if r2: recipient = patient; patient = " ".join(toks[r2[0][0]:r2[0][1]]); pa = (r2[0], False)
             if pa is None:                                                             # events3_prereg.md (2): "found them" -> the last patient
                 nxt = k + 1
                 if nxt < len(toks) and self.is_word(toks[nxt]) and toks[nxt].lower() in self.closed and toks[nxt].lower() not in getattr(self, "auxiliaries", ()):
@@ -157,7 +176,7 @@ class EventReader:
                 i += 1
             st_ = self.status(toks, k)
             if ag and not ag[1] and ag[0][0] > 0 and toks[ag[0][0] - 1].lower() in getattr(self, "negatives", ()): st_ = "negated"   # "No guest drank"
-            out.append(dict(verb=lemma, pos=k, agent=agent, patient=patient, adjuncts=adj, text=text, status=st_))
+            out.append(dict(verb=lemma, pos=k, agent=agent, patient=patient, adjuncts=adj, text=text, status=st_, recipient=recipient))
         return out
 
 
@@ -178,7 +197,9 @@ class EventMemory:
                   if t.lower() not in self.reader.closed]
         lemmas = [l for l in lemmas if l]
         same = {x for l in lemmas for x in self.reader.same.get(l, ())}                 # events2_prereg.md: synonymous verbs, second
-        content = {t.lower() for t in words[1:] if self.reader.is_noun(t)}
+        pl = getattr(self.reader, "plural", {})
+        def base(x): x = x.lower(); return pl.get(x, x)                 # phrases amendment: "shelves" is "shelf"
+        content = {base(t) for i, t in enumerate(words) if i > 0 and self.reader.noun_at(words, i)}    # phrases (B): by position ("apples")
         # events5_prereg.md (E): a PASSIVE question -- a learned auxiliary, later a past participle -- names the patient
         lw = [t.lower() for t in words]
         aux_at = [i for i, t in enumerate(lw) if i > 0 and t in getattr(self.reader, "auxiliaries", ())]
@@ -189,9 +210,16 @@ class EventMemory:
             if ev["verb"] not in lemmas and ev["verb"] not in same: continue
             if ev.get("status") == "irrealis" and not irr_ok: continue
             if ev.get("status") == "negated": continue                          # negation_prereg.md (C)
-            roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or ""}
-            filled = {r for r, v in roles.items() if v and set(v.lower().split()) & content}
-            if passive and "agent" not in filled:
+            roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or "", "recipient": ev.get("recipient") or ""}
+            filled = {r for r, v in roles.items() if v and {base(x) for x in v.split()} & content}
+            num = None                               # phrases_prereg.md (B): the numeral a matched role holds and the question lacks
+            for r in ("patient", "agent"):
+                if r in filled:
+                    rt = roles[r].split(); hit_i = next((i for i, x in enumerate(rt) if base(x) in content), None)
+                    nums = [i for i, x in enumerate(rt) if x.isdigit() and x not in lw and (hit_i is None or i < hit_i)]
+                    if nums: num = rt[nums[-1]]
+            if num is not None: ans = num
+            elif passive and "agent" not in filled:
                 if "patient" in filled and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])
                 elif "patient" not in filled and ev["patient"]: ans = ev["patient"]
                 else: continue
@@ -199,7 +227,7 @@ class EventMemory:
             elif "agent" in filled and "patient" in filled and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])     # (E): every adjunct
             elif "agent" in filled and not ev["patient"] and ev["adjuncts"]: ans = " ".join(ev["adjuncts"])
             elif "agent" not in filled and ev["agent"] and (filled or not content
-                                                            or any(set(a.lower().split()) & content for a in ev["adjuncts"])): ans = ev["agent"]   # events3_prereg.md (4); events5 (H): an adjunct shared
+                                                            or any({base(x) for x in a.split()} & content for a in ev["adjuncts"])): ans = ev["agent"]   # events3_prereg.md (4); events5 (H): an adjunct shared
             else: continue                      # honesty_prereg.md: no role shared with the question -> no basis to answer
             score = len(filled) + (0.5 if ev["verb"] in lemmas else 0)
             if best is None or score > best[0]: best = (score, ans, ev)

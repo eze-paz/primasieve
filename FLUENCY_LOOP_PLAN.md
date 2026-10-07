@@ -131,3 +131,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 19 | honesty (map) | negation discovered from the dictionary ("not": first word of definitions of prefixed entries) (negation_prereg.md) | PASS | probes WRONG 23 -> 21; B6 49 held |
 | 2026-10-07 | 20 | honesty (map) | world answers: known words not read as their own relatives; negators owed; aligned value must fit the question word (worldhonesty_prereg.md) | PASS | 3 wrong-question answers removed; B2 90.4 % held |
 | 2026-10-07 | -- | speed | profile + caching that changes no reply (speed_prereg.md) | 0/100 B6 replies differ | **battery ~55-60 min -> 5 min 32 s**; door build 75 s -> 1 s |
+| 2026-10-07 | 21 | map | recipients, numerals, relative "who", noun plurals learned from the dictionary, catenative participles (phrases_prereg.md) | PASS | probes WRONG 21 -> 15, RIGHT 95 -> 101; B6 49 |

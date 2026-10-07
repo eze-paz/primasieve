@@ -45,6 +45,47 @@ def verb_forms(uni=None):
     return fin, base
 
 
+NOUN_CACHE = os.path.join(HERE, "..", "_nldata", "noun_plurals.json")
+
+
+def noun_plurals(uni=None, min_n=20, share=0.3):
+    """phrases_prereg.md amendment: plural -> singular, from UniMorph's N;PL cells and the dictionary's noun glosses
+    "<T> of <lemma>" for templates T learned from those cells (as gloss_forms does for verbs) -> {plural: singular}"""
+    if os.path.exists(NOUN_CACHE): return json.load(open(NOUN_CACHE, encoding="utf-8"))
+    import sqlite3
+    cand = collections.defaultdict(set); uni = uni or {}
+    for line in open(UNIMORPH, encoding="utf-8", errors="replace"):
+        f = line.rstrip("\n").split("\t")
+        if len(f) >= 3 and f[2].startswith("N") and "PL" in f[2].split(";") and " " not in f[1] and f[0] != f[1]:
+            cand[f[1].lower()].add(f[0].lower())
+    # several singulars ("shelves": shelf, shelve) -> the most frequent in the text model's counts, as for verb lemmas
+    pairs = {f: max(sorted(ls), key=lambda l: uni.get(l, 0)) for f, ls in cand.items()}
+    db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+    cnt = collections.Counter(); tot = collections.Counter()
+    for form, lemma in list(pairs.items())[:40000]:
+        r = db.execute("select v from e where w=?", (form,)).fetchone()
+        if not r: continue
+        try: gl = [str(x.get("gloss", "")).strip().rstrip(".").lower() for x in json.loads(r[0]).get("senses", []) if x.get("pos") == "noun"]
+        except Exception: continue
+        for g in gl:
+            m = GLOSS_RX.match(g)
+            if m: tot[m.group(1)] += 1; cnt[m.group(1)] += m.group(2) == lemma
+    kept = {T for T, n in cnt.items() if n >= min_n and n >= share * tot[T]}
+    for w, v in db.execute("select w, v from e"):
+        if " " in w or not w[:1].isalpha(): continue
+        try: senses = json.loads(v).get("senses", [])
+        except Exception: continue
+        for x in senses:
+            if x.get("pos") != "noun": continue
+            m = GLOSS_RX.match(str(x.get("gloss", "")).strip().rstrip(".").lower())
+            if m and m.group(1) in kept and m.group(2) != w.lower(): cand[w.lower()].add(m.group(2))
+    # both sources pooled; the most frequent singular wins ("shelves": shelf over shelve; "glasses": glass over glasse)
+    out = {f: max(sorted(ls), key=lambda l: uni.get(l, 0)) for f, ls in cand.items()}
+    json.dump(out, open(NOUN_CACHE, "w", encoding="utf-8"))
+    print(f"noun_plurals: templates {sorted(kept)}; {len(out)} plurals", flush=True)
+    return out
+
+
 GLOSS_CACHE = os.path.join(HERE, "..", "_nldata", "verb_glosses.json")
 GLOSS_RX = re.compile(r"^(.+) of ([^\W\d_][\w'-]*)$")
 
@@ -340,5 +381,19 @@ def _build(closed, uni=None, same=None):
         pass
     R.cond = learn_conditional(closed, R.to_marker)                                      # reality_prereg.md
     R.negator, R.negatives = learn_negatives(closed, knockout=getattr(build, "knockout_neg", False))   # negation_prereg.md
+    try:                      # phrases_prereg.md (A): determiners by the dictionary's labels (>= 30 % det/article senses, or
+        import sqlite3        # any such sense among the 50 most frequent book symbols -- "a"'s entry is mostly a letter)
+        _db = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))
+        order = json.load(open(CLOSED_CACHE, encoding="utf-8")) if os.path.exists(CLOSED_CACHE) else sorted(closed)
+        def _detshare(w):
+            ps = pos_senses(_db, w); d = sum(v for p_, v in ps.items() if p_ in ("det", "article"))
+            return d, sum(ps.values())
+        R.dets = set()
+        for i, w in enumerate(order):
+            d, n = _detshare(w)
+            if d and (d >= 0.3 * n or i < 50): R.dets.add(w)
+    except Exception:
+        R.dets = set()
+    R.plural = noun_plurals(uni)                                                          # phrases_prereg.md amendment
     R.determiners = set()     # events5_prereg.md (F) dropped before the run: the learned set held modals and prepositions, not "a"/"the"
     return R, side, counts
