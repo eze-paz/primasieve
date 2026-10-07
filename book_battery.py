@@ -180,6 +180,9 @@ def quote_hook(R, inner):
                     if w[:1].isupper() and w.lower() not in R.closed: return w, None
                     if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
         return None, None
+    import sqlite3, kb_events as KE
+    _db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
+    pron_subjects = {w for w in R.closed if KE.pos_senses(_db, w).get("pron")} - set(getattr(R, "negatives", ()))
     def hook(B, per):
         per = inner(B, per)
         for i in sorted(per):
@@ -191,10 +194,21 @@ def quote_hook(R, inner):
                 if len([t for t in tokens(text) if t[:1].isalnum()]) < 3: continue
                 spk, how = speaker_near(before, after)
                 ctx = f"{B.title}, {spk + (' (' + how + ')' if how else '') if spk else 'a speaker (not resolved)'}'s words"
-                sub = inner(One(text, ctx), {0: []})[0]
+                saved = R.subjects; R.subjects = set(saved) | pron_subjects    # bookquote3 (A): dialogue's pronoun subjects
+                try: sub = inner(One(text, ctx), {0: []})[0]
+                finally: R.subjects = saved
+                if not sub:                                                  # bookquote3 (B): a command is a speech act
+                    tw = [t for t in tokens(text) if t[:1].isalnum()]
+                    v0 = tw[0].lower() if tw else ""
+                    if v0 in R.base and v0 not in R.verbs and v0 not in R.closed and v0 not in R.participles:
+                        rest = [t for t in tw[1:6]]
+                        obj = " ".join(rest[:3]) if rest else ""
+                        sub = [dict(kind="event", subj="(an order to the one addressed)", rel=R.base[v0], obj=obj, title=ctx,
+                                    via=None, described=True, command=True)]
                 for p in sub:
                     if p["subj"].lower() == "i": p["subj"] = "I"; p["via"] = "the speaker"
                     elif p["subj"].lower() == "you": p["via"] = "the one addressed"
+                    elif p.get("via") == "referent not resolved" and p["subj"].lower() in pron_subjects: pass
                     p["quoted"] = True; got.append(p)
             per[i] = got
         return per
