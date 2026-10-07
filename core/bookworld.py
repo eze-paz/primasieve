@@ -406,6 +406,9 @@ class Book:
             lemma, vp = v
             doer, e, how = self.doer_of(ts, k, vp, ends, starts)
             if how is None or self.asked(ts, vp) or self.inside(ts, k, i): continue
+            # bookdescribe run 2: a learned negative symbol in the verb group ("does not need") -- the event is not told
+            negs = getattr(self.R, "negatives", ()); j0 = max(0, min(vp, k) - 3)
+            if any(ts[j].lower() in negs for j in range(j0, min(len(ts), k + 3))): continue      # "does not need": after, too
             if self.v >= 4 and vp + 2 < len(ts) and ts[vp + 1] in "'’" and ts[vp + 2].lower() in self.closed: continue   # bookvoice (3)
             via = None
             if doer is None:

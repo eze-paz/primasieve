@@ -133,3 +133,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | -- | speed | profile + caching that changes no reply (speed_prereg.md) | 0/100 B6 replies differ | **battery ~55-60 min -> 5 min 32 s**; door build 75 s -> 1 s |
 | 2026-10-07 | 21 | map | recipients, numerals, relative "who", noun plurals learned from the dictionary, catenative participles (phrases_prereg.md) | PASS | probes WRONG 21 -> 15, RIGHT 95 -> 101; B6 49 |
 | 2026-10-07 | 22 | map (pronouns) | name and pronoun classes learned from books; gloss evidence for unseen names (gender_prereg.md) | NOT PASSED (C refuted) | learned for book names; story names unclassable without a word list -- kept for per-book use |
+| 2026-10-07 | 23 (novel 7-8) | B4-book | described doers in books, main-clause subjects only; negation guard in the book reader (bookdescribe_prereg.md) | D2 PASS (0.86), D1 miss (14.0 vs 15 %) | real novels 9.4 -> 14.0 % read at 0.86 |

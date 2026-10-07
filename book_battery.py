@@ -26,18 +26,58 @@ def test_books():
     return [b for b in books if held_book(b)][:10]
 
 
+def describe_hook(R, strict=False):
+    """bookdescribe_prereg.md: for a unit the book reader leaves unread, the story reader's realis events whose doer is
+    written in the sentence and begins with a learned determiner or a capital, in sentences without a quotation mark"""
+    dets = set(getattr(R, "dets", ()))
+    def hook(B, per):
+        R.last_agent = None; R.last_patient = None
+        for i in sorted(per):
+            if per[i]: continue
+            sent = B.sents[i]
+            if any(q in sent for q in '"“”'): continue
+            low = " " + " ".join(tokens(sent)).lower() + " "; got = []
+            from core.events import tokens as etoks
+            et = etoks(sent); words_at = [j for j, x in enumerate(et) if x[:1].isalnum()]
+            for ev in R.read(sent):
+                a = ev.get("agent")
+                if not a or ev.get("status", "realis") != "realis": continue
+                aw = a.split()
+                if strict:              # bookdescribe run 2: the main clause's own subject, verb right after it, active, lexical
+                    if not words_at or aw[0].lower() in R.closed: continue
+                    starts = [j for j in range(len(et)) if et[j:j + len(aw)] == aw]
+                    if not starts: continue
+                    s0 = starts[0]; e0 = s0 + len(aw); first = words_at[0]
+                    if not (s0 == first or (s0 == first + 1 and et[first].lower() in dets)): continue
+                    k = ev["pos"]; vt = et[k].lower() if k < len(et) else ""
+                    if not (k == e0 or (k == e0 + 1 and et[e0][:1].isalnum() and et[e0].lower() not in R.closed)): continue
+                    if vt not in R.verbs or vt in R.closed or ev["verb"] in R.closed: continue
+                    if k > 0 and et[k - 1].lower() in getattr(R, "auxiliaries", ()): continue
+                if " " + " ".join(aw).lower() + " " not in low: continue
+                k = low.split().index(aw[0].lower()) if aw[0].lower() in low.split() else -1
+                prev = low.split()[k - 1] if k > 0 else ""
+                if not (prev in dets or aw[0][:1].isupper()): continue
+                got.append(dict(kind="event", subj=(prev + " " if prev in dets else "") + a, rel=ev["verb"], obj=ev.get("patient") or "",
+                                title=B.title, via=None, described=True))
+            per[i] = got
+        return per
+    return hook
+
+
 def units(B, n=500):
     return [i for i, s in enumerate(B.sents) if 4 <= len(s.split()) <= 60][:n]
 
 
 def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_ids=None, chains=True):
     R, L = KB.build(); abbr = set(L["abbreviations"])
+    if it >= 7 and not hooks: hooks = {"after_read": describe_hook(R, strict=it >= 8)}
+    base_it = 5 if it >= 7 else it                       # bookdescribe_prereg.md: iteration 5's reader plus the hook
     say(f"learned: {len(L['abbreviations'])} abbreviations {L['abbreviations'][:30]}; determiners {L['determiners']}; "
         f"chain heads {L['chain_heads']}  ({time.time() - T0:.0f} s)")
     stats = collections.defaultdict(collections.Counter); props_all = []; control = []; books = {}; bridges = []
     if it >= 5: ST, lookup, related, common = KB.bridger(); say(f"store loaded  ({time.time() - T0:.0f} s)")
     for b in (book_ids or test_books()):
-        B = KB.book(b, R, L, it=it, knockout=knockout, chains=chains); books[b] = B
+        B = KB.book(b, R, L, it=base_it, knockout=knockout, chains=chains); books[b] = B
         if hooks and "after_build" in hooks: hooks["after_build"](B)
         g = "novels" if b in NOVELS else "others"
         if it >= 5:
@@ -73,7 +113,8 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
     honesty = sum(1 for g, b, i, p in props_all if p.get("real") or not KB.say(p).startswith("according to "))
     say(f"K3 honesty: book propositions said without context or marked real: {honesty} of {len(props_all)}")
     # judged samples (fixed seeds; the file keeps the builder's labels)
-    path = os.path.join(HERE, "tests", f"bookworld_judged_it{it}{'ko' if knockout else ''}{'' if chains else 'nochain'}.json")
+    tag = sys.argv[sys.argv.index("--tag") + 1] if "--tag" in sys.argv else ""      # a fresh judged sample for a new reader
+    path = os.path.join(HERE, "tests", f"bookworld_judged_it{it}{'ko' if knockout else ''}{'' if chains else 'nochain'}{tag}.json")
     pron = [x for x in props_all if x[3].get("via")]
     say(f"pronoun-resolved propositions: {len(pron)}; units read only through a pronoun: "
         f"{len({(b, i) for g, b, i, p in pron} - {(b, i) for g, b, i, p in props_all if not p.get('via')})}")
