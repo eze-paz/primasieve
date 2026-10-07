@@ -155,12 +155,17 @@ def describe_hook(R, strict=False, pronouns=False, copula=None, resolve_on=False
                     starts = [j for j in range(len(et)) if et[j:j + len(aw)] == aw]
                     if not starts: continue
                     s0 = starts[0]; e0 = s0 + len(aw); first = words_at[0]
+                    appos = (s0 > first + 1 and et[s0 - 1] == "," and e0 < len(et) and et[e0] == "," and ev["pos"] == e0 + 1
+                             and "," not in et[first:s0 - 1]
+                             and all(x[:1].isupper() or x.lower() in dets for x in et[first:s0 - 1] if x[:1].isalnum()))   # appos (B)
+                    if appos:
+                        a = " ".join(x for x in et[first:s0 - 1] if x[:1].isalnum()); aw = a.split(); s0 = first
                     poss = (s0 >= first + 3 and et[s0 - 1].lower() == "s" and et[s0 - 2] in "'’"
                             and all(x[:1].isupper() or x == "." for x in et[first:s0 - 2]))          # bookshapes (A): "Mr. Vanborough's temper"
                     if not (s0 == first or (s0 == first + 1 and et[first].lower() in dets) or poss): continue
                     if poss: a = " ".join(x for x in et[first:s0 - 2] if x != ".") + "'s " + a; aw = a.split()
                     k = ev["pos"]; vt = et[k].lower() if k < len(et) else ""
-                    if not (k == e0 or (k == e0 + 1 and et[e0][:1].isalnum() and et[e0].lower() not in R.closed)): continue
+                    if not (appos or k == e0 or (k == e0 + 1 and et[e0][:1].isalnum() and et[e0].lower() not in R.closed)): continue
                     possess = (vt in R.closed and R.verbs.get(vt) not in (None, vt) and R.verbs.get(vt) != copula_lemma
                                and k + 1 < len(et) and et[k + 1].lower() in dets)          # bookhave (A): "has a soul"
                     if vt not in R.verbs or ((vt in R.closed or ev["verb"] in R.closed) and not possess): continue

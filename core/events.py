@@ -300,6 +300,13 @@ class EventMemory:
             B_ = {base(w) for w in b_.split() if w.lower() not in self.reader.closed}
             if A_ & content and not B_ & content: content = content | B_
             elif B_ & content and not A_ & content: content = content | A_
+        # appos_prereg.md (C): "Was the wind calm?" -> yes, from a fact whose two sides each share the question's words
+        if lw and lw[0] in getattr(self.reader, "copula", ()) and getattr(self, "facts", None):
+            qc = {base(t) for t in words[1:] if t.lower() not in self.reader.closed}
+            for a_, b_ in reversed(self.facts):
+                A_ = {base(w) for w in a_.split()}; B_ = {base(w) for w in b_.split()}
+                if A_ & qc and B_ & qc and not (A_ & B_):
+                    return "yes", dict(verb="be", agent=a_, patient=b_, adjuncts=[], text="")
         # identity_prereg.md (C): "Who/What was X?" from identity facts (not a passive: no past participle)
         if len(lw) > 2 and lw[1] in getattr(self.reader, "copula", ()) and not passive and self.facts:
             ql = [base(t) for t in words[2:] if t.lower() not in self.reader.closed]; q = set(ql)

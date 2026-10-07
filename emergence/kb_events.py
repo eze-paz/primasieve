@@ -496,7 +496,19 @@ def _build(closed, uni=None, same=None):
         R.dets = set()
         for i, w in enumerate(order):
             d, n = _detshare(w)
-            if d and (d >= 0.3 * n or i < 50): R.dets.add(w)
+            if d and d >= 0.3 * n: R.dets.add(w)        # appos_prereg.md: the top-50 rule admitted he, she, it, said (one minor sense)
+        # appos_prereg.md: the dictionary's entry may lack the sense ("a": letter and symbol senses only) -- a closed symbol
+        # sharing >= 10 % of the commonest determiner's two-sided slots is a determiner too
+        try:
+            from core.textmodel import TextModel as _TM5
+            from core.synonyms import Synonyms as _SY5
+            top_det = next((w for w in order if w in R.dets), None)
+            if top_det:
+                sims = [(w, n_) for w, n_ in _SY5(_TM5.load(os.path.join(HERE, "..", "_nldata", "textmodel.json"))).two_sided(top_det, 40) if w in closed]
+                if sims:
+                    mx = sims[0][1]; R.dets |= {w for w, n_ in sims if n_ >= 0.1 * mx}
+        except Exception:
+            pass
     except Exception:
         R.dets = set()
     R.plural = noun_plurals(uni)                                                          # phrases_prereg.md amendment

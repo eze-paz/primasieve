@@ -152,3 +152,4 @@ holds their hashes). B8 (the owner's blind rating) is not yet rated.
 | 2026-10-07 | 39 (novel 22) | B4-book precision | five guards from the judged sample (bookprec_prereg.md) | PASS (0.96 at 37.7 %) | precision back to 0.96 |
 | 2026-10-07 | 40 (novel 23) | B4-book generalisation | the same readers on four novels never looked at (generalize_prereg.md) | PASS | **unseen novels 37.0 % at 0.96** (development 37.7 % at 0.96) |
 | 2026-10-07 | 41 (novel 24) | product | the book readers in the live door: a pasted passage is its own source, read and answerable (bookread_prereg.md) | PASS | live door reads unseen Conrad and answers about it |
+| 2026-10-07 | 42 (novel 25) | B6, B4-book, product | determiners cleaned (no pronouns; "a" by slots); apposition between subject and verb; yes/no copular questions (appos_prereg.md) | PASS | **B6 56 -> 58**; probes WRONG 14; novels 37.7 % at 0.94 |
