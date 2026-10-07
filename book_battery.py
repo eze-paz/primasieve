@@ -26,6 +26,9 @@ def test_books():
     return [b for b in books if held_book(b)][:10]
 
 
+DETS_FOR_OBJECTS = set()
+
+
 def in_sent(patient, low, verb_at=None):
     """bookpronoun run 2: a patient carried over from another sentence (a resolved "them") is not this sentence's; run 3:
     the patient must begin within 3 symbols after its verb (a later verb's object is not this one's)"""
@@ -34,6 +37,11 @@ def in_sent(patient, low, verb_at=None):
     at = [j for j in range(len(w)) if w[j:j + len(pw)] == pw]
     if not at: return ""
     if verb_at is not None and not any(verb_at < j <= verb_at + 3 for j in at): return ""
+    if verb_at is not None:                 # bookshapes run 3: only determiners between the verb and its object ("sat WITH his lips")
+        j = min(j for j in at if verb_at < j <= verb_at + 3)
+        if any(w[m] not in DETS_FOR_OBJECTS for m in range(verb_at + 1, j)): return ""
+        end = j + len(pw)
+        if end < len(w) and w[end] == "-": return ""          # a hyphen-cut object ("knee" of "knee-breeches")
     return patient
 
 
@@ -67,10 +75,32 @@ def copula_forms(R):
     return out
 
 
+def existential_word(R, n_books=60):
+    """bookshapes_prereg.md (B): the closed sentence-initial symbol without a dictionary pronoun sense most often followed
+    by a copula form"""
+    import re as _re, sqlite3, kb_events as KE
+    db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite")); cop = copula_forms(R)
+    c = collections.Counter()
+    for b in KE.books(False)[:n_books]:
+        for st in _re.split(r"(?<=[.!?])\s+", open(os.path.join(GUT, b + ".txt"), encoding="utf-8", errors="replace").read()):
+            w = [x.lower() for x in tokens(st) if x[:1].isalnum()]
+            if len(w) >= 3 and w[0] in R.closed and w[1] in cop and not KE.pos_senses(db, w[0]).get("pron"): c[w[0]] += 1
+    ex = c.most_common(1)[0][0] if c else None
+    say(f"existential word learned: {ex!r} ({c.most_common(3)})")
+    return ex
+
+
 def describe_hook(R, strict=False, pronouns=False, copula=None):
     """bookdescribe_prereg.md: for a unit the book reader leaves unread, the story reader's realis events whose doer is
     written in the sentence and begins with a learned determiner or a capital, in sentences without a quotation mark"""
-    dets = set(getattr(R, "dets", ()))
+    dets = set(getattr(R, "dets", ())); DETS_FOR_OBJECTS.update(dets)
+    import sqlite3, kb_events as KE
+    _db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
+    def _share(w, pos):
+        ps = KE.pos_senses(_db, w); return ps.get(pos, 0) / max(1, sum(ps.values()))
+    # amended (run 2): >= 30 % pronoun senses ("at" has a minor one)
+    pron_sense = {w for w in R.closed if _share(w, "pron") >= 0.3} - set(getattr(R, "subjects", ())) - set(getattr(R, "negatives", ()))
+    existential = existential_word(R) if copula else None
     def hook(B, per):
         R.last_agent = None; R.last_patient = None
         for i in sorted(per):
@@ -86,10 +116,14 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                 aw = a.split()
                 if strict:              # bookdescribe run 2: the main clause's own subject, verb right after it, active, lexical
                     if not words_at or aw[0].lower() in R.closed: continue
+                    if not aw[0][:1].isupper() and (aw[0].lower() in R.participles or aw[0].lower() in R.verbs): continue   # bookshapes guard
                     starts = [j for j in range(len(et)) if et[j:j + len(aw)] == aw]
                     if not starts: continue
                     s0 = starts[0]; e0 = s0 + len(aw); first = words_at[0]
-                    if not (s0 == first or (s0 == first + 1 and et[first].lower() in dets)): continue
+                    poss = (s0 >= first + 3 and et[s0 - 1].lower() == "s" and et[s0 - 2] in "'’"
+                            and all(x[:1].isupper() or x == "." for x in et[first:s0 - 2]))          # bookshapes (A): "Mr. Vanborough's temper"
+                    if not (s0 == first or (s0 == first + 1 and et[first].lower() in dets) or poss): continue
+                    if poss: a = " ".join(x for x in et[first:s0 - 2] if x != ".") + "'s " + a; aw = a.split()
                     k = ev["pos"]; vt = et[k].lower() if k < len(et) else ""
                     if not (k == e0 or (k == e0 + 1 and et[e0][:1].isalnum() and et[e0].lower() not in R.closed)): continue
                     if vt not in R.verbs or vt in R.closed or ev["verb"] in R.closed: continue
@@ -118,6 +152,8 @@ def describe_hook(R, strict=False, pronouns=False, copula=None):
                 if cpos is not None:
                     head = wl[:cpos]
                     if cpos == 1 and low_w[0] in getattr(R, "subjects", ()) and low_w[0] != "who": subj = (wl[0], "referent not resolved")
+                    elif cpos == 1 and low_w[0] == existential: subj = ("there", None)                       # bookshapes (B)
+                    elif cpos == 1 and low_w[0] in pron_sense: subj = (wl[0], "referent not resolved")        # bookshapes (C)
                     elif all(x[:1].isupper() for x in head) and head[0].lower() not in R.closed: subj = (" ".join(head), None)
                     elif low_w[0] in dets and cpos >= 2 and all(x not in R.closed and x not in R.verbs for x in low_w[1:cpos]): subj = (" ".join(head), None)
                 if subj is not None:
@@ -179,6 +215,8 @@ def quote_hook(R, inner):
                 v = [x for x in pair if x.lower() in R.verbs]; n = [x for x in pair if x not in v]
                 if v and n:
                     w = n[0]
+                    if w in abbr and pair.index(w) == 0 and pair[1][:1].isupper(): w = w + ". " + pair[1]
+                    elif w in abbr: return None, None                                 # amended: "Mr" alone is not a speaker
                     if w[:1].isupper() and w.lower() not in R.closed: return w, None
                     if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
         return None, None
@@ -209,12 +247,17 @@ def quote_hook(R, inner):
                 v = [x for x in pair if x.lower() in R.verbs]; n = [x for x in pair if x not in v]
                 if v and n:
                     w = n[0]
+                    if w in abbr and pair.index(w) == 0 and pair[1][:1].isupper(): w = w + ". " + pair[1]
+                    elif w in abbr: return None, None                                 # amended: "Mr" alone is not a speaker
                     if w[:1].isupper() and w.lower() not in R.closed: return w, None
                     if w.lower() in getattr(R, "subjects", ()): return w, "referent not resolved"
         return None, None
     import sqlite3, kb_events as KE
     _db = sqlite3.connect(os.path.join(HERE, "_nldata", "kaikki_all.sqlite"))
-    pron_subjects = {w for w in R.closed if KE.pos_senses(_db, w).get("pron")} - set(getattr(R, "negatives", ()))
+    pron_subjects = {w for w in R.closed if KE.pos_senses(_db, w).get("pron", 0) >= 0.3 * max(1, sum(KE.pos_senses(_db, w).values()))} - set(getattr(R, "negatives", ()))
+    abbr = set()
+    try: abbr = set(KB.build()[1]["abbreviations"])
+    except Exception: pass
     def hook(B, per):
         per = inner(B, per)
         for i in sorted(per):
@@ -233,7 +276,10 @@ def quote_hook(R, inner):
                 if not sub:                                                  # bookquote3 (B): a command is a speech act
                     tw = [t for t in tokens(text) if t[:1].isalnum()]
                     v0 = tw[0].lower() if tw else ""
-                    if v0 in R.base and v0 not in R.verbs and v0 not in R.closed and v0 not in R.participles:
+                    ps0 = KE.pos_senses(_db, v0)
+                    if (v0 in R.base and v0 not in R.verbs and v0 not in R.closed and v0 not in R.participles
+                            and not (len(tw) > 1 and tw[1][:1].isupper())             # bookshapes guard: "Mother Posset" is a vocative
+                            and ps0.get("verb", 0) >= 0.5 * max(1, sum(ps0.values()))):   # amended: mostly a verb ("wise", "long" are not)
                         rest = [t for t in tw[1:6]]
                         obj = " ".join(rest[:3]) if rest else ""
                         sub = [dict(kind="event", subj="(an order to the one addressed)", rel=R.base[v0], obj=obj, title=ctx,

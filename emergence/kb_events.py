@@ -464,6 +464,15 @@ def _build(closed, uni=None, same=None):
         pass
     R.cond = learn_conditional(closed, R.to_marker)                                      # reality_prereg.md
     R.negator, R.negatives = learn_negatives(closed, knockout=getattr(build, "knockout_neg", False))   # negation_prereg.md
+    try:                      # bookshapes run 2: contractions whose dictionary glosses contain the negator ("won't")
+        import sqlite3
+        _db3 = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite")); R.neg_contractions = set()
+        for w, v in _db3.execute("select w, v from e where w like ?", ("%'%",)):
+            try: gl = " ".join(str(x.get("gloss", "")).lower() for x in json.loads(v).get("senses", []))
+            except Exception: continue
+            if R.negator and re.search(r"\b%s\b" % re.escape(R.negator), gl): R.neg_contractions.add(w.lower().replace("’", "'"))
+    except Exception:
+        R.neg_contractions = set()
     try:                      # bookquote2 run 2: in-clause negation only by negatives without a preposition sense ("without")
         import sqlite3
         _db2 = sqlite3.connect(os.path.join(HERE, "..", "_nldata", "kaikki_all.sqlite"))

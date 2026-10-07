@@ -83,6 +83,8 @@ class EventReader:
         # bookquote2 run 2: a contraction piece that is a learned marker ("won't": won ' t) -- not told as happened; and a
         # learned negative later in the same clause ("feared him no more than ...")
         if k + 2 < len(toks) and toks[k + 1] in "'’" and toks[k + 2].lower() in marks: return "negated"
+        if k + 2 < len(toks) and toks[k + 1] in "'’" and (toks[k] + "'" + toks[k + 2]).lower() in getattr(self, "neg_contractions", ()):
+            return "negated"                                     # bookshapes run 2: the dictionary's negative contractions
         j = k + 1
         clause_negs = getattr(self, "clause_negatives", negs)   # negatives with a preposition sense ("without") open a phrase
         while j < len(toks) and j <= k + 4 and self.is_word(toks[j]):
