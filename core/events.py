@@ -100,6 +100,12 @@ class EventReader:
             j -= 1
         return "realis"
 
+    def phrase(self, toks, s, e):
+        """roles2_prereg.md (A): a role's words with the learned determiner or numeral right before its run ("a small boat")"""
+        while s > 0 and self.is_word(toks[s - 1]) and (toks[s - 1].lower() in getattr(self, "dets", ()) or toks[s - 1].isdigit()):
+            s -= 1
+        return " ".join(toks[s:e])
+
     def run_at(self, toks, k, step, limit, pronoun=False):
         """the noun run nearest to position k in direction `step`, skipping at most `limit` closed symbols, inside the
         clause -> ((start, end), is_pronoun) or None. With `pronoun`, a closed symbol right beside k is returned as one."""
@@ -136,7 +142,7 @@ class EventReader:
                     r0 = self.run_at(toks, k - 1, -1 if self.side == "L" else 1, 0)
                     if r0: ag0 = " ".join(toks[r0[0][0]:r0[0][1]])
                 pa = self.run_at(toks, k, 1 if self.side == "L" else -1, 2)
-                patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
+                patient = self.phrase(toks, *pa[0]) if pa else None
                 out.append(dict(verb=self.base[t.lower()], pos=k, agent=ag0, patient=patient, adjuncts=[], text=text, status=self.status(toks, k)))
                 continue
             lt_ = t.lower()                          # phrases_prereg.md amendment: "started eating the leaves" -- a present
@@ -168,20 +174,20 @@ class EventReader:
             agent = None
             if ag:
                 (s0, e0), pron = ag
-                agent = self.last_agent if pron else " ".join(toks[s0:e0])
+                agent = self.last_agent if pron else self.phrase(toks, s0, e0)
                 # a run that was the previous verb's patient in this sentence is not this verb's doer: two verbs joined
                 # in one clause share the first one's agent ("the fox ate the cheese and ran away")
                 if out and not pron and agent == out[-1]["patient"]: agent = out[-1]["agent"]
                 elif not pron: self.last_agent = agent
             if agent is None and out: agent = out[-1]["agent"]       # events5_prereg.md (C): coordinated verbs share the doer
-            patient = " ".join(toks[pa[0][0]:pa[0][1]]) if pa else None
+            patient = self.phrase(toks, *pa[0]) if pa else None
             recipient = None
             if pa is not None:                       # phrases_prereg.md (A): "gave Leo a book" -- a determiner and a second run
                 e = pa[0][1]
                 if (e + 1 < len(toks) and toks[e].lower() in getattr(self, "dets", ()) and self.noun_at(toks, e + 1)
                         and pa[0][0] > 0 and toks[pa[0][0]][:1].isupper()):     # amended: the recipient is a name ("Leo", not "the piano")
                     r2 = self.run_at(toks, e, 1, 0)
-                    if r2: recipient = patient; patient = " ".join(toks[r2[0][0]:r2[0][1]]); pa = (r2[0], False)
+                    if r2: recipient = patient; patient = self.phrase(toks, *r2[0]); pa = (r2[0], False)
             if pa is None:                                                             # events3_prereg.md (2): "found them" -> the last patient
                 nxt = k + 1
                 if nxt < len(toks) and self.is_word(toks[nxt]) and toks[nxt].lower() in self.closed and toks[nxt].lower() not in getattr(self, "auxiliaries", ()):
@@ -237,6 +243,13 @@ class EventMemory:
             A = toks[a[0]:a[1]]; B = toks[b[0]:b[1]]
             if A and B and A[0].lower() in dets and B[0][:1].isupper(): out.append((" ".join(B), " ".join(A)))
             elif A and B and A[0][:1].isupper() and B[0].lower() in dets: out.append((" ".join(A), " ".join(B)))
+        pp = getattr(R, "past_participles", ())
+        for k, t in enumerate(toks):                # roles2 (C): "a girl named Petra" -> Petra = a girl
+            if 0 < k < len(toks) - 1 and t.lower() in pp and toks[k + 1][:1].isupper() and toks[k + 1].lower() not in R.closed:
+                a = run(k - 1, -1); b = run(k + 1, 1)
+                if a and b:
+                    A = toks[a[0]:a[1]]
+                    if A and A[0].lower() in dets: out.append((" ".join(toks[b[0]:b[1]]), " ".join(A)))
         for k, t in enumerate(toks):
             if t.lower() not in cop or k == 0: continue
             j = k - 1
@@ -280,6 +293,11 @@ class EventMemory:
         lw = [t.lower() for t in words]
         aux_at = [i for i, t in enumerate(lw) if i > 0 and t in getattr(self.reader, "auxiliaries", ())]
         passive = bool(aux_at) and any(t in getattr(self.reader, "past_participles", ()) for t in lw[aux_at[0] + 1:])
+        for a_, b_ in getattr(self, "facts", ()):             # roles2 (B): identities widen the question ("petra" -> "girl")
+            A_ = {base(w) for w in a_.split() if w.lower() not in self.reader.closed}
+            B_ = {base(w) for w in b_.split() if w.lower() not in self.reader.closed}
+            if A_ & content and not B_ & content: content = content | B_
+            elif B_ & content and not A_ & content: content = content | A_
         # identity_prereg.md (C): "Who/What was X?" from identity facts (not a passive: no past participle)
         if len(lw) > 2 and lw[1] in getattr(self.reader, "copula", ()) and not passive and self.facts:
             ql = [base(t) for t in words[2:] if t.lower() not in self.reader.closed]; q = set(ql)
