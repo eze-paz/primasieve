@@ -1,0 +1,4849 @@
+{
+ "note": "ENGLISH_MAP.md probes. Written for the map; none copied from tests/battery. Story probes: each story is fed sentence by sentence (split after . ! ?), then each question asked. Question probes: one live door, in order; 'setup' turns are said first. gold: any listed string in the reply (battery.hit); '@ABSTAIN' = an abstention is the right outcome; '@DICT' = a dictionary definition is the right outcome; gold_all: every string must appear. pred/pred_door: R(IGHT) / W(RONG) / S(ILENT), predicted from the code BEFORE running.",
+ "engine_commit": "cdbf193b",
+ "phenomena": [
+  {
+   "id": "morph.past_regular",
+   "family": "morphology",
+   "name": "regular past tense (-ed)",
+   "definition": "past tense formed with -ed; the commonest finite form in narrative",
+   "examples": [
+    "Nadia painted the fence."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "morph.past_regular",
+   "freq_note": "",
+   "freq_value": 0.4891
+  },
+  {
+   "id": "morph.irregular",
+   "family": "morphology",
+   "name": "irregular past (strong verbs)",
+   "definition": "past tense by vowel change or suppletion (broke, swept, went)",
+   "examples": [
+    "Kofi broke the vase."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "morph.irregular",
+   "freq_note": "",
+   "freq_value": 0.3051
+  },
+  {
+   "id": "morph.top200_verbs",
+   "family": "morphology",
+   "name": "forms of the very commonest verbs",
+   "definition": "made, said, found, called, take, make, see, do, get, use ... -- the most frequent verbs of English, all inside the engine's 200-word closed class",
+   "examples": [
+    "She made a wish.",
+    "He said that ..."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.top200_forms",
+   "freq_note": "engine-specific consequence of a general fact: the commonest verbs are as frequent as function words",
+   "freq_value": 0.2224
+  },
+  {
+   "id": "morph.third_sg",
+   "family": "morphology",
+   "name": "third-person singular present (-s)",
+   "definition": "habitual/present narrative: feeds, milks",
+   "examples": [
+    "Pablo feeds the chickens."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "morph.third_sg",
+   "freq_note": "",
+   "freq_value": 0.0364
+  },
+  {
+   "id": "morph.noun_verb_homograph",
+   "family": "morphology",
+   "name": "plural noun = 3sg verb homographs",
+   "definition": "watches, plants, kids: the -s form is a plural noun or a verb by position",
+   "examples": [
+    "Sara lost her watches.",
+    "Her brother watches the kids."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "morph.plural",
+   "freq_note": "rate shown is the plural-noun cue (upper bound for the homograph risk)",
+   "freq_value": 0.3598
+  },
+  {
+   "id": "morph.contraction",
+   "family": "morphology",
+   "name": "contractions (n't, 's, 'll)",
+   "definition": "clitic negation and auxiliaries attached to the previous word",
+   "examples": [
+    "Paco didn't see the deer.",
+    "what's the capital"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "morph.contraction_neg",
+   "freq_note": "n't only; other clitics 3.0 %",
+   "freq_value": 0.0282
+  },
+  {
+   "id": "morph.possessive_s",
+   "family": "morphology",
+   "name": "possessive 's",
+   "definition": "genitive clitic marking the possessor (Maya's dog)",
+   "examples": [
+    "Maya's dog chased the cat.",
+    "ken's salary"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "morph.possessive_s",
+   "freq_note": "",
+   "freq_value": 0.0918
+  },
+  {
+   "id": "morph.derivation",
+   "family": "morphology",
+   "name": "derivational morphology",
+   "definition": "words built by affixes (kind-ness, un-friend-ly); productive new formations",
+   "examples": [
+    "kindness",
+    "unbloggable"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) (dictionary)",
+   "freq": "morph.derivation",
+   "freq_note": "",
+   "freq_value": 0.3062
+  },
+  {
+   "id": "morph.degree_forms",
+   "family": "morphology",
+   "name": "comparative/superlative forms (-er/-est, irregular)",
+   "definition": "biggest, least, smallest: degree forms the worlds were not taught",
+   "examples": [
+    "which employee has the biggest salary"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py",
+   "freq": "quant.superlative",
+   "freq_note": "",
+   "freq_value": 0.0351
+  },
+  {
+   "id": "np.article",
+   "family": "noun phrase",
+   "name": "articles and definiteness",
+   "definition": "a/an introduces, the refers back",
+   "examples": [
+    "A dog found a bone. The dog buried the bone."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.article",
+   "freq_note": "",
+   "freq_value": 0.7222
+  },
+  {
+   "id": "np.adjective",
+   "family": "noun phrase",
+   "name": "attributive adjectives",
+   "definition": "adjective before the head noun",
+   "examples": [
+    "The tall woman lifted the heavy box."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.adjective",
+   "freq_note": "",
+   "freq_value": 0.1661
+  },
+  {
+   "id": "np.compound",
+   "family": "noun phrase",
+   "name": "noun-noun compounds",
+   "definition": "two nouns forming one head (fire truck, bus stop)",
+   "examples": [
+    "The fire truck blocked the bus stop."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.compound",
+   "freq_note": "cue is weak (closed list of heads); compounds are far more common than 1.6 %",
+   "freq_value": 0.0163
+  },
+  {
+   "id": "np.of_phrase",
+   "family": "noun phrase",
+   "name": "of-phrases (genitive/partitive)",
+   "definition": "head + of + NP (captain of the ship, half of her sandwich)",
+   "examples": [
+    "The captain of the ship rang the bell."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.of_phrase",
+   "freq_note": "",
+   "freq_value": 0.3924
+  },
+  {
+   "id": "np.appositive",
+   "family": "noun phrase",
+   "name": "appositives",
+   "definition": "NP, NP, -- a second description of the same referent",
+   "examples": [
+    "Sam, the old fisherman, caught a fish."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.appositive",
+   "freq_note": "",
+   "freq_value": 0.0047
+  },
+  {
+   "id": "np.possessive_det",
+   "family": "noun phrase",
+   "name": "possessive determiners",
+   "definition": "my/his/her/their + noun",
+   "examples": [
+    "Lucas lost his keys. His mother found them."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.possessive_det",
+   "freq_note": "",
+   "freq_value": 0.4186
+  },
+  {
+   "id": "np.quantifier",
+   "family": "noun phrase",
+   "name": "quantifying determiners and numerals in NPs",
+   "definition": "three boys, each boy, many",
+   "examples": [
+    "Three boys climbed the hill."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.quantifier",
+   "freq_note": "",
+   "freq_value": 0.2777
+  },
+  {
+   "id": "np.numeral",
+   "family": "noun phrase",
+   "name": "cardinal numerals",
+   "definition": "digits and number words inside NPs",
+   "examples": [
+    "Ana bought 12 apples and 3 pears."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.numeral",
+   "freq_note": "",
+   "freq_value": 0.164
+  },
+  {
+   "id": "np.proper_name",
+   "family": "noun phrase",
+   "name": "multi-word proper names",
+   "definition": "personal and place names of several words",
+   "examples": [
+    "Mary Ann Evans wrote a long novel."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.multiword_name",
+   "freq_note": "",
+   "freq_value": 0.1071
+  },
+  {
+   "id": "np.title",
+   "family": "noun phrase",
+   "name": "titles before names",
+   "definition": "Captain Reyes, Doctor Lim, Mr. Smith",
+   "examples": [
+    "Captain Reyes steered the ship."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.title",
+   "freq_note": "",
+   "freq_value": 0.0455
+  },
+  {
+   "id": "np.frequent_noun",
+   "family": "noun phrase",
+   "name": "very frequent common nouns",
+   "definition": "man, people, day, water, family, city, time, world -- nouns frequent enough to sit in the engine's 200-word closed class",
+   "examples": [
+    "A man sold him a horse.",
+    "asked for water"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.frequent_noun",
+   "freq_note": "engine-specific: closed class = 200 commonest symbols of the text model",
+   "freq_value": 0.1126
+  },
+  {
+   "id": "np.coordination",
+   "family": "noun phrase",
+   "name": "coordinated NPs",
+   "definition": "X and Y as one argument",
+   "examples": [
+    "Eva and Karl painted the barn."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "np.coordinated_np",
+   "freq_note": "",
+   "freq_value": 0.0286
+  },
+  {
+   "id": "verb.transitive",
+   "family": "verb and argument structure",
+   "name": "transitive clauses",
+   "definition": "subject-verb-object",
+   "examples": [
+    "The cat scratched the girl."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.transitive",
+   "freq_note": "proxy cue (pronoun/name + past verb + determiner)",
+   "freq_value": 0.1278
+  },
+  {
+   "id": "verb.intransitive_pp",
+   "family": "verb and argument structure",
+   "name": "intransitive verb + locative PP",
+   "definition": "slept in the car",
+   "examples": [
+    "The baby slept in the car."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.transitive",
+   "freq_note": "no separate cue; share of PP adjuncts is high",
+   "freq_value": 0.1278
+  },
+  {
+   "id": "verb.ditransitive",
+   "family": "verb and argument structure",
+   "name": "double-object construction",
+   "definition": "V + recipient + theme (gave Leo a book)",
+   "examples": [
+    "Mia gave Leo a book."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.ditransitive",
+   "freq_note": "",
+   "freq_value": 0.0106
+  },
+  {
+   "id": "verb.dative_alternation",
+   "family": "verb and argument structure",
+   "name": "prepositional dative",
+   "definition": "V + theme + to + recipient",
+   "examples": [
+    "Nora gave a scarf to her sister."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.dative_to",
+   "freq_note": "",
+   "freq_value": 0.0163
+  },
+  {
+   "id": "verb.particle",
+   "family": "verb and argument structure",
+   "name": "particle (phrasal) verbs",
+   "definition": "V + up/down/out (picked up, put down)",
+   "examples": [
+    "Nina picked up the phone."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.particle",
+   "freq_note": "",
+   "freq_value": 0.0537
+  },
+  {
+   "id": "verb.light",
+   "family": "verb and argument structure",
+   "name": "light-verb constructions",
+   "definition": "take a walk, make a decision: the meaning sits in the noun",
+   "examples": [
+    "Omar took a long walk by the river."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.light",
+   "freq_note": "cue covers a closed list of nouns only; true rate is several times higher",
+   "freq_value": 0.0006
+  },
+  {
+   "id": "verb.copula",
+   "family": "verb and argument structure",
+   "name": "copula and predicative complements",
+   "definition": "X was a nurse / X is tall",
+   "examples": [
+    "Hana was a nurse."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); chat.py Door (sentence split, recall vs world answer)",
+   "freq": "verb.copula",
+   "freq_note": "",
+   "freq_value": 0.2114
+  },
+  {
+   "id": "verb.existential",
+   "family": "verb and argument structure",
+   "name": "existential there",
+   "definition": "there is/was + NP",
+   "examples": [
+    "There was a well behind the house."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.existential",
+   "freq_note": "",
+   "freq_value": 0.0343
+  },
+  {
+   "id": "verb.control",
+   "family": "verb and argument structure",
+   "name": "subject and object control (want to, tell X to)",
+   "definition": "the understood subject of an infinitive",
+   "examples": [
+    "Sana wanted to learn the violin.",
+    "Mira told Tomas to close the gate."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.control",
+   "freq_note": "",
+   "freq_value": 0.0443
+  },
+  {
+   "id": "verb.causative",
+   "family": "verb and argument structure",
+   "name": "causatives (make/let/have X do)",
+   "definition": "made her brother wash the dishes",
+   "examples": [
+    "Ella made her brother wash the dishes."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.causative",
+   "freq_note": "",
+   "freq_value": 0.0165
+  },
+  {
+   "id": "verb.perception",
+   "family": "verb and argument structure",
+   "name": "perception-verb complements",
+   "definition": "heard the dog bark",
+   "examples": [
+    "Lina heard the dog bark."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "verb.causative",
+   "freq_note": "same cue family as causatives",
+   "freq_value": 0.0165
+  },
+  {
+   "id": "voice.passive_by",
+   "family": "voice",
+   "name": "passive with by-agent",
+   "definition": "be + participle + by NP",
+   "examples": [
+    "The window was broken by a stone."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "voice.passive_by",
+   "freq_note": "",
+   "freq_value": 0.0216
+  },
+  {
+   "id": "voice.passive_agentless",
+   "family": "voice",
+   "name": "agentless passive",
+   "definition": "be + participle, no by-phrase",
+   "examples": [
+    "The letters were burned in the stove."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "voice.passive",
+   "freq_note": "",
+   "freq_value": 0.1492
+  },
+  {
+   "id": "voice.get_passive",
+   "family": "voice",
+   "name": "get-passive",
+   "definition": "got bitten",
+   "examples": [
+    "Pedro got bitten by a snake."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "voice.get_passive",
+   "freq_note": "",
+   "freq_value": 0.0013
+  },
+  {
+   "id": "voice.passive_question",
+   "family": "voice",
+   "name": "passive question over an active story",
+   "definition": "When was X done? / By whom was X done?",
+   "examples": [
+    "When was the oak tree planted?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "voice.passive",
+   "freq_note": "",
+   "freq_value": 0.1492
+  },
+  {
+   "id": "tam.progressive",
+   "family": "tense, aspect, mood",
+   "name": "progressive aspect",
+   "definition": "be + -ing",
+   "examples": [
+    "Lara was reading a letter."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "tam.progressive",
+   "freq_note": "",
+   "freq_value": 0.0591
+  },
+  {
+   "id": "tam.perfect",
+   "family": "tense, aspect, mood",
+   "name": "perfect aspect",
+   "definition": "have + participle",
+   "examples": [
+    "Tom has fixed the roof."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "tam.perfect",
+   "freq_note": "",
+   "freq_value": 0.1565
+  },
+  {
+   "id": "tam.future",
+   "family": "tense, aspect, mood",
+   "name": "future / will + infinitive",
+   "definition": "irrealis future events",
+   "examples": [
+    "Tomorrow Ada will visit her aunt."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "tam.will_future",
+   "freq_note": "",
+   "freq_value": 0.0738
+  },
+  {
+   "id": "tam.modal_epistemic",
+   "family": "tense, aspect, mood",
+   "name": "epistemic modals (may have, must have)",
+   "definition": "possibility, not fact",
+   "examples": [
+    "The thief may have taken the ring."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "tam.epistemic",
+   "freq_note": "modal + have/be; includes non-epistemic uses",
+   "freq_value": 0.0587
+  },
+  {
+   "id": "tam.conditional",
+   "family": "tense, aspect, mood",
+   "name": "conditionals",
+   "definition": "if-clause + consequence: neither is asserted",
+   "examples": [
+    "If Leo wins, his father will buy a boat."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "tam.conditional",
+   "freq_note": "",
+   "freq_value": 0.0606
+  },
+  {
+   "id": "tam.counterfactual",
+   "family": "tense, aspect, mood",
+   "name": "counterfactual / subjunctive",
+   "definition": "had studied ... would have passed: the event did NOT happen",
+   "examples": [
+    "If Ben had studied, he would have passed."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "tam.subjunctive",
+   "freq_note": "",
+   "freq_value": 0.0047
+  },
+  {
+   "id": "tam.imperative",
+   "family": "tense, aspect, mood",
+   "name": "imperatives and requests as questions",
+   "definition": "Tell me X / Give me X",
+   "examples": [
+    "Tell me the capital of Japan"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "tam.imperative",
+   "freq_note": "",
+   "freq_value": 0.0246
+  },
+  {
+   "id": "tam.tense_mismatch",
+   "family": "tense, aspect, mood",
+   "name": "question tense differs from story tense",
+   "definition": "story present, question past (plays / played)",
+   "examples": [
+    "Ivy plays the piano. Who played the piano?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "morph.third_sg",
+   "freq_note": "",
+   "freq_value": 0.0364
+  },
+  {
+   "id": "neg.not",
+   "family": "negation",
+   "name": "clausal negation (not / n't)",
+   "definition": "the event did not happen",
+   "examples": [
+    "She didn't eat the soup."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "neg.not",
+   "freq_note": "",
+   "freq_value": 0.1626
+  },
+  {
+   "id": "neg.never",
+   "family": "negation",
+   "name": "never",
+   "definition": "negative frequency adverb",
+   "examples": [
+    "Kai never visited Lima."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "neg.never",
+   "freq_note": "",
+   "freq_value": 0.0265
+  },
+  {
+   "id": "neg.no_det",
+   "family": "negation",
+   "name": "negative determiners and pronouns (no, nobody)",
+   "definition": "No guest drank ...",
+   "examples": [
+    "No guest drank the wine."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "neg.no_det",
+   "freq_note": "",
+   "freq_value": 0.087
+  },
+  {
+   "id": "neg.world",
+   "family": "negation",
+   "name": "negation in questions over worlds",
+   "definition": "not / outside / except restricting a set",
+   "examples": [
+    "how many employees are not in support"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "neg.not",
+   "freq_note": "",
+   "freq_value": 0.1626
+  },
+  {
+   "id": "q.yes_no",
+   "family": "questions",
+   "name": "polar questions over worlds",
+   "definition": "Is X the Y of Z?",
+   "examples": [
+    "is tokyo the capital of japan"
+   ],
+   "component": "chat.py statement path (kb_constructions reader, filled-question check); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.yes_no",
+   "freq_note": "share of questions",
+   "freq_value": 0.2424
+  },
+  {
+   "id": "q.who_subject",
+   "family": "questions",
+   "name": "who-questions with a content verb",
+   "definition": "who wrote / directed X",
+   "examples": [
+    "who wrote hamlet"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py",
+   "freq": "q.wh_who",
+   "freq_note": "share of questions",
+   "freq_value": 0.0307
+  },
+  {
+   "id": "q.what_object",
+   "family": "questions",
+   "name": "what-questions with do-support",
+   "definition": "what X does Y verb",
+   "examples": [
+    "what currency does japan use"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.object_wh",
+   "freq_note": "share of questions",
+   "freq_value": 0.0817
+  },
+  {
+   "id": "q.whom",
+   "family": "questions",
+   "name": "whom / object who",
+   "definition": "who(m) did X verb",
+   "examples": [
+    "Whom did the cat scratch?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.wh_whom",
+   "freq_note": "share of questions",
+   "freq_value": 0.0152
+  },
+  {
+   "id": "q.whose",
+   "family": "questions",
+   "name": "whose-questions",
+   "definition": "possessor questions",
+   "examples": [
+    "Whose dog chased the cat?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.wh_whose",
+   "freq_note": "share of questions",
+   "freq_value": 0.0014
+  },
+  {
+   "id": "q.which",
+   "family": "questions",
+   "name": "which-questions",
+   "definition": "selection among a set",
+   "examples": [
+    "Which dog dug a hole?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.wh_which",
+   "freq_note": "share of questions",
+   "freq_value": 0.0048
+  },
+  {
+   "id": "q.where",
+   "family": "questions",
+   "name": "where-questions",
+   "definition": "location",
+   "examples": [
+    "Where did Bea hide the key?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.wh_where",
+   "freq_note": "share of questions",
+   "freq_value": 0.0272
+  },
+  {
+   "id": "q.when",
+   "family": "questions",
+   "name": "when-questions",
+   "definition": "time",
+   "examples": [
+    "When did the family visit the zoo?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.wh_when",
+   "freq_note": "share of questions",
+   "freq_value": 0.0117
+  },
+  {
+   "id": "q.why",
+   "family": "questions",
+   "name": "why-questions",
+   "definition": "reason",
+   "examples": [
+    "Why did Tim stay home?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "q.wh_why",
+   "freq_note": "share of questions",
+   "freq_value": 0.0362
+  },
+  {
+   "id": "q.how_manner",
+   "family": "questions",
+   "name": "how-questions (manner/instrument)",
+   "definition": "with a knife, easily",
+   "examples": [
+    "How did Rita open the jar?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "q.wh_how",
+   "freq_note": "share of questions",
+   "freq_value": 0.0445
+  },
+  {
+   "id": "q.how_many",
+   "family": "questions",
+   "name": "how many / how much",
+   "definition": "counting questions",
+   "examples": [
+    "How many boys climbed the hill?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.wh_how_many",
+   "freq_note": "share of questions",
+   "freq_value": 0.0045
+  },
+  {
+   "id": "q.embedded",
+   "family": "questions",
+   "name": "embedded questions",
+   "definition": "can you tell me what X is",
+   "examples": [
+    "can you tell me what the capital of egypt is"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "q.embedded",
+   "freq_note": "rate over questions+statements (embedded questions mostly end with '.')",
+   "freq_value": 0.2231
+  },
+  {
+   "id": "q.ellipsis",
+   "family": "questions",
+   "name": "elliptical follow-ups",
+   "definition": "what about X? / and X?",
+   "examples": [
+    "what about frank?"
+   ],
+   "component": "core/session.py (conversation context, ellipsis)",
+   "freq": "q.elliptical",
+   "freq_note": "share of questions",
+   "freq_value": 0.0355
+  },
+  {
+   "id": "q.tag",
+   "family": "questions",
+   "name": "tag questions",
+   "definition": "statement + isn't it?",
+   "examples": [
+    "tokyo is the capital of japan, isn't it?"
+   ],
+   "component": "chat.py statement path (kb_constructions reader, filled-question check)",
+   "freq": "q.tag",
+   "freq_note": "share of questions",
+   "freq_value": 0.02
+  },
+  {
+   "id": "q.declarative",
+   "family": "questions",
+   "name": "declarative (rising) questions",
+   "definition": "statement form + ?",
+   "examples": [
+    "the capital of brazil is brasilia?"
+   ],
+   "component": "chat.py statement path (kb_constructions reader, filled-question check)",
+   "freq": "q.declarative",
+   "freq_note": "share of questions; the cue also catches fragments",
+   "freq_value": 0.3455
+  },
+  {
+   "id": "q.alternative",
+   "family": "questions",
+   "name": "alternative questions",
+   "definition": "A or B?",
+   "examples": [
+    "is the capital of japan tokyo or kyoto"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); chat.py statement path (kb_constructions reader, filled-question check)",
+   "freq": "q.alternative",
+   "freq_note": "share of questions",
+   "freq_value": 0.0762
+  },
+  {
+   "id": "q.inverse_relation",
+   "family": "questions",
+   "name": "relation asked from the other end",
+   "definition": "who is managed by X / which country has X as capital",
+   "examples": [
+    "who is managed by carol"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py",
+   "freq": "voice.passive",
+   "freq_note": "rate is the passive cue (inverse questions are mostly passive or 'has X as')",
+   "freq_value": 0.1492
+  },
+  {
+   "id": "clause.coord_vp",
+   "family": "clause linkage",
+   "name": "coordinated verb phrases (shared subject)",
+   "definition": "X washed A and peeled B",
+   "examples": [
+    "Ines washed the apples and peeled the pears."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.coord_vp",
+   "freq_note": "",
+   "freq_value": 0.0876
+  },
+  {
+   "id": "clause.coord_clauses",
+   "family": "clause linkage",
+   "name": "coordinated clauses",
+   "definition": "X did A, and Y did B",
+   "examples": [
+    "Ali fed the goats, and his wife milked the cows."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.coord_clauses",
+   "freq_note": "",
+   "freq_value": 0.298
+  },
+  {
+   "id": "clause.temporal_sub",
+   "family": "clause linkage",
+   "name": "temporal subordinate clauses (when/after/before)",
+   "definition": "When the bell rang, ...",
+   "examples": [
+    "When the bell rang, the children ran outside."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.subordination",
+   "freq_note": "",
+   "freq_value": 0.1791
+  },
+  {
+   "id": "clause.open_class_connective",
+   "family": "clause linkage",
+   "name": "connectives outside the closed class (until, since, across, near)",
+   "definition": "prepositions/conjunctions rarer than the 200 commonest symbols",
+   "examples": [
+    "Max waited until the rain stopped."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.open_class_connective",
+   "freq_note": "",
+   "freq_value": 0.117
+  },
+  {
+   "id": "clause.relative_subject",
+   "family": "clause linkage",
+   "name": "subject relative clauses",
+   "definition": "the boy who broke the window",
+   "examples": [
+    "The boy who broke the window ran away."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.relative_wh",
+   "freq_note": "",
+   "freq_value": 0.0949
+  },
+  {
+   "id": "clause.relative_object",
+   "family": "clause linkage",
+   "name": "object relative clauses",
+   "definition": "the cake that Mia baked",
+   "examples": [
+    "The cake that Mia baked was delicious."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.relative_that",
+   "freq_note": "",
+   "freq_value": 0.0264
+  },
+  {
+   "id": "clause.reduced_relative",
+   "family": "clause linkage",
+   "name": "reduced relatives (participial modifiers)",
+   "definition": "the woman wearing a red coat",
+   "examples": [
+    "The woman wearing a red coat stole the bag."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.relative_reduced",
+   "freq_note": "",
+   "freq_value": 0.008
+  },
+  {
+   "id": "clause.complement_that",
+   "family": "clause linkage",
+   "name": "that-complement clauses",
+   "definition": "said that P / thought that P",
+   "examples": [
+    "Tom said that the bridge was closed."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.complement_that",
+   "freq_note": "",
+   "freq_value": 0.0223
+  },
+  {
+   "id": "clause.direct_speech",
+   "family": "clause linkage",
+   "name": "direct speech with attribution",
+   "definition": "\"...,\" said X",
+   "examples": [
+    "\"The soup is cold,\" said Ada."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.direct_speech",
+   "freq_note": "",
+   "freq_value": 0.2495
+  },
+  {
+   "id": "clause.purpose",
+   "family": "clause linkage",
+   "name": "purpose infinitives",
+   "definition": "went to the shop to buy milk",
+   "examples": [
+    "Lia went to the shop to buy milk."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "clause.infinitive_purpose",
+   "freq_note": "",
+   "freq_value": 0.031
+  },
+  {
+   "id": "ref.pronoun_gender",
+   "family": "reference",
+   "name": "pronoun resolution needing gender/number",
+   "definition": "she after two names of different gender",
+   "examples": [
+    "Leo met Mia. She carried his bag."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.third_person_pronoun",
+   "freq_note": "rate = sentences with a third-person pronoun; competition between two antecedents is a fraction of these",
+   "freq_value": 0.4459
+  },
+  {
+   "id": "ref.pronoun_object",
+   "family": "reference",
+   "name": "object pronouns (it/him/them)",
+   "definition": "He adopted it.",
+   "examples": [
+    "Ken saw a puppy. He adopted it."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.object_pronoun",
+   "freq_note": "",
+   "freq_value": 0.2321
+  },
+  {
+   "id": "ref.reflexive",
+   "family": "reference",
+   "name": "reflexives",
+   "definition": "himself/herself",
+   "examples": [
+    "Zoe cut herself on the glass."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.reflexive",
+   "freq_note": "",
+   "freq_value": 0.065
+  },
+  {
+   "id": "ref.possessive_pronoun",
+   "family": "reference",
+   "name": "independent possessive pronouns",
+   "definition": "mine, hers, theirs",
+   "examples": [
+    "Lily lent him hers."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.possessive_pronoun",
+   "freq_note": "",
+   "freq_value": 0.01
+  },
+  {
+   "id": "ref.one_anaphora",
+   "family": "reference",
+   "name": "one-anaphora",
+   "definition": "a green one",
+   "examples": [
+    "Tom gave her a green one."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.one_anaphora",
+   "freq_note": "",
+   "freq_value": 0.0104
+  },
+  {
+   "id": "ref.vp_ellipsis",
+   "family": "reference",
+   "name": "VP ellipsis",
+   "definition": "Joe did too",
+   "examples": [
+    "Mara bought a ticket, and Joe did too."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.vp_ellipsis",
+   "freq_note": "",
+   "freq_value": 0.045
+  },
+  {
+   "id": "ref.gapping",
+   "family": "reference",
+   "name": "gapping",
+   "definition": "Ivan ordered soup, and Olga salad",
+   "examples": [
+    "Ivan ordered soup, and Olga salad."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.gapping",
+   "freq_note": "cue nearly blind; literature puts gapping well under 1 %",
+   "freq_value": 0.0
+  },
+  {
+   "id": "ref.cataphora",
+   "family": "reference",
+   "name": "pronoun before its antecedent",
+   "definition": "Before he left, Tom locked the door.",
+   "examples": [
+    "Before he left, Tom locked the door."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.cataphora_sentence_initial_pronoun",
+   "freq_note": "rate = sentence-initial third-person pronouns (most are anaphoric; true cataphora is rarer)",
+   "freq_value": 0.1537
+  },
+  {
+   "id": "ref.first_person",
+   "family": "reference",
+   "name": "first/second person in a told story",
+   "definition": "I lent my bike to Omar.",
+   "examples": [
+    "I lent my bike to Omar."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.first_second_person",
+   "freq_note": "in a told story every I/my needs the teller as referent",
+   "freq_value": 0.3759
+  },
+  {
+   "id": "quant.comparative",
+   "family": "quantification and comparison",
+   "name": "comparatives",
+   "definition": "more than, taller than",
+   "examples": [
+    "does alice earn more than ken"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "quant.comparative",
+   "freq_note": "",
+   "freq_value": 0.0355
+  },
+  {
+   "id": "quant.superlative",
+   "family": "quantification and comparison",
+   "name": "superlatives",
+   "definition": "highest, most",
+   "examples": [
+    "who has the highest salary in sales"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "quant.superlative",
+   "freq_note": "",
+   "freq_value": 0.0351
+  },
+  {
+   "id": "quant.only",
+   "family": "quantification and comparison",
+   "name": "focus particle only",
+   "definition": "Only Ravi finished.",
+   "examples": [
+    "Only Ravi finished the race."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "quant.only_focus",
+   "freq_note": "",
+   "freq_value": 0.0894
+  },
+  {
+   "id": "quant.universal",
+   "family": "quantification and comparison",
+   "name": "universal quantifiers",
+   "definition": "every, each, all",
+   "examples": [
+    "Every guest brought a gift."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "quant.universal",
+   "freq_note": "",
+   "freq_value": 0.1173
+  },
+  {
+   "id": "quant.counting_condition",
+   "family": "quantification and comparison",
+   "name": "counting under a condition",
+   "definition": "how many X after Y",
+   "examples": [
+    "how many employees started after 2015"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "quant.counting",
+   "freq_note": "",
+   "freq_value": 0.0377
+  },
+  {
+   "id": "quant.arithmetic_words",
+   "family": "quantification and comparison",
+   "name": "arithmetic in words",
+   "definition": "twice, six times seven",
+   "examples": [
+    "what is twice the salary of bob"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "quant.arithmetic_words",
+   "freq_note": "book rate; in questions to a numbers world far higher",
+   "freq_value": 0.0131
+  },
+  {
+   "id": "disc.courtesy",
+   "family": "discourse and dialogue",
+   "name": "greetings, please, thanks",
+   "definition": "social formulae around a question",
+   "examples": [
+    "Hello! Could you please tell me the capital of Brazil?"
+   ],
+   "component": "chat.py Door (sentence split, recall vs world answer); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "disc.vocative_courtesy",
+   "freq_note": "book rate; in chat far higher",
+   "freq_value": 0.0188
+  },
+  {
+   "id": "disc.user_belief",
+   "family": "discourse and dialogue",
+   "name": "user states a (possibly false) belief",
+   "definition": "I think X, right?",
+   "examples": [
+    "I think the capital of Egypt is Alexandria, right?"
+   ],
+   "component": "chat.py statement path (kb_constructions reader, filled-question check)",
+   "freq": "disc.hedge",
+   "freq_note": "",
+   "freq_value": 0.0419
+  },
+  {
+   "id": "disc.marker",
+   "family": "discourse and dialogue",
+   "name": "discourse markers",
+   "definition": "well, so, now",
+   "examples": [
+    "Well, who is the manager of Ken?"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "disc.marker",
+   "freq_note": "",
+   "freq_value": 0.0226
+  },
+  {
+   "id": "disc.multi_sentence",
+   "family": "discourse and dialogue",
+   "name": "several sentences in one turn",
+   "definition": "statement + question",
+   "examples": [
+    "My name is Sam. What is the capital of Italy?"
+   ],
+   "component": "chat.py Door (sentence split, recall vs world answer)",
+   "freq": "orth.long_sentence",
+   "freq_note": "proxy only",
+   "freq_value": 0.1289
+  },
+  {
+   "id": "disc.correction",
+   "family": "discourse and dialogue",
+   "name": "user corrections",
+   "definition": "no, I meant X",
+   "examples": [
+    "no, I meant Ken"
+   ],
+   "component": "core/session.py (conversation context, ellipsis)",
+   "freq": "disc.marker",
+   "freq_note": "no corpus cue; chat-specific",
+   "freq_value": 0.0226
+  },
+  {
+   "id": "disc.story_world_collision",
+   "family": "discourse and dialogue",
+   "name": "story names that are also world entities",
+   "definition": "a story about Alice and Bob while the records world holds alice and bob",
+   "examples": [
+    "Alice gave Bob a present."
+   ],
+   "component": "chat.py Door (sentence split, recall vs world answer)",
+   "freq": "np.world_name",
+   "freq_note": "sentences naming something a world holds (11 employee names + fixture places and works)",
+   "freq_value": 0.0163
+  },
+  {
+   "id": "disc.topic_continuity",
+   "family": "discourse and dialogue",
+   "name": "topic continuity across sentences",
+   "definition": "a character carried by pronouns across sentences",
+   "examples": [
+    "Grace planted roses. Two weeks later she sold them."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "ref.cataphora_sentence_initial_pronoun",
+   "freq_note": "",
+   "freq_value": 0.1537
+  },
+  {
+   "id": "lex.synonym_verb",
+   "family": "lexical semantics",
+   "name": "verb synonymy between story and question",
+   "definition": "purchased / buy, repaired / fixed",
+   "examples": [
+    "Pam purchased a lamp. What did Pam buy?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory) (dictionary sameness)",
+   "freq": "lex.converse_pairs",
+   "freq_note": "no cue; any question not echoing the story verb",
+   "freq_value": 0.0742
+  },
+  {
+   "id": "lex.synonym_noun",
+   "family": "lexical semantics",
+   "name": "noun synonymy in world questions",
+   "definition": "wage/pay for salary",
+   "examples": [
+    "what is the wage of alice"
+   ],
+   "component": "core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py",
+   "freq": "lex.converse_pairs",
+   "freq_note": "no cue",
+   "freq_value": 0.0742
+  },
+  {
+   "id": "lex.converse",
+   "family": "lexical semantics",
+   "name": "converse relations",
+   "definition": "sell/buy, manager/reports to",
+   "examples": [
+    "Mia sold her bike to Tom. Who bought it?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "lex.converse_pairs",
+   "freq_note": "",
+   "freq_value": 0.0742
+  },
+  {
+   "id": "lex.hypernym",
+   "family": "lexical semantics",
+   "name": "hypernymy (collie -> dog)",
+   "definition": "a question names a superordinate",
+   "examples": [
+    "A collie chased the sheep. What did the dog chase?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "lex.converse_pairs",
+   "freq_note": "no cue",
+   "freq_value": 0.0742
+  },
+  {
+   "id": "lex.idiom",
+   "family": "lexical semantics",
+   "name": "idioms and non-compositional phrasal verbs",
+   "definition": "kicked the bucket, gave up",
+   "examples": [
+    "Grandpa kicked the bucket."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "lex.idiom",
+   "freq_note": "",
+   "freq_value": 0.0534
+  },
+  {
+   "id": "lex.polysemy",
+   "family": "lexical semantics",
+   "name": "polysemous words",
+   "definition": "bank, bat",
+   "examples": [
+    "what does bank mean"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary) (dictionary)",
+   "freq": "lex.idiom",
+   "freq_note": "no cue; most frequent words are polysemous",
+   "freq_value": 0.0534
+  },
+  {
+   "id": "inf.consequence",
+   "family": "inference",
+   "name": "event consequences",
+   "definition": "won the race -> came first; no info about losers",
+   "examples": [
+    "Juan won the race."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "inf.cause",
+   "freq_note": "no direct cue",
+   "freq_value": 0.0449
+  },
+  {
+   "id": "inf.temporal_order",
+   "family": "inference",
+   "name": "temporal order",
+   "definition": "then / before / after",
+   "examples": [
+    "Kira ate breakfast. Then she went to school."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "inf.temporal",
+   "freq_note": "",
+   "freq_value": 0.0819
+  },
+  {
+   "id": "inf.cause",
+   "family": "inference",
+   "name": "cause (because, so)",
+   "definition": "why something happened",
+   "examples": [
+    "The ice melted because the sun was hot."
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "inf.cause",
+   "freq_note": "",
+   "freq_value": 0.0449
+  },
+  {
+   "id": "inf.state_from_event",
+   "family": "inference",
+   "name": "states that follow from events",
+   "definition": "hid X under Y -> X is under Y; gave X to Y -> Y has X",
+   "examples": [
+    "Where is the key?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "inf.temporal",
+   "freq_note": "no cue",
+   "freq_value": 0.0819
+  },
+  {
+   "id": "inf.unasked",
+   "family": "inference",
+   "name": "questions the story cannot answer",
+   "definition": "the right answer is to abstain",
+   "examples": [
+    "What color did Omar paint the door?"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "inf.cause",
+   "freq_note": "no cue; honesty test",
+   "freq_value": 0.0449
+  },
+  {
+   "id": "orth.typo",
+   "family": "orthography and noise",
+   "name": "typing slips",
+   "definition": "one-edit misspellings",
+   "examples": [
+    "what is the captial of italy"
+   ],
+   "component": "core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py",
+   "freq": "orth.typo",
+   "freq_note": "chat-specific; no corpus cue",
+   "freq_value": 0.05
+  },
+  {
+   "id": "orth.casing",
+   "family": "orthography and noise",
+   "name": "casing (all caps, lower-case names)",
+   "definition": "WHO IS ..., tom",
+   "examples": [
+    "WHO IS THE MANAGER OF KEN"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary); core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "orth.allcaps",
+   "freq_note": "",
+   "freq_value": 0.0275
+  },
+  {
+   "id": "orth.missing_punct",
+   "family": "orthography and noise",
+   "name": "missing punctuation / run-on text",
+   "definition": "no period, no question mark",
+   "examples": [
+    "Ava fed the cat then she washed the dishes"
+   ],
+   "component": "core/events.py + emergence/kb_events.py (event memory); core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "orth.long_sentence",
+   "freq_note": "proxy",
+   "freq_value": 0.1289
+  },
+  {
+   "id": "orth.abbreviation",
+   "family": "orthography and noise",
+   "name": "abbreviations with a period",
+   "definition": "Dr. Patel, Mrs. Gomez: a period that does not end the sentence",
+   "examples": [
+    "Mrs. Gomez thanked Dr. Patel."
+   ],
+   "component": "chat.py Door (sentence split, recall vs world answer); core/events.py + emergence/kb_events.py (event memory)",
+   "freq": "orth.abbreviation",
+   "freq_note": "",
+   "freq_value": 0.0284
+  },
+  {
+   "id": "orth.apostrophe_missing",
+   "family": "orthography and noise",
+   "name": "missing apostrophes",
+   "definition": "whats, alices",
+   "examples": [
+    "whats the capital of japan"
+   ],
+   "component": "core/rephrase.py (one-edit spelling, did-you-mean) + core/synonyms.py",
+   "freq": "morph.contraction_other",
+   "freq_note": "chat-specific",
+   "freq_value": 0.0303
+  },
+  {
+   "id": "orth.noise_punct",
+   "family": "orthography and noise",
+   "name": "repeated / stray punctuation",
+   "definition": "?!!, ???",
+   "examples": [
+    "capital of france???"
+   ],
+   "component": "core/reason.py + chat.py worlds (records, sales, Wikidata fixture, dictionary)",
+   "freq": "disc.exclamative",
+   "freq_note": "",
+   "freq_value": 0.0532
+  }
+ ],
+ "stories": [
+  {
+   "sid": "S01",
+   "text": "Nadia painted the fence. Later Omar washed the car.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S01.1",
+     "phen": "morph.past_regular",
+     "q": "Who painted the fence?",
+     "gold": [
+      "nadia"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "-ed form in the verb table; agent = nearest noun run on the left"
+    },
+    {
+     "id": "S01.2",
+     "phen": "morph.past_regular",
+     "q": "What did Omar wash?",
+     "gold": [
+      "car"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent run 'Later Omar' still contains omar; patient 'car'"
+    }
+   ]
+  },
+  {
+   "sid": "S02",
+   "text": "Kofi broke the vase. Then he swept the floor.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S02.1",
+     "phen": "morph.irregular",
+     "q": "Who broke the vase?",
+     "gold": [
+      "kofi"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "UniMorph lists broke -> break"
+    },
+    {
+     "id": "S02.2",
+     "phen": "morph.irregular",
+     "q": "What did Kofi sweep?",
+     "gold": [
+      "floor"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'he' (learned subject) -> last agent Kofi"
+    }
+   ]
+  },
+  {
+   "sid": "S03",
+   "text": "Lena found a coin. She made a wish.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S03.1",
+     "phen": "morph.top200_verbs",
+     "q": "What did Lena find?",
+     "gold": [
+      "coin"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "events3 main-verb rule: a name right before a closed verb form makes an event"
+    },
+    {
+     "id": "S03.2",
+     "phen": "morph.top200_verbs",
+     "q": "What did Lena make?",
+     "gold": [
+      "wish"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'made' after a pronoun and 'make' are closed-class: no event, no question lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S04",
+   "text": "Every morning Pablo feeds the chickens. His sister milks the cow.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S04.1",
+     "phen": "morph.third_sg",
+     "q": "Who feeds the chickens?",
+     "gold": [
+      "pablo"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "-s form after a noun is a verb (events6 A); agent run 'Every morning Pablo' contains pablo"
+    },
+    {
+     "id": "S04.2",
+     "phen": "morph.third_sg",
+     "q": "What does Pablo's sister milk?",
+     "gold": [
+      "cow"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent 'sister' shares a content word"
+    }
+   ]
+  },
+  {
+   "sid": "S05",
+   "text": "Sara lost her watches. Her brother watches the kids.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S05.1",
+     "phen": "morph.noun_verb_homograph",
+     "q": "What did Sara lose?",
+     "gold": [
+      "watches"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "after 'her' a third-person form is a noun (events6 A)"
+    },
+    {
+     "id": "S05.2",
+     "phen": "morph.noun_verb_homograph",
+     "q": "Who watches the kids?",
+     "gold": [
+      "brother"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "after a noun the same form is a verb; question lemma watch"
+    }
+   ]
+  },
+  {
+   "sid": "S06",
+   "text": "Paco didn't see the deer. His dog saw it.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S06.1",
+     "phen": "morph.contraction",
+     "q": "Who saw the deer?",
+     "gold": [
+      "dog"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'see' after 't' is closed-class (no event); 'saw it' finds no earlier patient -> see(dog, None) shares nothing with 'deer'"
+    },
+    {
+     "id": "S06.2",
+     "phen": "morph.contraction",
+     "q": "Did Paco see the deer?",
+     "gold": [
+      "no"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no event with Paco; polarity not represented"
+    }
+   ]
+  },
+  {
+   "sid": "S07",
+   "text": "Maya's dog chased the cat.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S07.1",
+     "phen": "q.whose",
+     "q": "Whose dog chased the cat?",
+     "gold": [
+      "maya"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "agent run stops at 's: 'dog'; both roles filled, no adjunct to return"
+    },
+    {
+     "id": "S07.2",
+     "phen": "morph.possessive_s",
+     "q": "What did Maya's dog chase?",
+     "gold": [
+      "cat"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent 'dog' shares a word; patient 'cat'"
+    }
+   ]
+  },
+  {
+   "sid": "S08",
+   "text": "A dog found a bone. The dog buried the bone.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S08.1",
+     "phen": "np.article",
+     "q": "What did the dog bury?",
+     "gold": [
+      "bone"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain transitive"
+    },
+    {
+     "id": "S08.2",
+     "phen": "np.article",
+     "q": "What did the dog find?",
+     "gold": [
+      "bone"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'found' after the noun 'dog' -> main-verb rule"
+    }
+   ]
+  },
+  {
+   "sid": "S09",
+   "text": "The tall woman lifted the heavy box.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S09.1",
+     "phen": "np.adjective",
+     "q": "Who lifted the box?",
+     "gold": [
+      "woman"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "noun run 'tall woman'"
+    },
+    {
+     "id": "S09.2",
+     "phen": "np.adjective",
+     "q": "What did the tall woman lift?",
+     "gold": [
+      "box"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient run 'heavy box'"
+    }
+   ]
+  },
+  {
+   "sid": "S10",
+   "text": "The fire truck blocked the bus stop.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S10.1",
+     "phen": "np.compound",
+     "q": "What blocked the bus stop?",
+     "gold": [
+      "fire truck"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "noun run keeps both nouns"
+    },
+    {
+     "id": "S10.2",
+     "phen": "np.compound",
+     "q": "What did the fire truck block?",
+     "gold": [
+      "bus stop"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'stop' is a base form, not finite -> noun"
+    }
+   ]
+  },
+  {
+   "sid": "S11",
+   "text": "The captain of the ship rang the bell.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S11.1",
+     "phen": "np.of_phrase",
+     "q": "Who rang the bell?",
+     "gold": [
+      "captain"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "learned linker 'of' extends the run (events6 C)"
+    },
+    {
+     "id": "S11.2",
+     "phen": "np.of_phrase",
+     "q": "What did the captain of the ship ring?",
+     "gold": [
+      "bell"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent run contains captain/ship"
+    }
+   ]
+  },
+  {
+   "sid": "S12",
+   "text": "Sam, the old fisherman, caught a huge fish.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S12.1",
+     "phen": "np.appositive",
+     "q": "Who caught a huge fish?",
+     "gold": [
+      "sam",
+      "fisherman"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "one comma crossed; agent 'fisherman'"
+    },
+    {
+     "id": "S12.2",
+     "phen": "np.appositive",
+     "q": "What did Sam catch?",
+     "gold": [
+      "fish"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "the name is not linked to 'fisherman': no role shares 'sam'"
+    }
+   ]
+  },
+  {
+   "sid": "S13",
+   "text": "Lucas lost his keys. His mother found them under the sofa.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S13.1",
+     "phen": "np.possessive_det",
+     "q": "Who found the keys?",
+     "gold": [
+      "mother"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'found' is closed in the question; 'keys' is a verb form (key) -> the only lemma is 'key'"
+    },
+    {
+     "id": "S13.2",
+     "phen": "np.possessive_det",
+     "q": "Where did his mother find the keys?",
+     "gold": [
+      "under the sofa",
+      "sofa"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'keys' is not content (verb form) -> patient not filled -> answers 'keys'"
+    }
+   ]
+  },
+  {
+   "sid": "S14",
+   "text": "Three boys climbed the hill. Each boy carried a flag.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S14.1",
+     "phen": "np.quantifier",
+     "q": "Who climbed the hill?",
+     "gold": [
+      "boys"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent run 'boys'"
+    },
+    {
+     "id": "S14.2",
+     "phen": "q.how_many",
+     "q": "How many boys climbed the hill?",
+     "gold": [
+      "three",
+      "3"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no count role; both roles filled, no adjunct"
+    },
+    {
+     "id": "S14.3",
+     "phen": "np.quantifier",
+     "q": "Who carried a flag?",
+     "gold": [
+      "boy"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'each' closed, skipped; agent 'boy'"
+    }
+   ]
+  },
+  {
+   "sid": "S15",
+   "text": "Ana bought 12 apples and 3 pears.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S15.1",
+     "phen": "np.numeral",
+     "q": "What did Ana buy?",
+     "gold": [
+      "apples"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient run '12 apples and 3 pears'"
+    },
+    {
+     "id": "S15.2",
+     "phen": "np.numeral",
+     "q": "How many apples did Ana buy?",
+     "gold": [
+      "12"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "both roles filled, no adjunct"
+    }
+   ]
+  },
+  {
+   "sid": "S16",
+   "text": "Mary Ann Evans wrote a long novel.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S16.1",
+     "phen": "np.proper_name",
+     "q": "Who wrote a long novel?",
+     "gold": [
+      "mary ann evans"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "capitalised run kept whole"
+    },
+    {
+     "id": "S16.2",
+     "phen": "np.proper_name",
+     "q": "What did Mary Ann Evans write?",
+     "gold": [
+      "novel"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'long' closed, skipped"
+    }
+   ]
+  },
+  {
+   "sid": "S17",
+   "text": "Captain Reyes steered the ship. Doctor Lim treated the sailors.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S17.1",
+     "phen": "np.title",
+     "q": "Who steered the ship?",
+     "gold": [
+      "reyes"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "title + name is one noun run"
+    },
+    {
+     "id": "S17.2",
+     "phen": "np.title",
+     "q": "Who treated the sailors?",
+     "gold": [
+      "lim"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "same"
+    }
+   ]
+  },
+  {
+   "sid": "S18",
+   "text": "Ivan walked to the fair. A man sold him a horse.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S18.1",
+     "phen": "np.frequent_noun",
+     "q": "Who sold a horse?",
+     "gold": [
+      "a man",
+      "man"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'man' is closed -> read as a pronoun -> last agent Ivan (honesty risk)"
+    },
+    {
+     "id": "S18.2",
+     "phen": "np.frequent_noun",
+     "q": "Who walked to the fair?",
+     "gold": [
+      "ivan"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S19",
+   "text": "A stranger knocked on the door. The stranger asked for water.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S19.1",
+     "phen": "np.frequent_noun",
+     "q": "Who asked for water?",
+     "gold": [
+      "stranger"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'water' closed so the question has no content; most recent 'ask' event"
+    },
+    {
+     "id": "S19.2",
+     "phen": "np.frequent_noun",
+     "q": "What did the stranger ask for?",
+     "gold": [
+      "water"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'water' closed -> no patient -> falls back to last patient 'door'"
+    }
+   ]
+  },
+  {
+   "sid": "S20",
+   "text": "Eva and Karl painted the barn.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S20.1",
+     "phen": "np.coordination",
+     "q": "Who painted the barn?",
+     "gold": [
+      "eva and karl"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "learned coordinator 'and' extends the run"
+    },
+    {
+     "id": "S20.2",
+     "phen": "np.coordination",
+     "q": "What did Karl paint?",
+     "gold": [
+      "barn"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent run contains karl"
+    }
+   ]
+  },
+  {
+   "sid": "S21",
+   "text": "The cat scratched the girl. The girl cried.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S21.1",
+     "phen": "verb.transitive",
+     "q": "Who scratched the girl?",
+     "gold": [
+      "cat"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient filled -> agent"
+    },
+    {
+     "id": "S21.2",
+     "phen": "q.whom",
+     "q": "Whom did the cat scratch?",
+     "gold": [
+      "girl"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent filled -> patient"
+    },
+    {
+     "id": "S21.3",
+     "phen": "verb.transitive",
+     "q": "Who cried?",
+     "gold": [
+      "girl"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "no content -> most recent 'cry' agent"
+    }
+   ]
+  },
+  {
+   "sid": "S22",
+   "text": "The baby slept in the car.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S22.1",
+     "phen": "verb.intransitive_pp",
+     "q": "Where did the baby sleep?",
+     "gold": [
+      "car"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "PP object taken as patient (skips 'in the'); the answer is still the car"
+    },
+    {
+     "id": "S22.2",
+     "phen": "verb.intransitive_pp",
+     "q": "Who slept in the car?",
+     "gold": [
+      "baby"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient filled -> agent"
+    }
+   ]
+  },
+  {
+   "sid": "S23",
+   "text": "Mia gave Leo a book.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S23.1",
+     "phen": "verb.ditransitive",
+     "q": "What did Mia give Leo?",
+     "gold": [
+      "book"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent+patient(Leo) filled -> adjunct 'a book'"
+    },
+    {
+     "id": "S23.2",
+     "phen": "verb.ditransitive",
+     "q": "Who gave Leo a book?",
+     "gold": [
+      "mia"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient filled -> agent"
+    },
+    {
+     "id": "S23.3",
+     "phen": "verb.ditransitive",
+     "q": "What did Mia give?",
+     "gold": [
+      "book"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "the recipient is stored as patient -> answers 'Leo'"
+    },
+    {
+     "id": "S23.4",
+     "phen": "inf.state_from_event",
+     "q": "Who has the book now?",
+     "gold": [
+      "leo"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'has' closed; no lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S24",
+   "text": "Nora gave a scarf to her sister.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S24.1",
+     "phen": "verb.dative_alternation",
+     "q": "Who did Nora give the scarf to?",
+     "gold": [
+      "sister"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent+patient filled -> adjunct 'to her sister'"
+    },
+    {
+     "id": "S24.2",
+     "phen": "verb.dative_alternation",
+     "q": "Who got the scarf?",
+     "gold": [
+      "sister"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "converse verb 'get' has no event"
+    }
+   ]
+  },
+  {
+   "sid": "S25",
+   "text": "Nina picked up the phone. Then she put down the cup.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S25.1",
+     "phen": "verb.particle",
+     "q": "What did Nina pick up?",
+     "gold": [
+      "phone"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "particle is closed, skipped"
+    },
+    {
+     "id": "S25.2",
+     "phen": "verb.particle",
+     "q": "Who put down the cup?",
+     "gold": [
+      "nina"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'she' -> Nina"
+    }
+   ]
+  },
+  {
+   "sid": "S26",
+   "text": "Omar took a long walk by the river.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S26.1",
+     "phen": "verb.light",
+     "q": "Where did Omar walk?",
+     "gold": [
+      "river"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no 'walk' event"
+    },
+    {
+     "id": "S26.2",
+     "phen": "verb.light",
+     "q": "What did Omar take?",
+     "gold": [
+      "walk"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'take' is closed-class -> no question lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S27",
+   "text": "Hana was a nurse. Her husband was a pilot.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S27.1",
+     "phen": "verb.copula",
+     "q": "Who was a nurse?",
+     "gold": [
+      "hana"
+     ],
+     "pred": "S",
+     "pred_door": "W",
+     "why": "be(Hana, nurse) is stored, but 'was' is closed so the question has no lemma"
+    },
+    {
+     "id": "S27.2",
+     "phen": "verb.copula",
+     "q": "What was Hana's husband?",
+     "gold": [
+      "pilot"
+     ],
+     "pred": "S",
+     "pred_door": "W",
+     "why": "same; in the door the dictionary likely quotes a gloss instead"
+    }
+   ]
+  },
+  {
+   "sid": "S28",
+   "text": "There was a well behind the house. A frog lived in the well.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S28.1",
+     "phen": "verb.existential",
+     "q": "What was behind the house?",
+     "gold": [
+      "well"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'There was' makes no event (no noun before 'was')"
+    },
+    {
+     "id": "S28.2",
+     "phen": "verb.existential",
+     "q": "Who lived in the well?",
+     "gold": [
+      "frog"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'well' closed -> no content -> most recent 'live' agent"
+    }
+   ]
+  },
+  {
+   "sid": "S29",
+   "text": "Sana wanted to learn the violin.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S29.1",
+     "phen": "verb.control",
+     "q": "What did Sana want to learn?",
+     "gold": [
+      "violin"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "infinitive event learn(Sana, violin) is most recent among equal scores"
+    }
+   ]
+  },
+  {
+   "sid": "S30",
+   "text": "Mira told Tomas to close the gate.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S30.1",
+     "phen": "verb.control",
+     "q": "Who did Mira tell to close the gate?",
+     "gold": [
+      "tomas"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "tell(Mira, Tomas): agent filled -> patient"
+    },
+    {
+     "id": "S30.2",
+     "phen": "verb.control",
+     "q": "Who will close the gate?",
+     "gold": [
+      "tomas"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "infinitive takes the clause's first agent (Mira): object control not modelled"
+    }
+   ]
+  },
+  {
+   "sid": "S31",
+   "text": "Ella made her brother wash the dishes.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S31.1",
+     "phen": "verb.causative",
+     "q": "Who washed the dishes?",
+     "gold": [
+      "brother"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "bare 'wash' is read as a noun inside 'brother wash'; no wash event"
+    },
+    {
+     "id": "S31.2",
+     "phen": "verb.causative",
+     "q": "Who made her brother wash the dishes?",
+     "gold": [
+      "ella"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'made' closed in the question; 'dishes' -> lemma dish"
+    }
+   ]
+  },
+  {
+   "sid": "S32",
+   "text": "Lina heard the dog bark.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S32.1",
+     "phen": "verb.perception",
+     "q": "Who heard the dog?",
+     "gold": [
+      "lina"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient run 'dog bark' contains dog"
+    },
+    {
+     "id": "S32.2",
+     "phen": "verb.perception",
+     "q": "What barked?",
+     "gold": [
+      "dog"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no bark event (bare form read as a noun)"
+    }
+   ]
+  },
+  {
+   "sid": "S33",
+   "text": "The window was broken by a stone.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S33.1",
+     "phen": "voice.passive_by",
+     "q": "What broke the window?",
+     "gold": [
+      "stone"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "stored reversed (agent=window, patient=stone); an active question reverses back"
+    },
+    {
+     "id": "S33.2",
+     "phen": "voice.passive_by",
+     "q": "What was broken?",
+     "gold": [
+      "window"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "passive question returns the stored patient 'stone' (honesty risk)"
+    }
+   ]
+  },
+  {
+   "sid": "S34",
+   "text": "The letters were burned in the stove.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S34.1",
+     "phen": "voice.passive_agentless",
+     "q": "What was burned?",
+     "gold": [
+      "letters"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "patient slot holds 'stove' (PP object)"
+    },
+    {
+     "id": "S34.2",
+     "phen": "voice.passive_agentless",
+     "q": "Where were the letters burned?",
+     "gold": [
+      "stove"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "same slip gives the right answer by accident"
+    }
+   ]
+  },
+  {
+   "sid": "S35",
+   "text": "Pedro got bitten by a snake.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S35.1",
+     "phen": "voice.get_passive",
+     "q": "What bit Pedro?",
+     "gold": [
+      "snake"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'got' is not a learned auxiliary -> no 'bite' event"
+    },
+    {
+     "id": "S35.2",
+     "phen": "voice.get_passive",
+     "q": "Who got bitten?",
+     "gold": [
+      "pedro"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "event get(Pedro, bitten)"
+    }
+   ]
+  },
+  {
+   "sid": "S36",
+   "text": "Grandpa planted the oak tree in 1950.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S36.1",
+     "phen": "voice.passive_question",
+     "q": "When was the oak tree planted?",
+     "gold": [
+      "1950"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "events5 E: passive question with patient named -> adjuncts"
+    },
+    {
+     "id": "S36.2",
+     "phen": "voice.passive_question",
+     "q": "By whom was the oak tree planted?",
+     "gold": [
+      "grandpa"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "same rule returns the adjunct 'in 1950'"
+    }
+   ]
+  },
+  {
+   "sid": "S37",
+   "text": "Lara was reading a letter. Her cat was sleeping on the bed.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S37.1",
+     "phen": "tam.progressive",
+     "q": "What was Lara reading?",
+     "gold": [
+      "letter"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "auxiliary + participle -> event"
+    },
+    {
+     "id": "S37.2",
+     "phen": "tam.progressive",
+     "q": "Where was the cat sleeping?",
+     "gold": [
+      "bed"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "PP object as patient"
+    }
+   ]
+  },
+  {
+   "sid": "S38",
+   "text": "Tom has fixed the roof.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S38.1",
+     "phen": "tam.perfect",
+     "q": "What has Tom fixed?",
+     "gold": [
+      "roof"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'has' skipped in the agent search"
+    },
+    {
+     "id": "S38.2",
+     "phen": "tam.perfect",
+     "q": "Who has fixed the roof?",
+     "gold": [
+      "tom"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'has' + participle in the QUESTION reads as passive (events5 E); patient named, no adjunct -> nothing"
+    }
+   ]
+  },
+  {
+   "sid": "S39",
+   "text": "Tomorrow Ada will visit her aunt.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S39.1",
+     "phen": "tam.future",
+     "q": "Who will Ada visit?",
+     "gold": [
+      "aunt"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "an infinitive event in the first sentence takes no agent (none before it)"
+    }
+   ]
+  },
+  {
+   "sid": "S40",
+   "text": "Ada cooked dinner. Later she will wash the plates.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S40.1",
+     "phen": "tam.future",
+     "q": "Did Ada wash the plates?",
+     "gold": [
+      "no",
+      "not yet",
+      "will"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "future stored as a plain event; answers 'plates'"
+    }
+   ]
+  },
+  {
+   "sid": "S41",
+   "text": "Inspector Ross searched the house. The thief may have taken the ring.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S41.1",
+     "phen": "tam.modal_epistemic",
+     "q": "Who took the ring?",
+     "gold": [
+      "thief"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'thief' 2 closed symbols away; 'have' read as a pronoun -> last agent Inspector Ross (honesty risk)"
+    },
+    {
+     "id": "S41.2",
+     "phen": "tam.modal_epistemic",
+     "q": "What did Inspector Ross search?",
+     "gold": [
+      "house"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S42",
+   "text": "If Leo wins, his father will buy a boat.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S42.1",
+     "phen": "tam.conditional",
+     "q": "Who will buy a boat?",
+     "gold": [
+      "father"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "infinitive takes the sentence's first agent Leo"
+    },
+    {
+     "id": "S42.2",
+     "phen": "tam.conditional",
+     "q": "Did his father buy a boat?",
+     "gold": [
+      "no",
+      "not yet",
+      "if"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "patient filled -> agent 'Leo'"
+    }
+   ]
+  },
+  {
+   "sid": "S43",
+   "text": "If Ben had studied, he would have passed the exam.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S43.1",
+     "phen": "tam.counterfactual",
+     "q": "Who passed the exam?",
+     "gold": [
+      "@ABSTAIN",
+      "nobody",
+      "no one"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "pass(Ben, exam) stored as fact (honesty risk)"
+    },
+    {
+     "id": "S43.2",
+     "phen": "tam.counterfactual",
+     "q": "Did Ben pass the exam?",
+     "gold": [
+      "no"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "both roles filled, no adjunct"
+    }
+   ]
+  },
+  {
+   "sid": "S44",
+   "text": "Ivy plays the piano every evening.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S44.1",
+     "phen": "tam.tense_mismatch",
+     "q": "Who played the piano?",
+     "gold": [
+      "ivy"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "lemma matching across tenses"
+    },
+    {
+     "id": "S44.2",
+     "phen": "tam.tense_mismatch",
+     "q": "What does Ivy play?",
+     "gold": [
+      "piano"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient run 'piano every evening' contains piano"
+    }
+   ]
+  },
+  {
+   "sid": "S45",
+   "text": "Rosa cooked dinner. She didn't eat the soup.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S45.1",
+     "phen": "neg.not",
+     "q": "Who ate the soup?",
+     "gold": [
+      "@ABSTAIN",
+      "nobody",
+      "no one"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'t' is a learned marker -> eat(Rosa, soup) stored as fact (honesty risk)"
+    },
+    {
+     "id": "S45.2",
+     "phen": "neg.not",
+     "q": "Did Rosa eat the soup?",
+     "gold": [
+      "no"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "both roles filled, no adjunct"
+    }
+   ]
+  },
+  {
+   "sid": "S46",
+   "text": "Kai never visited Lima.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S46.1",
+     "phen": "neg.never",
+     "q": "Who visited Lima?",
+     "gold": [
+      "never",
+      "nobody",
+      "no one"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'never' is not closed -> agent run 'Kai never'; the reply happens to say 'never'"
+    },
+    {
+     "id": "S46.2",
+     "phen": "neg.never",
+     "q": "Did Kai visit Lima?",
+     "gold": [
+      "no"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "both roles filled, no adjunct"
+    }
+   ]
+  },
+  {
+   "sid": "S47",
+   "text": "No guest drank the wine.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S47.1",
+     "phen": "neg.no_det",
+     "q": "Who drank the wine?",
+     "gold": [
+      "no guest",
+      "nobody",
+      "no one"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'no' closed, dropped -> agent 'guest' (honesty risk)"
+    }
+   ]
+  },
+  {
+   "sid": "S48",
+   "text": "Nobody opened the gift.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S48.1",
+     "phen": "neg.no_det",
+     "q": "Who opened the gift?",
+     "gold": [
+      "nobody",
+      "no one"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'Nobody' is not closed -> agent 'Nobody'"
+    }
+   ]
+  },
+  {
+   "sid": "S49",
+   "text": "Two dogs ran into the yard. The black dog dug a hole.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S49.1",
+     "phen": "q.which",
+     "q": "Which dog dug a hole?",
+     "gold": [
+      "black"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "agent 'black dog' and patient both filled; no adjunct"
+    }
+   ]
+  },
+  {
+   "sid": "S50",
+   "text": "Bea hid the key under the mat.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S50.1",
+     "phen": "q.where",
+     "q": "Where did Bea hide the key?",
+     "gold": [
+      "mat"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "adjunct 'under the mat'"
+    },
+    {
+     "id": "S50.2",
+     "phen": "inf.state_from_event",
+     "q": "Where is the key?",
+     "gold": [
+      "mat"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'is' closed; no lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S51",
+   "text": "On Sunday the family visited the zoo.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S51.1",
+     "phen": "q.when",
+     "q": "When did the family visit the zoo?",
+     "gold": [
+      "sunday"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'family' closed -> agent None; fronted time phrase not an adjunct"
+    }
+   ]
+  },
+  {
+   "sid": "S52",
+   "text": "Tim stayed home because he was sick.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S52.1",
+     "phen": "q.why",
+     "q": "Why did Tim stay home?",
+     "gold": [
+      "sick"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "adjunct scan picks up 'he was sick'"
+    }
+   ]
+  },
+  {
+   "sid": "S53",
+   "text": "The road was closed, so Dan took the bus.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S53.1",
+     "phen": "q.why",
+     "q": "Why did Dan take the bus?",
+     "gold": [
+      "closed"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'take' closed in the question -> no lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S54",
+   "text": "Rita opened the jar with a knife.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S54.1",
+     "phen": "q.how_manner",
+     "q": "How did Rita open the jar?",
+     "gold": [
+      "knife"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "adjunct 'with a knife'"
+    }
+   ]
+  },
+  {
+   "sid": "S55",
+   "text": "Leo won the race easily.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S55.1",
+     "phen": "q.how_manner",
+     "q": "How did Leo win the race?",
+     "gold": [
+      "easily"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'easily' joins the patient run; no adjunct left"
+    }
+   ]
+  },
+  {
+   "sid": "S56",
+   "text": "Ines washed the apples and peeled the pears.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S56.1",
+     "phen": "clause.coord_vp",
+     "q": "Who peeled the pears?",
+     "gold": [
+      "ines"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "previous patient is not the next doer (events rule) -> shared agent"
+    },
+    {
+     "id": "S56.2",
+     "phen": "clause.coord_vp",
+     "q": "What did Ines peel?",
+     "gold": [
+      "pears"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S57",
+   "text": "Ali fed the goats, and his wife milked the cows.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S57.1",
+     "phen": "clause.coord_clauses",
+     "q": "Who milked the cows?",
+     "gold": [
+      "wife"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent run 'wife'"
+    },
+    {
+     "id": "S57.2",
+     "phen": "clause.coord_clauses",
+     "q": "What did Ali feed?",
+     "gold": [
+      "goats"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S58",
+   "text": "When the bell rang, the children ran outside.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S58.1",
+     "phen": "clause.temporal_sub",
+     "q": "Who ran outside?",
+     "gold": [
+      "children"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "comma bounds the clause"
+    },
+    {
+     "id": "S58.2",
+     "phen": "clause.temporal_sub",
+     "q": "What rang?",
+     "gold": [
+      "bell"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "most recent 'ring' agent"
+    }
+   ]
+  },
+  {
+   "sid": "S59",
+   "text": "After Nora finished her homework, she called her friend.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S59.1",
+     "phen": "clause.temporal_sub",
+     "q": "When did Nora call her friend?",
+     "gold": [
+      "homework"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'called' is closed-class after a pronoun -> no call event at all"
+    }
+   ]
+  },
+  {
+   "sid": "S60",
+   "text": "Max waited until the rain stopped.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S60.1",
+     "phen": "clause.open_class_connective",
+     "q": "Who waited?",
+     "gold": [
+      "max"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    },
+    {
+     "id": "S60.2",
+     "phen": "clause.open_class_connective",
+     "q": "What did Max wait for?",
+     "gold": [
+      "rain"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'until' read as a noun -> patient 'until'"
+    }
+   ]
+  },
+  {
+   "sid": "S61",
+   "text": "The teacher looked outside. The boy who broke the window ran away.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S61.1",
+     "phen": "clause.relative_subject",
+     "q": "Who broke the window?",
+     "gold": [
+      "boy"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'who' is a learned subject -> resolved to last agent 'teacher' (honesty risk)"
+    },
+    {
+     "id": "S61.2",
+     "phen": "clause.relative_subject",
+     "q": "Who ran away?",
+     "gold": [
+      "boy"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "agent 'window' = previous patient -> previous agent 'teacher'"
+    }
+   ]
+  },
+  {
+   "sid": "S62",
+   "text": "The cake that Mia baked was delicious.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S62.1",
+     "phen": "clause.relative_object",
+     "q": "What did Mia bake?",
+     "gold": [
+      "cake"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "patient search goes right: 'delicious'"
+    },
+    {
+     "id": "S62.2",
+     "phen": "clause.relative_object",
+     "q": "Who baked the cake?",
+     "gold": [
+      "mia"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no role contains 'cake'"
+    }
+   ]
+  },
+  {
+   "sid": "S63",
+   "text": "The woman wearing a red coat stole the bag.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S63.1",
+     "phen": "clause.reduced_relative",
+     "q": "Who stole the bag?",
+     "gold": [
+      "woman"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "nearest noun run on the left is 'red coat' (honesty risk)"
+    },
+    {
+     "id": "S63.2",
+     "phen": "clause.reduced_relative",
+     "q": "What was the woman wearing?",
+     "gold": [
+      "red coat",
+      "coat"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'wearing' without an auxiliary makes no event"
+    }
+   ]
+  },
+  {
+   "sid": "S64",
+   "text": "Tom said that the bridge was closed.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S64.1",
+     "phen": "clause.complement_that",
+     "q": "What did Tom say?",
+     "gold": [
+      "bridge was closed"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "say(Tom, bridge): the clause is cut to its first noun"
+    },
+    {
+     "id": "S64.2",
+     "phen": "clause.complement_that",
+     "q": "Was the bridge closed?",
+     "gold": [
+      "said",
+      "tom"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "close(bridge) has no patient or adjunct to return"
+    }
+   ]
+  },
+  {
+   "sid": "S65",
+   "text": "\"The soup is cold,\" said Ada.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S65.1",
+     "phen": "clause.direct_speech",
+     "q": "Who said the soup is cold?",
+     "gold": [
+      "ada"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'said' after a quote: no noun before it, closed -> no event; question has no lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S66",
+   "text": "\"I saw a wolf,\" cried the boy.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S66.1",
+     "phen": "clause.direct_speech",
+     "q": "Who saw a wolf?",
+     "gold": [
+      "boy"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'I' has no referent; 'the boy' is read as the patient of 'cried'"
+    }
+   ]
+  },
+  {
+   "sid": "S67",
+   "text": "Lia went to the shop to buy milk.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S67.1",
+     "phen": "clause.purpose",
+     "q": "Why did Lia go to the shop?",
+     "gold": [
+      "buy milk"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "adjunct 'to buy milk'"
+    },
+    {
+     "id": "S67.2",
+     "phen": "clause.purpose",
+     "q": "What did Lia buy?",
+     "gold": [
+      "milk"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "infinitive event buy(Lia, milk)"
+    }
+   ]
+  },
+  {
+   "sid": "S68",
+   "text": "Leo met Mia at the station. She carried his bag.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S68.1",
+     "phen": "ref.pronoun_gender",
+     "q": "Who carried the bag?",
+     "gold": [
+      "mia"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "pronoun = last agent (Leo); gender not used (honesty risk)"
+    },
+    {
+     "id": "S68.2",
+     "phen": "ref.pronoun_gender",
+     "q": "Where did Leo meet Mia?",
+     "gold": [
+      "station"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "adjunct 'at the station'"
+    }
+   ]
+  },
+  {
+   "sid": "S69",
+   "text": "Ken saw a puppy. He adopted it.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S69.1",
+     "phen": "ref.pronoun_object",
+     "q": "What did Ken adopt?",
+     "gold": [
+      "puppy"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "object pronoun -> last patient"
+    },
+    {
+     "id": "S69.2",
+     "phen": "ref.pronoun_object",
+     "q": "Who adopted the puppy?",
+     "gold": [
+      "ken"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "patient filled -> agent"
+    }
+   ]
+  },
+  {
+   "sid": "S70",
+   "text": "Zoe cut herself on the glass.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S70.1",
+     "phen": "ref.reflexive",
+     "q": "Who did Zoe cut?",
+     "gold": [
+      "herself",
+      "zoe"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'herself' not closed -> patient 'herself'"
+    },
+    {
+     "id": "S70.2",
+     "phen": "ref.reflexive",
+     "q": "What did Zoe cut herself on?",
+     "gold": [
+      "glass"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "both roles filled -> adjunct 'on the glass'"
+    }
+   ]
+  },
+  {
+   "sid": "S71",
+   "text": "Sam lost his pen, so Lily lent him hers.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S71.1",
+     "phen": "ref.possessive_pronoun",
+     "q": "What did Lily lend Sam?",
+     "gold": [
+      "pen"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "patient 'hers' returned unresolved"
+    },
+    {
+     "id": "S71.2",
+     "phen": "ref.possessive_pronoun",
+     "q": "Who lent Sam a pen?",
+     "gold": [
+      "lily"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no 'lend' role contains sam or pen"
+    }
+   ]
+  },
+  {
+   "sid": "S72",
+   "text": "Kim wanted a red apple, but Tom gave her a green one.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S72.1",
+     "phen": "ref.one_anaphora",
+     "q": "What did Tom give Kim?",
+     "gold": [
+      "green apple",
+      "green one"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'one' closed -> patient 'green'"
+    },
+    {
+     "id": "S72.2",
+     "phen": "ref.one_anaphora",
+     "q": "Who gave Kim an apple?",
+     "gold": [
+      "tom"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'apple' not in the give event"
+    }
+   ]
+  },
+  {
+   "sid": "S73",
+   "text": "Mara bought a ticket, and Joe did too.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S73.1",
+     "phen": "ref.vp_ellipsis",
+     "q": "Who else bought a ticket?",
+     "gold": [
+      "joe"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "only buy(Mara, ticket) exists -> 'Mara'"
+    },
+    {
+     "id": "S73.2",
+     "phen": "ref.vp_ellipsis",
+     "q": "Did Joe buy a ticket?",
+     "gold": [
+      "yes"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "patient filled -> agent 'Mara'"
+    }
+   ]
+  },
+  {
+   "sid": "S74",
+   "text": "Ivan ordered soup, and Olga salad.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S74.1",
+     "phen": "ref.gapping",
+     "q": "What did Olga order?",
+     "gold": [
+      "salad"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no verb in the second conjunct"
+    },
+    {
+     "id": "S74.2",
+     "phen": "ref.gapping",
+     "q": "What did Ivan order?",
+     "gold": [
+      "soup"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S75",
+   "text": "Before he left, Tom locked the door.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S75.1",
+     "phen": "ref.cataphora",
+     "q": "Who left?",
+     "gold": [
+      "tom"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'he' resolves backward only (no earlier agent) -> agent None"
+    },
+    {
+     "id": "S75.2",
+     "phen": "ref.cataphora",
+     "q": "Who locked the door?",
+     "gold": [
+      "tom"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S76",
+   "text": "I lent my bike to Omar.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S76.1",
+     "phen": "ref.first_person",
+     "q": "What did I lend Omar?",
+     "gold": [
+      "bike"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'I' resolves to no one -> agent None; no role shares 'omar' except an adjunct, and the agent is empty"
+    },
+    {
+     "id": "S76.2",
+     "phen": "ref.first_person",
+     "q": "Who has my bike?",
+     "gold": [
+      "omar"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'has' closed"
+    }
+   ]
+  },
+  {
+   "sid": "S77",
+   "text": "Ana is taller than Ben.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S77.1",
+     "phen": "quant.comparative",
+     "q": "Who is taller?",
+     "gold": [
+      "ana"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "copula and 'taller' make no event"
+    }
+   ]
+  },
+  {
+   "sid": "S78",
+   "text": "Only Ravi finished the race.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S78.1",
+     "phen": "quant.only",
+     "q": "Who finished the race?",
+     "gold": [
+      "ravi"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'only' closed, skipped"
+    },
+    {
+     "id": "S78.2",
+     "phen": "quant.only",
+     "q": "Did Sita finish the race?",
+     "gold": [
+      "no"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "patient filled -> agent 'Ravi' (no polarity)"
+    }
+   ]
+  },
+  {
+   "sid": "S79",
+   "text": "Every guest brought a gift.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S79.1",
+     "phen": "quant.universal",
+     "q": "Who brought a gift?",
+     "gold": [
+      "guest"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "agent run 'Every guest'"
+    }
+   ]
+  },
+  {
+   "sid": "S80",
+   "text": "Alice gave Bob a present.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S80.1",
+     "phen": "disc.story_world_collision",
+     "q": "What did Alice give Bob?",
+     "gold": [
+      "present"
+     ],
+     "pred": "R",
+     "pred_door": "W",
+     "why": "event memory alone is right"
+    },
+    {
+     "id": "S80.2",
+     "phen": "disc.story_world_collision",
+     "q": "Who gave Bob a present?",
+     "gold": [
+      "alice"
+     ],
+     "pred": "R",
+     "pred_door": "W",
+     "why": "door: the records world reads 'bob' and answers cleanly (e.g. his manager), overriding the recall"
+    }
+   ]
+  },
+  {
+   "sid": "S81",
+   "text": "Grace planted roses. Two weeks later she sold them at the market.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S81.1",
+     "phen": "disc.topic_continuity",
+     "q": "Who sold the roses?",
+     "gold": [
+      "grace"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'she' -> Grace; 'them' -> roses"
+    },
+    {
+     "id": "S81.2",
+     "phen": "disc.topic_continuity",
+     "q": "Where did Grace sell the roses?",
+     "gold": [
+      "market"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'roses' is a verb form (not content) -> answers the patient 'roses'"
+    }
+   ]
+  },
+  {
+   "sid": "S82",
+   "text": "Pam purchased a lamp. Jon repaired the fence.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S82.1",
+     "phen": "lex.synonym_verb",
+     "q": "What did Pam buy?",
+     "gold": [
+      "lamp"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "dictionary sameness buy = purchase (events2)"
+    },
+    {
+     "id": "S82.2",
+     "phen": "lex.synonym_verb",
+     "q": "Who fixed the fence?",
+     "gold": [
+      "jon"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "fix = repair"
+    }
+   ]
+  },
+  {
+   "sid": "S83",
+   "text": "Mia sold her bike to Tom.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S83.1",
+     "phen": "lex.converse",
+     "q": "Who bought Mia's bike?",
+     "gold": [
+      "tom"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no 'buy' event; converse not known"
+    },
+    {
+     "id": "S83.2",
+     "phen": "lex.converse",
+     "q": "Who sold the bike?",
+     "gold": [
+      "mia"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S84",
+   "text": "A collie chased the sheep.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S84.1",
+     "phen": "lex.hypernym",
+     "q": "What did the dog chase?",
+     "gold": [
+      "sheep"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'dog' shares no role word"
+    },
+    {
+     "id": "S84.2",
+     "phen": "lex.hypernym",
+     "q": "What chased the sheep?",
+     "gold": [
+      "collie"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S85",
+   "text": "Grandpa kicked the bucket last winter.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S85.1",
+     "phen": "lex.idiom",
+     "q": "Did Grandpa die?",
+     "gold": [
+      "yes"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no 'die' event"
+    },
+    {
+     "id": "S85.2",
+     "phen": "lex.idiom",
+     "q": "When did Grandpa die?",
+     "gold": [
+      "last winter",
+      "winter"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "same"
+    }
+   ]
+  },
+  {
+   "sid": "S86",
+   "text": "Ravi gave up smoking.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S86.1",
+     "phen": "lex.idiom",
+     "q": "Did Ravi stop smoking?",
+     "gold": [
+      "yes"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no 'stop' event"
+    }
+   ]
+  },
+  {
+   "sid": "S88",
+   "text": "Juan won the race.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S88.1",
+     "phen": "inf.consequence",
+     "q": "Who lost the race?",
+     "gold": [
+      "@ABSTAIN"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "no 'lose' event -> abstains (correct)"
+    },
+    {
+     "id": "S88.2",
+     "phen": "inf.consequence",
+     "q": "Who came first?",
+     "gold": [
+      "juan"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "no 'come' event; consequence not inferred"
+    }
+   ]
+  },
+  {
+   "sid": "S89",
+   "text": "Kira ate breakfast. Then she went to school.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S89.1",
+     "phen": "inf.temporal_order",
+     "q": "Where did Kira go after breakfast?",
+     "gold": [
+      "school"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "go(Kira, school): agent filled -> patient"
+    },
+    {
+     "id": "S89.2",
+     "phen": "inf.temporal_order",
+     "q": "What did Kira do before school?",
+     "gold": [
+      "breakfast"
+     ],
+     "pred": "S",
+     "pred_door": "S",
+     "why": "'do' closed; no lemma"
+    }
+   ]
+  },
+  {
+   "sid": "S90",
+   "text": "The ice melted because the sun was hot.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S90.1",
+     "phen": "inf.cause",
+     "q": "Why did the ice melt?",
+     "gold": [
+      "sun was hot",
+      "hot"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "'because' closed, skipped -> patient 'sun'"
+    },
+    {
+     "id": "S90.2",
+     "phen": "inf.cause",
+     "q": "What melted?",
+     "gold": [
+      "ice"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "plain"
+    }
+   ]
+  },
+  {
+   "sid": "S91",
+   "text": "Omar painted the door.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S91.1",
+     "phen": "inf.unasked",
+     "q": "What color did Omar paint the door?",
+     "gold": [
+      "@ABSTAIN"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "both roles filled, no adjunct -> abstains"
+    },
+    {
+     "id": "S91.2",
+     "phen": "inf.unasked",
+     "q": "Who painted the window?",
+     "gold": [
+      "@ABSTAIN"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "no role shares 'window' -> abstains"
+    }
+   ]
+  },
+  {
+   "sid": "S92",
+   "text": "the dog bit tom.",
+   "door": false,
+   "qs": [
+    {
+     "id": "S92.1",
+     "phen": "orth.casing",
+     "q": "who bit tom?",
+     "gold": [
+      "dog"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "the reader does not need capitals"
+    }
+   ]
+  },
+  {
+   "sid": "S93",
+   "text": "Ava fed the cat then she washed the dishes",
+   "door": true,
+   "qs": [
+    {
+     "id": "S93.1",
+     "phen": "orth.missing_punct",
+     "q": "Who washed the dishes?",
+     "gold": [
+      "ava"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "'she' -> Ava; 'dishes' as noun after 'the'"
+    }
+   ]
+  },
+  {
+   "sid": "S94",
+   "text": "Dr. Patel examined the patient. Mrs. Gomez thanked Dr. Patel.",
+   "door": true,
+   "qs": [
+    {
+     "id": "S94.1",
+     "phen": "orth.abbreviation",
+     "q": "Who examined the patient?",
+     "gold": [
+      "patel"
+     ],
+     "pred": "R",
+     "pred_door": "R",
+     "why": "split after 'Dr.' still leaves 'Patel examined the patient.'"
+    },
+    {
+     "id": "S94.2",
+     "phen": "orth.abbreviation",
+     "q": "Who did Mrs. Gomez thank?",
+     "gold": [
+      "patel"
+     ],
+     "pred": "W",
+     "pred_door": "W",
+     "why": "split after 'Dr.' -> patient 'Dr'"
+    }
+   ]
+  }
+ ],
+ "questions": [
+  {
+   "id": "Q001",
+   "phen": "morph.contraction",
+   "q": "what's the capital of egypt",
+   "gold": [
+    "cairo"
+   ],
+   "pred": "R",
+   "why": "'s splits off as a common symbol; capital+egypt read by the Wikidata fixture",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q002",
+   "phen": "morph.possessive_s",
+   "q": "what is ken's salary",
+   "gold": [
+    "110"
+   ],
+   "pred": "R",
+   "why": "'s is a common symbol; salary+ken read by the records table",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q003",
+   "phen": "morph.derivation",
+   "q": "what does kindness mean",
+   "gold": [
+    "@DICT"
+   ],
+   "pred": "R",
+   "why": "listed word: the dictionary world quotes its gloss",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q004",
+   "phen": "morph.derivation",
+   "q": "what does unbloggable mean",
+   "gold": [
+    "@ABSTAIN"
+   ],
+   "pred": "R",
+   "why": "nonce derivation: no gloss, no one-edit neighbour -> abstains (correct)",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q005",
+   "phen": "morph.degree_forms",
+   "q": "which employee has the biggest salary",
+   "gold": [
+    "dave"
+   ],
+   "pred": "S",
+   "why": "'biggest' unread; at best a did-you-mean offer for 'largest'/'highest'",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q006",
+   "phen": "morph.degree_forms",
+   "q": "who earns the least",
+   "gold": [
+    "heidi"
+   ],
+   "pred": "S",
+   "why": "'earns' and 'least' unread",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q007",
+   "phen": "tam.imperative",
+   "q": "Tell me the capital of Japan",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "why": "imperative words are not read; capital+japan cover the turn",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q008",
+   "phen": "tam.imperative",
+   "q": "Give me the salary of Grace",
+   "gold": [
+    "95"
+   ],
+   "pred": "R",
+   "why": "salary+grace read by records",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q009",
+   "phen": "neg.world",
+   "q": "how many employees are not in support",
+   "gold": [
+    "9"
+   ],
+   "pred": "W",
+   "why": "'not' is a common symbol, ignored -> counts support (2)",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q010",
+   "phen": "neg.world",
+   "q": "what is the total salary outside engineering",
+   "gold": [
+    "1100"
+   ],
+   "pred": "W",
+   "why": "'outside' unread; total salary in engineering (380) or overall (1480)",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q011",
+   "phen": "q.yes_no",
+   "q": "is tokyo the capital of japan",
+   "gold": [
+    "yes"
+   ],
+   "pred": "R",
+   "why": "echo answer + CHECK -> Yes",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q012",
+   "phen": "q.yes_no",
+   "q": "is rome the capital of japan",
+   "gold": [
+    "no"
+   ],
+   "pred": "R",
+   "why": "CHECK contradicted by Tokyo -> No",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q013",
+   "phen": "q.who_subject",
+   "q": "who wrote hamlet",
+   "gold": [
+    "shakespeare"
+   ],
+   "pred": "S",
+   "why": "'wrote' is not a property label of the fixture; at most a did-you-mean",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q014",
+   "phen": "q.who_subject",
+   "q": "who directed jaws",
+   "gold": [
+    "spielberg"
+   ],
+   "pred": "S",
+   "why": "'directed' is 2 edits from 'director'",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q015",
+   "phen": "q.what_object",
+   "q": "what currency does japan use",
+   "gold": [
+    "yen"
+   ],
+   "pred": "R",
+   "why": "currency+japan cover the content; 'use' closed",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q016",
+   "phen": "q.what_object",
+   "q": "what language do people speak in brazil",
+   "gold": [
+    "portuguese"
+   ],
+   "pred": "S",
+   "why": "'language' alone may not map to 'official language'; 'speak' unread",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q017",
+   "phen": "q.whom",
+   "q": "whom does carol manage",
+   "gold": [
+    "bob"
+   ],
+   "pred": "W",
+   "why": "'manage' one edit from 'manager' -> manager of carol = dave (inverse lost)",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q018",
+   "phen": "q.whose",
+   "q": "whose manager is frank",
+   "gold": [
+    "erin",
+    "grace"
+   ],
+   "pred": "W",
+   "why": "reads manager+frank -> manager of frank = dave",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q019",
+   "phen": "q.which",
+   "q": "which department is in berlin",
+   "gold": [
+    "research"
+   ],
+   "pred": "R",
+   "why": "records: department filtered by city",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q020",
+   "phen": "q.where",
+   "q": "where was napoleon born",
+   "gold": [
+    "ajaccio"
+   ],
+   "pred": "S",
+   "why": "'born' is not 'place of birth'",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q021",
+   "phen": "q.when",
+   "q": "when did judy start",
+   "gold": [
+    "2012"
+   ],
+   "pred": "R",
+   "why": "records 'start' column",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q022",
+   "phen": "q.how_many",
+   "q": "how many people work in sales",
+   "gold": [
+    "2"
+   ],
+   "pred": "R",
+   "why": "'people','work' closed; COUNT over sales",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q023",
+   "phen": "q.embedded",
+   "q": "can you tell me what the capital of egypt is",
+   "gold": [
+    "cairo"
+   ],
+   "pred": "R",
+   "why": "politeness frame ignored; capital+egypt",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q024",
+   "phen": "q.embedded",
+   "q": "do you know who directed jaws",
+   "gold": [
+    "spielberg"
+   ],
+   "pred": "S",
+   "why": "'directed' unread",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q025",
+   "phen": "q.ellipsis",
+   "q": "what about frank?",
+   "gold": [
+    "130"
+   ],
+   "pred": "R",
+   "why": "context: previous structure with frank substituted",
+   "setup": [
+    "what is the salary of alice"
+   ],
+   "gold_all": false
+  },
+  {
+   "id": "Q026",
+   "phen": "q.ellipsis",
+   "q": "and italy?",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "why": "same",
+   "setup": [
+    "what is the capital of japan"
+   ],
+   "gold_all": false
+  },
+  {
+   "id": "Q027",
+   "phen": "q.tag",
+   "q": "tokyo is the capital of japan, isn't it?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "R",
+   "why": "statement check -> Yes",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q028",
+   "phen": "q.tag",
+   "q": "alice works in sales, doesn't she?",
+   "gold": [
+    "no",
+    "engineering"
+   ],
+   "pred": "S",
+   "why": "records facts are not in the statement store",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q029",
+   "phen": "q.declarative",
+   "q": "the capital of brazil is brasilia?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "W",
+   "why": "filled check compares 'brasilia' with the label 'Brasilia' with an accent: likely a No (diacritic mismatch)",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q030",
+   "phen": "q.declarative",
+   "q": "bob earns 150?",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "why": "'earns' unread",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q031",
+   "phen": "q.alternative",
+   "q": "is the capital of japan tokyo or kyoto",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "why": "capital of japan read; Tokyo stated",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q032",
+   "phen": "q.alternative",
+   "q": "is alice in engineering or sales",
+   "gold": [
+    "engineering"
+   ],
+   "pred": "S",
+   "why": "two filters, no structure",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q033",
+   "phen": "q.inverse_relation",
+   "q": "who is managed by carol",
+   "gold": [
+    "bob"
+   ],
+   "pred": "W",
+   "why": "'managed' read as 'manager' (one edit) -> manager of carol = dave (honesty risk)",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q034",
+   "phen": "q.inverse_relation",
+   "q": "which country has paris as its capital",
+   "gold": [
+    "france"
+   ],
+   "pred": "R",
+   "why": "country of paris = France, by luck of the composition",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q035",
+   "phen": "quant.comparative",
+   "q": "does alice earn more than ken",
+   "gold": [
+    "yes"
+   ],
+   "pred": "S",
+   "why": "'earn','more','than' unread; no comparison structure",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q036",
+   "phen": "quant.superlative",
+   "q": "who has the highest salary in sales",
+   "gold": [
+    "frank"
+   ],
+   "pred": "R",
+   "why": "taught 'which employee has the highest' shape",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q037",
+   "phen": "quant.superlative",
+   "q": "which product has the highest price",
+   "gold": [
+    "doohickey"
+   ],
+   "pred": "R",
+   "why": "sales table argmax",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q038",
+   "phen": "quant.universal",
+   "q": "what is the salary of each employee in support",
+   "gold": [
+    "70",
+    "75"
+   ],
+   "pred": "S",
+   "why": "list-of-values over a filter has no structure",
+   "setup": [],
+   "gold_all": true
+  },
+  {
+   "id": "Q039",
+   "phen": "quant.counting_condition",
+   "q": "how many employees started after 2015",
+   "gold": [
+    "5"
+   ],
+   "pred": "W",
+   "why": "'after' comparison not read; counts something else",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q040",
+   "phen": "quant.counting_condition",
+   "q": "how many departments are in lisbon",
+   "gold": [
+    "1"
+   ],
+   "pred": "R",
+   "why": "COUNT with city filter",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q041",
+   "phen": "quant.arithmetic_words",
+   "q": "what is twice the salary of bob",
+   "gold": [
+    "300"
+   ],
+   "pred": "S",
+   "why": "'twice' unread (the exec world knows 'double')",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q042",
+   "phen": "quant.arithmetic_words",
+   "q": "what is six times seven",
+   "gold": [
+    "42"
+   ],
+   "pred": "S",
+   "why": "number words are not read as numbers",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q043",
+   "phen": "disc.courtesy",
+   "q": "Hello! Could you please tell me the capital of Brazil?",
+   "gold": [
+    "brasilia",
+    "brasília"
+   ],
+   "pred": "R",
+   "why": "sentences split; courtesy words not content",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q044",
+   "phen": "disc.courtesy",
+   "q": "thanks, and what is the currency of brazil",
+   "gold": [
+    "real"
+   ],
+   "pred": "R",
+   "why": "currency+brazil read",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q045",
+   "phen": "disc.user_belief",
+   "q": "I think the capital of Egypt is Alexandria, right?",
+   "gold": [
+    "cairo",
+    "no"
+   ],
+   "pred": "R",
+   "why": "statement check contradicts with Cairo",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q046",
+   "phen": "disc.user_belief",
+   "q": "maybe ken's salary is 200?",
+   "gold": [
+    "110",
+    "no"
+   ],
+   "pred": "S",
+   "why": "records facts not in the statement store",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q047",
+   "phen": "disc.marker",
+   "q": "Well, who is the manager of Ken?",
+   "gold": [
+    "bob"
+   ],
+   "pred": "R",
+   "why": "'well' closed; manager+ken",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q048",
+   "phen": "disc.marker",
+   "q": "So what is the city of the sales department?",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "why": "city + sales",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q049",
+   "phen": "disc.multi_sentence",
+   "q": "My name is Sam. What is the capital of Italy?",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "why": "each sentence answered; the second is the question",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q050",
+   "phen": "disc.multi_sentence",
+   "q": "I work in sales. How many employees are in my department?",
+   "gold": [
+    "2"
+   ],
+   "pred": "W",
+   "why": "'my department' not linked to sales -> counts all employees",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q051",
+   "phen": "disc.correction",
+   "q": "no, I meant Ken",
+   "gold": [
+    "110"
+   ],
+   "pred": "S",
+   "why": "'no' is feedback on the last answer; 'meant' unread",
+   "setup": [
+    "what is the salary of bob"
+   ],
+   "gold_all": false
+  },
+  {
+   "id": "Q052",
+   "phen": "disc.correction",
+   "q": "sorry, I meant Spain",
+   "gold": [
+    "madrid"
+   ],
+   "pred": "R",
+   "why": "context ellipsis with spain substituted",
+   "setup": [
+    "what is the capital of france"
+   ],
+   "gold_all": false
+  },
+  {
+   "id": "Q053",
+   "phen": "lex.synonym_noun",
+   "q": "what is the wage of alice",
+   "gold": [
+    "120"
+   ],
+   "pred": "S",
+   "why": "did-you-mean offer at best",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q054",
+   "phen": "lex.synonym_noun",
+   "q": "what is the pay of erin",
+   "gold": [
+    "90"
+   ],
+   "pred": "S",
+   "why": "same",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q055",
+   "phen": "lex.converse",
+   "q": "who reports to bob",
+   "gold": [
+    "alice",
+    "ken"
+   ],
+   "pred": "S",
+   "why": "'reports' unread",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q056",
+   "phen": "lex.polysemy",
+   "q": "what does bank mean",
+   "gold": [
+    "@DICT"
+   ],
+   "pred": "R",
+   "why": "dictionary quotes the senses",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q057",
+   "phen": "lex.polysemy",
+   "q": "what is a bat",
+   "gold": [
+    "@DICT"
+   ],
+   "pred": "R",
+   "why": "same",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q058",
+   "phen": "orth.typo",
+   "q": "what is the captial of italy",
+   "gold": [
+    "rome"
+   ],
+   "pred": "R",
+   "why": "one swap -> 'capital', unique",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q059",
+   "phen": "orth.typo",
+   "q": "waht is the salray of bob",
+   "gold": [
+    "150"
+   ],
+   "pred": "R",
+   "why": "'salray' -> 'salary' unique; 'waht' not content",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q060",
+   "phen": "orth.casing",
+   "q": "WHO IS THE MANAGER OF KEN",
+   "gold": [
+    "bob"
+   ],
+   "pred": "R",
+   "why": "symbols are lower-cased",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q061",
+   "phen": "orth.missing_punct",
+   "q": "capital of japan",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "why": "fragment read by coverage",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q062",
+   "phen": "orth.apostrophe_missing",
+   "q": "whats the capital of japan",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "why": "coverage ignores the unread 'whats'",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q063",
+   "phen": "orth.apostrophe_missing",
+   "q": "what is alices salary",
+   "gold": [
+    "120"
+   ],
+   "pred": "R",
+   "why": "one edit 'alices' -> 'alice'",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q064",
+   "phen": "orth.noise_punct",
+   "q": "what is the capital of japan ?!!",
+   "gold": [
+    "tokyo"
+   ],
+   "pred": "R",
+   "why": "punctuation dropped by symbols()",
+   "setup": [],
+   "gold_all": false
+  },
+  {
+   "id": "Q065",
+   "phen": "orth.noise_punct",
+   "q": "capital of france???",
+   "gold": [
+    "paris"
+   ],
+   "pred": "R",
+   "why": "same",
+   "setup": [],
+   "gold_all": false
+  }
+ ]
+}

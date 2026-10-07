@@ -1,0 +1,127 @@
+ENGLISH FREQUENCIES over 60 training books, 45102 sentences, 1022295 words  (approximate surface cues)
+phenomenon                                rate   of q  cue
+morph.plural                             0.360         determiner/numeral + word ending -s
+morph.past_regular                       0.489         word ending -ed (5+ letters)
+morph.irregular                          0.305         one of ~60 common irregular past forms
+morph.third_sg                           0.036         he/she/it + word ending -s
+morph.contraction_neg                    0.028         n't
+morph.contraction_other                  0.030         pronoun + 'll/'re/'ve/'d/'m/'s
+morph.possessive_s                       0.092         word's + word (not it's/that's/there's/he's/let's...)
+morph.derivation                         0.306         word with -ness/-ment/-tion/-able/-ful/-less/-ity or un-/re- prefix
+morph.adverb_ly                          0.212         word ending -ly (5+ letters, not only/family/early...)
+np.article                               0.722         the/a/an
+np.adjective                             0.166         a/the + word ending -ful/-ous/-ive/-al/-ic/-y/-ish + word
+np.compound                              0.016         two lowercase nouns after the/a ending -er/-ing/-ion + noun? (no reliable cue: the/a + 2 w
+np.of_phrase                             0.392         word + of + (the|a|an|his|her|their|my|its|word)
+np.appositive                            0.005         Capitalised name , the/a/an/my/his/her ... ,
+np.possessive_det                        0.419         my/your/his/her/its/our/their
+np.quantifier                            0.278         all/every/each/some/any/many/few/several/most/both/no/much + word
+np.numeral                               0.164         a digit or one..twelve/twenty/hundred/thousand
+np.proper_name                           0.460         capitalised non-initial word (not I, not after a quote or colon)
+np.multiword_name                        0.107         two or more consecutive capitalised words, not sentence-initial (Mary Ann Evans, New York)
+np.world_name                            0.016         a name that one of the engine's worlds also holds (the 11 records employees, the fixture's
+np.coordinated_np                        0.029         Name and Name | the/a/his/her X and the/a/his/her Y
+np.title                                 0.045         Mr/Mrs/Dr/Miss/Sir/Lady/Lord/Captain/Colonel/Madame + Name
+np.frequent_noun                         0.113         the/a/his/her/their + one of the very frequent nouns man/men/people/time/day/city/town/fam
+np.demonstrative                         0.173         this/that/these/those + word
+verb.transitive                          0.128         pronoun/name + past verb + the/a/his/her (proxy for V + object NP)
+verb.ditransitive                        0.011         give/tell/show/send/bring/offer/hand/lend (any form) + object pronoun/name + the/a/his/her
+verb.dative_to                           0.016         give/send/hand/bring/show/offer/lend/sell/pass ... to + pronoun/name/the
+verb.particle                            0.054         common verb + up/down/out/off/away/back/over/on
+verb.top200_forms                        0.222         a form of the commonest verbs (made/said/found/called/used/given/take/get/make/see/use/do/
+verb.light                               0.001         take/make/have/give + a + walk/look/bath/step/turn/decision/rest/try/glance/promise/start
+verb.copula                              0.211         be-form + a/an/the/not/very/so/too/adjective-like word (not a participle, not -ing)
+verb.existential                         0.034         there + be-form
+verb.control                             0.044         want/try/begin/decide/hope/wish/refuse/promise/agree/mean/like/manage/forget/seem/seem/con
+verb.raising_object                      0.003         want/expect/ask/tell/order/allow/beg/persuade + object + to
+verb.causative                           0.017         make/let/have/help/bid (any form) + object + bare word (not to/-ing/-ed)
+voice.passive                            0.149         be-form + (adverb) + participle (-ed or irregular)
+voice.passive_by                         0.022         passive cue + by within 6 words
+voice.get_passive                        0.001         get/got/gets/getting/gotten + participle
+tam.progressive                          0.059         be-form + word ending -ing
+tam.perfect                              0.157         have-form + (adverb) + participle
+tam.modal                                0.256         will/would/can/could/may/might/shall/should/must/'ll
+tam.will_future                          0.074         will/shall/'ll/going to + word
+tam.epistemic                            0.059         may/might/must/could/should + have/be (epistemic or perfect modal)
+tam.future_going_to                      0.003         going to + word (not a place: the/a)
+tam.conditional                          0.061         if/unless/were I/had I/should you
+tam.imperative                           0.025         sentence (or quotation) opening with a common base verb
+tam.subjunctive                          0.005         if I/he/she/it were | lest | God save/bless | be it | so be it | would that
+tam.habitual_used_to                     0.004         used to + word / would (habitual) proxy: used to
+tam.archaic                              0.027         thou/thee/thy/thine/hath/doth/art/shalt/wilt/'tis/ye
+neg.not                                  0.163         not / n't
+neg.never                                0.026         never
+neg.no_det                               0.087         no + word / nothing / nobody / none / no one / nowhere
+neg.scope                                0.007         not all / not every / not only / not much / not a single / never all
+q.any                                    0.064         sentence ending ? (inside or outside a quotation)
+q.yes_no                                 0.016  0.242  ? and first word (after an opening quote) an auxiliary
+q.wh_what                                0.008  0.122  ? and opening word what
+q.wh_who                                 0.002  0.031  ? and opening who
+q.wh_whom                                0.001  0.015  ? and whom anywhere
+q.wh_whose                               0.000  0.001  ? and opening whose
+q.wh_which                               0.000  0.005  ? and opening which
+q.wh_where                               0.002  0.027  ? and opening where
+q.wh_when                                0.001  0.012  ? and opening when
+q.wh_why                                 0.002  0.036  ? and opening why
+q.wh_how                                 0.003  0.044  ? and opening how (not how many/much)
+q.wh_how_many                            0.000  0.004  ? and opening how many/how much
+q.subject_wh                             0.001  0.015  ? opening who/what + past or -s verb (subject question)
+q.object_wh                              0.005  0.082  ? opening what/who/whom + do/did/does/will/would/can/shall
+q.alternative                            0.005  0.076  ? with ' or ' inside the question
+q.tag                                    0.001  0.020  , aux(n't) + pronoun ?
+q.embedded                               0.014  0.223  know/wonder/ask/tell/see/understand + wh-word/whether/if, not ending ?
+q.elliptical                             0.002  0.035  question of 1-3 words (echo / fragment: 'Why?', 'And you?')
+q.declarative                            0.022  0.345  ? with no auxiliary or wh-word in the first two words (rising declarative 'You saw him?')
+clause.coordination                      0.361         , and / , but / ; and / and + pronoun subject
+clause.coord_vp                          0.088         and/but/or + (adverb) + past verb (a second verb sharing the subject)
+clause.coord_clauses                     0.298         , and/but/so + pronoun/name/the (a second clause with its own subject)
+clause.subordination                     0.179         because/when/after/before/until/while/since/although/though/as soon as/till/whenever
+clause.open_class_connective             0.117         until/till/since/unless/although/though/whereas/across/near/toward(s)/against/among/along/
+quant.arithmetic_words                   0.013         twice/thrice/double/half/plus/minus/divided/times as
+clause.relative_wh                       0.095         noun-like word + who/whom/whose/which (not after a comma-less verb)
+clause.relative_that                     0.026         the/a + word + that + word (relative OR complement 'that': ambiguous)
+clause.relative_reduced                  0.008         noun + -ed/-ing participle + by/in/on/with/from (reduced relative proxy)
+clause.complement_that                   0.022         say/think/know/believe/feel/see/find/hope/fear/tell + (obj) + that
+clause.infinitive_purpose                0.031         (in order) to + verb after a comma or an object (proxy: in order to | , to)
+clause.participial_adjunct               0.032         sentence-initial or post-comma -ing/-ed clause
+clause.direct_speech                     0.249         a quotation mark
+clause.reported_speech                   0.013         said/told/asked/answered + (him/her/them) + that/if/whether/to
+ref.personal_pronoun                     0.725         he/she/they/it/we/i/you/him/her/them/me/us
+ref.third_person_pronoun                 0.446         he/she/they/him/her/them (third-person, needing an antecedent)
+ref.object_pronoun                       0.232         him/them/me/us, or it after a verb-like word
+ref.first_second_person                  0.376         I/me/my/we/us/our/you/your
+ref.reflexive                            0.065         himself/herself/themselves/itself/myself/yourself/ourselves
+ref.possessive_pronoun                   0.010         mine/yours/hers/ours/theirs
+ref.demonstrative_pron                   0.054         this/that + verb or punctuation
+ref.definite_desc                        0.609         the + word
+ref.one_anaphora                         0.010         a/the/an + adjective + one(s) | the other one | that one
+ref.vp_ellipsis                          0.045         aux (+not) right before punctuation | so did/do I | did too | do so
+ref.gapping                              0.000         no reliable cue: ', and X Y' with verb missing -- proxy: , and + Name/pronoun + the/a + wo
+ref.cataphora_sentence_initial_pronoun   0.154         sentence opening with a third-person pronoun (antecedent outside the sentence)
+quant.comparative                        0.035         more/less/fewer ... than | -er than | as ... as
+quant.superlative                        0.035         the most/least + word | the -est
+quant.only_focus                         0.089         only/just/even/also (focus particles)
+quant.universal                          0.117         every/each/all/everyone/everything/everybody
+quant.counting                           0.038         how many / the number of / count / numeral + plural noun
+disc.quote                               0.249         a quotation mark (= clause.direct_speech)
+disc.speaker_attribution                 0.054         said/asked/replied/cried/answered/exclaimed/whispered + Name/pronoun, or the reverse, next
+disc.vocative_courtesy                   0.019         please/thank/thanks/sorry/pardon/sir/madam/ma'am/hello/good morning/goodbye
+disc.hedge                               0.042         perhaps/maybe/probably/possibly/I think/I suppose/I believe/seems/it may be/I fancy
+disc.marker                              0.023         sentence opening with Well/Now/So/Oh/However/Indeed/Then/Yet/Still/Besides/Why/Ah/Of cours
+disc.exclamative                         0.053         sentence ending !
+disc.interjection                        0.029         oh/ah/alas/hush/hurrah/pooh/ha/hm/bah
+lex.converse_pairs                       0.074         a member of give/receive, buy/sell, lend/borrow, teach/learn, win/lose, before/after, pare
+lex.idiom                                0.053         one of ~30 fixed phrases (of course, at once, at last, by and by, make up his mind, take p
+lex.phrasal_meaning                      0.009         particle verb with non-compositional meaning (give up/make out/put up with/turn out/come a
+inf.cause                                0.045         because/so/therefore/thus/hence/for this reason/as a result/so that
+inf.temporal                             0.082         then/afterwards/later/next/at last/finally/soon/presently/meanwhile/at length
+inf.manner                               0.226         by + -ing | with + a/an/the/his/her + noun at clause end | -ly adverb
+orth.abbreviation                        0.028         Mr./Mrs./Dr./St./etc. (a period that does not end the sentence)
+orth.hyphen_dash                         0.215         a hyphenated word or a dash (--, —)
+orth.semicolon_colon                     0.227         ; or :
+orth.allcaps                             0.028         an all-caps word of 2+ letters (not I, not roman numerals)
+orth.long_sentence                       0.129         more than 40 words
+orth.nonascii                            0.000         a non-ASCII character
+orth.parenthesis                         0.046         ( or [
+
+written C:\Users\aezequiel\Desktop\AI_Projects\primasieve\english_freq.json

@@ -1,0 +1,703 @@
+{
+ "note": "APPROXIMATE surface-cue rates: share of sentences where the cue fires (cue recall and precision both imperfect). Question types also as a share of question sentences ('of_questions').",
+ "books": 60,
+ "book_ids": [
+  "10084",
+  "1160",
+  "1190",
+  "1243",
+  "1333",
+  "1392",
+  "1414",
+  "1434",
+  "1484",
+  "1554",
+  "1562",
+  "1587",
+  "1621",
+  "165",
+  "166",
+  "1689",
+  "1713",
+  "1729",
+  "1739",
+  "178",
+  "1813",
+  "1824",
+  "1841",
+  "1867",
+  "1886",
+  "1911",
+  "1933",
+  "1946",
+  "1980",
+  "2021",
+  "2034",
+  "2052",
+  "2072",
+  "2102",
+  "2107",
+  "2113",
+  "2120",
+  "2142",
+  "2182",
+  "2286",
+  "2304",
+  "2330",
+  "2368",
+  "2416",
+  "2430",
+  "2458",
+  "2470",
+  "2506",
+  "2521",
+  "2543",
+  "2555",
+  "2573",
+  "2580",
+  "2598",
+  "317",
+  "333",
+  "355",
+  "398",
+  "406",
+  "422"
+ ],
+ "sentences": 45102,
+ "words": 1022295,
+ "rates": {
+  "morph.plural": {
+   "rate": 0.3598,
+   "count": 16228,
+   "cue": "determiner/numeral + word ending -s"
+  },
+  "morph.past_regular": {
+   "rate": 0.4891,
+   "count": 22058,
+   "cue": "word ending -ed (5+ letters)"
+  },
+  "morph.irregular": {
+   "rate": 0.3051,
+   "count": 13761,
+   "cue": "one of ~60 common irregular past forms"
+  },
+  "morph.third_sg": {
+   "rate": 0.0364,
+   "count": 1640,
+   "cue": "he/she/it + word ending -s"
+  },
+  "morph.contraction_neg": {
+   "rate": 0.0282,
+   "count": 1271,
+   "cue": "n't"
+  },
+  "morph.contraction_other": {
+   "rate": 0.0303,
+   "count": 1368,
+   "cue": "pronoun + 'll/'re/'ve/'d/'m/'s"
+  },
+  "morph.possessive_s": {
+   "rate": 0.0918,
+   "count": 4141,
+   "cue": "word's + word (not it's/that's/there's/he's/let's...)"
+  },
+  "morph.derivation": {
+   "rate": 0.3062,
+   "count": 13811,
+   "cue": "word with -ness/-ment/-tion/-able/-ful/-less/-ity or un-/re- prefix"
+  },
+  "morph.adverb_ly": {
+   "rate": 0.2121,
+   "count": 9566,
+   "cue": "word ending -ly (5+ letters, not only/family/early...)"
+  },
+  "np.article": {
+   "rate": 0.7222,
+   "count": 32574,
+   "cue": "the/a/an"
+  },
+  "np.adjective": {
+   "rate": 0.1661,
+   "count": 7490,
+   "cue": "a/the + word ending -ful/-ous/-ive/-al/-ic/-y/-ish + word"
+  },
+  "np.compound": {
+   "rate": 0.0163,
+   "count": 735,
+   "cue": "two lowercase nouns after the/a ending -er/-ing/-ion + noun? (no reliable cue: the/a + 2 words + verb proxy)"
+  },
+  "np.of_phrase": {
+   "rate": 0.3924,
+   "count": 17700,
+   "cue": "word + of + (the|a|an|his|her|their|my|its|word)"
+  },
+  "np.appositive": {
+   "rate": 0.0047,
+   "count": 211,
+   "cue": "Capitalised name , the/a/an/my/his/her ... ,"
+  },
+  "np.possessive_det": {
+   "rate": 0.4186,
+   "count": 18878,
+   "cue": "my/your/his/her/its/our/their"
+  },
+  "np.quantifier": {
+   "rate": 0.2777,
+   "count": 12526,
+   "cue": "all/every/each/some/any/many/few/several/most/both/no/much + word"
+  },
+  "np.numeral": {
+   "rate": 0.164,
+   "count": 7396,
+   "cue": "a digit or one..twelve/twenty/hundred/thousand"
+  },
+  "np.proper_name": {
+   "rate": 0.4597,
+   "count": 20734,
+   "cue": "capitalised non-initial word (not I, not after a quote or colon)"
+  },
+  "np.multiword_name": {
+   "rate": 0.1071,
+   "count": 4829,
+   "cue": "two or more consecutive capitalised words, not sentence-initial (Mary Ann Evans, New York)"
+  },
+  "np.world_name": {
+   "rate": 0.0163,
+   "count": 734,
+   "cue": "a name that one of the engine's worlds also holds (the 11 records employees, the fixture's cities/countries/works)"
+  },
+  "np.coordinated_np": {
+   "rate": 0.0286,
+   "count": 1288,
+   "cue": "Name and Name | the/a/his/her X and the/a/his/her Y"
+  },
+  "np.title": {
+   "rate": 0.0455,
+   "count": 2053,
+   "cue": "Mr/Mrs/Dr/Miss/Sir/Lady/Lord/Captain/Colonel/Madame + Name"
+  },
+  "np.frequent_noun": {
+   "rate": 0.1126,
+   "count": 5079,
+   "cue": "the/a/his/her/their + one of the very frequent nouns man/men/people/time/day/city/town/family/water/world/life/work/place/village/group/part/way/name/house? (man..name: words in the engine's 200 commonest)"
+  },
+  "np.demonstrative": {
+   "rate": 0.1732,
+   "count": 7810,
+   "cue": "this/that/these/those + word"
+  },
+  "verb.transitive": {
+   "rate": 0.1278,
+   "count": 5766,
+   "cue": "pronoun/name + past verb + the/a/his/her (proxy for V + object NP)"
+  },
+  "verb.ditransitive": {
+   "rate": 0.0106,
+   "count": 479,
+   "cue": "give/tell/show/send/bring/offer/hand/lend (any form) + object pronoun/name + the/a/his/her/some"
+  },
+  "verb.dative_to": {
+   "rate": 0.0163,
+   "count": 733,
+   "cue": "give/send/hand/bring/show/offer/lend/sell/pass ... to + pronoun/name/the"
+  },
+  "verb.particle": {
+   "rate": 0.0537,
+   "count": 2423,
+   "cue": "common verb + up/down/out/off/away/back/over/on"
+  },
+  "verb.top200_forms": {
+   "rate": 0.2224,
+   "count": 10032,
+   "cue": "a form of the commonest verbs (made/said/found/called/used/given/take/get/make/see/use/do/set/work): all inside the engine's 200-word closed class"
+  },
+  "verb.light": {
+   "rate": 0.0006,
+   "count": 25,
+   "cue": "take/make/have/give + a + walk/look/bath/step/turn/decision/rest/try/glance/promise/start"
+  },
+  "verb.copula": {
+   "rate": 0.2114,
+   "count": 9534,
+   "cue": "be-form + a/an/the/not/very/so/too/adjective-like word (not a participle, not -ing)"
+  },
+  "verb.existential": {
+   "rate": 0.0343,
+   "count": 1548,
+   "cue": "there + be-form"
+  },
+  "verb.control": {
+   "rate": 0.0443,
+   "count": 2000,
+   "cue": "want/try/begin/decide/hope/wish/refuse/promise/agree/mean/like/manage/forget/seem/seem/continue/attempt/long + to"
+  },
+  "verb.raising_object": {
+   "rate": 0.0031,
+   "count": 139,
+   "cue": "want/expect/ask/tell/order/allow/beg/persuade + object + to"
+  },
+  "verb.causative": {
+   "rate": 0.0165,
+   "count": 744,
+   "cue": "make/let/have/help/bid (any form) + object + bare word (not to/-ing/-ed)"
+  },
+  "voice.passive": {
+   "rate": 0.1492,
+   "count": 6728,
+   "cue": "be-form + (adverb) + participle (-ed or irregular)"
+  },
+  "voice.passive_by": {
+   "rate": 0.0216,
+   "count": 974,
+   "cue": "passive cue + by within 6 words"
+  },
+  "voice.get_passive": {
+   "rate": 0.0013,
+   "count": 59,
+   "cue": "get/got/gets/getting/gotten + participle"
+  },
+  "tam.progressive": {
+   "rate": 0.0591,
+   "count": 2664,
+   "cue": "be-form + word ending -ing"
+  },
+  "tam.perfect": {
+   "rate": 0.1565,
+   "count": 7058,
+   "cue": "have-form + (adverb) + participle"
+  },
+  "tam.modal": {
+   "rate": 0.2564,
+   "count": 11563,
+   "cue": "will/would/can/could/may/might/shall/should/must/'ll"
+  },
+  "tam.will_future": {
+   "rate": 0.0738,
+   "count": 3330,
+   "cue": "will/shall/'ll/going to + word"
+  },
+  "tam.epistemic": {
+   "rate": 0.0587,
+   "count": 2646,
+   "cue": "may/might/must/could/should + have/be (epistemic or perfect modal)"
+  },
+  "tam.future_going_to": {
+   "rate": 0.0032,
+   "count": 143,
+   "cue": "going to + word (not a place: the/a)"
+  },
+  "tam.conditional": {
+   "rate": 0.0606,
+   "count": 2735,
+   "cue": "if/unless/were I/had I/should you"
+  },
+  "tam.imperative": {
+   "rate": 0.0246,
+   "count": 1111,
+   "cue": "sentence (or quotation) opening with a common base verb"
+  },
+  "tam.subjunctive": {
+   "rate": 0.0047,
+   "count": 214,
+   "cue": "if I/he/she/it were | lest | God save/bless | be it | so be it | would that"
+  },
+  "tam.habitual_used_to": {
+   "rate": 0.0035,
+   "count": 157,
+   "cue": "used to + word / would (habitual) proxy: used to"
+  },
+  "tam.archaic": {
+   "rate": 0.0269,
+   "count": 1212,
+   "cue": "thou/thee/thy/thine/hath/doth/art/shalt/wilt/'tis/ye"
+  },
+  "neg.not": {
+   "rate": 0.1626,
+   "count": 7335,
+   "cue": "not / n't"
+  },
+  "neg.never": {
+   "rate": 0.0265,
+   "count": 1195,
+   "cue": "never"
+  },
+  "neg.no_det": {
+   "rate": 0.087,
+   "count": 3923,
+   "cue": "no + word / nothing / nobody / none / no one / nowhere"
+  },
+  "neg.scope": {
+   "rate": 0.0071,
+   "count": 320,
+   "cue": "not all / not every / not only / not much / not a single / never all"
+  },
+  "q.any": {
+   "rate": 0.0643,
+   "count": 2900,
+   "cue": "sentence ending ? (inside or outside a quotation)"
+  },
+  "q.yes_no": {
+   "rate": 0.0156,
+   "count": 703,
+   "cue": "? and first word (after an opening quote) an auxiliary",
+   "of_questions": 0.2424
+  },
+  "q.wh_what": {
+   "rate": 0.0078,
+   "count": 353,
+   "cue": "? and opening word what",
+   "of_questions": 0.1217
+  },
+  "q.wh_who": {
+   "rate": 0.002,
+   "count": 89,
+   "cue": "? and opening who",
+   "of_questions": 0.0307
+  },
+  "q.wh_whom": {
+   "rate": 0.001,
+   "count": 44,
+   "cue": "? and whom anywhere",
+   "of_questions": 0.0152
+  },
+  "q.wh_whose": {
+   "rate": 0.0001,
+   "count": 4,
+   "cue": "? and opening whose",
+   "of_questions": 0.0014
+  },
+  "q.wh_which": {
+   "rate": 0.0003,
+   "count": 14,
+   "cue": "? and opening which",
+   "of_questions": 0.0048
+  },
+  "q.wh_where": {
+   "rate": 0.0018,
+   "count": 79,
+   "cue": "? and opening where",
+   "of_questions": 0.0272
+  },
+  "q.wh_when": {
+   "rate": 0.0008,
+   "count": 34,
+   "cue": "? and opening when",
+   "of_questions": 0.0117
+  },
+  "q.wh_why": {
+   "rate": 0.0023,
+   "count": 105,
+   "cue": "? and opening why",
+   "of_questions": 0.0362
+  },
+  "q.wh_how": {
+   "rate": 0.0029,
+   "count": 129,
+   "cue": "? and opening how (not how many/much)",
+   "of_questions": 0.0445
+  },
+  "q.wh_how_many": {
+   "rate": 0.0003,
+   "count": 13,
+   "cue": "? and opening how many/how much",
+   "of_questions": 0.0045
+  },
+  "q.subject_wh": {
+   "rate": 0.001,
+   "count": 43,
+   "cue": "? opening who/what + past or -s verb (subject question)",
+   "of_questions": 0.0148
+  },
+  "q.object_wh": {
+   "rate": 0.0053,
+   "count": 237,
+   "cue": "? opening what/who/whom + do/did/does/will/would/can/shall",
+   "of_questions": 0.0817
+  },
+  "q.alternative": {
+   "rate": 0.0049,
+   "count": 221,
+   "cue": "? with ' or ' inside the question",
+   "of_questions": 0.0762
+  },
+  "q.tag": {
+   "rate": 0.0013,
+   "count": 58,
+   "cue": ", aux(n't) + pronoun ?",
+   "of_questions": 0.02
+  },
+  "q.embedded": {
+   "rate": 0.0143,
+   "count": 647,
+   "cue": "know/wonder/ask/tell/see/understand + wh-word/whether/if, not ending ?",
+   "of_questions": 0.2231
+  },
+  "q.elliptical": {
+   "rate": 0.0023,
+   "count": 103,
+   "cue": "question of 1-3 words (echo / fragment: 'Why?', 'And you?')",
+   "of_questions": 0.0355
+  },
+  "q.declarative": {
+   "rate": 0.0222,
+   "count": 1002,
+   "cue": "? with no auxiliary or wh-word in the first two words (rising declarative 'You saw him?')",
+   "of_questions": 0.3455
+  },
+  "clause.coordination": {
+   "rate": 0.361,
+   "count": 16283,
+   "cue": ", and / , but / ; and / and + pronoun subject"
+  },
+  "clause.coord_vp": {
+   "rate": 0.0876,
+   "count": 3952,
+   "cue": "and/but/or + (adverb) + past verb (a second verb sharing the subject)"
+  },
+  "clause.coord_clauses": {
+   "rate": 0.298,
+   "count": 13442,
+   "cue": ", and/but/so + pronoun/name/the (a second clause with its own subject)"
+  },
+  "clause.subordination": {
+   "rate": 0.1791,
+   "count": 8079,
+   "cue": "because/when/after/before/until/while/since/although/though/as soon as/till/whenever"
+  },
+  "clause.open_class_connective": {
+   "rate": 0.117,
+   "count": 5275,
+   "cue": "until/till/since/unless/although/though/whereas/across/near/toward(s)/against/among/along/beyond/behind/beside/during/within/beneath"
+  },
+  "quant.arithmetic_words": {
+   "rate": 0.0131,
+   "count": 592,
+   "cue": "twice/thrice/double/half/plus/minus/divided/times as"
+  },
+  "clause.relative_wh": {
+   "rate": 0.0949,
+   "count": 4282,
+   "cue": "noun-like word + who/whom/whose/which (not after a comma-less verb)"
+  },
+  "clause.relative_that": {
+   "rate": 0.0264,
+   "count": 1190,
+   "cue": "the/a + word + that + word (relative OR complement 'that': ambiguous)"
+  },
+  "clause.relative_reduced": {
+   "rate": 0.008,
+   "count": 360,
+   "cue": "noun + -ed/-ing participle + by/in/on/with/from (reduced relative proxy)"
+  },
+  "clause.complement_that": {
+   "rate": 0.0223,
+   "count": 1008,
+   "cue": "say/think/know/believe/feel/see/find/hope/fear/tell + (obj) + that"
+  },
+  "clause.infinitive_purpose": {
+   "rate": 0.031,
+   "count": 1399,
+   "cue": "(in order) to + verb after a comma or an object (proxy: in order to | , to)"
+  },
+  "clause.participial_adjunct": {
+   "rate": 0.0321,
+   "count": 1448,
+   "cue": "sentence-initial or post-comma -ing/-ed clause"
+  },
+  "clause.direct_speech": {
+   "rate": 0.2495,
+   "count": 11255,
+   "cue": "a quotation mark"
+  },
+  "clause.reported_speech": {
+   "rate": 0.0129,
+   "count": 580,
+   "cue": "said/told/asked/answered + (him/her/them) + that/if/whether/to"
+  },
+  "ref.personal_pronoun": {
+   "rate": 0.7246,
+   "count": 32682,
+   "cue": "he/she/they/it/we/i/you/him/her/them/me/us"
+  },
+  "ref.third_person_pronoun": {
+   "rate": 0.4459,
+   "count": 20113,
+   "cue": "he/she/they/him/her/them (third-person, needing an antecedent)"
+  },
+  "ref.object_pronoun": {
+   "rate": 0.2321,
+   "count": 10466,
+   "cue": "him/them/me/us, or it after a verb-like word"
+  },
+  "ref.first_second_person": {
+   "rate": 0.3759,
+   "count": 16952,
+   "cue": "I/me/my/we/us/our/you/your"
+  },
+  "ref.reflexive": {
+   "rate": 0.065,
+   "count": 2931,
+   "cue": "himself/herself/themselves/itself/myself/yourself/ourselves"
+  },
+  "ref.possessive_pronoun": {
+   "rate": 0.01,
+   "count": 451,
+   "cue": "mine/yours/hers/ours/theirs"
+  },
+  "ref.demonstrative_pron": {
+   "rate": 0.0537,
+   "count": 2420,
+   "cue": "this/that + verb or punctuation"
+  },
+  "ref.definite_desc": {
+   "rate": 0.6092,
+   "count": 27474,
+   "cue": "the + word"
+  },
+  "ref.one_anaphora": {
+   "rate": 0.0104,
+   "count": 469,
+   "cue": "a/the/an + adjective + one(s) | the other one | that one"
+  },
+  "ref.vp_ellipsis": {
+   "rate": 0.045,
+   "count": 2028,
+   "cue": "aux (+not) right before punctuation | so did/do I | did too | do so"
+  },
+  "ref.gapping": {
+   "rate": 0.0,
+   "count": 0,
+   "cue": "no reliable cue: ', and X Y' with verb missing -- proxy: , and + Name/pronoun + the/a + word + punctuation"
+  },
+  "ref.cataphora_sentence_initial_pronoun": {
+   "rate": 0.1537,
+   "count": 6930,
+   "cue": "sentence opening with a third-person pronoun (antecedent outside the sentence)"
+  },
+  "quant.comparative": {
+   "rate": 0.0355,
+   "count": 1603,
+   "cue": "more/less/fewer ... than | -er than | as ... as"
+  },
+  "quant.superlative": {
+   "rate": 0.0351,
+   "count": 1581,
+   "cue": "the most/least + word | the -est"
+  },
+  "quant.only_focus": {
+   "rate": 0.0894,
+   "count": 4032,
+   "cue": "only/just/even/also (focus particles)"
+  },
+  "quant.universal": {
+   "rate": 0.1173,
+   "count": 5290,
+   "cue": "every/each/all/everyone/everything/everybody"
+  },
+  "quant.counting": {
+   "rate": 0.0377,
+   "count": 1700,
+   "cue": "how many / the number of / count / numeral + plural noun"
+  },
+  "disc.quote": {
+   "rate": 0.2495,
+   "count": 11255,
+   "cue": "a quotation mark (= clause.direct_speech)"
+  },
+  "disc.speaker_attribution": {
+   "rate": 0.0537,
+   "count": 2421,
+   "cue": "said/asked/replied/cried/answered/exclaimed/whispered + Name/pronoun, or the reverse, next to a quote"
+  },
+  "disc.vocative_courtesy": {
+   "rate": 0.0188,
+   "count": 849,
+   "cue": "please/thank/thanks/sorry/pardon/sir/madam/ma'am/hello/good morning/goodbye"
+  },
+  "disc.hedge": {
+   "rate": 0.0419,
+   "count": 1891,
+   "cue": "perhaps/maybe/probably/possibly/I think/I suppose/I believe/seems/it may be/I fancy"
+  },
+  "disc.marker": {
+   "rate": 0.0226,
+   "count": 1021,
+   "cue": "sentence opening with Well/Now/So/Oh/However/Indeed/Then/Yet/Still/Besides/Why/Ah/Of course + comma"
+  },
+  "disc.exclamative": {
+   "rate": 0.0532,
+   "count": 2400,
+   "cue": "sentence ending !"
+  },
+  "disc.interjection": {
+   "rate": 0.0289,
+   "count": 1305,
+   "cue": "oh/ah/alas/hush/hurrah/pooh/ha/hm/bah"
+  },
+  "lex.converse_pairs": {
+   "rate": 0.0742,
+   "count": 3346,
+   "cue": "a member of give/receive, buy/sell, lend/borrow, teach/learn, win/lose, before/after, parent/child"
+  },
+  "lex.idiom": {
+   "rate": 0.0534,
+   "count": 2408,
+   "cue": "one of ~30 fixed phrases (of course, at once, at last, by and by, make up his mind, take place, give up, in fact, after all, all at once, as well, kind of, sort of, for good, on the other hand)"
+  },
+  "lex.phrasal_meaning": {
+   "rate": 0.0089,
+   "count": 400,
+   "cue": "particle verb with non-compositional meaning (give up/make out/put up with/turn out/come across/take after/find out/carry on/look after/go on)"
+  },
+  "inf.cause": {
+   "rate": 0.0449,
+   "count": 2026,
+   "cue": "because/so/therefore/thus/hence/for this reason/as a result/so that"
+  },
+  "inf.temporal": {
+   "rate": 0.0819,
+   "count": 3693,
+   "cue": "then/afterwards/later/next/at last/finally/soon/presently/meanwhile/at length"
+  },
+  "inf.manner": {
+   "rate": 0.2263,
+   "count": 10205,
+   "cue": "by + -ing | with + a/an/the/his/her + noun at clause end | -ly adverb"
+  },
+  "orth.abbreviation": {
+   "rate": 0.0284,
+   "count": 1281,
+   "cue": "Mr./Mrs./Dr./St./etc. (a period that does not end the sentence)"
+  },
+  "orth.hyphen_dash": {
+   "rate": 0.2153,
+   "count": 9711,
+   "cue": "a hyphenated word or a dash (--, \u2014)"
+  },
+  "orth.semicolon_colon": {
+   "rate": 0.2271,
+   "count": 10243,
+   "cue": "; or :"
+  },
+  "orth.allcaps": {
+   "rate": 0.0275,
+   "count": 1241,
+   "cue": "an all-caps word of 2+ letters (not I, not roman numerals)"
+  },
+  "orth.long_sentence": {
+   "rate": 0.1289,
+   "count": 5814,
+   "cue": "more than 40 words"
+  },
+  "orth.nonascii": {
+   "rate": 0.0,
+   "count": 0,
+   "cue": "a non-ASCII character"
+  },
+  "orth.parenthesis": {
+   "rate": 0.0456,
+   "count": 2056,
+   "cue": "( or ["
+  }
+ }
+}
