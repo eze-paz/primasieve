@@ -40,7 +40,7 @@ def run(it=1, judged_n=(50, 50), control_n=50, hooks=None, knockout=False, book_
         if hooks and "after_build" in hooks: hooks["after_build"](B)
         g = "novels" if b in NOVELS else "others"
         U = set(units(B)); allps = {i: B.read(i) for i in range(len(B.sents))}
-        if it >= 3: Book.check(allps)                                   # bookcheck (6): checks from the book's own text
+        if it >= 3: Book.check(allps, it)                                   # bookcheck (6): checks from the book's own text
         per = {i: allps[i] for i in U}
         if hooks and "after_read" in hooks: per = hooks["after_read"](B, per)
         R.last_agent = None; R.last_patient = None

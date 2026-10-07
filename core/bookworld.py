@@ -44,13 +44,23 @@ def split(text, abbr):
     return out
 
 
+def paragraphs(text):
+    """bookvoice (1), amended: a paragraph break is a run of line breaks LONGER than the text's commonest run (some
+    texts break every line twice and paragraphs four times)"""
+    text = text.replace("\r", "")
+    runs = collections.Counter(len(m.group(0)) for m in re.finditer(r"\n+", text))
+    if not runs: return [text]
+    line = runs.most_common(1)[0][0]
+    return [p for p in re.split(r"\n{%d,}" % (line + 1), text) if p.strip()]
+
+
 def heading(t): return len(t) > 1 and t.isupper()
 
 
 class Book:
     def __init__(self, bid, text, closed, abbr, reader, determiners=(), chain_heads=(), title=None, least=5, verbish=(),
                  skippable=(), nounish=(), preplike=(), det2=(), subjects=(), pronouns=False, knockout=False, quotes=False,
-                 version=1, complementizers=(), chains=True, speaker=None, narrator_label=None):
+                 version=1, complementizers=(), chains=True, speaker=None, narrator_label=None, quote_default=None):
         self.verbish = set(verbish); self.skip = set(skippable); self.nounish = set(nounish); self.prep = set(preplike)
         self.bid = bid; self.closed = set(closed); self.R = reader; self.det = set(determiners); self.heads = set(chain_heads)
         self.det2 = set(det2); self.subjects = set(subjects) & self.closed
@@ -58,7 +68,20 @@ class Book:
         self.speaker = speaker; self.narrator_label = narrator_label; self.narrated = False
         self.use_pronouns = pronouns; self.knockout = knockout; self.use_quotes = quotes; self.quote = None
         self.title = title or ("book " + str(bid)); self.real = False
-        self.sents = split(text, abbr); self.toks = [tokens(s) for s in self.sents]
+        if version >= 4:
+            # bookvoice (1): paragraphs first; sentences within them; the first sentence of each paragraph is marked
+            self.sents, self.par_start = [], []
+            for par in paragraphs(text):
+                ss = split(par, abbr); self.sents += ss; self.par_start += [True] + [False] * (len(ss) - 1)
+        else:
+            self.sents = split(text, abbr); self.par_start = [False] * len(self.sents)
+        self.toks = [tokens(s) for s in self.sents]
+        self.play = False
+        if version >= 4:
+            # bookvoice (2): a play -- >= 20 % of paragraphs open with a capitalised heading token followed by "."
+            heads = [ts for ts, ps in zip(self.toks, self.par_start) if ps]
+            lab = sum(1 for ts in heads if len(ts) >= 2 and heading(ts[0]) and ts[1] == ".")
+            self.play = lab >= 0.2 * max(1, len(heads))
         raw = [[t for t in ts if t[:1].isalpha() and not heading(t)] for ts in self.toks] if not pronouns else self.segments(abbr)
         self.entities = find_entities(raw, least=least, closed=self.closed)
         # titles: an entity symbol followed (past an abbreviation's ".") by another capitalised symbol >= 80 % of the time
@@ -82,10 +105,10 @@ class Book:
                         n = ts[k + 1]
                         if (n[:1].islower() and n.isalpha() and n.lower() not in self.closed and n.lower() not in reader.verbs
                                 and n.lower() not in reader.participles): adj[t.lower()] += 1
-            self.adjectives = {e for e in cap if adj[e] >= 0.5 * cap[e]}
+            self.adjectives = {e for e in cap if adj[e] >= (0.3 if version >= 4 else 0.5) * cap[e]}
             self.entities -= self.adjectives
         self._names = [self.names(ts) for ts in self.toks]
-        if quotes: self.quote = self.learn_quote()
+        if quotes: self.quote = self.learn_quote() or (quote_default if version >= 4 else None)
         self.aff = collections.defaultdict(collections.Counter)
         if pronouns: self.learn_affinity()
 
@@ -140,7 +163,18 @@ class Book:
                     if v and v[1] == k: c[ts[k - 1]] += 1
         return c.most_common(1)[0][0] if c and c.most_common(1)[0][1] >= 3 else None
 
-    def inside(self, ts, k):
+    def parity(self):
+        """bookvoice (1): quotation marks open at the start of each sentence, carried within a paragraph"""
+        self.qopen = []; q = 0
+        for ts, ps in zip(self.toks, self.par_start):
+            if ps: q = 0
+            self.qopen.append(q)
+            if self.quote is not None: q = (q + ts.count(self.quote)) % 2
+
+    def inside(self, ts, k, i=None):
+        if self.v >= 4 and i is not None and self.use_quotes and self.quote is not None:
+            if not hasattr(self, "qopen"): self.parity()
+            return (self.qopen[i] + ts[:k].count(self.quote)) % 2 == 1
         """position k lies inside an open quotation (an odd number of the book's quotation marks before it)"""
         return self.use_quotes and self.quote is not None and ts[:k].count(self.quote) % 2 == 1
 
@@ -215,7 +249,7 @@ class Book:
         ts = self.toks[i]; out = []; ns = self._names[i]
         ends = {n[1]: n for n in ns}; starts = {n[0]: n for n in ns}
         for k in range(len(ts)):
-            if not is_word(ts[k]) or self.inside(ts, k): continue
+            if not is_word(ts[k]) or self.inside(ts, k, i): continue
             v = self.verb_at(ts, k)
             if v is None: continue
             doer, e, how = self.doer_of(ts, k, v[1], ends, starts)
@@ -227,7 +261,7 @@ class Book:
         ts = self.toks[i]; ns = self._names[i]; out = []
         ends = {n[1]: n for n in ns}; starts = {n[0]: n for n in ns}
         for k in range(len(ts)):
-            if not is_word(ts[k]) or self.inside(ts, k): continue
+            if not is_word(ts[k]) or self.inside(ts, k, i): continue
             v = self.verb_at(ts, k)
             if v is None: continue
             doer, e, how = self.doer_of(ts, k, v[1], ends, starts)
@@ -248,7 +282,7 @@ class Book:
             # bookcheck, amended before the run: the first-person symbol (learned: the commonest subject opening a
             # quotation) used as a doer OUTSIDE quotations in >= 15 % of the pronoun doers -> the book has a narrator
             outside = collections.Counter(p for i in range(len(self.toks)) for _, p in self.pronoun_doers(i))
-            self.narrated = outside[self.speaker] >= 0.15 * max(1, sum(outside.values()))
+            self.narrated = outside[self.speaker] >= 0.15 * max(1, sum(outside.values())) and not self.play
         if self.v >= 3:
             # bookcheck, amended before the run: a name's pronoun from SAME-SENTENCE evidence -- a sentence whose only
             # named doer is e, with a later pronoun doer p ("Temple bowed; ... he left the house"); a story told around
@@ -323,10 +357,12 @@ class Book:
             if v is None: continue
             lemma, vp = v
             doer, e, how = self.doer_of(ts, k, vp, ends, starts)
-            if how is None or self.asked(ts, vp) or self.inside(ts, k): continue
+            if how is None or self.asked(ts, vp) or self.inside(ts, k, i): continue
+            if self.v >= 4 and vp + 2 < len(ts) and ts[vp + 1] in "'’" and ts[vp + 2].lower() in self.closed: continue   # bookvoice (3)
             via = None
             if doer is None:
                 p = how.split(":")[1]
+                if self.play: continue                                              # bookvoice (2)
                 if self.narrated and p == self.speaker:
                     at = e - 1 if how.startswith("pronoun") else k + 1
                     doer = (at, at + 1, ("#" + p,), ts[at], at); via = self.narrator_label
@@ -341,6 +377,7 @@ class Book:
             if self.use_pronouns and obj is None and not dialogue and ts[vp].lower() in self.closed: continue   # "she could", "Royall had once"
             rel = " ".join(ts[e:vp + 1]) if (self.use_pronouns and not dialogue) else " ".join(ts[k:vp + 1])
             out.append(self.prop("event", doer, rel, obj, i, lemma=lemma, via=via))
+            out[-1]["dialogue"] = dialogue
         out += self.roles(ts, ns, starts, i)
         return out
 
@@ -383,21 +420,27 @@ class Book:
                     context=self.bid, title=self.title, real=self.real)
 
     @staticmethod
-    def claim_key(p):
+    def claim_key(p, v=3):
+        if v >= 4:                                     # bookvoice (5): repetition needs content
+            if p["kind"] != "event" or not p.get("obj") or p.get("dialogue"): return None
+            return ("event", p["skey"], p["lemma"], p["obj"].split()[-1].lower())
         """what a repetition must share: subject key, verb lemma (or role relation), patient head (or object key)"""
         if p["kind"] == "event": return ("event", p["skey"], p["lemma"], " ".join((p["obj"] or "").split()[-1:]).lower())
         return ("role", p["skey"], p["rel"].lower(), p["okey"] or (p["obj"] or "").lower())
 
     @staticmethod
-    def check(by_sentence):
+    def check(by_sentence, v=3):
         """bookcheck (6): {sentence: [propositions]} of one book -> each proposition gets check = SUPPORTED (with the
         other sentence) when another sentence of the book yields the same claim key, else UNCHECKED"""
         where = collections.defaultdict(set)
         for i, ps in by_sentence.items():
-            for p in ps: where[Book.claim_key(p)].add(i)
+            for p in ps:
+                key = Book.claim_key(p, v)
+                if key is not None: where[key].add(i)
         for i, ps in by_sentence.items():
             for p in ps:
-                others = sorted(where[Book.claim_key(p)] - {i})
+                key = Book.claim_key(p, v)
+                others = sorted(where[key] - {i}) if key is not None else []
                 p["check"] = "SUPPORTED" if others else "UNCHECKED"
                 if others: p["support"] = min(others, key=lambda j: abs(j - i))
 

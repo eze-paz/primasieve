@@ -1,0 +1,1672 @@
+{
+ "note": "labels are the BUILDER's judgement (disclosed): ok = the sentence says this",
+ "it": 4,
+ "items": [
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 436,
+   "text": "\"Pluck up thy courage, man,\" said Clorinda.",
+   "prop": "according to A Lady Of Quality, Clorinda said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 194,
+   "text": "Poussin looked alternately at the old man and at Porbus with uneasy curiosity.",
+   "prop": "according to The Hidden Masterpiece, Poussin looked alternately",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 205,
+   "text": "\"Let this excellent person speak,\" said Jarber.",
+   "prop": "according to Going Into Society, Jarber said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 455,
+   "text": "\"Do not let him retract,\" cried Porbus, striking Poussin on the shoulder.",
+   "prop": "according to The Hidden Masterpiece, Porbus cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 56,
+   "text": "Mr. Vanborough pushed the bottles in silence to Mr. Kendrew.",
+   "prop": "according to Man And Wife, Vanborough pushed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 33,
+   "text": "\"Damn her puling tricks!\" said Sir Jeoffry again, pulling at his horse's bit until the beast reared.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 198,
+   "text": "\"I don't triumph,\" said Jarber, folding up the second manuscript, and looking hard at Trottle.",
+   "prop": "according to Going Into Society, Jarber said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 149,
+   "text": "You never saw the like of the wisdom as his Ed expressed, when he made use of them two words.",
+   "prop": "according to Going Into Society, Ed expressed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 85,
+   "text": "Arter he had been mad for a week--in a state of mind, in short, in which, if I had let him sit on the organ for only two minutes, I believe he would have bust--but we kep the organ from him--Mr. Chops come round, and behaved liberal and beautiful to all.",
+   "prop": "according to Going Into Society, I (narrator) had let",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "conditional 'if I had let'"
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 460,
+   "text": "\"Old man!\" said Poussin, roused from his meditation by Gillette's voice, \"see this sword.",
+   "prop": "according to The Hidden Masterpiece, Poussin said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 297,
+   "text": "With that reply Mr. Delamayn took a written paper from his pocket, and spread it out on the table before him.",
+   "prop": "according to Man And Wife, Delamayn took a written paper",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 144,
+   "text": "Porbus and Poussin stood motionless on either side of the easel, plunged in passionate contemplation.",
+   "prop": "according to The Hidden Masterpiece, Poussin stood motionless",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 133,
+   "text": "The noise not leavin off, I laid down my pipe, and I took up a candle, and I went down and opened the door.",
+   "prop": "according to Going Into Society, I (narrator) took",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 409,
+   "text": "\"Exhort be damned, and Twemlow be damned too!\" cried Sir Jeoffry, who had a great quarrel with his lordship and hated him bitterly.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 145,
+   "text": "Mrs. Vanborough rose immediately.",
+   "prop": "according to Man And Wife, Mrs. Vanborough rose immediately",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 175,
+   "text": "Mr. Kendrew lifted his hand warningly.",
+   "prop": "according to Man And Wife, Kendrew lifted his hand warningly",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 375,
+   "text": "\"How so?\" asked Frenhofer, surprised.",
+   "prop": "according to The Hidden Masterpiece, Frenhofer asked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 121,
+   "text": "\"Does the young fellow belong to you?\" asked Porbus of the old man.",
+   "prop": "according to The Hidden Masterpiece, Porbus asked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 98,
+   "text": "Sir Jeoffry had not wished to see them, nor had he done so, but upon the rarest occasions, and then nearly always by some untoward accident.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry had not wished",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 208,
+   "text": "\"A date!\" repeated Jarber.",
+   "prop": "according to Going Into Society, Jarber repeated",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 520,
+   "text": "When the door closed behind her and Sir John Oxon returned to the table, for a while a sort of dulness fell upon the party.",
+   "prop": "according to A Lady Of Quality, Sir John Oxon returned",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 371,
+   "text": "\"Had she a secret to keep, child though she is,\" said Eldershawe, \"there is none--man or woman--who could scare or surprise it from her; and 'tis a strange quality to note so early in a female creature.\"",
+   "prop": "according to A Lady Of Quality, Eldershawe said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 96,
+   "text": "In consequence of a note that was brought to Bartlemy Fair in the autumn of next year by a servant, most wonderful got up in milk-white cords and tops, I cleaned myself and went to Pall Mall, one evening appinted.",
+   "prop": "according to Going Into Society, I (narrator) cleaned myself",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 510,
+   "text": "She had been too long a boy to them for that to have entered any mind, and when she finished her song, sprang down, and made for the door, Sir John beheld his long-looked-for chance, and was there before her to open it with a great bow, made with his hand upon his heart and his fair locks falling.",
+   "prop": "according to A Lady Of Quality, Sir John beheld",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 75,
+   "text": "\"Master,\" said Porbus at length, \"I studied that throat from the nude; but, to our sorrow, there are effects in nature which become false or impossible when placed on canvas.\"",
+   "prop": "according to The Hidden Masterpiece, Porbus said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 277,
+   "text": "Sir Jeoffry followed her in haste.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry followed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 57,
+   "text": "The old woman Sir Jeoffry had dubbed Mother Posset had been her sole attendant at such times as these for the past five years, because she would come to her for a less fee than a better woman, and Sir Jeoffry had sworn he would not pay for wenches being brought into the world.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry had sworn",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 243,
+   "text": "\"See, he is talking to his own soul,\" said Porbus in a low voice.",
+   "prop": "according to The Hidden Masterpiece, Porbus said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 499,
+   "text": "The voluble Lady Jane interrupted him before he could open his lips.",
+   "prop": "according to Man And Wife, Lady Jane interrupted",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 420,
+   "text": "\"Oh, it is finished!\" said Frenhofer.",
+   "prop": "according to The Hidden Masterpiece, Frenhofer said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 184,
+   "text": "He got wiser every day; his views of Society and the Public was luminous, bewilderin, awful; and his Ed got bigger and bigger as his Wisdom expanded it.",
+   "prop": "according to Going Into Society, Ed got bigger",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 318,
+   "text": "\"Well,\" continued Poussin, in a grave tone, \"if to make me a great painter it were necessary to pose to some one else--\"",
+   "prop": "according to The Hidden Masterpiece, Poussin continued",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 442,
+   "text": "Gillette stood before him in the ingenuous, simple attitude of a young Georgian, innocent and timid, captured by brigands and offered to a slave-merchant.",
+   "prop": "according to The Hidden Masterpiece, Gillette stood",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 109,
+   "text": "\"Leaving the house is not the worst of the sacrifice,\" answered Mrs. Vanborough.",
+   "prop": "according to Man And Wife, Mrs. Vanborough answered",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 459,
+   "text": "\"With thy shape, Clo, God knows every man will,\" laughed Sir Jeoffry, \"but I fear me not with thy manners.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry laughed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 104,
+   "text": "Sir Jeoffry could not bear the sight of them, and they fled at the sound of his footsteps, if it so happened that by chance they heard it, huddling together in corners, and slinking behind doors or anything big enough to hide them.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry could not bear the sight",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 452,
+   "text": "Mr. Vanborough had returned to the contemplation of the alternative between freeing himself or not freeing himself from the marriage tie.",
+   "prop": "according to Man And Wife, Vanborough had returned",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 562,
+   "text": "While Poussin listened to Gillette, Frenhofer drew a green curtain before his Catherine, with the grave composure of a jeweller locking his drawers when he thinks that thieves are near him.",
+   "prop": "according to The Hidden Masterpiece, Frenhofer drew a green curtain",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 125,
+   "text": "\"Let us see what you can do,\" said Porbus, giving him a red crayon and a piece of paper.",
+   "prop": "according to The Hidden Masterpiece, Porbus said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 300,
+   "text": "Mr. Kendrew started, and showed the first tokens of interest in the proceedings which had escaped him yet.",
+   "prop": "according to Man And Wife, Kendrew started",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1553",
+   "sent": 185,
+   "text": "\"Young man,\" said Porbus, observing that he was speechless, with his eyes fixed on a picture, \"do not look at that too long, or you will fall into despair.\"",
+   "prop": "according to The Hidden Masterpiece, Porbus said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 20,
+   "text": "Mr. Magsman entered into the following particulars.",
+   "prop": "according to Going Into Society, Magsman entered",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 348,
+   "text": "Mr. Delamayn folded up the manuscript, and put it back in his pocket.",
+   "prop": "according to Man And Wife, Delamayn folded",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 356,
+   "text": "Mr. Kendrew started to his feet.",
+   "prop": "according to Man And Wife, Kendrew started",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 362,
+   "text": "Mr. Delamayn stated the law, as that law still stands--to the disgrace of the English Legislature and the English Nation.",
+   "prop": "according to Man And Wife, Delamayn stated the law",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 301,
+   "text": "Rake seemed to answer to her excited little laugh almost as much as to her hand.",
+   "prop": "according to A Lady Of Quality, Rake seemed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 406,
+   "text": "Mr. Delamayn shook his head, and sipped his claret.",
+   "prop": "according to Man And Wife, Delamayn shook his head",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 114,
+   "text": "Mrs. Vanborough tried to clear the conjugal horizon b y a smile.",
+   "prop": "according to Man And Wife, Mrs. Vanborough tried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 223,
+   "text": "\"What I have gone through,\" said Jarber, \"words are not eloquent enough to tell.",
+   "prop": "according to Going Into Society, Jarber said",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 401,
+   "text": "Sir Jeoffry stood at the buffet with a flagon of ale in his hand, taking his stirrup cup.",
+   "prop": "according to A Lady Of Quality, Sir Jeoffry stood",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 171,
+   "text": "In his first volume Mr. Bridges offered a few rondeaux and triolets, turning his back on all these things as soon as they became popular.",
+   "prop": "according to Letters On Literature, Bridges offered a few rondeaux",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 393,
+   "text": "This was a momentous year for Bunyan, for in it Dr. Brown has shown, by a \"comparison of dates,\" that we may probably place the beginning of Bunyan's ministerial life.",
+   "prop": "according to The Life Of John Bunyan, Dr. Brown has shown",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 466,
+   "text": "But, as Dr. Brown observes, \"religious liberty had not yet come to mean liberty all round, but only liberty for a certain recognized section of Christians.\" That there was no lack of persecution during the Commonwealth is clear from the cruel treatment to which Quakers were subjected, to say nothing of the intolerance shown to Episcopalians and Roman Catholics.",
+   "prop": "according to The Life Of John Bunyan, Dr. Brown observes",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 588,
+   "text": "Such an order Bunyan would not regard as concerning him.",
+   "prop": "according to The Life Of John Bunyan, Bunyan would not regard",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 478,
+   "text": "One of them, Anne Blackley by name, openly bade him throw away the Scriptures, to which Bunyan replied, \"No; for then the devil would be too hard for me.\" The same enthusiast charged him with \"preaching up an idol, and using conjuration and witchcraft,\" because of his assertion of the bodily presence of Christ in heaven.",
+   "prop": "according to The Life Of John Bunyan, Bunyan replied",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 119,
+   "text": "Three days later Montrose was totally defeated at Philiphaugh; and after a vain attempt to relieve Chester, Charles shut himself up in Oxford.",
+   "prop": "according to The Life Of John Bunyan, Charles shut himself",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 202,
+   "text": "His mind \"lay fixed on eternity like a horse-leech at the vein.\" The Bible became precious to him.",
+   "prop": "according to The Life Of John Bunyan, Bible became precious",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 332,
+   "text": "The earliest known anatomical model, which is here shown, is the clay model of a sheep's liver with the divination text dating from about 2000 B.C., from which Jastrow has worked out the modern anatomical equivalents of the Babylonian terms.",
+   "prop": "according to The Evolution Of Modern Medicine, Jastrow has worked",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 224,
+   "text": "Lovelace would have fared worse with him than with Richardson, who, I verily believe, admired that infernal (excuse me) coward and villain.",
+   "prop": "according to Letters On Literature, Lovelace would have fared worse",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 484,
+   "text": "This is more tolerable when Theocritus is the model, as in the \"Eclogues,\" and less obvious in the \"Georgics,\" when the poet is carried away into naturalness by the passion for his native land, by the longing for peace after cruel wars, by the joy of a country life.",
+   "prop": "according to Letters On Literature, Theocritus is the model",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 494,
+   "text": "Burrough entitled his reply, \"The Gospel of Peace, contended for in the Spirit of Meekness and Love against the secret opposition of John Bunyan, a professed minister in Bedfordshire.\" His opening words, too characteristic of the entire treatise, display but little of the meekness professed.",
+   "prop": "according to The Life Of John Bunyan, Burrough entitled his reply",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 273,
+   "text": "He is a scholar, nay more, as Adams had his innocent vanity, Fielding has his innocent pedantry.",
+   "prop": "according to Letters On Literature, Fielding has his innocent pedantry",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 336,
+   "text": "Even in spite of this friendliness and affection which Longfellow wins, I can see, of course, that he does moralize too much.",
+   "prop": "according to Letters On Literature, Longfellow wins",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 227,
+   "text": "\"Miss Nancy's Interest alone, and not yours, ought to be your sole Consideration,\" cried Thomas, .",
+   "prop": "according to Letters On Literature, Thomas cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 211,
+   "text": "None besides you and Maskwell are acquainted with the secret of my Aunt Touchwood's violent passion for me.",
+   "prop": "according to The Double-Dealer, Maskwell are acquainted",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "negated subject 'None besides you and Maskwell'"
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 373,
+   "text": "Bunyan never mentions his baptism himself, and the church books of Gifford's congregation do not commence till May, 1656, the year after Gifford's death.",
+   "prop": "according to The Life Of John Bunyan, Bunyan never mentions his baptism himself",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 413,
+   "text": "But he liked best to preach \"in the darkest places of the country, where people were the furthest off from profession,\" where he could give the fullest scope to \"the awakening and converting power\" he possessed.",
+   "prop": "according to The Life Of John Bunyan, God (he) could give the fullest scope",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 147,
+   "text": "One Sunday, Vicar Hall preached a sermon on the sin of Sabbath-breaking, and like many hearers before and since, he imagined that it was aimed expressly at him.",
+   "prop": "according to The Life Of John Bunyan, Vicar Hall preached a sermon",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 73,
+   "text": "Why Mr. Browning is obscure is a long question; probably the answer is that he often could not help himself.",
+   "prop": "according to Letters On Literature, Browning is obscure",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 426,
+   "text": "Next Keats writes that he himself \"never was in love, yet the voice and shape of a woman has haunted me these two days.\" On September 22, 1819, Keats sent Reynolds the \"Ode to Autumn,\" than which there is no more perfect poem in the language of Shakespeare.",
+   "prop": "according to Letters On Literature, Keats writes",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 160,
+   "text": "The name of Mr. Robert Bridges is probably strange to many lovers of poetry who would like nothing better than to make acquaintance with his verse.",
+   "prop": "according to Letters On Literature, Robert Bridges is probably strange",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "subject is 'the name of Mr. Robert Bridges'"
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 98,
+   "text": "Pliny remarks that physic \"was early fathered upon the gods\"; and to the ordinary non-medical mind, there is still something mysterious about sickness, something outside the ordinary standard.",
+   "prop": "according to The Evolution Of Modern Medicine, Pliny remarks",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 412,
+   "text": "They would also bless God for me--unworthy wretch that I am--and count me God's instrument that showed to them the way of salvation.\" He preached wherever he found opportunity, in woods, in barns, on village greens, or even in churches.",
+   "prop": "according to The Life Of John Bunyan, God (he) preached wherever",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 260,
+   "text": "Maskwell is flesh and blood at best, and opportunities between them are frequent.",
+   "prop": "according to The Double-Dealer, Maskwell is flesh",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 148,
+   "text": "Many years have passed since 1866, and yet one's old opinion, that English poetry contains no verbal music more original, sonorous, and sweet than Mr. Swinburne wrote in these pieces when still very young, remains an opinion unshaken.",
+   "prop": "according to Letters On Literature, Swinburne wrote",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 117,
+   "text": "After Carnegie came Morgan, who triple-locked the door.",
+   "prop": "according to War Of The Classes, Carnegie came Morgan",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "inversion: Morgan came"
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 405,
+   "text": "Peter Corcoran \"fought nearly as soon as he could walk,\" wherein he resembled Keats, and part of his character may even have been borrowed from the author of the \"Ode to the Nightingale.\" Peter fell in love, wrote poetry, witnessed a \"mill\" at the Fives-Court, and became the Laureate of the Ring.",
+   "prop": "according to Letters On Literature, Peter fell",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 510,
+   "text": "Homer sang of what he knew, of spears and ships, of heroic chiefs and beggar men, of hunts and sieges, of mountains where the lion roamed, and of fairy isles where a goddess walked alone.",
+   "prop": "according to Letters On Literature, Homer sang",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 209,
+   "text": "So, as Mr. Froude says, \"not understanding Oriental metaphors,\" he thought he had here a simple test which would at once solve the question.",
+   "prop": "according to The Life Of John Bunyan, Froude says",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 125,
+   "text": "With his characteristic disregard of all facts or dates but such as concern his spiritual history, Bunyan tells us nothing about the orphan girl he made his wife.",
+   "prop": "according to The Life Of John Bunyan, Bunyan tells",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 400,
+   "text": "In his introduction to his recent edition of Book II of the Astronomicon of Manilius, Garrod traces the growth of the cult, which under the Empire had an extraordinary vogue.",
+   "prop": "according to The Evolution Of Modern Medicine, Empire had an extraordinary vogue",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "subject is 'the cult, which under the Empire'"
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 370,
+   "text": "He was received into the church by baptism, which, according to his earliest biographer, Charles Doe \"the Struggler,\" was performed publicly by Mr. Gifford, in the river Ouse, the \"Bedford river\" into which Bunyan tells us he once fell out of a boat, and barely escaped drowning.",
+   "prop": "according to The Life Of John Bunyan, Bunyan tells",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 378,
+   "text": "If great creating Nature has not assumed for herself she has assuredly secured to the great creating poet the right of partiality, of limitation, of setting aside and leaving out, of taking one impression and one emotion as sufficient for the day.",
+   "prop": "according to The Rhythm Of Life, Nature has not assumed",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 507,
+   "text": "In his third book, published in 1658, at \"the King's Head, in the Old Bailey,\" a few days before Oliver Cromwell's death, Bunyan left the thorny domain of polemics, for that of Christian exhortation, in which his chief work was to be done.",
+   "prop": "according to The Life Of John Bunyan, Bunyan left the thorny domain",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 398,
+   "text": "Gilbert Murray remarks that \"astrology fell upon the Hellenistic mind as a new disease falls upon some remote island people.\" But in the Greek conquest of the Roman mind, astrology took a prominent role.",
+   "prop": "according to The Evolution Of Modern Medicine, Murray remarks",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 354,
+   "text": "Longfellow is exactly the antithesis of Poe, who, with all his science of verse and ghostly skill, has no humanity, or puts none of it into his lines.",
+   "prop": "according to Letters On Literature, Longfellow is exactly",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "empty copula complement"
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 279,
+   "text": "\"I was now so taken with the love and mercy of God that I thought I could have spoken of it even to the very crows that sat upon the ploughed lands before me, had they been capable to have understood me.\" \"Surely,\" he cried with gladness, \"I will not forget this forty years hence.\" \"But, alas!",
+   "prop": "according to The Life Of John Bunyan, God (he) cried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "he is Bunyan (quoted first person)"
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 261,
+   "text": "This England, with its dominant Squires, who behaved much like robber barons on the Rhine, was the merry England Fielding tried to turn from some of its ways.",
+   "prop": "according to Letters On Literature, Fielding tried",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 396,
+   "text": "As Mr. Froude says, \"he was modest, humble, shrinking.\" The members of his congregation, recognizing that he had \"the gift of utterance\" asked him to speak \"a word of exhortation\" to them.",
+   "prop": "according to The Life Of John Bunyan, Froude says",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 208,
+   "text": "The Bible told him that faith, \"even as a grain of mustard seed,\" would enable its possessor to work miracles.",
+   "prop": "according to The Life Of John Bunyan, Bible told",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 426,
+   "text": "Next Keats writes that he himself \"never was in love, yet the voice and shape of a woman has haunted me these two days.\" On September 22, 1819, Keats sent Reynolds the \"Ode to Autumn,\" than which there is no more perfect poem in the language of Shakespeare.",
+   "prop": "according to Letters On Literature, Keats sent Reynolds",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 251,
+   "text": "Fielding asks his Muse to give him \"humour and good humour.\" What novelist was ever so rich in both?",
+   "prop": "according to Letters On Literature, Fielding asks his Muse",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 59,
+   "text": "Bunyan seems to be describing his own father and his wandering life when he speaks of \"an honest poor labouring man, who, like Adam unparadised, had all the world to get his bread in, and was very careful to maintain his family.\" He and his wife were also careful with a higher care that their children should be properly educated.",
+   "prop": "according to The Life Of John Bunyan, Bunyan seems",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 63,
+   "text": "\"The wickedness of the tinker,\" writes Southey, \"has been greatly overrated, and it is taking the language of self-accusation too literally to pronounce of John Bunyan that he was at any time depraved.\" The justice of this verdict of acquittal is fully accepted by Coleridge.",
+   "prop": "according to The Life Of John Bunyan, Southey writes",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 408,
+   "text": "People \"came in by hundreds to hear the word, and that from all parts, though upon sundry and divers accounts,\"--\"some,\" as Southey writes, \"to marvel, and some perhaps to mock.\" Curiosity to hear the once profane tinker preach was not one of the least prevalent motives.",
+   "prop": "according to The Life Of John Bunyan, Southey writes",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 238,
+   "text": "I'll observe my uncle myself, and Jack Maskwell has promised me to watch my aunt narrowly, and give me notice upon any suspicion.",
+   "prop": "according to The Double-Dealer, Jack Maskwell has promised",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 219,
+   "text": "In the later periods, specialism reached a remarkable development, and Herodotus remarks that the country was full of physicians;--\"One treats only the diseases of the eye, another those of the head, the teeth, the abdomen, or the internal organs.\"",
+   "prop": "according to The Evolution Of Modern Medicine, Herodotus remarks",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 94,
+   "text": "He has not that inspired greatness of Wordsworth, when nature does for him what his \"_lutin_\" did for Corneille, \"takes the pen from his hand and writes for him.\" But he has none of the creeping prose which, to my poor mind, invades even \"Tintern Abbey.\" He is, as Mr. Swinburne says, \"the surest-footed\" of our poets.",
+   "prop": "according to Letters On Literature, Swinburne says",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "Swinburne not the sayer in the shown text (unverifiable: counted wrong)"
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 450,
+   "text": "I wish I had room for three or four sonnets, the Robin Hood sonnets to Keats, and another on a picture of a lady.",
+   "prop": "according to Letters On Literature, Robin Hood sonnets",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "'Robin Hood sonnets' is a noun phrase"
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 471,
+   "text": "Yet, all through the centuries, the Church has never wholly abandoned the claim to apostolic healing; nor is there any reason why she should.",
+   "prop": "according to The Evolution Of Modern Medicine, Church has never wholly",
+   "kind": "event",
+   "check": "UNCHECKED",
+   "ok": false,
+   "why": "verb missing ('has never wholly' abandoned)"
+  }
+ ],
+ "control": [
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 127,
+   "text": "Indeed the fact of his marriage would probably have been passed over altogether but for the important bearing it hid on his inner life.",
+   "prop": "important bearing | hide | inner",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 667,
+   "text": "I dare swear you won't guess--_The Sillabub_, ha, ha, ha.",
+   "prop": "call | dare | swear",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 162,
+   "text": "To see the system of a sky in fragments is to miss what I learn to look for in all achieved works of Nature and art: the organism that is unity and life.",
+   "prop": "sky | achieve | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 73,
+   "text": "Despite her weakness, and it was great and woefully increasing with each panting breath, she slowly laboured to turn herself towards the pillow on which her offspring lay, and, this done, she lay staring at the child and gasping, her thin chest rising and falling convulsively.",
+   "prop": "offspring | lie | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 420,
+   "text": "Peter says he got it from a friend, who was sending him an American copy of \"Guy Mannering\" \"to present to a young lady who, strange to say, read books and wore pockets,\" virtues unusual in the sex.",
+   "prop": "Peter | get | contain",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 47,
+   "text": "The font is that in which he was baptized, as were also his father and mother and remoter progenitors, as well as his children, Mary, his dearly- loved blind child, on July 20, 1650, and her younger sister, Elizabeth, on April 14, 1654.",
+   "prop": "font | baptize | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 318,
+   "text": "This revolt, appearing spontaneously all over the industrial field in the form of demands for an increased share of the joint product, is being carefully and shrewdly shaped for a political assault upon society.",
+   "prop": "shrewdly | shape | political assault upon society",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 106,
+   "text": "All probability therefore points to John Bunyan, the lusty young tinker of Elstow, the leader in all manly sports and adventurous enterprises among his mates, and probably caring very little on what side he fought, having been drafted to Newport to serve under Sir Samuel Luke, of Cople, and other Parliamentary commanders.",
+   "prop": "manly | sport | adventurous",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 47,
+   "text": "But there is one thing at which I am more concerned than all the false criticisms that are made upon me, and that is, some of the ladies are offended.",
+   "prop": "am | concern | cunning",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 152,
+   "text": "We can also agree that the larger the product through the employment of labor-saving methods the better, as there will be more to be divided, but again the question of the division.",
+   "prop": "saving | method | better",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 475,
+   "text": "The tramp is one of two kinds of men: he is either a discouraged worker or a discouraged criminal.",
+   "prop": "either | discourage | worker",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 255,
+   "text": "Here and there, however, certain members of the capitalist class see clearly the cleavage in society along which the struggle is beginning to show itself, while the press and magazines are beginning to raise an occasional and troubled voice.",
+   "prop": "magazines | trouble | voice",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 536,
+   "text": "O let the saints know that unless the devil can pluck Christ out of heaven he cannot pull a true believer out of Christ.\" In a striking passage he shows how, by turning Satan's temptations against himself, Christians may \"Get the art as to outrun him in his own shoes, and make his own darts pierce himself.\" \"What!",
+   "prop": "own | shoe | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 563,
+   "text": "\"Mr. Vanborough told me you were that gentleman's wife.\"",
+   "prop": "Vanborough | tell | appear behind",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 410,
+   "text": "a marble tile Taken from ancient Jove's majestic pile-- And might I dip my feather in some spring, Adown Mount Ida threadlike wandering:-- And were my thoughts brought from some starry isle In Heaven's blue sea--I then might with a smile Write down a hymn to fame, and proudly sing!",
+   "prop": "thoughts | bring | starry isle",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 172,
+   "text": "And when you've no more left to give, they'll laugh at you to your face, and leave you to have your bones picked dry by Wulturs, like the dead Wild Ass of the Prairies that you deserve to be!\" Here he giv himself the most tremendious one of all, and dropped.",
+   "prop": "ll drill | pick | dry",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 434,
+   "text": "I only wish to say--in case you are thinking of my convenience as your guest--that it will be no nuisance to _me._\"",
+   "prop": "Delamayn | say | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 413,
+   "text": "But he liked best to preach \"in the darkest places of the country, where people were the furthest off from profession,\" where he could give the fullest scope to \"the awakening and converting power\" he possessed.",
+   "prop": "awakening | possess | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 779,
+   "text": "Well, my lady, march on; I will fight under you, then: I am convinced, as far as passion will permit.",
+   "prop": "violation | fight | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 427,
+   "text": "Cato waged war on the Greek physicians and forbade \"his uilicus all resort to haruspicem, augurem, hariolum Chaldaeum,\" but in vain; so widespread became the belief that the great philosopher, Panaetius (who died about 111 B.C.), and two of his friends alone among the stoics, rejected the claims of astrology as a science (Garrod).",
+   "prop": "Cato | wage | war",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 372,
+   "text": "It may be only too true that the actual world is 'with pathos delicately edged.' For Malvolio living we should have had living sympathies: so much aspiration, so ill-educated a love of refinement; so unarmed a credulity, noblest of weaknesses, betrayed for the laughter of a chambermaid.",
+   "prop": "Malvolio living | shall | living sympathies",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 73,
+   "text": "Despite her weakness, and it was great and woefully increasing with each panting breath, she slowly laboured to turn herself towards the pillow on which her offspring lay, and, this done, she lay staring at the child and gasping, her thin chest rising and falling convulsively.",
+   "prop": "child | gasp | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 357,
+   "text": "To me \"Hiawatha\" seems by far the best of his longer efforts; it is quite full of sympathy with men and women, nature, beasts, birds, weather, and wind and snow.",
+   "prop": "nature | beast | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 112,
+   "text": "Mr. Vanborough looked across the table, as ungraciously as possible, at his wife.",
+   "prop": "Vanborough | look | across",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 78,
+   "text": "Thus old Romano bowed to Raphael's fame, And scholar to the youth he taught became.",
+   "prop": "Romano | bow | Raphael",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 211,
+   "text": "if ever there was a woman to be 'buried' (as you call it), that woman is my wife.",
+   "prop": "call | it | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 178,
+   "text": "And laden branches float By banks of myosote; And scented flag and golden fleur-de-lys Delay the loitering boat.\"",
+   "prop": "laden | branch | float",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 171,
+   "text": "It so chanced that the horse he rode the oftenest was her favourite, and many were the tempests of rage she fell into when she went to the stable to play with the animal and did not find him in his stall, because his master had ordered him out.",
+   "prop": "always | chance | horse",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 287,
+   "text": "\"It was as if his book had been written out of my heart.\" It greatly comforted him to find that his condition was not, as he had thought, solitary, but that others had known the same inward struggles.",
+   "prop": "greatly | think | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 522,
+   "text": "They talked mostly, indeed, of their young playfellow, of whom they felt, in some indistinct manner, they were to be bereft; they rallied Sir Jeoffry, told stories of her childhood and made pictures of her budding beauties, comparing them with those of young ladies who were celebrated toasts.",
+   "prop": "whom | feel | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 408,
+   "text": "\"This gentleman is my Lord Twemlow's chaplain, whom he sends to exhort you, requesting you to have the civility to hear him.\"",
+   "prop": "whom | hear | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 72,
+   "text": "There, far as the remotest line That limits swift imagination's flight, Unending orbs mingled in mazy motion, Immutably fulfilling Eternal Nature's law.",
+   "prop": "Unending | mingle | mazy motion",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 268,
+   "text": "Is there no egotism, ministering to his dignity, that man, having the law of the organism of the world written in his members, can take with him, out of the room that has been built to accord with him, into the landscape that stands only a little further away?",
+   "prop": "landscape | stand | accord",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 382,
+   "text": "And in that gay, wilful world it is that he gives us--or used to give us, for even the world is obsolete--the pleasure of _oubliance_.",
+   "prop": "Shakespeare | give | know",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 212,
+   "text": "Since my first refusal of her addresses she has endeavoured to do me all ill offices with my uncle, yet has managed 'em with that subtilty, that to him they have borne the face of kindness; while her malice, like a dark lanthorn, only shone upon me where it was directed.",
+   "prop": "yet | direct | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 323,
+   "text": "\"The life or soul, as the seat of life, in the sacrificial animal is, therefore, the divine element in the animal, and the god in accepting the animal, which is involved in the act of bringing it as an offering to a god, identifies himself with the animal--becomes, as it were, one with it.",
+   "prop": "god | become | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 278,
+   "text": "The words of the preacher's text, \"Behold, thou art fair, my love,\" kindling his spirit, he felt his \"heart filled with comfort and hope.\" \"Now I could believe that my sins would be forgiven.\" He was almost beside himself with ecstasy.",
+   "prop": "heart | sin | forgiven",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 118,
+   "text": "These doors will not open again, and before them pause thousands of ambitious young men to read the placard: NO THOROUGH-FARE.",
+   "prop": "triple | door | open again",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 276,
+   "text": "They were but \"hints, touches, and short visits,\" sweet when present, but \"like Peter's sheet, suddenly caught up again into heaven.\" But, though transient, they helped the burdened Pilgrim onward.",
+   "prop": "short | visit | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 527,
+   "text": "European medicine was introduced by the Portuguese and the Dutch, whose \"factory\" or \"company\" physicians were not without influence upon practice.",
+   "prop": "European medicine | introduce | Portuguese",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1187",
+   "sent": 312,
+   "text": "And a strike, under certain provocation, may extend as far as did the general strike in Belgium a few years since, when practically the entire wage-earning population stopped work in order to force political concessions from the property-owning classes.",
+   "prop": "earning population | stop | order",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1191",
+   "sent": 24,
+   "text": "I was prepared for the attack, and am pretty confident I could have vindicated some parts and excused others; and where there were any plain miscarriages, I would most ingenuously have confessed 'em.",
+   "prop": "true critic | vindicate | attack",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1276",
+   "sent": 333,
+   "text": "Certain poets, a certain time ago, ransacked the language for words full of life and beauty, made a vocabulary of them, and out of wantonness wrote them to death.",
+   "prop": "ago | word | full",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 262,
+   "text": "Its extent and importance may be best gathered from chapters VII and VIII in the 28th book of Pliny's \"Natural History.\" Several remedies are mentioned as derived from man; others from the elephant, lion, camel, crocodile, and some seventy-nine are prepared from the hyaena.",
+   "prop": "best | gather | widespread throughout",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1550",
+   "sent": 203,
+   "text": "One of them was a hunting-crop, which she brandished grandly, until she was more taken with a powder-flask which it so happened her father, Sir Jeoffry, had lain down but a few minutes before, in passing through.",
+   "prop": "forthwith | happen | father",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1395",
+   "sent": 502,
+   "text": "He wasteth not his heart in pity of the poor, he envieth not the rich, he gathereth what fruits the branches bear and what the kindly wilderness unasked brings forth; he knows not our laws, nor the madness of the courts, nor the records of the common weal\"--does not read the newspapers, in fact.",
+   "prop": "kindly wilderness | court | None",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 489,
+   "text": "To the refutation of such fundamental errors, substituting a mystical for an historical faith, Bunyan's little treatise is addressed; and it may be truly said the work is done effectually.",
+   "prop": "fundamental | error | None",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 6,
+   "text": "The wooden house was laid up in ordinary for the winter, near the mouth of a muddy creek; and everything near it, the foggy river, the misty marshes, and the steaming market-gardens, smoked in company with the grizzled man.",
+   "prop": "steaming market | grizzle | company",
+   "ok": null
+  },
+  {
+   "group": "novels",
+   "book": "1586",
+   "sent": 126,
+   "text": "And, if they happen to pass my poultry-yard, they instantly lose all appreciation of the merits of a fresh egg!\"",
+   "prop": "never | pass | poultry",
+   "ok": null
+  },
+  {
+   "group": "others",
+   "book": "1566",
+   "sent": 105,
+   "text": "Primitive man recognized many of these superhuman agencies relating to disease, such as the spirits of the dead, either human or animal, independent disease demons, or individuals who might act by controlling the spirits or agencies of disease.",
+   "prop": "Primitive | spirit | dead",
+   "ok": null
+  }
+ ],
+ "pronouns": [
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 132,
+   "prev": "One night, when we had played the last company out, which was a shy company, through its raining Heavens hard, I was takin a pipe in the one pair back along with the young man with the toes, which I had taken on for a month (though he never drawed--except on paper), and I heard a kickin at the street door.",
+   "text": "\"Halloa!\" I says to the young man, \"what's up!\" He rubs his eyebrows with his toes, and he says, \"I can't imagine, Mr. Magsman\"--which he never could imagine nothin, and was monotonous company.",
+   "prop": "according to Going Into Society, I (narrator) says",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 413,
+   "prev": "They would also bless God for me--unworthy wretch that I am--and count me God's instrument that showed to them the way of salvation.\" He preached wherever he found opportunity, in woods, in barns, on village greens, or even in churches.",
+   "text": "But he liked best to preach \"in the darkest places of the country, where people were the furthest off from profession,\" where he could give the fullest scope to \"the awakening and converting power\" he possessed.",
+   "prop": "according to The Life Of John Bunyan, God (he) liked best",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 166,
+   "prev": "Magsman, the sarser is the uniwersal Institution!\"",
+   "text": "I perceived, you understand, that he was soured by his misfortunes, and I felt for Mr. Chops.",
+   "prop": "according to Going Into Society, I (narrator) perceived",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 96,
+   "prev": "They took lodgings in Pall Mall, London, and they blazed away.",
+   "text": "In consequence of a note that was brought to Bartlemy Fair in the autumn of next year by a servant, most wonderful got up in milk-white cords and tops, I cleaned myself and went to Pall Mall, one evening appinted.",
+   "prop": "according to Going Into Society, I (narrator) cleaned myself",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 413,
+   "prev": "They would also bless God for me--unworthy wretch that I am--and count me God's instrument that showed to them the way of salvation.\" He preached wherever he found opportunity, in woods, in barns, on village greens, or even in churches.",
+   "text": "But he liked best to preach \"in the darkest places of the country, where people were the furthest off from profession,\" where he could give the fullest scope to \"the awakening and converting power\" he possessed.",
+   "prop": "according to The Life Of John Bunyan, God (he) possessed",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 133,
+   "prev": "\"Halloa!\" I says to the young man, \"what's up!\" He rubs his eyebrows with his toes, and he says, \"I can't imagine, Mr. Magsman\"--which he never could imagine nothin, and was monotonous company.",
+   "text": "The noise not leavin off, I laid down my pipe, and I took up a candle, and I went down and opened the door.",
+   "prop": "according to Going Into Society, I (narrator) laid",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 134,
+   "prev": "The noise not leavin off, I laid down my pipe, and I took up a candle, and I went down and opened the door.",
+   "text": "I looked out into the street; but nothin could I see, and nothin was I aware of, until I turned round quick, because some creetur run between my legs into the passage.",
+   "prop": "according to Going Into Society, I (narrator) looked",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 126,
+   "prev": "It warn't long after that, that I read in the newspaper of Mr. Chops's being presented at court.",
+   "text": "It was printed, \"It will be recollected\"--and I've noticed in my life, that it is sure to be printed that it _will_ be recollected, whenever it won't--\"that Mr. Chops is the individual of small stature, whose brilliant success in the last State Lottery attracted so much attention.\" Well, I says to myself, Such is Life!",
+   "prop": "according to Going Into Society, I (narrator) says",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 413,
+   "prev": "They would also bless God for me--unworthy wretch that I am--and count me God's instrument that showed to them the way of salvation.\" He preached wherever he found opportunity, in woods, in barns, on village greens, or even in churches.",
+   "text": "But he liked best to preach \"in the darkest places of the country, where people were the furthest off from profession,\" where he could give the fullest scope to \"the awakening and converting power\" he possessed.",
+   "prop": "according to The Life Of John Bunyan, God (he) could give the fullest scope",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 85,
+   "prev": "The first use he made of his property, was, to offer to fight the Wild Indian for five hundred pound a side, him with a poisoned darnin-needle and the Indian with a club; but the Indian being in want of backers to that amount, it went no further.",
+   "text": "Arter he had been mad for a week--in a state of mind, in short, in which, if I had let him sit on the organ for only two minutes, I believe he would have bust--but we kep the organ from him--Mr. Chops come round, and behaved liberal and beautiful to all.",
+   "prop": "according to Going Into Society, I (narrator) had let",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 166,
+   "prev": "Magsman, the sarser is the uniwersal Institution!\"",
+   "text": "I perceived, you understand, that he was soured by his misfortunes, and I felt for Mr. Chops.",
+   "prop": "according to Going Into Society, I (narrator) felt",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 215,
+   "prev": "He had evidently forgotten to inquire about dates; and, in spite of his magnificent talk about his series of discoveries, it was quite as plain that the two stories he had just read, had really and truly exhausted his present stock.",
+   "text": "I thought myself bound, in common gratitude, to help him out of his embarrassment by a timely suggestion.",
+   "prop": "according to Going Into Society, I (narrator) thought myself",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 412,
+   "prev": "\"At first,\" he says, \"I could not believe that God should speak by me to the heart of any man, still counting myself unworthy; and though I did put it from me that they should be awakened by me, still they would confess it and affirm it before the saints of God.",
+   "text": "They would also bless God for me--unworthy wretch that I am--and count me God's instrument that showed to them the way of salvation.\" He preached wherever he found opportunity, in woods, in barns, on village greens, or even in churches.",
+   "prop": "according to The Life Of John Bunyan, God (he) preached wherever",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 98,
+   "prev": "The gentlemen was at their wine arter dinner, and Mr. Chops's eyes was more fixed in that Ed of his than I thought good for him.",
+   "text": "There was three of 'em (in company, I mean), and I knowed the third well.",
+   "prop": "according to Going Into Society, I (narrator) knowed",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 133,
+   "prev": "\"Halloa!\" I says to the young man, \"what's up!\" He rubs his eyebrows with his toes, and he says, \"I can't imagine, Mr. Magsman\"--which he never could imagine nothin, and was monotonous company.",
+   "text": "The noise not leavin off, I laid down my pipe, and I took up a candle, and I went down and opened the door.",
+   "prop": "according to Going Into Society, I (narrator) took",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 204,
+   "prev": "Of course it stands empty now.",
+   "text": "Who would think of taking it after it had been turned into a caravan?\" I looked at Trottle, as I said those last words, and Jarber waved his hand indulgently in the same direction.",
+   "prop": "according to Going Into Society, I (narrator) looked",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 152,
+   "prev": "It's wallable; it's cost twelve thousand five hundred pound; it may do you good in life--The secret of this matter is, that it ain't so much that a person goes into Society, as that Society goes into a person.\"",
+   "text": "Not exactly keepin up with his meanin, I shook my head, put on a deep look, and said, \"You're right there, Mr. Chops.\"",
+   "prop": "according to Going Into Society, I (narrator) shook my head",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 103,
+   "prev": "They was all dressed like May- Day--gorgeous!--And as to Wine, they swam in all sorts.",
+   "text": "I made the round of the bottles, first separate (to say I had done it), and then mixed 'em all together (to say I had done it), and then tried two of 'em as half-and-half, and then t'other two.",
+   "prop": "according to Going Into Society, I (narrator) made the round",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 160,
+   "prev": "With the jewels,\" said Mr. Chops.",
+   "text": "I sat down and looked at him, and he stood up and looked at me.",
+   "prop": "according to Going Into Society, I (narrator) sat",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 222,
+   "prev": "He looked so terribly harassed, that he was really quite a spectacle of feebleness and fatigue.",
+   "text": "I saw, at a glance, that the question of dates had gone against him, that Mr. Magsman had not been the last tenant of the House, and that the reason of its emptiness was still to seek.",
+   "prop": "according to Going Into Society, I (narrator) saw",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 235,
+   "prev": "I instantly felt the strongest possible conviction that he was at his old tricks: and that his stepping out in the evening, without leave, meant--Philandering.",
+   "text": "Controlling myself on my visitor's account, I dismissed Peggy, stifled my indignation, and prepared, as politely as might be, to listen to Jarber.",
+   "prop": "according to Going Into Society, I (narrator) dismissed Peggy",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 219,
+   "prev": "For the rest of the week I would not encourage Trottle by allowing him to refer to the House at all.",
+   "text": "I suspected he was making his own inquiries about dates, but I put no questions to him.",
+   "prop": "according to Going Into Society, I (narrator) suspected",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 130,
+   "prev": "(On account of which, I had that canvass new-painted, him with a bag of money in his hand, a presentin it to George the Fourth, and a lady in Ostrich Feathers fallin in love with him in a bag-wig, sword, and buckles correct.)",
+   "text": "I took the House as is the subject of present inquiries--though not the honour of bein acquainted--and I run Magsman's Amusements in it thirteen months--sometimes one thing, sometimes another, sometimes nothin particular, but always all the canvasses outside.",
+   "prop": "according to Going Into Society, I (narrator) took the House",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 115,
+   "prev": "We're in Society together, and what would Society say?\"",
+   "text": "\"Come out of Society!\" says I.",
+   "prop": "according to Going Into Society, I (narrator) says",
+   "ok": true
+  },
+  {
+   "group": "others",
+   "book": "1037",
+   "sent": 279,
+   "prev": "The words of the preacher's text, \"Behold, thou art fair, my love,\" kindling his spirit, he felt his \"heart filled with comfort and hope.\" \"Now I could believe that my sins would be forgiven.\" He was almost beside himself with ecstasy.",
+   "text": "\"I was now so taken with the love and mercy of God that I thought I could have spoken of it even to the very crows that sat upon the ploughed lands before me, had they been capable to have understood me.\" \"Surely,\" he cried with gladness, \"I will not forget this forty years hence.\" \"But, alas!",
+   "prop": "according to The Life Of John Bunyan, God (he) cried",
+   "ok": false,
+   "why": "he is Bunyan, not God"
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 216,
+   "prev": "I thought myself bound, in common gratitude, to help him out of his embarrassment by a timely suggestion.",
+   "text": "So I proposed that he should come to tea again, on the next Monday evening, the thirteenth, and should make such inquiries in the meantime, as might enable him to dispose triumphantly of Trottle's objection.",
+   "prop": "according to Going Into Society, I (narrator) proposed",
+   "ok": true
+  },
+  {
+   "group": "novels",
+   "book": "1422",
+   "sent": 219,
+   "prev": "For the rest of the week I would not encourage Trottle by allowing him to refer to the House at all.",
+   "text": "I suspected he was making his own inquiries about dates, but I put no questions to him.",
+   "prop": "according to Going Into Society, I (narrator) put",
+   "ok": true
+  }
+ ],
+ "checks": [],
+ "judged": "2026-10-07 by the builder (Claude), strict rules of it1-it3; a first-person passage of 1422 told by Magsman is counted as the book's narrator"
+}

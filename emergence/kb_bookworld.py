@@ -129,4 +129,4 @@ def book(bid, R, L, text=None, it=1, knockout=False, chains=True):
                 verbish=L["verbish"], skippable=L["skippable"], nounish=L["nounish"], preplike=L["preplike"],
                 det2=L.get("det2", ()), subjects=L.get("subjects", ()), pronouns=it >= 2, quotes=it >= 2, knockout=knockout,
                 version=it, complementizers=L.get("complementizers", ()), chains=chains,
-                speaker=L.get("speaker"), narrator_label=NARRATOR)
+                speaker=L.get("speaker"), narrator_label=NARRATOR, quote_default='"')
