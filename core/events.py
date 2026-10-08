@@ -306,6 +306,7 @@ class EventMemory:
         pl = getattr(self.reader, "plural", {})
         def base(x): x = x.lower(); return pl.get(x, x)                 # phrases amendment: "shelves" is "shelf"
         content = {base(t) for i, t in enumerate(words) if i > 0 and self.reader.noun_at(words, i)}    # phrases (B): by position ("apples")
+        q_content = set(content)                                     # glossparen: the question's own words, before widening
         # events5_prereg.md (E): a PASSIVE question -- a learned auxiliary, later a past participle -- names the patient
         lw = [t.lower() for t in words]
         aux_at = [i for i, t in enumerate(lw) if i > 0 and t in getattr(self.reader, "auxiliaries", ())]
@@ -362,7 +363,7 @@ class EventMemory:
             if ev["verb"] not in lemmas and ev["verb"] not in same: continue
             if ev["verb"] not in lex_lemmas and ev["verb"] not in same:      # haveq (amended): a closed-verb match only when
                 allw = {base(x) for r in ("agent", "patient", "recipient") for x in (ev.get(r) or "").split()}   # every content
-                if not content or not content <= allw: continue                                             # word is in its roles
+                if not q_content or not q_content <= allw: continue                                             # word is in its roles
             if ev.get("status") == "irrealis" and not irr_ok: continue
             if ev.get("status") == "negated": continue                          # negation_prereg.md (C)
             roles = {"agent": ev["agent"] or "", "patient": ev["patient"] or "", "recipient": ev.get("recipient") or ""}

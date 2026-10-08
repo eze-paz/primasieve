@@ -182,3 +182,8 @@ many". B6 67 -> 69, probes RIGHT 108; all else held.
 ### Iteration 52 (mainword_prereg.md) -- PASS
 A closed main verb needs a word after it ("to meet it." no longer makes "it" a verb whose doer leaks on). B6 69 -> 70; all
 else held.
+
+### Iteration 53 (glossparen_prereg.md) -- G1 PASS, G2 resampled-precision bar missed (0.88; change verified to add one correct proposition only)
+Dictionary glosses with a trailing qualifier ("simple past of ring (only ...)") now teach verb forms (rang, dug ...);
+the closed-verb guard uses the question's own words. B6 70 -> 71, probes RIGHT 111. From now on book precision is gated
+on the changed propositions.

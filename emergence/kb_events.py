@@ -88,6 +88,7 @@ def noun_plurals(uni=None, min_n=20, share=0.3):
 
 GLOSS_CACHE = os.path.join(HERE, "..", "_nldata", "verb_glosses.json")
 GLOSS_RX = re.compile(r"^(.+) of ([^\W\d_][\w'-]*)$")
+_unqual = lambda g: re.sub(r"\s*\([^()]*\)$", "", g)       # glossparen: "simple past of ring (only in senses ...)"
 
 
 def gloss_forms(cells, knockout=False, min_n=20, share=0.3):
@@ -100,7 +101,7 @@ def gloss_forms(cells, knockout=False, min_n=20, share=0.3):
     def verb_glosses(w):
         r = db.execute("select v from e where w=?", (w,)).fetchone()
         if not r: return []
-        try: return [str(x.get("gloss", "")).strip().rstrip(".").lower() for x in json.loads(r[0]).get("senses", []) if x.get("pos") == "verb"]
+        try: return [_unqual(str(x.get("gloss", "")).strip().rstrip(".").lower()) for x in json.loads(r[0]).get("senses", []) if x.get("pos") == "verb"]
         except Exception: return []
     trip = list(cells)
     if knockout:
@@ -121,7 +122,7 @@ def gloss_forms(cells, knockout=False, min_n=20, share=0.3):
         except Exception: continue
         for x in senses:
             if x.get("pos") != "verb": continue
-            m = GLOSS_RX.match(str(x.get("gloss", "")).strip().rstrip(".").lower())
+            m = GLOSS_RX.match(_unqual(str(x.get("gloss", "")).strip().rstrip(".").lower()))
             if m and m.group(1) in by_T:
                 for c in by_T[m.group(1)]: out.append((w.lower(), m.group(2), c))
     out = sorted(set(out))
