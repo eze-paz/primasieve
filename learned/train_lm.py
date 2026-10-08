@@ -93,7 +93,7 @@ def main():
             hl = held_loss() if step % 1000 == 0 or step == 1 else None
             log.append(dict(step=step, t=round(el), loss=round(loss.item(), 4), held=hl and round(hl, 4), lr=lr, tokens=tok_seen))
             print(f"  step {step} t {el / 60:.0f} min loss {loss.item():.3f}" + (f" held {hl:.3f}" if hl else "") + f" lr {lr:.2e}", flush=True)
-        if step % 2000 == 0:
+        if step % 500 == 0:
             torch.save(dict(cfg=CFG, state=m.state_dict(), step=step), CKPT)
     hl = held_loss()
     torch.save(dict(cfg=CFG, state=m.state_dict(), step=step), CKPT)

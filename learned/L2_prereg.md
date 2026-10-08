@@ -27,3 +27,27 @@ not a gain at context 256 where attention is already cheap. If L2 beats L1 on ei
 claim. A miss on L2a by more than 5% means the recurrence loses too much at this size and L3 proceeds on the transformer.
 
 Honesty: samples and judgments saved in `learned/L2_samples.json`. A miss is recorded.
+
+## Result (2026-10-08, after the run)
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **L2a** | 1.743 bits/char (0.878 of the bigram) | <= 1.731 (1.05 x L1's 1.649) | **MISS by 0.7%** (5.7% worse than L1) |
+| **L2b** | 2 / 20 fluent (`L2_samples.json`) | >= 2 / 20 | PASS (parity) |
+| **L2c** | 5.99 M params; inference 1.20e7 FLOPs/token (1168x cheaper than 7 B); per-token state 64.5 KB fixed, vs the transformer's key-value cache 3.1 MB at context 256 and growing | reported | reported |
+
+Disclosures:
+- The first attempt at this run was killed by the tool session's background limit at 112 min, before a checkpoint, and
+  was restarted from scratch (same seed, full 3 h). Its log is kept as `cache/train_ssm_killed_at_112min.out`; it matched
+  the restart step for step (loss 5.07 / 4.55 / 3.96 at steps 400 / 800 / 1600 in both).
+- **The miss is throughput, not learning.** A step cost 4.2 s against L1's 3.07 s (the log-space scan's cumsum and
+  logcumsumexp, forward and backward, are memory-bound at B x T x 2e), so the budget bought 2562 steps / 21 M tokens
+  against L1's 4253 / 35 M. At equal step counts the recurrence trails L1 by about 1.4% in held-out loss (step 1000:
+  4.606 vs 4.557; step 2000: 4.257 vs 4.198). L2's final 4.202 at step 2562 equals L1's at step 2000.
+- Fluency judgments: as for L1, the two fluent continuations are ones whose completed sentences happen to be short
+  dialogue lines or a noun-phrase list; both models are far from the L1b bar of 14 and this is the undertraining
+  the plan already names, not a difference between the blocks.
+
+By the registered rule ("a miss on L2a by more than 5% means ... L3 proceeds on the transformer") L3 proceeds on the
+transformer unless the owner re-registers L2 with a faster scan. The recorded reason to consider that: the per-step
+learning is at parity and the state is 48x smaller, which is the property L4 (retrieval in context) needs.
