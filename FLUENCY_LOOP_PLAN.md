@@ -191,3 +191,8 @@ on the changed propositions.
 ### Iteration 54 (purpose_prereg.md) -- PASS
 A purpose infinitive after a common-noun object takes the clause's doer ("Bram climbed the mast to fix a sail"); a named
 object keeps control ("told Tomas to close"). Readings corrected; scores held; book propositions identical.
+
+### Iteration 55 (coordback_prereg.md) -- PASS; LOOP ENDED
+No backward "and" onto a predicate ("was clear and the ship"). Scores held. The owner redirected the project after 55:
+the rule-based loop ends (55 iterations: B6 21 -> 71, novels 9.4 -> 38.3 %); next is a learned reader under the honesty
+layer, gated on this battery.

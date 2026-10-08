@@ -69,6 +69,10 @@ class EventReader:
             if q >= 1 and toks[q].lower() in joins and self.noun_at(toks, q - 1):
                 q -= 1
                 while q - 1 >= 0 and self.noun_at(toks, q - 1): q -= 1
+                p_ = q - 1                                                  # coordback: "was clear and the ship" -- a run
+                while p_ >= 0 and toks[p_].lower() in getattr(self, "dets", ()): p_ -= 1    # right after a verb form is
+                vf = set(self.verbs) | set(getattr(self, "copula", ())) | set(getattr(self, "auxiliaries", ()))
+                if p_ >= 0 and toks[p_].lower() in vf: break                # the previous clause's, not a co-doer
                 s = q
             else: break
         return s, e
