@@ -194,5 +194,5 @@ object keeps control ("told Tomas to close"). Readings corrected; scores held; b
 
 ### Iteration 55 (coordback_prereg.md) -- PASS; LOOP ENDED
 No backward "and" onto a predicate ("was clear and the ship"). Scores held. The owner redirected the project after 55:
-the rule-based loop ends (55 iterations: B6 21 -> 71, novels 9.4 -> 38.3 %); next is a learned reader under the honesty
+the rule-based loop ends (55 iterations: B6 4 -> 71 from the 2026-10-06 baseline; book-battery novels 9.4 % at its iteration 5 -> 38.3 %); next is a learned reader under the honesty
 layer, gated on this battery.
