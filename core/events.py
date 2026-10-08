@@ -156,7 +156,7 @@ class EventReader:
                 out.append(dict(verb=self.participles[lt_], pos=k, agent=out[-1]["agent"], patient=" ".join(toks[pa[0][0]:pa[0][1]]) if pa else None,
                                 adjuncts=[], text=text, status=out[-1].get("status", "realis")))
                 continue
-            main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks)
+            main = (lemma is not None and t.lower() in self.closed and k + 1 < len(toks) and self.is_word(toks[k + 1])   # mainword
                     and toks[k + 1].lower() not in self.participles and toks[k + 1].lower() not in self.verbs
                     and k > 0 and self.is_noun(toks[k - 1]))                          # events3_prereg.md (3): "the crow had the cheese"
             if lemma is not None and k > 0 and toks[k - 1].lower() in (getattr(self, "determiners", None) or getattr(self, "dets", ())) and k + 1 < len(toks) and self.is_noun(toks[k + 1]):

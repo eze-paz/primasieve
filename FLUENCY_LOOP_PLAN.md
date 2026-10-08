@@ -178,3 +178,7 @@ Only a learned pronoun may stand for the last patient: no scored answer changed 
 Questions whose only verb is closed-class ("Who had a clever cat?", "How many daughters did the king have?") select events
 by that verb when no lexical verb is told of, with every content word required in the event; number words answer "how
 many". B6 67 -> 69, probes RIGHT 108; all else held.
+
+### Iteration 52 (mainword_prereg.md) -- PASS
+A closed main verb needs a word after it ("to meet it." no longer makes "it" a verb whose doer leaks on). B6 69 -> 70; all
+else held.
