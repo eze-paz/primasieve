@@ -10,8 +10,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
+    import sys
+    tag = "_" + sys.argv[sys.argv.index("--arch") + 1] if "--arch" in sys.argv else ""     # L2_prereg.md: --arch ssm
+    out_name = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else "L1_samples.json"
     tok = BPE.load(); V = tok.size
-    ck = torch.load(os.path.join(CACHE, "lm.pt")); m = LM(**ck["cfg"]); m.load_state_dict(ck["state"]); m.eval()
+    ck = torch.load(os.path.join(CACHE, f"lm{tag}.pt")); m = LM(**ck["cfg"]); m.load_state_dict(ck["state"]); m.eval()
     train = np.fromfile(os.path.join(CACHE, "train.bin"), dtype=np.uint16).astype(np.int64)
     held = np.fromfile(os.path.join(CACHE, "held.bin"), dtype=np.uint16).astype(np.int64)
     T = ck["cfg"]["ctx"]; rng = np.random.default_rng(7)
@@ -54,14 +57,14 @@ def main():
         out.append(dict(book=b, opening=o, continuation=cont, fluent=None, note=""))
         print(f"\n[{b}] {o} || {cont}")
     # ---- L1c
-    lg = json.load(open(os.path.join(CACHE, "train_log.json")))
+    lg = json.load(open(os.path.join(CACHE, f"train_log{tag}.json")))
     n = lg["params"]; inf = 2 * n
     eff = dict(params=n, train_tokens=lg["tokens"], train_flops=lg["train_flops"], train_seconds=lg["seconds"],
                inference_flops_per_token=inf, llm7b_flops_per_token=2 * 7e9, ratio_vs_7b=2 * 7e9 / inf)
     print(f"\nL1c: {n / 1e6:.2f} M parameters; training {lg['train_flops']:.2e} FLOPs in {lg['seconds'] / 3600:.1f} h on the laptop CPU; "
           f"inference {inf:.2e} FLOPs/token vs 7 B LLM {2 * 7e9:.2e} -> {2 * 7e9 / inf:.0f}x cheaper per token")
     json.dump(dict(L1a=dict(model_bpc=bpc_m, bigram_bpc=bpc_b, ratio=bpc_m / bpc_b, chars=chars), L1b=out, L1c=eff),
-              open(os.path.join(HERE, "L1_samples.json"), "w", encoding="utf-8"), indent=1)
+              open(os.path.join(HERE, out_name), "w", encoding="utf-8"), indent=1)
 
 
 if __name__ == "__main__":

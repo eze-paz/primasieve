@@ -21,10 +21,16 @@ class Block(nn.Module):
 
 
 class LM(nn.Module):
-    def __init__(s, vocab, d, layers, heads, ctx, **_):
-        super().__init__(); s.ctx = ctx
-        s.tok = nn.Embedding(vocab, d); s.pos = nn.Embedding(ctx, d)
-        s.blocks = nn.ModuleList(Block(d, heads) for _ in range(layers)); s.ln = nn.LayerNorm(d)
+    def __init__(s, vocab, d, layers, heads, ctx, arch="attn", **_):
+        super().__init__(); s.ctx = ctx; s.arch = arch
+        s.tok = nn.Embedding(vocab, d)
+        if arch == "ssm":                                        # L2: recurrent blocks, no position embedding (order comes from the recurrence)
+            from ssm import SSMBlock
+            s.blocks = nn.ModuleList(SSMBlock(d) for _ in range(layers))
+        else:
+            s.pos = nn.Embedding(ctx, d)
+            s.blocks = nn.ModuleList(Block(d, heads) for _ in range(layers))
+        s.ln = nn.LayerNorm(d)
         s.apply(s._init)
 
     @staticmethod
@@ -32,7 +38,8 @@ class LM(nn.Module):
         if isinstance(m, (nn.Linear, nn.Embedding)): nn.init.normal_(m.weight, std=0.02)
 
     def forward(s, idx):
-        x = s.tok(idx) + s.pos(torch.arange(idx.shape[1]))
+        x = s.tok(idx)
+        if s.arch != "ssm": x = x + s.pos(torch.arange(idx.shape[1]))
         for b in s.blocks: x = b(x)
         return s.ln(x) @ s.tok.weight.T                          # embeddings shared with the output layer
 
@@ -53,6 +60,9 @@ def batches(data, B, T, rng):
 
 def main():
     hours = float(sys.argv[sys.argv.index("--hours") + 1]) if "--hours" in sys.argv else 3.0
+    if "--arch" in sys.argv: CFG["arch"] = sys.argv[sys.argv.index("--arch") + 1]      # L2_prereg.md: --arch ssm
+    tag = "" if CFG.get("arch", "attn") == "attn" else "_" + CFG["arch"]
+    CKPT = os.path.join(CACHE, f"lm{tag}.pt"); LOG = os.path.join(CACHE, f"train_log{tag}.json")
     torch.manual_seed(0); rng = np.random.default_rng(0)
     train = np.fromfile(os.path.join(CACHE, "train.bin"), dtype=np.uint16)
     held = np.fromfile(os.path.join(CACHE, "held.bin"), dtype=np.uint16)
@@ -84,11 +94,11 @@ def main():
             log.append(dict(step=step, t=round(el), loss=round(loss.item(), 4), held=hl and round(hl, 4), lr=lr, tokens=tok_seen))
             print(f"  step {step} t {el / 60:.0f} min loss {loss.item():.3f}" + (f" held {hl:.3f}" if hl else "") + f" lr {lr:.2e}", flush=True)
         if step % 2000 == 0:
-            torch.save(dict(cfg=CFG, state=m.state_dict(), step=step), os.path.join(CACHE, "lm.pt"))
+            torch.save(dict(cfg=CFG, state=m.state_dict(), step=step), CKPT)
     hl = held_loss()
-    torch.save(dict(cfg=CFG, state=m.state_dict(), step=step), os.path.join(CACHE, "lm.pt"))
+    torch.save(dict(cfg=CFG, state=m.state_dict(), step=step), CKPT)
     json.dump(dict(params=n, steps=step, tokens=tok_seen, seconds=round(time.time() - T0), final_held=hl,
-                   train_flops=6 * n * tok_seen, log=log), open(os.path.join(CACHE, "train_log.json"), "w"), indent=1)
+                   train_flops=6 * n * tok_seen, log=log), open(LOG, "w"), indent=1)
     print(f"done: {step} steps, {tok_seen / 1e6:.0f} M tokens seen, held-out loss {hl:.3f}, training FLOPs {6 * n * tok_seen:.2e}", flush=True)
 
 
