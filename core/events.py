@@ -145,6 +145,8 @@ class EventReader:
                 elif k >= 2 and self.noun_at(toks, k - 2):
                     r0 = self.run_at(toks, k - 1, -1 if self.side == "L" else 1, 0)
                     if r0: ag0 = " ".join(toks[r0[0][0]:r0[0][1]])
+                    if (out and r0 and self.phrase(toks, *r0[0]) == out[-1]["patient"]          # purpose (P1): "climbed the
+                            and not toks[r0[0][0]][:1].isupper()): ag0 = out[-1]["agent"]          # mast to fix"; a name controls ("told Tomas to")
                 pa = self.run_at(toks, k, 1 if self.side == "L" else -1, 2)
                 patient = self.phrase(toks, *pa[0]) if pa else None
                 out.append(dict(verb=self.base[t.lower()], pos=k, agent=ag0, patient=patient, adjuncts=[], text=text, status=self.status(toks, k)))

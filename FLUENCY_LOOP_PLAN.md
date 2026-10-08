@@ -187,3 +187,7 @@ else held.
 Dictionary glosses with a trailing qualifier ("simple past of ring (only ...)") now teach verb forms (rang, dug ...);
 the closed-verb guard uses the question's own words. B6 70 -> 71, probes RIGHT 111. From now on book precision is gated
 on the changed propositions.
+
+### Iteration 54 (purpose_prereg.md) -- PASS
+A purpose infinitive after a common-noun object takes the clause's doer ("Bram climbed the mast to fix a sail"); a named
+object keeps control ("told Tomas to close"). Readings corrected; scores held; book propositions identical.
