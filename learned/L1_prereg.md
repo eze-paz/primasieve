@@ -21,3 +21,18 @@ held-out books by the existing hash split are never seen), write fluent English?
 | **L1c** | efficiency recorded: parameters, training FLOPs (6 N T), inference FLOPs per token, against a 7 B-parameter LLM (~2 x 7e9 FLOPs per token) | reported (target for the full system: >= 100x cheaper per token) |
 
 Honesty: the builder judges L1b; samples and judgments are saved in `learned/L1_samples.json`. A miss is recorded.
+
+## Result (2026-10-08) -- NOT PASSED (L1a narrowly, L1b clearly); L1c recorded
+- Run: 5.84 M parameters, 4,253 steps, 35 M tokens seen (under one pass of the 37.7 M training tokens), 1.22e15 FLOPs,
+  3.0 h on the laptop CPU (~100 GFLOP/s used of ~344 peak). Held-out loss 4.56 -> 4.20 -> 4.03 -> 3.97 nats/token
+  (steps 1000-4000), still falling at the end; no overfitting (train ~3.8).
+- **L1a MISS (narrow)**: 1.649 bits/char against the interpolated bigram's 1.987 -> ratio **0.830** (bar <= 0.8), over
+  209,006 held-out characters. The bigram over 4096 subword pieces is a stronger baseline than expected.
+- **L1b MISS**: **2 / 20** continuations fully grammatical (bar 14). The model has learned English's surface: dialogue
+  layout, quotation and attribution ("said the old man"), sentence shapes, period style, punctuation, names. It has not
+  learned to keep a sentence's structure together: verbless sentences, broken phrases ("walked the house in to the
+  window"), invented words. Judgments with a note for each: learned/L1_samples.json.
+- **L1c**: 1.17e7 FLOPs per token to run -> **1,199x cheaper per token** than a 7 B LLM (1.4e10); training 1.2e15 FLOPs.
+- Reading: the model is far too undertrained for fluency (about 6 tokens per parameter; compute-optimal training is ~20,
+  and fluent small models in the literature also used simpler text). The per-token cost target is met many times over;
+  the quality is not.

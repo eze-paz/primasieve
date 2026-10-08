@@ -1,0 +1,160 @@
+{
+ "L1a": {
+  "model_bpc": 1.648544479584318,
+  "bigram_bpc": 1.9865875101687296,
+  "ratio": 0.8298373321819082,
+  "chars": 209006.0
+ },
+ "L1b": [
+  {
+   "book": "2231",
+   "opening": "It was yelping and snarling, curiously suggestive of",
+   "continuation": " her own, half-belly, biting, half-paste, and her own, her father, was there in a little room.\n\"Do you think you love me,\" she said, \"to me, I hope, and if you are better, you know",
+   "fluent": false,
+   "note": "garbled noun list; 'Do you think you love me ... to me' broken"
+  },
+  {
+   "book": "2307",
+   "opening": "After a moment's deliberation he went over to",
+   "continuation": " his office and walked the house in to the window.\n\"I don't tell you,\" he said. \"Why, it's a bit sure. You'll never be right now. You'll make me.\"\n\"I don't!\" I stamm",
+   "fluent": false,
+   "note": "'walked the house in to the window'"
+  },
+  {
+   "book": "526",
+   "opening": "The Lawyer--the best of old fellows--had, because of",
+   "continuation": " the young people in the world.\n\"Might and old girls, and we are a very nice of women, and the gentlemen--money. They call them so many a very poor man.\"\n\"You may say,\" said the old man, \"tell you say",
+   "fluent": false,
+   "note": "sentence lacks its participle; 'a very nice of women'"
+  },
+  {
+   "book": "253",
+   "opening": "The Conference for Revision of the Universal Copyright",
+   "continuation": ", is, in the same case, the most important and more, the best partual is to be made about the same time. The Revolution of the Braulds and \"Proters\" is not the only \"country\"; but it is rather per",
+   "fluent": false,
+   "note": "'the best partual is to be made'"
+  },
+  {
+   "book": "1550",
+   "opening": "All the men being enamoured of her, 'twas",
+   "continuation": " so much the more terrible to be thought of her, and that she was afraid of herself; which was the right of the other.\nTwo days after her arrival, she was afraid that she knew the young man to come home, and that he was a bad man, and that he",
+   "fluent": true,
+   "note": "archaic but grammatical; 'she knew the young man to come home' acceptable in period style"
+  },
+  {
+   "book": "1586",
+   "opening": "Punctually at the expiration of the quarter of",
+   "continuation": " the Russians with a very important view of the Portsmouth. At the same time, the following is in the course of the time, and was the last of the extremity of all these men, by which the Tueseerinians were as well as it",
+   "fluent": false,
+   "note": "no verb in the completed sentence"
+  },
+  {
+   "book": "655",
+   "opening": "The old Palazzo passed into other hands, and",
+   "continuation": " it was a good and unlocked-made. The Deputch's name was written, for at present. \"You were a very young man,\" replied the man, with a kindle, \"I am so sure,\" \"as if you are ashamed",
+   "fluent": false,
+   "note": "'a good and unlocked-made'"
+  },
+  {
+   "book": "909",
+   "opening": "About this time I returned to Kentucke with",
+   "continuation": " her my father's son.'\n'But now,' said Njal, 'and my son died to me, and this last night, I could not help him for my mother.'\n'I,' said Kate, 'as you could, that I gave no",
+   "fluent": false,
+   "note": "'her my father's son'"
+  },
+  {
+   "book": "909",
+   "opening": "And we view Kentucke situated on the fertile",
+   "continuation": " in the mood of the cave, where the bachelors and the \"trust\" are the \"Goh,\" and the Maids were the two in the village of the Mackland, and the Bishop of Renana. And the M",
+   "fluent": false,
+   "note": "'on the fertile in the mood of the cave'"
+  },
+  {
+   "book": "1395",
+   "opening": "Euripides has been called \"the meteoric poet,\" and",
+   "continuation": " the _Send._.\nThe old man, the man of the _Smosterge_, seems to have been a great man, who was a man of a good man; but, with a name, is a gentleman of black code, and who was",
+   "fluent": false,
+   "note": "'the _Send._'"
+  },
+  {
+   "book": "1641",
+   "opening": "In the first place, as Desroches once said,",
+   "continuation": " to the same extending the turret, wherever the cave, or the same, will be made to render the bourgeoisie with them as they were for them. But they must have been a little luncheon in the house; but the lady, who",
+   "fluent": false,
+   "note": "'to the same extending the turret'"
+  },
+  {
+   "book": "2307",
+   "opening": "He had come out of his house, which",
+   "continuation": " he could see his way before.\n\"Then what is that?\" said the man.\n\"Five me here.\"\n\"No; I should like to come,\" answered the old man.\n\"Well,\" said the man.\n\"I have been here before;",
+   "fluent": false,
+   "note": "'Five me here.'"
+  },
+  {
+   "book": "526",
+   "opening": "The water shone pacifically; the sky, without a",
+   "continuation": " single movement, and a great distance of rain, bearing the light, a little stream in its way to time.\nThe night of the sea began to be visible; a light lay in the air. The landscape was built with a wild gylinder, and a",
+   "fluent": false,
+   "note": "completed sentence has no verb"
+  },
+  {
+   "book": "1704",
+   "opening": "She began to have strange cravings; she liked",
+   "continuation": " her; but she had not a very bad life in her.\nBut she hadn't been looking at her, though it was she had her so--or perhaps it was as a woman. Her hair was so like a woman who was not on her face, but she had been",
+   "fluent": false,
+   "note": "'though it was she had her so'"
+  },
+  {
+   "book": "1037",
+   "opening": "Only two of his works were produced in",
+   "continuation": " the same way: 'Great God of God's,' he continued to call himself at this time. 'You have given me the same thing.' He asked, 'That is not so,' he said, 'I never had to do. Let me see.'\n\"",
+   "fluent": false,
+   "note": "'He asked, ... he said'"
+  },
+  {
+   "book": "2307",
+   "opening": "Sophronia would have liked to call him Joash,",
+   "continuation": " he knew how he was. He had been the only one thing I have been. He had been in the same way--of many a dozen men--if he did--he was very fond of. I couldn't be very much pleased. I don't see how he",
+   "fluent": false,
+   "note": "'He had been the only one thing I have been'"
+  },
+  {
+   "book": "296",
+   "opening": "Their surprise and dismay may be conjectured when",
+   "continuation": " she passed up by a gang-field, and, after a sudden, was suddenly recommended by the two in his heart, and the light of a great deal, for he was afraid of her, or by the other.\nIt was to be done, and to be",
+   "fluent": false,
+   "note": "'was suddenly recommended by the two in his heart'"
+  },
+  {
+   "book": "1957",
+   "opening": "Camille had lectured Calyste on his disobedience, explaining",
+   "continuation": " that the great Padrat are not the inartial nicknestry had been left on a few years. When he had left his house, the chamber-de-down, the Restorable Pacific, and the River. The old Dog",
+   "fluent": false,
+   "note": "'the inartial nicknestry'"
+  },
+  {
+   "book": "253",
+   "opening": "Each Contracting State undertakes to provide for the",
+   "continuation": " publication of the committees, and not to all other prosperous subjects; and by the more theory of the new class may be composed, to its own, and to the whole of the nation of the State, theory, and the same means, the only",
+   "fluent": false,
+   "note": "'by the more theory of the new class may be composed'"
+  },
+  {
+   "book": "1395",
+   "opening": "I remember a dreadful passage in \"Joseph Andrews,\"",
+   "continuation": " in the middle of the daylight. In the morning of the daylight we had lost two days at Bordeaux's (1640). This was one day, and, having a very small shamour on Swaron, we had a good deal",
+   "fluent": true,
+   "note": "both complete sentences grammatical (meaning odd: 'morning of the daylight')"
+  }
+ ],
+ "L1c": {
+  "params": 5839616,
+  "train_tokens": 34840576,
+  "train_flops": 1220733510352896,
+  "train_seconds": 10805,
+  "inference_flops_per_token": 11679232,
+  "llm7b_flops_per_token": 14000000000.0,
+  "ratio_vs_7b": 1198.7089562053395
+ },
+ "L1b_score": 2
+}
