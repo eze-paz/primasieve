@@ -1,0 +1,16 @@
+{
+ "ssm2": {
+  "tag": "ssm2",
+  "n": 200,
+  "win_rate": 0.885,
+  "mean_rank": 2.68,
+  "top1": 0.495
+ },
+ "ssm3": {
+  "tag": "ssm3",
+  "n": 200,
+  "win_rate": 0.695,
+  "mean_rank": 4.515,
+  "top1": 0.19
+ }
+}

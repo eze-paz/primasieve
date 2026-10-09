@@ -35,3 +35,26 @@ Prediction: L3a passes (names are a small share of tokens and are already hard t
 possessives of undetected names) and the detector is the next iteration.
 
 Honesty: `L3_probe.json`, `L3_samples.json` with the builder's judgments. A miss is recorded.
+
+## Result (2026-10-09, after the run)
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **L3a** | **1.664 bits/char** on the original held-out text (L2b 1.645; +1.2%) | <= 1.727 | **PASS** |
+| **L3b** | control 0.885 win / 0.495 top-1 (sanity met); **L3 0.695 win / 0.190 top-1**, mean rank 4.51 of 11 (control 2.68) | control >= 0.80; L3 <= 0.60 | **MISS** as registered (0.695 > 0.60) |
+| **L3c** | **8 / 20** fluent (`L3_samples.json`; caveat on judge drift recorded there) | >= 3 / 20 | PASS |
+
+Run: 3851 steps, 32 M tokens, held-out loss 4.003 (L2b 3.971); held-out at equal steps 4.569 / 4.198 / 4.042 vs L2b
+4.556 / 4.178 / 4.019. Permuting every name cost about 1% of language, as predicted.
+
+Diagnosis of the L3b miss (post hoc, `L3_probe.json` plus the split below): the probe's residual is a *frequency prior*,
+not memory. With a neutral context from no book ("It was late in the evening when they came to the house of"), the
+same candidates give L3 **0.693** win / 0.197 top-1 -- identical to its score with the real book context (0.701 / 0.197).
+The book context adds nothing for L3. For the control it adds a lot: 0.796 / 0.219 neutral -> 0.876 / 0.467 with the
+book context. True surnames are frequent names; the distractors were drawn uniformly from a pool full of rare ones,
+so a model that knows only *which names are common* scores ~0.7. The bar of 0.60 assumed frequency-matched distractors
+and was mis-set. Surname-in-context copying is not the channel: the 63 probes whose context already contains the
+surname score the same as the 137 that do not (L3 0.683 vs 0.701).
+
+Consequence: L3b is re-registered as `L3b_prereg.md` with frequency-matched distractors and a context-lift measure,
+evaluated on these same checkpoints (no retraining). That re-registration is after seeing this data and is labelled so.
