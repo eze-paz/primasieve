@@ -32,3 +32,5 @@ text with the v3 format -> `r3_val_v3.json`). The test sets are run once, on tha
 
 Init: R3c starts from **`ckpt_read3b_s200.pth`** (the R3b checkpoint that read hits at 36/33), not the final one whose
 'unknown' bias is baked in; stated here before launch. Launch: `finetune.py --init ckpt_read3b_s200.pth --data r3_train_v3.json,stories_train_v2.json --layers 6 --lr 2e-5 --hours 2 --keep-every 100 --tag read3c`; then every kept checkpoint is scored on `r3_val_v3.json` and the best is tested once.
+
+Deviation (2026-10-10 00:20): the first R3c launch (batch 8) died silently at ~step 95 with no traceback and no checkpoint; relaunched with **batch 4** (the v3 prompts are the longest so far; memory is the likely cause). Steps per hour roughly double, examples per hour unchanged.
