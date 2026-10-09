@@ -21,6 +21,71 @@ TITLES = {"f": ["Mrs", "Miss"], "m": ["Mr", "Dr"]}
 def pron(g): return ("she", "her", "her") if g == "f" else ("he", "him", "his")
 
 
+ANIMALS = ["fox", "hare", "tortoise", "crow", "wolf", "owl", "mouse", "bear", "goat", "heron", "lion", "ant", "frog", "stag", "donkey", "cat", "dog", "sparrow"]
+ROLES = [("baker", "o"), ("miller", "m"), ("old woman", "f"), ("old man", "m"), ("captain", "m"), ("innkeeper", "o"), ("shepherd", "m"), ("nurse", "f"),
+         ("blacksmith", "m"), ("schoolmaster", "m"), ("widow", "f"), ("merchant", "m"), ("gardener", "o"), ("fisherman", "m"), ("queen", "f"), ("king", "m")]
+FOODS = ["cheese", "clover", "grapes", "a loaf", "honey", "berries", "corn", "a fish", "an apple", "nuts"]
+
+
+def actor(R, P, kind=None):
+    """an actor of a varied kind: a bare name, a titled name, a role ('the baker'), or an animal ('the fox').
+    Returns (mention, gold forms, gender)"""
+    kind = kind or R.choice(["name", "name", "title", "role", "animal", "animal"])
+    if kind == "name":
+        x, g = P(None); return x, [x.lower()], g
+    if kind == "title":
+        g = R.choice("fm"); x, _ = P(g); t = R.choice(TITLES[g]); return f"{t}. {x}", [f"{t.lower()} {x.lower()}", x.lower()], g
+    if kind == "role":
+        r, g = R.choice(ROLES); return f"the {r}", [f"the {r}", r], (g if g != "o" else R.choice("fm"))
+    a = R.choice(ANIMALS); return f"the {a}", [f"the {a}", a], R.choice("fm")
+
+
+def fables(R, P):
+    out = []
+    # A: race (tortoise and hare shape, with any two actors)
+    a, ga, g1 = actor(R, P); b, gb, g2 = actor(R, P)
+    while b == a: b, gb, g2 = actor(R, P)
+    place = R.choice(PLACES)
+    out.append((f"{a.capitalize()} challenged {b} to a race to {place}. {b.capitalize()} ran ahead and then lay down to sleep under a tree. "
+                f"{a.capitalize()} never stopped and reached {place} first. When {b} woke, the race was over.",
+                [("Who challenged whom to a race?", ga), ("Who slept during the race?", gb), ("Who never stopped?", ga), ("Who won the race?", ga),
+                 ("Where was the race to?", [place.lower(), place.lower().replace("the ", "")])]))
+    # B: flattery and food (fox and crow shape)
+    a, ga, _ = actor(R, P); b, gb, _ = actor(R, P); food = R.choice(FOODS)
+    while b == a: b, gb, _ = actor(R, P)
+    out.append((f"{b.capitalize()} sat on a branch holding {food}. {a.capitalize()} came by and flattered {b}, praising {b}'s fine voice. "
+                f"{b.capitalize()} opened its mouth to sing and dropped {food}. {a.capitalize()} ate {food} and walked away.",
+                [("Who flattered whom?", ga), (f"Who was holding {food}?", gb), (f"Who ate {food}?", ga), (f"What did {a} eat?", [food.replace("a ", "").replace("an ", "")]),
+                 (f"Why did {b} drop {food}?", ["to sing", "opened its mouth"])]))
+    # C: keys / lost thing with a time
+    a, ga, g1 = actor(R, P); b, gb, g2 = actor(R, P); obj = R.choice(["the keys", "a purse", "a letter", "the ring", "a glove"]); place = R.choice(PLACES)
+    where = R.choice(["under a bench", "behind the door", "in a drawer", "under the stairs", "beside the well", "on the roof"]); when = R.choice(["at lunch", "at dawn", "after supper", "at noon", "on Sunday", "before dark"])
+    while b == a: b, gb, g2 = actor(R, P)
+    out.append((f"{a.capitalize()} could not find {obj}. {b.capitalize()} had seen {obj} {where} near {place}. {b.capitalize()} fetched {obj} and returned {obj} to {a} {when}.",
+                [(f"Where were {obj}?" if obj.endswith("s") else f"Where was {obj}?", [where]), (f"Who returned {obj}?", gb), (f"When did {b} return {obj}?", [when]),
+                 (f"Who lost {obj}?", ga), (f"Near which place?", [place.lower(), place.lower().replace("the ", "")])]))
+    # D: planting / harvest with a season
+    a, ga, _ = actor(R, P); crop = R.choice(["tomatoes", "beans", "potatoes", "pumpkins", "onions", "roses"]); season = R.choice(["in the spring", "in autumn", "in early summer", "in March"])
+    helper, gh, _ = actor(R, P)
+    while helper == a: helper, gh, _ = actor(R, P)
+    out.append((f"{a.capitalize()} planted {crop} {season}. {helper.capitalize()} watered them every evening. By the end of the season the {crop} filled three baskets, "
+                f"and {a} gave one basket to {helper}.",
+                [(f"What did {a} plant?", [crop]), (f"When were the {crop} planted?", [season, season.replace("in ", "")]), ("Who watered them?", gh),
+                 ("How many baskets did they fill?", ["three", "3"]), (f"Who received a basket?", gh)]))
+    # E: ship / storm
+    a, ga, _ = actor(R, P, "title"); b, gb, _ = actor(R, P); thing = R.choice(["a hat", "a lantern", "the map", "a barrel", "a coat"]); place = R.choice(PLACES)
+    out.append((f"{a} steered the ship through a storm toward {place}. A wave knocked {thing} belonging to {b} into the sea. {b.capitalize()} was angry, but {a} laughed "
+                f"and gave {b} {thing.replace('the ', 'a ')} of {('his' if _ == 'm' else 'her')} own.",
+                [("Who steered the ship?", ga), ("What fell into the sea?", [thing.replace("the ", ""), f"{gb[0]}'s {thing.replace('the ', '').replace('a ', '')}"]),
+                 (f"Whose {thing.replace('the ', '').replace('a ', '')} fell into the sea?", gb), ("Where was the ship going?", [place.lower(), place.lower().replace("the ", "")]), ("Who was angry?", gb)]))
+    # F: buying with a count
+    a, ga, _ = actor(R, P); n = R.choice(["two", "three", "four", "five"]); item = R.choice(["loaves of bread", "candles", "eggs", "pears", "ribbons"]); seller, gs, _ = actor(R, P, "role"); place = R.choice(PLACES); coin = R.choice(["a silver coin", "two pennies", "a copper", "a shilling"])
+    out.append((f"{a.capitalize()} went to {place} and bought {n} {item} from {seller}. {a.capitalize()} paid with {coin}. On the way home {a} gave one to a child who was crying.",
+                [(f"What did {a} buy?", [f"{n} {item}", item]), (f"Who sold the {item}?", gs), (f"How did {a} pay?", [coin.replace("a ", "").replace("two ", "")]),
+                 (f"Where did {a} buy the {item}?", [place.lower(), place.lower().replace("the ", "")]), ("Who was crying?", ["a child", "child"])]))
+    return out
+
+
 def skeletons(R, P):
     """P(gender) -> a fresh name. Each skeleton returns (text, [(question, [gold forms])])."""
     out = []
@@ -87,7 +152,7 @@ def skeletons(R, P):
 
 
 def main():
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 6000
+    n = int(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else 6000
     names = json.load(open(os.path.join(ROOT, "learned", "cache", "names.json"), encoding="utf-8"))["pool"]
     first = {g: [x for x in names[g] if x.isalpha() and 3 <= len(x) <= 9] for g in "fm"}
     R = random.Random(2026); data = []
@@ -100,11 +165,11 @@ def main():
             while True:
                 x = R.choice(first[g])
                 if x not in used and x not in test_names: used.add(x); return x, g
-        for text, qs in skeletons(R, P):
+        for text, qs in skeletons(R, P) + (fables(R, P) if "--v2" in sys.argv else []):
             data.append(dict(text=text, qs=qs))
     R.shuffle(data); data = data[:n]
     assert not any(d["text"] == s["text"] for d in data for s in test)
-    json.dump(data, open(os.path.join(HERE, "stories_train.json"), "w", encoding="utf-8"), indent=0)
+    json.dump(data, open(os.path.join(HERE, "stories_train_v2.json" if "--v2" in sys.argv else "stories_train.json"), "w", encoding="utf-8"), indent=0)
     print(len(data), "stories,", sum(len(d["qs"]) for d in data), "questions"); print(data[0]["text"]); print(data[0]["qs"][:2])
 
 
