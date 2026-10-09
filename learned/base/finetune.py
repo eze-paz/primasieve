@@ -62,6 +62,9 @@ def main():
             print(f"  step {step} t {el / 60:.1f} min loss {loss.item():.3f} ({toks / el:.0f} tok/s)", flush=True)
         if step % 200 == 0:
             torch.save({k: v.detach().to(torch.bfloat16) for k, v in m.state_dict().items()}, os.path.join(HERE, f"ckpt_{tag}.pth"))
+        keep = arg("--keep-every", 0)
+        if keep and step % keep == 0:
+            torch.save({k: v.detach().to(torch.bfloat16) for k, v in m.state_dict().items()}, os.path.join(HERE, f"ckpt_{tag}_s{step}.pth"))
     torch.save({k: v.detach().to(torch.bfloat16) for k, v in m.state_dict().items()}, os.path.join(HERE, f"ckpt_{tag}.pth"))
     json.dump(dict(steps=step, tokens=toks, seconds=round(time.time() - T0), log=log), open(os.path.join(HERE, f"ckpt_{tag}_log.json"), "w"), indent=1)
     print(f"done: {step} steps, {toks} tokens", flush=True)

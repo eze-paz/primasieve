@@ -1,0 +1,487 @@
+[
+ {
+  "story": "v1",
+  "q": "What did Nadia keep?",
+  "gold": [
+   "bees"
+  ],
+  "prompt": "Question: What did Nadia keep?\nSearch: Nadia keep\nHits:\n[48] The morning smites them with her ray; They toss with every breeze that blows, They dance where fires of dawning play: _This is King Louis' orchard close_! Nadia kept bees behind the chapel.\n[51] Her neighbour Osip helped her mend the fence with old planks. In return Nadia gave him a pot of honey every month until winter.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v1",
+  "q": "What broke the fence?",
+  "gold": [
+   "a bear",
+   "bear"
+  ],
+  "prompt": "Question: What broke the fence?\nSearch: broke fence\nHits:\n[49] Nadia kept bees behind the chapel. One summer a bear broke the fence and knocked over two hives.\n[50] One summer a bear broke the fence and knocked over two hives. Her neighbour Osip helped her mend the fence with old planks.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v1",
+  "q": "Who helped mend the fence?",
+  "gold": [
+   "osip",
+   "her neighbour"
+  ],
+  "prompt": "Question: Who helped mend the fence?\nSearch: helped mend fence\nHits:\n[50] One summer a bear broke the fence and knocked over two hives. Her neighbour Osip helped her mend the fence with old planks.\n[49] Nadia kept bees behind the chapel. One summer a bear broke the fence and knocked over two hives.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v1",
+  "q": "What did Nadia give Osip?",
+  "gold": [
+   "honey",
+   "a pot of honey"
+  ],
+  "prompt": "Question: What did Nadia give Osip?\nSearch: Nadia give Osip\nHits:\n[50] One summer a bear broke the fence and knocked over two hives. Her neighbour Osip helped her mend the fence with old planks.\n[48] The morning smites them with her ray; They toss with every breeze that blows, They dance where fires of dawning play: _This is King Louis' orchard close_! Nadia kept bees behind the chapel.\n[51] Her neighbour Osip helped her mend the fence with old planks. In return Nadia gave him a pot of honey every month until winter.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v1",
+  "q": "Where were the hives?",
+  "gold": [
+   "behind the chapel",
+   "chapel"
+  ],
+  "prompt": "Question: Where were the hives?\nSearch: hives\nHits:\n[49] Nadia kept bees behind the chapel. One summer a bear broke the fence and knocked over two hives.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v2",
+  "q": "What did the ferryman charge?",
+  "gold": [
+   "a penny",
+   "penny"
+  ],
+  "prompt": "Question: What did the ferryman charge?\nSearch: ferryman charge\nHits:\n[35] The decorations of the walls have been applied like a poultice, regardless of the proportions of the rooms and the distribution of the spaces. The ferryman rowed people across the river for a penny.\n[37] One foggy evening a doctor begged him to cross without paying. The ferryman agreed because the doctor's patient was a child.\n[38] The ferryman agreed because the doctor's patient was a child. The next morning the doctor left a silver spoon on the ferryman's bench.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v2",
+  "q": "Who begged to cross without paying?",
+  "gold": [
+   "the doctor",
+   "doctor"
+  ],
+  "prompt": "Question: Who begged to cross without paying?\nSearch: begged cross without paying\nHits:\n[36] The ferryman rowed people across the river for a penny. One foggy evening a doctor begged him to cross without paying.\n[16] The fortune of our couple continuing to develop with pleasing rapidity, the building of a country house is next decided upon. A friend of the husband, who has recently started out as an architect, designs them a picturesque residence without a straight line on its exterior or a square room inside.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v2",
+  "q": "Why did the ferryman agree?",
+  "gold": [
+   "the patient was a child",
+   "a child"
+  ],
+  "prompt": "Question: Why did the ferryman agree?\nSearch: Why ferryman agree\nHits:\n[35] The decorations of the walls have been applied like a poultice, regardless of the proportions of the rooms and the distribution of the spaces. The ferryman rowed people across the river for a penny.\n[37] One foggy evening a doctor begged him to cross without paying. The ferryman agreed because the doctor's patient was a child.\n[38] The ferryman agreed because the doctor's patient was a child. The next morning the doctor left a silver spoon on the ferryman's bench.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v2",
+  "q": "What did the doctor leave?",
+  "gold": [
+   "a silver spoon",
+   "spoon"
+  ],
+  "prompt": "Question: What did the doctor leave?\nSearch: doctor leave\nHits:\n[36] The ferryman rowed people across the river for a penny. One foggy evening a doctor begged him to cross without paying.\n[37] One foggy evening a doctor begged him to cross without paying. The ferryman agreed because the doctor's patient was a child.\n[38] The ferryman agreed because the doctor's patient was a child. The next morning the doctor left a silver spoon on the ferryman's bench.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v2",
+  "q": "When did the doctor leave it?",
+  "gold": [
+   "the next morning",
+   "morning"
+  ],
+  "prompt": "Question: When did the doctor leave it?\nSearch: doctor leave\nHits:\n[36] The ferryman rowed people across the river for a penny. One foggy evening a doctor begged him to cross without paying.\n[37] One foggy evening a doctor begged him to cross without paying. The ferryman agreed because the doctor's patient was a child.\n[38] The ferryman agreed because the doctor's patient was a child. The next morning the doctor left a silver spoon on the ferryman's bench.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v3",
+  "q": "What did Ilse grow?",
+  "gold": [
+   "cabbages"
+  ],
+  "prompt": "Question: What did Ilse grow?\nSearch: Ilse grow\nHits:\n[11] Two sisters, Ilse and Greta, shared a garden. Ilse grew cabbages and Greta grew roses.\n[10] This physicking was continued for two long, long days, and then I began slowly to recover. Two sisters, Ilse and Greta, shared a garden.\n[12] Ilse grew cabbages and Greta grew roses. When hail flattened the cabbages, Greta sold her roses at the market and bought seed for Ilse.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v3",
+  "q": "What did Greta grow?",
+  "gold": [
+   "roses"
+  ],
+  "prompt": "Question: What did Greta grow?\nSearch: Greta grow\nHits:\n[11] Two sisters, Ilse and Greta, shared a garden. Ilse grew cabbages and Greta grew roses.\n[10] This physicking was continued for two long, long days, and then I began slowly to recover. Two sisters, Ilse and Greta, shared a garden.\n[12] Ilse grew cabbages and Greta grew roses. When hail flattened the cabbages, Greta sold her roses at the market and bought seed for Ilse.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v3",
+  "q": "What flattened the cabbages?",
+  "gold": [
+   "hail"
+  ],
+  "prompt": "Question: What flattened the cabbages?\nSearch: flattened cabbages\nHits:\n[12] Ilse grew cabbages and Greta grew roses. When hail flattened the cabbages, Greta sold her roses at the market and bought seed for Ilse.\n[11] Two sisters, Ilse and Greta, shared a garden. Ilse grew cabbages and Greta grew roses.\n[13] When hail flattened the cabbages, Greta sold her roses at the market and bought seed for Ilse. By autumn the cabbages were bigger than before.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v3",
+  "q": "Who sold roses at the market?",
+  "gold": [
+   "greta"
+  ],
+  "prompt": "Question: Who sold roses at the market?\nSearch: sold roses market\nHits:\n[12] Ilse grew cabbages and Greta grew roses. When hail flattened the cabbages, Greta sold her roses at the market and bought seed for Ilse.\n[11] Two sisters, Ilse and Greta, shared a garden. Ilse grew cabbages and Greta grew roses.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v3",
+  "q": "What did Greta buy?",
+  "gold": [
+   "seed"
+  ],
+  "prompt": "Question: What did Greta buy?\nSearch: Greta buy\nHits:\n[11] Two sisters, Ilse and Greta, shared a garden. Ilse grew cabbages and Greta grew roses.\n[10] This physicking was continued for two long, long days, and then I began slowly to recover. Two sisters, Ilse and Greta, shared a garden.\n[12] Ilse grew cabbages and Greta grew roses. When hail flattened the cabbages, Greta sold her roses at the market and bought seed for Ilse.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v4",
+  "q": "Who owned the clock?",
+  "gold": [
+   "benedek",
+   "old benedek"
+  ],
+  "prompt": "Question: Who owned the clock?\nSearch: owned clock\nHits:\n[47] He had the pleasure to observe that the paper was taken up by the ladies, who immediately retired into the castle.\" These were not the manners of the local Mackays, of the Sinclairs, and of \"the small but fierce clan of Gunn,\" in the dark ages. Old Benedek owned the only clock in the village.\n[49] Every noon he rang a bell so the farmers knew the hour. One day the clock stopped, and the farmers ate lunch late.\n[50] One day the clock stopped, and the farmers ate lunch late. A travelling tinker named Jules fixed the clock for a bowl of soup.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v4",
+  "q": "What did Benedek do every noon?",
+  "gold": [
+   "rang a bell",
+   "rang the bell"
+  ],
+  "prompt": "Question: What did Benedek do every noon?\nSearch: Benedek every noon\nHits:\n[48] Old Benedek owned the only clock in the village. Every noon he rang a bell so the farmers knew the hour.\n[47] He had the pleasure to observe that the paper was taken up by the ladies, who immediately retired into the castle.\" These were not the manners of the local Mackays, of the Sinclairs, and of \"the small but fierce clan of Gunn,\" in the dark ages. Old Benedek owned the only clock in the village.\n[54] She delighted in descriptions of scenery, the more romantic the better, and usually drawn entirely from her inner consciousness. Her heroines write sonnets (which never but once _are_ sonnets) and other lyrics, on every occasion.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v4",
+  "q": "What happened when the clock stopped?",
+  "gold": [
+   "ate lunch late",
+   "late"
+  ],
+  "prompt": "Question: What happened when the clock stopped?\nSearch: happened clock stopped\nHits:\n[49] Every noon he rang a bell so the farmers knew the hour. One day the clock stopped, and the farmers ate lunch late.\n[47] He had the pleasure to observe that the paper was taken up by the ladies, who immediately retired into the castle.\" These were not the manners of the local Mackays, of the Sinclairs, and of \"the small but fierce clan of Gunn,\" in the dark ages. Old Benedek owned the only clock in the village.\n[50] One day the clock stopped, and the farmers ate lunch late. A travelling tinker named Jules fixed the clock for a bowl of soup.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v4",
+  "q": "Who fixed the clock?",
+  "gold": [
+   "jules",
+   "the tinker"
+  ],
+  "prompt": "Question: Who fixed the clock?\nSearch: fixed clock\nHits:\n[50] One day the clock stopped, and the farmers ate lunch late. A travelling tinker named Jules fixed the clock for a bowl of soup.\n[47] He had the pleasure to observe that the paper was taken up by the ladies, who immediately retired into the castle.\" These were not the manners of the local Mackays, of the Sinclairs, and of \"the small but fierce clan of Gunn,\" in the dark ages. Old Benedek owned the only clock in the village.\n[49] Every noon he rang a bell so the farmers knew the hour. One day the clock stopped, and the farmers ate lunch late.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v4",
+  "q": "What did Jules get for fixing it?",
+  "gold": [
+   "a bowl of soup",
+   "soup"
+  ],
+  "prompt": "Question: What did Jules get for fixing it?\nSearch: Jules get fixing\nHits:\n[50] One day the clock stopped, and the farmers ate lunch late. A travelling tinker named Jules fixed the clock for a bowl of soup.\n[1] \"And e'en as the word he uttered, he drew his keen sword out Brazen, on each side shearing, and with a fearful shout Rushed on him; but Odysseus that very while let fly And smote him with the arrow in the breast, the pap hard by, And drove the swift shaft to the liver, and adown to the ground fell the sword From out of his hand, and doubled he hung above the board, And staggered; and whirling he fell, and the meat was scattered around, And the double cup moreover, and his forehead smote the ground; And his heart was wrung with torment, and with both feet spurning he smote The high-seat; and over his eyen did the cloud of darkness float. \"And then it was Amphinomus, who drew his whetted sword And fell on, making his onrush 'gainst Odysseus the glorious lord, If perchance he might get him out-doors: but Telemachus him forewent, And a cast of the brazen war-spear from behind him therewith sent Amidmost of his shoulders, that drave through his breast and out, And clattering he fell, and the earth all the breadth of his forehead smote.\" There is no need to say more of Mr.\n[4] Apparently we must accent the penultimate in \"Amphinomus\" if the line is to scan. I select a passage of peaceful beauty from Book V.:-- \"But all about that cavern there grew a blossoming wood, Of alder and of poplar and of cypress savouring good; And fowl therein wing-spreading were wont to roost and be, For owls were there and falcons, and long-tongued crows of the sea, And deeds of the sea they deal with and thereof they have a care But round the hollow cavern there spread and flourished fair A vine of garden breeding, and in its grapes was glad; And four wells of the white water their heads together had, And flowing on in order four ways they thence did get; And soft were the meadows blooming with parsley and violet.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v5",
+  "q": "Who invited the fox and the stork?",
+  "gold": [
+   "the badger",
+   "badger"
+  ],
+  "prompt": "Question: Who invited the fox and the stork?\nSearch: invited fox stork\nHits:\n[35] The stork said nothing and went home hungry. A week later the stork served dinner in tall jars, and the fox went home hungry.\n[32] Waiving it with the lazy amiability of Southern indifference, she welcomed him by the familiarity of a Christian name. \"I reckoned that mebbee you opined old Blue Grass friends wouldn't naturally hitch on to them fancy doins,\" he said, glancing around the apartment to avoid her clear eyes, as if resolutely setting himself against the old charm of her manner as he had against the more recent glory of her surroundings, \"but I thought I'd just drop in for the sake of old times.\" A fox and a stork were invited to dinner by the badger.\n[34] The badger served soup in flat dishes, which the stork could not eat. The stork said nothing and went home hungry.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v5",
+  "q": "What was served in flat dishes?",
+  "gold": [
+   "soup"
+  ],
+  "prompt": "Question: What was served in flat dishes?\nSearch: served flat dishes\nHits:\n[33] \"I reckoned that mebbee you opined old Blue Grass friends wouldn't naturally hitch on to them fancy doins,\" he said, glancing around the apartment to avoid her clear eyes, as if resolutely setting himself against the old charm of her manner as he had against the more recent glory of her surroundings, \"but I thought I'd just drop in for the sake of old times.\" A fox and a stork were invited to dinner by the badger. The badger served soup in flat dishes, which the stork could not eat.\n[35] The stork said nothing and went home hungry. A week later the stork served dinner in tall jars, and the fox went home hungry.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v5",
+  "q": "Who went home hungry first?",
+  "gold": [
+   "the stork",
+   "stork"
+  ],
+  "prompt": "Question: Who went home hungry first?\nSearch: went home hungry first\nHits:\n[34] The badger served soup in flat dishes, which the stork could not eat. The stork said nothing and went home hungry.\n[35] The stork said nothing and went home hungry. A week later the stork served dinner in tall jars, and the fox went home hungry.\n[63] Captain Poindexter was a legal friend of her husband, and had dined there frequently; nevertheless she asked: \"Did you tell him Mr. Tucker was not at home?\" Mrs.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v5",
+  "q": "What did the stork serve dinner in?",
+  "gold": [
+   "tall jars",
+   "jars"
+  ],
+  "prompt": "Question: What did the stork serve dinner in?\nSearch: stork serve dinner\nHits:\n[35] The stork said nothing and went home hungry. A week later the stork served dinner in tall jars, and the fox went home hungry.\n[34] The badger served soup in flat dishes, which the stork could not eat. The stork said nothing and went home hungry.\n[33] \"I reckoned that mebbee you opined old Blue Grass friends wouldn't naturally hitch on to them fancy doins,\" he said, glancing around the apartment to avoid her clear eyes, as if resolutely setting himself against the old charm of her manner as he had against the more recent glory of her surroundings, \"but I thought I'd just drop in for the sake of old times.\" A fox and a stork were invited to dinner by the badger. The badger served soup in flat dishes, which the stork could not eat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v5",
+  "q": "Who went home hungry a week later?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "prompt": "Question: Who went home hungry a week later?\nSearch: went home hungry week later\nHits:\n[35] The stork said nothing and went home hungry. A week later the stork served dinner in tall jars, and the fox went home hungry.\n[34] The badger served soup in flat dishes, which the stork could not eat. The stork said nothing and went home hungry.\n[63] Captain Poindexter was a legal friend of her husband, and had dined there frequently; nevertheless she asked: \"Did you tell him Mr. Tucker was not at home?\" Mrs.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v6",
+  "q": "What cargo did the ship carry?",
+  "gold": [
+   "salt"
+  ],
+  "prompt": "Question: What cargo did the ship carry?\nSearch: cargo ship carry\nHits:\n[10] III, pp. 114 ff. Captain Mireille sailed a cargo of salt to the northern port.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v6",
+  "q": "Who sewed the sail?",
+  "gold": [
+   "pavel",
+   "the cook"
+  ],
+  "prompt": "Question: Who sewed the sail?\nSearch: sewed sail\nHits:\n[11] Captain Mireille sailed a cargo of salt to the northern port. A storm tore the sail, and the cook, Pavel, sewed it with fishing line.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v6",
+  "q": "What did Pavel sew it with?",
+  "gold": [
+   "fishing line"
+  ],
+  "prompt": "Question: What did Pavel sew it with?\nSearch: Pavel sew\nHits:\n[11] Captain Mireille sailed a cargo of salt to the northern port. A storm tore the sail, and the cook, Pavel, sewed it with fishing line.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v6",
+  "q": "How late did they arrive?",
+  "gold": [
+   "three days",
+   "three days late"
+  ],
+  "prompt": "Question: How late did they arrive?\nSearch: late arrive\nHits:\n[12] A storm tore the sail, and the cook, Pavel, sewed it with fishing line. They arrived three days late.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v6",
+  "q": "Why did the merchant pay them?",
+  "gold": [
+   "the salt was dry",
+   "dry"
+  ],
+  "prompt": "Question: Why did the merchant pay them?\nSearch: Why merchant pay\nHits:\n[13] They arrived three days late. The merchant paid them anyway because the salt was dry.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v7",
+  "q": "Who was hired to sweep the floor?",
+  "gold": [
+   "rafal"
+  ],
+  "prompt": "Question: Who was hired to sweep the floor?\nSearch: hired sweep floor\nHits:\n[20] Eighteen (64,800). Tomasz the baker hired a boy named Rafal to sweep the floor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v7",
+  "q": "What did Rafal find?",
+  "gold": [
+   "a gold ring",
+   "ring"
+  ],
+  "prompt": "Question: What did Rafal find?\nSearch: Rafal find\nHits:\n[23] The ring belonged to Tomasz's late wife. Tomasz taught Rafal to bake and later left him the shop.\n[20] Eighteen (64,800). Tomasz the baker hired a boy named Rafal to sweep the floor.\n[21] Tomasz the baker hired a boy named Rafal to sweep the floor. Rafal found a gold ring under the oven and gave it to Tomasz.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v7",
+  "q": "Where did he find it?",
+  "gold": [
+   "under the oven",
+   "oven"
+  ],
+  "prompt": "Question: Where did he find it?\nSearch: find\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "v7",
+  "q": "Whose ring was it?",
+  "gold": [
+   "his late wife",
+   "wife",
+   "tomasz's wife"
+  ],
+  "prompt": "Question: Whose ring was it?\nSearch: Whose ring\nHits:\n[22] Rafal found a gold ring under the oven and gave it to Tomasz. The ring belonged to Tomasz's late wife.\n[21] Tomasz the baker hired a boy named Rafal to sweep the floor. Rafal found a gold ring under the oven and gave it to Tomasz.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v7",
+  "q": "What did Tomasz leave Rafal?",
+  "gold": [
+   "the shop",
+   "shop"
+  ],
+  "prompt": "Question: What did Tomasz leave Rafal?\nSearch: Tomasz leave Rafal\nHits:\n[23] The ring belonged to Tomasz's late wife. Tomasz taught Rafal to bake and later left him the shop.\n[20] Eighteen (64,800). Tomasz the baker hired a boy named Rafal to sweep the floor.\n[21] Tomasz the baker hired a boy named Rafal to sweep the floor. Rafal found a gold ring under the oven and gave it to Tomasz.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v8",
+  "q": "On which day did Miss Abena walk to the next village?",
+  "gold": [
+   "thursday"
+  ],
+  "prompt": "Question: On which day did Miss Abena walk to the next village?\nSearch: day Miss Abena walk next village\nHits:\n[26] Then he said: \"Will ye hearken to the word of an evil man, a robber of the folks?\" Spake the chieftain from the dais: \"Words will not hurt us, sea-warrior; and thou art but one among many; wherefore thy might this eve is but as the might of a new-born baby. Speak, and afterwards eat and drink, and depart safe from amongst us!\" Then was the hush yet greater in the hall, so that you might have heard a pin drop; and the chieftain said: \"It is a grief of ours that they are gone, and that none hath brought us back their dead bodies that we might lay them in the Acre of the Fathers.\" Then leapt up a man from the end-long table nigh to Fox, and cried out: \"Yea, folk! they are gone, and we deem that runagates of thy kindred, O new-come man, have stolen them from us; wherefor they shall one day pay us.\" The schoolmistress, Miss Abena, walked to the next village every Thursday to teach reading.\n[16] Then the Hostage and Hallblithe and the six damsels went aboard her, and when the Erne had bidden them farewell, they cast off the hawsers and thrust her out through the haven-mouth; but ere they had got midmost of the haven, they saw the Erne, that he had turned about, and was riding up the dale with his house-carles, and each man's weapon was shining in his hand: and they wondered if he were riding to battle with War-brand; and Fox said: \"Meseemeth our brother-in-arms hath in his mind to give those waylayers an evil minute, and verily he is the man to do the same.\" So they gat them out of the haven, and the ebb-tide drave out seaward strongly, and the wind was fair for Cleveland by the Sea; and they ran speedily past the black cliffs of the Isle of Ransom, and soon were they hull down behind them. But on the afternoon of the next day they hove up the land of the kindreds, and by sunset they beached their ship on the sand by the Rollers of the Raven, and went ashore without more ado.\n[17] But on the afternoon of the next day they hove up the land of the kindreds, and by sunset they beached their ship on the sand by the Rollers of the Raven, and went ashore without more ado. And the strand was empty of all men, even as on the day when Hallblithe first met the Puny Fox.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v8",
+  "q": "What did she teach?",
+  "gold": [
+   "reading"
+  ],
+  "prompt": "Question: What did she teach?\nSearch: teach\nHits:\n[26] Then he said: \"Will ye hearken to the word of an evil man, a robber of the folks?\" Spake the chieftain from the dais: \"Words will not hurt us, sea-warrior; and thou art but one among many; wherefore thy might this eve is but as the might of a new-born baby. Speak, and afterwards eat and drink, and depart safe from amongst us!\" Then was the hush yet greater in the hall, so that you might have heard a pin drop; and the chieftain said: \"It is a grief of ours that they are gone, and that none hath brought us back their dead bodies that we might lay them in the Acre of the Fathers.\" Then leapt up a man from the end-long table nigh to Fox, and cried out: \"Yea, folk! they are gone, and we deem that runagates of thy kindred, O new-come man, have stolen them from us; wherefor they shall one day pay us.\" The schoolmistress, Miss Abena, walked to the next village every Thursday to teach reading.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v8",
+  "q": "Who built the footbridge?",
+  "gold": [
+   "the children's fathers",
+   "fathers"
+  ],
+  "prompt": "Question: Who built the footbridge?\nSearch: built footbridge\nHits:\n[27] Speak, and afterwards eat and drink, and depart safe from amongst us!\" Then was the hush yet greater in the hall, so that you might have heard a pin drop; and the chieftain said: \"It is a grief of ours that they are gone, and that none hath brought us back their dead bodies that we might lay them in the Acre of the Fathers.\" Then leapt up a man from the end-long table nigh to Fox, and cried out: \"Yea, folk! they are gone, and we deem that runagates of thy kindred, O new-come man, have stolen them from us; wherefor they shall one day pay us.\" The schoolmistress, Miss Abena, walked to the next village every Thursday to teach reading. In the rainy season the path flooded, so the children's fathers built her a footbridge of logs.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v8",
+  "q": "What was the bridge made of?",
+  "gold": [
+   "logs"
+  ],
+  "prompt": "Question: What was the bridge made of?\nSearch: bridge made\nHits:\n[28] In the rainy season the path flooded, so the children's fathers built her a footbridge of logs. She named the bridge after the oldest pupil, Kofi.\n[7] To wit, he had loosened a strip of turf all save the two ends, and had propped it up with two ancient dwarf-wrought spears, so that amidmost there was a lintel to go under. So they made no delay, but clad in all their war-gear, they went under the earth-yoke one after the other; thereafter they stood together, and each let blood in his arm, so that the blood of all three mingled together fell down on the grass of the ancient earth; and they swore friendship and brotherhood each to each.\n[14] So the Erne laughed and said: \"Shall we have a word with War-brand then?\" But they rode steadily on their way, and when they came up to the knolls they saw that it was War-brand indeed with a score of men at his back; but they stirred not when they saw Erne's company that it was great. Then Erne laughed aloud and cried out in a big voice, \"What, lads! ye ride early this morning; are there foemen abroad in the Isle?\" So they went their ways and came to the haven, and there lay the Flaming Sword, and beside her a trim bark, not right great, all ready for sea: and Hallblithe's skiff was made fast to her for an after-boat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v8",
+  "q": "Who was the bridge named after?",
+  "gold": [
+   "kofi"
+  ],
+  "prompt": "Question: Who was the bridge named after?\nSearch: bridge named after\nHits:\n[28] In the rainy season the path flooded, so the children's fathers built her a footbridge of logs. She named the bridge after the oldest pupil, Kofi.\n[7] To wit, he had loosened a strip of turf all save the two ends, and had propped it up with two ancient dwarf-wrought spears, so that amidmost there was a lintel to go under. So they made no delay, but clad in all their war-gear, they went under the earth-yoke one after the other; thereafter they stood together, and each let blood in his arm, so that the blood of all three mingled together fell down on the grass of the ancient earth; and they swore friendship and brotherhood each to each.\n[14] So the Erne laughed and said: \"Shall we have a word with War-brand then?\" But they rode steadily on their way, and when they came up to the knolls they saw that it was War-brand indeed with a score of men at his back; but they stirred not when they saw Erne's company that it was great. Then Erne laughed aloud and cried out in a big voice, \"What, lads! ye ride early this morning; are there foemen abroad in the Isle?\" So they went their ways and came to the haven, and there lay the Flaming Sword, and beside her a trim bark, not right great, all ready for sea: and Hallblithe's skiff was made fast to her for an after-boat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v9",
+  "q": "What did the donkey refuse to do?",
+  "gold": [
+   "climb the hill"
+  ],
+  "prompt": "Question: What did the donkey refuse to do?\nSearch: donkey refuse\nHits:\n[40] The miller's daughter, Lucia, put an apple on a string in front of its nose. The donkey walked all the way to the top.\n[38] He loses shame, loses reason; becomes cruel, weak, degenerate. He invents new, bestial tortures; commits new, unspeakable 'atrocities,' until, one day, the natives turn and kill him, or he sticks his gun in his mouth and blows the top of his head off.\" A miller's donkey refused to climb the hill with a sack of flour.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v9",
+  "q": "What was in the sack?",
+  "gold": [
+   "flour"
+  ],
+  "prompt": "Question: What was in the sack?\nSearch: sack\nHits:\n[38] He loses shame, loses reason; becomes cruel, weak, degenerate. He invents new, bestial tortures; commits new, unspeakable 'atrocities,' until, one day, the natives turn and kill him, or he sticks his gun in his mouth and blows the top of his head off.\" A miller's donkey refused to climb the hill with a sack of flour.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v9",
+  "q": "Who put an apple on a string?",
+  "gold": [
+   "lucia",
+   "the miller's daughter"
+  ],
+  "prompt": "Question: Who put an apple on a string?\nSearch: put apple string\nHits:\n[39] He invents new, bestial tortures; commits new, unspeakable 'atrocities,' until, one day, the natives turn and kill him, or he sticks his gun in his mouth and blows the top of his head off.\" A miller's donkey refused to climb the hill with a sack of flour. The miller's daughter, Lucia, put an apple on a string in front of its nose.\n[41] The donkey walked all the way to the top. At the top Lucia gave it the apple and a second one.\n[76] In the fact that, to those about him, the thought of death was ever present, he found further excuse for much else that puzzled and shocked him. At home, death had been a contingency so remote that he had put it aside as something he need not consider until he was a grandfather.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v9",
+  "q": "How many apples did the donkey get at the top?",
+  "gold": [
+   "two",
+   "2"
+  ],
+  "prompt": "Question: How many apples did the donkey get at the top?\nSearch: many apples donkey get top\nHits:\n[40] The miller's daughter, Lucia, put an apple on a string in front of its nose. The donkey walked all the way to the top.\n[38] He loses shame, loses reason; becomes cruel, weak, degenerate. He invents new, bestial tortures; commits new, unspeakable 'atrocities,' until, one day, the natives turn and kill him, or he sticks his gun in his mouth and blows the top of his head off.\" A miller's donkey refused to climb the hill with a sack of flour.\n[41] The donkey walked all the way to the top. At the top Lucia gave it the apple and a second one.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "v9",
+  "q": "Where did the donkey walk?",
+  "gold": [
+   "to the top",
+   "the top",
+   "the hill"
+  ],
+  "prompt": "Question: Where did the donkey walk?\nSearch: donkey walk\nHits:\n[40] The miller's daughter, Lucia, put an apple on a string in front of its nose. The donkey walked all the way to the top.\n[38] He loses shame, loses reason; becomes cruel, weak, degenerate. He invents new, bestial tortures; commits new, unspeakable 'atrocities,' until, one day, the natives turn and kill him, or he sticks his gun in his mouth and blows the top of his head off.\" A miller's donkey refused to climb the hill with a sack of flour.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v10",
+  "q": "What did the children do on the lake?",
+  "gold": [
+   "skated",
+   "skate"
+  ],
+  "prompt": "Question: What did the children do on the lake?\nSearch: children lake\nHits:\n[18] Its little statue sends forth very meagre jets of water, and the fountain is merely noticeable as being the only one I could find at Copenhagen. Every winter the lake near Varde froze, and the children skated on it.\n[64] On Sundays, when the gardens are crowded, this is a very animated sight. The royal palace is situated on the summit of a hill, at the end of the avenue, and is surrounded by a beautiful park; it commands a view of a great portion of the town, with the surrounding country and the sea; still I far prefer the prospect from the \"Kastell.\" The Park contains a considerable island, which, during some part of the year, stands in the midst of an extensive lake.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v10",
+  "q": "Who fell through the ice?",
+  "gold": [
+   "erlend"
+  ],
+  "prompt": "Question: Who fell through the ice?\nSearch: fell through ice\nHits:\n[19] Every winter the lake near Varde froze, and the children skated on it. One year a boy named Erlend fell through thin ice near the reeds.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v10",
+  "q": "Who pulled him out?",
+  "gold": [
+   "sven",
+   "the fisherman"
+  ],
+  "prompt": "Question: Who pulled him out?\nSearch: pulled him out\nHits:\n[20] One year a boy named Erlend fell through thin ice near the reeds. A fisherman called Sven pulled him out with a ladder.\n[58] Among the vessels lying at anchor in the harbour I saw but few three-masters, and still fewer steamers. The ships of the fleet presented a curious appearance; at the first view they look like great houses with flag-staves, for every ship is provided with a roof, out of which the masts rise into the air; they are besides very high out of the water, so that all the port-holes and the windows of the cabins appear in two or three stories, one above the other.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v10",
+  "q": "What did Sven use?",
+  "gold": [
+   "a ladder",
+   "ladder"
+  ],
+  "prompt": "Question: What did Sven use?\nSearch: Sven use\nHits:\n[20] One year a boy named Erlend fell through thin ice near the reeds. A fisherman called Sven pulled him out with a ladder.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "v10",
+  "q": "What did the mayor have marked?",
+  "gold": [
+   "the reeds",
+   "reeds"
+  ],
+  "prompt": "Question: What did the mayor have marked?\nSearch: mayor marked\nHits:\n[21] A fisherman called Sven pulled him out with a ladder. After that the mayor had the reeds marked with red flags.\nAnswer:",
+  "found": true
+ }
+]
