@@ -24,3 +24,32 @@ zeroing all channel-mix destroys both. If no group separates (R2b fails), facts 
 this granularity, and the thesis needs finer tools (per-neuron attribution) or the constructive route.
 
 Honesty: `ablate_<ckpt>.json`; a miss is recorded.
+
+## Result (2026-10-09, `ablate_read1b.json`, on the R1b checkpoint)
+
+Reference: the base model's closed-book recall is **0.76**; the R1b checkpoint's is **0.62** before any ablation -- the
+reading fine-tune alone removed 14 points of closed-book recall while adding reading and honesty (R1b_prereg.md).
+
+| ablated (ffn.value zeroed) | recall | B6 |
+|---|---|---|
+| none (R1b) | 0.62 | 0.80 |
+| layers 0-5 | 0.00 | 0.00 |
+| layers 6-11 | 0.01 | 0.02 |
+| layers 12-17 | 0.21 | 0.00 |
+| **layers 18-23** | **0.33** | **0.77** |
+| layers 0-11 / 12-23 / 6-17 | 0.00 / 0.18 / 0.00 | 0.00 / 0.00 / 0.00 |
+| all 24 | 0.00 | 0.00 |
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R2a sanity** | base recall 0.76 | >= 0.70 | PASS |
+| **R2b separation** | layers 18-23: recall 0.76 -> 0.33 (-57% of the reference; -47% of R1b's own 0.62), B6 80 -> 77 (-3) | recall -50%, B6 <= -15 | **PASS** against the registered reference (would miss against R1b's own recall; both stated) |
+| **R2c remainder** | 6 of 24 channel-mix output matrices = 25 M of 451 M parameters (5.6%) removable with B6 within 15 points | reported | the only group separable at this granularity |
+
+Reading of the result: whole-group zeroing is a blunt tool. Every group before layer 18 is load-bearing for everything
+(the residual stream collapses), so facts and reading cannot be separated by coarse surgery below the last quarter.
+Two things did separate: (1) the last six channel-mix layers hold about half of the measured facts and almost none of
+the reading; (2) behaviour: the reading fine-tune lowered closed-book recall by 14 points by itself. The remainder is
+therefore not measurable as "parameters minus fact layers" at this granularity; the next instrument is per-neuron
+attribution within the channel-mix (which neurons fire for fact completions and not for reading), and the behavioural
+route (train "unknown" on closed-book facts while holding B6) which R3's counterfactual gate already pushes toward.
