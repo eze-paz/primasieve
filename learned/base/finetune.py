@@ -17,7 +17,11 @@ def arg(name, default):
 def examples(data, tok, R):
     """one (ids, loss_mask) per question; the prompt matches b6_rwkv.py exactly"""
     while True:
-        d = R.choice(data); q, gold = R.choice(d["qs"])
+        d = R.choice(data)
+        if "prompt" in d:                                       # R3 traces: prompt (question, query, hits) -> answer
+            p = tok.encode(d["prompt"]); a = tok.encode(" " + d["answer"] + "\n")
+            yield p + a, [0] * len(p) + [1] * len(a); continue
+        q, gold = R.choice(d["qs"])
         if R.random() < 0.15:                                  # honesty: the story does not hold the answer -> "unknown" (B1)
             other = R.choice(data)
             if other is d or any(g.split()[-1] in other["text"].lower() for g in gold): continue
