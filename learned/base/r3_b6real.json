@@ -1,0 +1,1136 @@
+[
+ {
+  "story": "s01",
+  "book": "162",
+  "q": "Who owned the red boat?",
+  "gold": [
+   "mira"
+  ],
+  "prompt": "Question: Who owned the red boat?\nSearch: owned red boat\nHits:\n[52] Mira had a small red boat.\n[53] One morning her brother Tomas borrowed the boat without asking.\n[11] You should say good-bye.\" It no longer bothered me that Rama owned two Porsches at a time when many disciples were struggling to meet the increasing tuition.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s01",
+  "book": "162",
+  "q": "Who borrowed the boat?",
+  "gold": [
+   "tomas",
+   "her brother"
+  ],
+  "prompt": "Question: Who borrowed the boat?\nSearch: borrowed boat\nHits:\n[53] One morning her brother Tomas borrowed the boat without asking.\n[52] Mira had a small red boat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s01",
+  "book": "162",
+  "q": "Where did Tomas row the boat?",
+  "gold": [
+   "the island",
+   "island",
+   "across the lake"
+  ],
+  "prompt": "Question: Where did Tomas row the boat?\nSearch: Tomas row boat\nHits:\n[53] One morning her brother Tomas borrowed the boat without asking.\n[52] Mira had a small red boat.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s01",
+  "book": "162",
+  "q": "Who was waiting on the dock?",
+  "gold": [
+   "mira"
+  ],
+  "prompt": "Question: Who was waiting on the dock?\nSearch: waiting dock\nHits:\n[55] When he came back, Mira was waiting on the dock.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s01",
+  "book": "162",
+  "q": "What did Tomas promise?",
+  "gold": [
+   "to ask first",
+   "ask first"
+  ],
+  "prompt": "Question: What did Tomas promise?\nSearch: Tomas promise\nHits:\n[56] She made him promise to ask first next time.\n[53] One morning her brother Tomas borrowed the boat without asking.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "book": "980",
+  "q": "Who opened the shop?",
+  "gold": [
+   "mr hollis",
+   "hollis",
+   "the baker"
+  ],
+  "prompt": "Question: Who opened the shop?\nSearch: opened shop\nHits:\n[63] Hollis, opened his shop at dawn.\n[54] The fine old gentleman revealed when she opened the door was probably the last great merchant in America to wear the chin beard.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "book": "980",
+  "q": "What did Petra buy?",
+  "gold": [
+   "two loaves of bread",
+   "bread",
+   "two loaves"
+  ],
+  "prompt": "Question: What did Petra buy?\nSearch: Petra buy\nHits:\n[64] A girl named Petra came in and bought two loaves of bread.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "book": "980",
+  "q": "How did Petra pay?",
+  "gold": [
+   "a silver coin",
+   "silver coin"
+  ],
+  "prompt": "Question: How did Petra pay?\nSearch: Petra pay\nHits:\n[64] A girl named Petra came in and bought two loaves of bread.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s02",
+  "book": "980",
+  "q": "Who gave Petra a roll?",
+  "gold": [
+   "mr hollis",
+   "hollis",
+   "the baker"
+  ],
+  "prompt": "Question: Who gave Petra a roll?\nSearch: gave Petra roll\nHits:\n[67] Hollis gave her a roll for free because it was her birthday.\n[64] A girl named Petra came in and bought two loaves of bread.\n[5] You haven't spoken the words to him, but all this urging him to change, to 'find something better to go into'--it's all been about nothing on earth but your foolish old glue factory that you know upsets him, and you gave your solemn word never to speak to him about again!\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "book": "980",
+  "q": "Why was the roll free?",
+  "gold": [
+   "her birthday",
+   "it was her birthday"
+  ],
+  "prompt": "Question: Why was the roll free?\nSearch: Why roll free\nHits:\n[67] Hollis gave her a roll for free because it was her birthday.\n[37] Why, by making glue and selling it.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "book": "1683",
+  "q": "Who had the cheese first?",
+  "gold": [
+   "the crow",
+   "crow"
+  ],
+  "prompt": "Question: Who had the cheese first?\nSearch: cheese first\nHits:\n[67] The fox ate the cheese and ran away.\n[66] The crow opened her beak to sing, and the cheese fell to the ground.\n[38] A too prolonged silence led me to perceive the terrible effect of my words, though the darkness at first concealed it.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "book": "1683",
+  "q": "Where was the crow sitting?",
+  "gold": [
+   "in a tree",
+   "a tree",
+   "tree"
+  ],
+  "prompt": "Question: Where was the crow sitting?\nSearch: crow sitting\nHits:\n[64] 'Has it never struck you that a time would come when you could no longer work, when competition will lower the price of flowers and articles of fashion----?' A fox saw a crow sitting in a tree with a piece of cheese.\n[65] The fox told the crow that her voice must be beautiful.\n[66] The crow opened her beak to sing, and the cheese fell to the ground.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "book": "1683",
+  "q": "Who flattered the crow?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "prompt": "Question: Who flattered the crow?\nSearch: flattered crow\nHits:\n[65] The fox told the crow that her voice must be beautiful.\n[66] The crow opened her beak to sing, and the cheese fell to the ground.\n[64] 'Has it never struck you that a time would come when you could no longer work, when competition will lower the price of flowers and articles of fashion----?' A fox saw a crow sitting in a tree with a piece of cheese.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "book": "1683",
+  "q": "What fell to the ground?",
+  "gold": [
+   "the cheese",
+   "cheese"
+  ],
+  "prompt": "Question: What fell to the ground?\nSearch: fell ground\nHits:\n[66] The crow opened her beak to sing, and the cheese fell to the ground.\n[28] The evening before, in our last quite friendly discussion, the Countess had exclaimed: \"'I have been paid a hundred francs for the flowers and caps I made this week!' Honorine exclaimed gleefully one Saturday evening when I went to visit her in the little sitting-room on the ground floor, which the unavowed proprietor had had regilt.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "book": "1683",
+  "q": "Who ate the cheese?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "prompt": "Question: Who ate the cheese?\nSearch: ate cheese\nHits:\n[67] The fox ate the cheese and ran away.\n[66] The crow opened her beak to sing, and the cheese fell to the ground.\n[64] 'Has it never struck you that a time would come when you could no longer work, when competition will lower the price of flowers and articles of fashion----?' A fox saw a crow sitting in a tree with a piece of cheese.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s04",
+  "book": "1628",
+  "q": "Who lost the keys?",
+  "gold": [
+   "leon"
+  ],
+  "prompt": "Question: Who lost the keys?\nSearch: lost keys\nHits:\n[75] Sharon.\" Leon lost his keys on the way to school.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s04",
+  "book": "1628",
+  "q": "Who found the keys?",
+  "gold": [
+   "ada",
+   "his friend ada"
+  ],
+  "prompt": "Question: Who found the keys?\nSearch: found keys\nHits:\n[75] Sharon.\" Leon lost his keys on the way to school.\n[76] His friend Ada found them under a bench in the park.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s04",
+  "book": "1628",
+  "q": "Where were the keys?",
+  "gold": [
+   "under a bench",
+   "under a bench in the park",
+   "the park"
+  ],
+  "prompt": "Question: Where were the keys?\nSearch: keys\nHits:\n[75] Sharon.\" Leon lost his keys on the way to school.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s04",
+  "book": "1628",
+  "q": "When did Ada return the keys?",
+  "gold": [
+   "at lunch",
+   "lunch"
+  ],
+  "prompt": "Question: When did Ada return the keys?\nSearch: Ada return keys\nHits:\n[75] Sharon.\" Leon lost his keys on the way to school.\n[76] His friend Ada found them under a bench in the park.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s04",
+  "book": "1628",
+  "q": "What did Leon share?",
+  "gold": [
+   "his apple",
+   "an apple",
+   "apple"
+  ],
+  "prompt": "Question: What did Leon share?\nSearch: Leon share\nHits:\n[77] She gave them back to Leon at lunch.\n[78] Leon thanked her and shared his apple with her.\n[75] Sharon.\" Leon lost his keys on the way to school.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "book": "1942",
+  "q": "How many daughters did the king have?",
+  "gold": [
+   "three",
+   "3"
+  ],
+  "prompt": "Question: How many daughters did the king have?\nSearch: many daughters king\nHits:\n[0] The old king had three daughters.\n[79] The king signed the order yesterday.\" \"I expected you to say all this, wife,\" said Cesar Birotteau.\n[75] I wish to show the liberals, my enemies, that to love the king is to love France.\" \"Why, yes, wife, we have enemies.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "book": "1942",
+  "q": "Who was the bravest daughter?",
+  "gold": [
+   "elin",
+   "the youngest"
+  ],
+  "prompt": "Question: Who was the bravest daughter?\nSearch: bravest daughter\nHits:\n[1] The youngest, Elin, was the bravest.\n[45] His daughter is never considered before me.\n[27] A prey to the nightmare, which still lasted though her mind was wide awake, she forgot her daughter peacefully asleep in an adjoining room, the door of which opened at the foot of her bed.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "book": "1942",
+  "q": "What came to the valley?",
+  "gold": [
+   "a dragon",
+   "the dragon",
+   "dragon"
+  ],
+  "prompt": "Question: What came to the valley?\nSearch: came valley\nHits:\n[2] When a dragon came to the valley, Elin rode out alone to meet it.\n[77] They all say, 'Birotteau has had luck; Birotteau is a man who came from nothing: yet here he is deputy-mayor; everything succeeds with him.' Well, they are going to be finely surprised.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "book": "1942",
+  "q": "What did Elin offer the dragon?",
+  "gold": [
+   "gold"
+  ],
+  "prompt": "Question: What did Elin offer the dragon?\nSearch: Elin offer dragon\nHits:\n[2] When a dragon came to the valley, Elin rode out alone to meet it.\n[3] She did not fight the dragon; she offered it gold, and the dragon flew away.\n[1] The youngest, Elin, was the bravest.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "book": "1942",
+  "q": "What did the dragon do?",
+  "gold": [
+   "flew away",
+   "it flew away"
+  ],
+  "prompt": "Question: What did the dragon do?\nSearch: dragon\nHits:\n[3] She did not fight the dragon; she offered it gold, and the dragon flew away.\n[2] When a dragon came to the valley, Elin rode out alone to meet it.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "book": "2122",
+  "q": "Who planted the tomatoes?",
+  "gold": [
+   "grandma rosa",
+   "rosa"
+  ],
+  "prompt": "Question: Who planted the tomatoes?\nSearch: planted tomatoes\nHits:\n[35] And now, as his Majesty's order was that I should 'attend him to the Stollen hills,' I went up to the carriage, and asked:-- Grandma Rosa planted tomatoes in the spring.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "book": "2122",
+  "q": "What ate the leaves?",
+  "gold": [
+   "a rabbit",
+   "the rabbit",
+   "rabbit"
+  ],
+  "prompt": "Question: What ate the leaves?\nSearch: ate leaves\nHits:\n[36] In summer, a rabbit started eating the leaves.\n[38] After that, the rabbit ate clover in the field instead.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "book": "2122",
+  "q": "Who built the fence?",
+  "gold": [
+   "nico",
+   "her grandson",
+   "her grandson nico"
+  ],
+  "prompt": "Question: Who built the fence?\nSearch: built fence\nHits:\n[37] Her grandson Nico built a fence around the garden.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "book": "2122",
+  "q": "What did the rabbit eat after that?",
+  "gold": [
+   "clover"
+  ],
+  "prompt": "Question: What did the rabbit eat after that?\nSearch: rabbit eat after\nHits:\n[38] After that, the rabbit ate clover in the field instead.\n[36] In summer, a rabbit started eating the leaves.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "book": "2122",
+  "q": "When were the tomatoes planted?",
+  "gold": [
+   "in the spring",
+   "spring"
+  ],
+  "prompt": "Question: When were the tomatoes planted?\nSearch: tomatoes planted\nHits:\n[35] And now, as his Majesty's order was that I should 'attend him to the Stollen hills,' I went up to the carriage, and asked:-- Grandma Rosa planted tomatoes in the spring.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "book": "1395",
+  "q": "Who steered the ship?",
+  "gold": [
+   "captain ortiz",
+   "ortiz",
+   "the captain"
+  ],
+  "prompt": "Question: Who steered the ship?\nSearch: steered ship\nHits:\n[16] Captain Ortiz steered the ship through the storm.\n[19] In the morning the sky was clear and the ship reached the harbor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "book": "1395",
+  "q": "Who climbed the mast?",
+  "gold": [
+   "bram",
+   "the sailor"
+  ],
+  "prompt": "Question: Who climbed the mast?\nSearch: climbed mast\nHits:\n[17] The sailor Bram climbed the mast to fix a torn sail.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "book": "1395",
+  "q": "What did Bram fix?",
+  "gold": [
+   "a torn sail",
+   "the sail",
+   "sail"
+  ],
+  "prompt": "Question: What did Bram fix?\nSearch: Bram fix\nHits:\n[17] The sailor Bram climbed the mast to fix a torn sail.\n[18] A wave knocked Bram's hat into the sea.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "book": "1395",
+  "q": "What fell into the sea?",
+  "gold": [
+   "bram's hat",
+   "his hat",
+   "a hat",
+   "hat"
+  ],
+  "prompt": "Question: What fell into the sea?\nSearch: fell into sea\nHits:\n[18] A wave knocked Bram's hat into the sea.\n[52] He comes into Lord Houghton's \"Life and Letters of Keats\" very early (vol. i. p. 30).\n[30] Longfellow is exactly the antithesis of Poe, who, with all his science of verse and ghostly skill, has no humanity, or puts none of it into his lines.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "book": "1395",
+  "q": "Where did the ship arrive?",
+  "gold": [
+   "the harbor",
+   "harbor"
+  ],
+  "prompt": "Question: Where did the ship arrive?\nSearch: ship arrive\nHits:\n[16] Captain Ortiz steered the ship through the storm.\n[19] In the morning the sky was clear and the ship reached the harbor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s08",
+  "book": "1704",
+  "q": "What did Sana want to learn?",
+  "gold": [
+   "the violin",
+   "violin"
+  ],
+  "prompt": "Question: What did Sana want to learn?\nSearch: Sana want learn\nHits:\n[44] Sana wanted to learn the violin.\n[66] The necessity of explaining to customers what they want, of guessing at their desires, and giving them desires for what they do not want, exercises the tongue of all retail shopkeepers.\n[47] After a year, Sana played a song at the school concert.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s08",
+  "book": "1704",
+  "q": "Who was her teacher?",
+  "gold": [
+   "mrs kato",
+   "kato"
+  ],
+  "prompt": "Question: Who was her teacher?\nSearch: teacher\nHits:\n[45] Her teacher, Mrs.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s08",
+  "book": "1704",
+  "q": "When were the lessons?",
+  "gold": [
+   "every tuesday",
+   "tuesday"
+  ],
+  "prompt": "Question: When were the lessons?\nSearch: lessons\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s08",
+  "book": "1704",
+  "q": "Where did Sana play a song?",
+  "gold": [
+   "at the school concert",
+   "the school concert",
+   "school concert"
+  ],
+  "prompt": "Question: Where did Sana play a song?\nSearch: Sana play song\nHits:\n[47] After a year, Sana played a song at the school concert.\n[44] Sana wanted to learn the violin.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s08",
+  "book": "1704",
+  "q": "Who recorded the concert?",
+  "gold": [
+   "her father",
+   "father"
+  ],
+  "prompt": "Question: Who recorded the concert?\nSearch: recorded concert\nHits:\n[48] Her father recorded the concert on his phone.\n[47] After a year, Sana played a song at the school concert.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "book": "2173",
+  "q": "Who challenged whom to a race?",
+  "gold": [
+   "the tortoise",
+   "tortoise"
+  ],
+  "prompt": "Question: Who challenged whom to a race?\nSearch: challenged whom race\nHits:\n[0] A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "book": "2173",
+  "q": "Who slept during the race?",
+  "gold": [
+   "the hare",
+   "hare"
+  ],
+  "prompt": "Question: Who slept during the race?\nSearch: slept during race\nHits:\n[0] A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "book": "2173",
+  "q": "Who never stopped?",
+  "gold": [
+   "the tortoise",
+   "tortoise"
+  ],
+  "prompt": "Question: Who never stopped?\nSearch: never stopped\nHits:\n[2] The tortoise walked slowly but never stopped.\n[49] They will be able to serve their King with dignity; because they will never abuse his name to the gratification of their private spleen or avarice.\n[55] I know not the origin of the House of Commons, but am very sure that it did not create itself; the electors wore prior to the elected; whose rights originated either from the people at large, or from some other form of legislature, which never could intend for the chosen a power of superseding the choosers.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "book": "2173",
+  "q": "Who won the race?",
+  "gold": [
+   "the tortoise",
+   "tortoise"
+  ],
+  "prompt": "Question: Who won the race?\nSearch: won race\nHits:\n[0] A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "book": "2173",
+  "q": "What did the hare do after running ahead?",
+  "gold": [
+   "lay down to sleep",
+   "slept",
+   "went to sleep"
+  ],
+  "prompt": "Question: What did the hare do after running ahead?\nSearch: hare after running ahead\nHits:\n[1] The hare ran far ahead and then lay down to sleep.\n[0] A tortoise challenged a hare to a race.\n[3] When the hare woke up, the tortoise had already crossed the finish line.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "book": "2117",
+  "q": "Where did Dr. Amari work?",
+  "gold": [
+   "the hospital",
+   "hospital",
+   "at the hospital in the city"
+  ],
+  "prompt": "Question: Where did Dr. Amari work?\nSearch: Dr Amari work\nHits:\n[37] Dr.\n[40] Dr.\n[38] Amari worked at the hospital in the city.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "book": "2117",
+  "q": "Who had a broken arm?",
+  "gold": [
+   "felix",
+   "a boy named felix"
+  ],
+  "prompt": "Question: Who had a broken arm?\nSearch: broken arm\nHits:\n[39] One night a boy named Felix arrived with a broken arm.\n[41] Amari set the bone and put his arm in a cast.\n[16] The morning, first in October, was not fine; and it was far other than scenery that the Prussian battalions had in hand!--Friday, 1st October, 1756, Day should have broken: but where is day?\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "book": "2117",
+  "q": "Who set the bone?",
+  "gold": [
+   "dr amari",
+   "amari",
+   "the doctor"
+  ],
+  "prompt": "Question: Who set the bone?\nSearch: set bone\nHits:\n[41] Amari set the bone and put his arm in a cast.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "book": "2117",
+  "q": "What did Felix's mother bring?",
+  "gold": [
+   "a cake",
+   "cake"
+  ],
+  "prompt": "Question: What did Felix's mother bring?\nSearch: Felix s mother bring\nHits:\n[42] Felix's mother brought the doctor a cake the next week.\n[39] One night a boy named Felix arrived with a broken arm.\n[51] That oozy Morell Brook issues on Browne's side of Lobositz, cutting Browne in two; but is otherwise all in Browne's favor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "book": "2117",
+  "q": "To whom did she bring it?",
+  "gold": [
+   "the doctor",
+   "dr amari",
+   "amari"
+  ],
+  "prompt": "Question: To whom did she bring it?\nSearch: whom bring\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s11",
+  "book": "1553",
+  "q": "What did the village have only one of?",
+  "gold": [
+   "well",
+   "a well"
+  ],
+  "prompt": "Question: What did the village have only one of?\nSearch: village only one\nHits:\n[24] Wait, she is about to rise; wait!\" The village had one well.\n[27] They dug a channel, and water flowed to the village again.\n[4] \"Do not look at that,\" said Frenhofer, \"it is only a daub which I made to study a pose; it is worth nothing.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s11",
+  "book": "1553",
+  "q": "Who remembered the spring?",
+  "gold": [
+   "old petr",
+   "petr"
+  ],
+  "prompt": "Question: Who remembered the spring?\nSearch: remembered spring\nHits:\n[26] Old Petr remembered a spring in the hills, and he led the villagers there.\n[16] See how these outlines spring forth from the background.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s11",
+  "book": "1553",
+  "q": "Where was the spring?",
+  "gold": [
+   "in the hills",
+   "the hills",
+   "hills"
+  ],
+  "prompt": "Question: Where was the spring?\nSearch: spring\nHits:\n[16] See how these outlines spring forth from the background.\n[26] Old Petr remembered a spring in the hills, and he led the villagers there.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s11",
+  "book": "1553",
+  "q": "What did the villagers dig?",
+  "gold": [
+   "a channel",
+   "channel"
+  ],
+  "prompt": "Question: What did the villagers dig?\nSearch: villagers dig\nHits:\n[26] Old Petr remembered a spring in the hills, and he led the villagers there.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s11",
+  "book": "1553",
+  "q": "Why did the well run low?",
+  "gold": [
+   "a dry summer",
+   "it was a dry summer",
+   "dry summer"
+  ],
+  "prompt": "Question: Why did the well run low?\nSearch: Why well run low\nHits:\n[25] In a dry summer the well ran low.\n[20] Why, she breathes!\n[48] Why did you come here?\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "book": "1187",
+  "q": "Who found the puppy?",
+  "gold": [
+   "jun"
+  ],
+  "prompt": "Question: Who found the puppy?\nSearch: found puppy\nHits:\n[52] Sometimes it is not known that it is represented at all.\" Jun found a lost puppy in the rain.\n[56] Bell, came to take the puppy home.\n[23] Cunniff found every man a socialist, and from his experiences Mr.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "book": "1187",
+  "q": "What did Jun dry it with?",
+  "gold": [
+   "a towel",
+   "towel"
+  ],
+  "prompt": "Question: What did Jun dry it with?\nSearch: Jun dry\nHits:\n[52] Sometimes it is not known that it is represented at all.\" Jun found a lost puppy in the rain.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s12",
+  "book": "1187",
+  "q": "Who made a bed for the puppy?",
+  "gold": [
+   "hana",
+   "his sister",
+   "his sister hana"
+  ],
+  "prompt": "Question: Who made a bed for the puppy?\nSearch: made bed puppy\nHits:\n[54] His sister Hana made a bed for it from an old box.\n[56] Bell, came to take the puppy home.\n[21] Cunniff, who lately made an intimate study of trade-unionism, says: \"All through the unions socialism filters.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "book": "1187",
+  "q": "What was the bed made from?",
+  "gold": [
+   "an old box",
+   "old box",
+   "a box"
+  ],
+  "prompt": "Question: What was the bed made from?\nSearch: bed made\nHits:\n[54] His sister Hana made a bed for it from an old box.\n[21] Cunniff, who lately made an intimate study of trade-unionism, says: \"All through the unions socialism filters.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "book": "1187",
+  "q": "Who was the owner?",
+  "gold": [
+   "mrs bell",
+   "bell"
+  ],
+  "prompt": "Question: Who was the owner?\nSearch: owner\nHits:\n[55] The next day they put up signs, and the owner, Mrs.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s13",
+  "book": "1422",
+  "q": "Who painted the portrait?",
+  "gold": [
+   "lucia",
+   "the painter"
+  ],
+  "prompt": "Question: Who painted the portrait?\nSearch: painted portrait\nHits:\n[57] The painter Lucia painted a portrait of the mayor.\n[60] He hung the portrait in the town hall.\n[59] Lucia painted it again, and this time the mayor smiled.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "book": "1422",
+  "q": "Whose portrait was it?",
+  "gold": [
+   "the mayor",
+   "mayor",
+   "the mayor's"
+  ],
+  "prompt": "Question: Whose portrait was it?\nSearch: Whose portrait\nHits:\n[60] He hung the portrait in the town hall.\n[57] The painter Lucia painted a portrait of the mayor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "book": "1422",
+  "q": "What did the mayor dislike?",
+  "gold": [
+   "his nose",
+   "his nose in the picture",
+   "the nose"
+  ],
+  "prompt": "Question: What did the mayor dislike?\nSearch: mayor dislike\nHits:\n[57] The painter Lucia painted a portrait of the mayor.\n[58] The mayor did not like his nose in the picture.\n[59] Lucia painted it again, and this time the mayor smiled.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "book": "1422",
+  "q": "Where was the portrait hung?",
+  "gold": [
+   "in the town hall",
+   "the town hall",
+   "town hall"
+  ],
+  "prompt": "Question: Where was the portrait hung?\nSearch: portrait hung\nHits:\n[60] He hung the portrait in the town hall.\n[57] The painter Lucia painted a portrait of the mayor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "book": "1422",
+  "q": "Who smiled?",
+  "gold": [
+   "the mayor",
+   "mayor"
+  ],
+  "prompt": "Question: Who smiled?\nSearch: smiled\nHits:\n[59] Lucia painted it again, and this time the mayor smiled.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "book": "1187",
+  "q": "Who went hiking?",
+  "gold": [
+   "omar and ines",
+   "omar",
+   "ines"
+  ],
+  "prompt": "Question: Who went hiking?\nSearch: went hiking\nHits:\n[13] Two friends, Omar and Ines, went hiking in the mountains.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "book": "1187",
+  "q": "Who twisted an ankle?",
+  "gold": [
+   "ines"
+  ],
+  "prompt": "Question: Who twisted an ankle?\nSearch: twisted ankle\nHits:\n[14] Ines twisted her ankle on a rock.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "book": "1187",
+  "q": "Who carried the backpack?",
+  "gold": [
+   "omar"
+  ],
+  "prompt": "Question: Who carried the backpack?\nSearch: carried backpack\nHits:\n[15] Omar carried her backpack and helped her walk down slowly.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "book": "1187",
+  "q": "Who drove them to town?",
+  "gold": [
+   "a ranger",
+   "the ranger",
+   "ranger"
+  ],
+  "prompt": "Question: Who drove them to town?\nSearch: drove town\nHits:\n[16] At the bottom, a ranger drove them to the town in a jeep.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "book": "1187",
+  "q": "What did the ranger drive?",
+  "gold": [
+   "a jeep",
+   "jeep"
+  ],
+  "prompt": "Question: What did the ranger drive?\nSearch: ranger drive\nHits:\n[16] At the bottom, a ranger drove them to the town in a jeep.\n[32] It is directed solely against the scab, placing him in such fear for life and limb as to drive him out of the contest.\n[61] The striking teamster complacently takes a scab driver into an alley, and with an iron bar breaks his arms, so that he can drive no more, but cries out to high Heaven for justice when the capitalist breaks his skull by means of a club in the hands of a policeman.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "book": "296",
+  "q": "Who had a clever cat?",
+  "gold": [
+   "a miller",
+   "the miller",
+   "miller"
+  ],
+  "prompt": "Question: Who had a clever cat?\nSearch: clever cat\nHits:\n[53] A miller had a clever cat.\n[54] When the miller died, his youngest son received only the cat.\n[55] The cat asked for a pair of boots and a bag.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "book": "296",
+  "q": "Who received the cat?",
+  "gold": [
+   "his youngest son",
+   "the youngest son",
+   "the son"
+  ],
+  "prompt": "Question: Who received the cat?\nSearch: received cat\nHits:\n[54] When the miller died, his youngest son received only the cat.\n[53] A miller had a clever cat.\n[55] The cat asked for a pair of boots and a bag.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "book": "296",
+  "q": "What did the cat ask for?",
+  "gold": [
+   "a pair of boots and a bag",
+   "boots and a bag",
+   "boots"
+  ],
+  "prompt": "Question: What did the cat ask for?\nSearch: cat ask\nHits:\n[18] I ask you, Mr.\n[53] A miller had a clever cat.\n[22] \"'I do not ask to return to your house, Mr.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s15",
+  "book": "296",
+  "q": "What did the cat give the king?",
+  "gold": [
+   "rabbits"
+  ],
+  "prompt": "Question: What did the cat give the king?\nSearch: cat give king\nHits:\n[56] With them it caught rabbits and gave them to the king, and the king soon invited the son to the palace.\n[53] A miller had a clever cat.\n[54] When the miller died, his youngest son received only the cat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "book": "296",
+  "q": "Who was invited to the palace?",
+  "gold": [
+   "the son",
+   "the youngest son",
+   "his youngest son"
+  ],
+  "prompt": "Question: Who was invited to the palace?\nSearch: invited palace\nHits:\n[56] With them it caught rabbits and gave them to the king, and the king soon invited the son to the palace.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "book": "2425",
+  "q": "Who forgot his lunch?",
+  "gold": [
+   "teo"
+  ],
+  "prompt": "Question: Who forgot his lunch?\nSearch: forgot lunch\nHits:\n[20] Teo forgot his lunch at home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "book": "2425",
+  "q": "Who gave Teo half a sandwich?",
+  "gold": [
+   "zoe",
+   "his classmate",
+   "his classmate zoe"
+  ],
+  "prompt": "Question: Who gave Teo half a sandwich?\nSearch: gave Teo half sandwich\nHits:\n[21] At noon his classmate Zoe gave him half of her sandwich.\n[22] The next day Teo brought two oranges and gave one to Zoe.\n[20] Teo forgot his lunch at home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "book": "2425",
+  "q": "When did Zoe share?",
+  "gold": [
+   "at noon",
+   "noon"
+  ],
+  "prompt": "Question: When did Zoe share?\nSearch: Zoe share\nHits:\n[21] At noon his classmate Zoe gave him half of her sandwich.\n[22] The next day Teo brought two oranges and gave one to Zoe.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "book": "2425",
+  "q": "What did Teo bring the next day?",
+  "gold": [
+   "two oranges",
+   "oranges"
+  ],
+  "prompt": "Question: What did Teo bring the next day?\nSearch: Teo bring next day\nHits:\n[22] The next day Teo brought two oranges and gave one to Zoe.\n[2] The very next day, I asked the lady who kept the books at the hotel whether she knew of any family that could take me to board and give me the benefit of their conversation.\n[20] Teo forgot his lunch at home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "book": "2425",
+  "q": "Who got an orange?",
+  "gold": [
+   "zoe"
+  ],
+  "prompt": "Question: Who got an orange?\nSearch: got orange\nHits:\n[23] We had hardly got here when father received a telegram saying he would have to come right back to New York.\n[25] We had just got settled at the hotel, in some charming rooms, and mother and I, as you may imagine, were greatly annoyed.\n[37] You know he is like the schoolmaster in Goldsmith's \"Deserted Village\"--\"e'en though vanquished, he would argue still.\" He and mother went to look at some seventeen families (they had got the addresses somewhere), while I retired to my sofa, and would have nothing to do with it.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s17",
+  "book": "1191",
+  "q": "What was Agnes's job?",
+  "gold": [
+   "lighthouse keeper",
+   "the lighthouse keeper",
+   "keeper"
+  ],
+  "prompt": "Question: What was Agnes's job?\nSearch: Agnes s job\nHits:\n[37] The fishermen later gave Agnes a basket of fish.\n[34] The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\n[89] Your ladyship's most humble servant.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s17",
+  "book": "1191",
+  "q": "What did Agnes see?",
+  "gold": [
+   "a small boat in trouble",
+   "a small boat",
+   "a boat"
+  ],
+  "prompt": "Question: What did Agnes see?\nSearch: Agnes see\nHits:\n[37] The fishermen later gave Agnes a basket of fish.\n[34] The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\n[118] So, sir, I see you have read the letter.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s17",
+  "book": "1191",
+  "q": "Whom did Agnes call?",
+  "gold": [
+   "the rescue team",
+   "rescue team"
+  ],
+  "prompt": "Question: Whom did Agnes call?\nSearch: Whom Agnes call\nHits:\n[37] The fishermen later gave Agnes a basket of fish.\n[34] The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s17",
+  "book": "1191",
+  "q": "Who was pulled from the water?",
+  "gold": [
+   "two fishermen",
+   "fishermen"
+  ],
+  "prompt": "Question: Who was pulled from the water?\nSearch: pulled water\nHits:\n[36] The team pulled two fishermen from the water.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s17",
+  "book": "1191",
+  "q": "What did Agnes receive?",
+  "gold": [
+   "a basket of fish",
+   "fish"
+  ],
+  "prompt": "Question: What did Agnes receive?\nSearch: Agnes receive\nHits:\n[37] The fishermen later gave Agnes a basket of fish.\n[34] The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "book": "1395",
+  "q": "Who lost the letter?",
+  "gold": [
+   "professor lind",
+   "lind",
+   "the professor"
+  ],
+  "prompt": "Question: Who lost the letter?\nSearch: lost letter\nHits:\n[14] Professor Lind lost an important letter in the library.\n[17] He found the letter inside a dictionary.\n[6] \"Was ever woman in this manner wooed?\" The lady \"glanced her eye over page after page in hopes of meeting with something that was intelligible,\" and no wonder she did not care for a long letter \"devoted to the subject of a mill between Belasco and the Brummagem youth.\" Peter was so ill-advised as to appear before her with glorious scars, \"two black eyes\" in fact, and she \"was inexorably cruel.\" Peter did not survive her disdain.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "book": "1395",
+  "q": "Where was the letter lost?",
+  "gold": [
+   "in the library",
+   "the library",
+   "library"
+  ],
+  "prompt": "Question: Where was the letter lost?\nSearch: letter lost\nHits:\n[14] Professor Lind lost an important letter in the library.\n[17] He found the letter inside a dictionary.\n[6] \"Was ever woman in this manner wooed?\" The lady \"glanced her eye over page after page in hopes of meeting with something that was intelligible,\" and no wonder she did not care for a long letter \"devoted to the subject of a mill between Belasco and the Brummagem youth.\" Peter was so ill-advised as to appear before her with glorious scars, \"two black eyes\" in fact, and she \"was inexorably cruel.\" Peter did not survive her disdain.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "book": "1395",
+  "q": "Who searched the shelves?",
+  "gold": [
+   "mr ruiz",
+   "ruiz",
+   "the librarian"
+  ],
+  "prompt": "Question: Who searched the shelves?\nSearch: searched shelves\nHits:\n[16] Ruiz, searched every shelf.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "book": "1395",
+  "q": "Where was the letter found?",
+  "gold": [
+   "inside a dictionary",
+   "a dictionary",
+   "dictionary"
+  ],
+  "prompt": "Question: Where was the letter found?\nSearch: letter found\nHits:\n[17] He found the letter inside a dictionary.\n[14] Professor Lind lost an important letter in the library.\n[6] \"Was ever woman in this manner wooed?\" The lady \"glanced her eye over page after page in hopes of meeting with something that was intelligible,\" and no wonder she did not care for a long letter \"devoted to the subject of a mill between Belasco and the Brummagem youth.\" Peter was so ill-advised as to appear before her with glorious scars, \"two black eyes\" in fact, and she \"was inexorably cruel.\" Peter did not survive her disdain.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "book": "1395",
+  "q": "What was the reward?",
+  "gold": [
+   "a book about birds",
+   "a book"
+  ],
+  "prompt": "Question: What was the reward?\nSearch: reward\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s19",
+  "book": "526",
+  "q": "Who caught the mouse?",
+  "gold": [
+   "a lion",
+   "the lion",
+   "lion"
+  ],
+  "prompt": "Question: Who caught the mouse?\nSearch: caught mouse\nHits:\n[3] A lion caught a little mouse.\n[4] The mouse begged to be let go and promised to help the lion one day.\n[6] Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "book": "526",
+  "q": "What did the mouse promise?",
+  "gold": [
+   "to help the lion",
+   "to help the lion one day",
+   "help the lion"
+  ],
+  "prompt": "Question: What did the mouse promise?\nSearch: mouse promise\nHits:\n[3] A lion caught a little mouse.\n[4] The mouse begged to be let go and promised to help the lion one day.\n[6] Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "book": "526",
+  "q": "What trapped the lion later?",
+  "gold": [
+   "a net",
+   "the net",
+   "net"
+  ],
+  "prompt": "Question: What trapped the lion later?\nSearch: trapped lion later\nHits:\n[6] Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\n[3] A lion caught a little mouse.\n[5] The lion laughed and let it go.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "book": "526",
+  "q": "Who freed the lion?",
+  "gold": [
+   "the mouse",
+   "mouse"
+  ],
+  "prompt": "Question: Who freed the lion?\nSearch: freed lion\nHits:\n[3] A lion caught a little mouse.\n[6] Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\n[5] The lion laughed and let it go.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "book": "526",
+  "q": "How was the lion freed?",
+  "gold": [
+   "the mouse chewed the ropes",
+   "chewed the ropes",
+   "chewing the ropes"
+  ],
+  "prompt": "Question: How was the lion freed?\nSearch: lion freed\nHits:\n[3] A lion caught a little mouse.\n[6] Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\n[5] The lion laughed and let it go.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "book": "1553",
+  "q": "Who drove to the coast?",
+  "gold": [
+   "eva and her uncle karl",
+   "eva and karl",
+   "eva",
+   "karl"
+  ],
+  "prompt": "Question: Who drove to the coast?\nSearch: drove coast\nHits:\n[50] Eva and her uncle Karl drove to the coast on Saturday.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "book": "1553",
+  "q": "When did they drive?",
+  "gold": [
+   "on saturday",
+   "saturday"
+  ],
+  "prompt": "Question: When did they drive?\nSearch: drive\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s20",
+  "book": "1553",
+  "q": "Who wanted to swim?",
+  "gold": [
+   "eva"
+  ],
+  "prompt": "Question: Who wanted to swim?\nSearch: wanted swim\nHits:\n[51] Karl wanted to fish, but Eva wanted to swim.\n[52] They agreed to fish in the morning and swim in the afternoon.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "book": "1553",
+  "q": "What did they do in the afternoon?",
+  "gold": [
+   "swim",
+   "swam"
+  ],
+  "prompt": "Question: What did they do in the afternoon?\nSearch: afternoon\nHits:\n[52] They agreed to fish in the morning and swim in the afternoon.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "book": "1553",
+  "q": "Where did they cook the fish?",
+  "gold": [
+   "over a fire on the beach",
+   "on the beach",
+   "the beach"
+  ],
+  "prompt": "Question: Where did they cook the fish?\nSearch: cook fish\nHits:\n[51] Karl wanted to fish, but Eva wanted to swim.\n[52] They agreed to fish in the morning and swim in the afternoon.\n[53] In the evening they cooked the fish they caught over a fire on the beach.\nAnswer:",
+  "found": true
+ }
+]
