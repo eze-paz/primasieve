@@ -21,12 +21,12 @@ class Block(nn.Module):
 
 
 class LM(nn.Module):
-    def __init__(s, vocab, d, layers, heads, ctx, arch="attn", **_):
+    def __init__(s, vocab, d, layers, heads, ctx, arch="attn", scan="log", expand=1.5, **_):
         super().__init__(); s.ctx = ctx; s.arch = arch
         s.tok = nn.Embedding(vocab, d)
         if arch == "ssm":                                        # L2: recurrent blocks, no position embedding (order comes from the recurrence)
             from ssm import SSMBlock
-            s.blocks = nn.ModuleList(SSMBlock(d) for _ in range(layers))
+            s.blocks = nn.ModuleList(SSMBlock(d, expand=expand, scan=scan) for _ in range(layers))
         else:
             s.pos = nn.Embedding(ctx, d)
             s.blocks = nn.ModuleList(Block(d, heads) for _ in range(layers))
@@ -61,7 +61,10 @@ def batches(data, B, T, rng):
 def main():
     hours = float(sys.argv[sys.argv.index("--hours") + 1]) if "--hours" in sys.argv else 3.0
     if "--arch" in sys.argv: CFG["arch"] = sys.argv[sys.argv.index("--arch") + 1]      # L2_prereg.md: --arch ssm
+    if "--scan" in sys.argv: CFG["scan"] = sys.argv[sys.argv.index("--scan") + 1]      # L2b_prereg.md: log | chunk | loop | jit
+    if "--expand" in sys.argv: CFG["expand"] = float(sys.argv[sys.argv.index("--expand") + 1])
     tag = "" if CFG.get("arch", "attn") == "attn" else "_" + CFG["arch"]
+    if "--tag" in sys.argv: tag = "_" + sys.argv[sys.argv.index("--tag") + 1]            # checkpoint / log name suffix
     CKPT = os.path.join(CACHE, f"lm{tag}.pt"); LOG = os.path.join(CACHE, f"train_log{tag}.json")
     torch.manual_seed(0); rng = np.random.default_rng(0)
     train = np.fromfile(os.path.join(CACHE, "train.bin"), dtype=np.uint16)

@@ -12,6 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def main():
     import sys
     tag = "_" + sys.argv[sys.argv.index("--arch") + 1] if "--arch" in sys.argv else ""     # L2_prereg.md: --arch ssm
+    if "--tag" in sys.argv: tag = "_" + sys.argv[sys.argv.index("--tag") + 1]              # L2b_prereg.md: --tag ssm2
     out_name = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else "L1_samples.json"
     tok = BPE.load(); V = tok.size
     ck = torch.load(os.path.join(CACHE, f"lm{tag}.pt")); m = LM(**ck["cfg"]); m.load_state_dict(ck["state"]); m.eval()
