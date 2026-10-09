@@ -23,3 +23,19 @@ produced. B6 fell from 79 (zero-shot) to 61. R1 was stopped at step 500 (loss 0.
 Prediction: B6 76-85, "unknown" >= 0.95. If B6 is still below 79, templated data cannot teach honesty without
 narrowing reading at this size, and the next step is to train the honesty case on the model's own zero-shot answers
 over varied generated stories (self-distillation) rather than on template golds.
+
+## Result (2026-10-09)
+
+Run: 661 steps, 393 k tokens, the full 2 h (the loss stop rule never held 50 consecutive steps; spikes to 0.1-0.5
+recurred on the "unknown" cases). Interim step 200: B6 76, "unknown" 87/100, 0 false unknowns.
+
+| gate | measured (final) | bar | verdict |
+|---|---|---|---|
+| **R1b-a** | B6 **80 / 100** (5 false unknowns) | > 79 | **PASS** (by one) |
+| **R1b-b** | B6 80 / 100 | >= 72 | **PASS** |
+| **R1b-c** | mismatched stories "unknown" **99 / 100**; false named answers 1 / 100 | >= 0.90; <= 0.05 | **PASS** |
+
+Honesty went from 0/100 (base) to 99/100 at no cost to reading (79 -> 80). This is the first learned component that
+beats the hand-rule reader on a battery line (B6 71) while satisfying B1's spirit on the mismatch test. The remaining
+B6 misses are reading errors (wrong actor in fable shapes, answer form) and 5 over-abstentions.
+Checkpoint: `ckpt_read1b.pth` (the R2 ablation and R3 start from it).
