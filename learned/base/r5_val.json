@@ -1,0 +1,486 @@
+[
+ {
+  "book": "496",
+  "sentence": "Abricotina alighted with a nimble jump from the horse.",
+  "q": "Who alighted a nimble jump?",
+  "gold": [
+   "abricotina",
+   "abricotina"
+  ],
+  "prompt": "Question: Who alighted a nimble jump?\nSearch: alighted nimble jump\nHits:\n[40] While they were thus conversing, they came to the bank of a large river. Abricotina alighted with a nimble jump from the horse.\nAnswer:",
+  "answer": "abricotina"
+ },
+ {
+  "book": "496",
+  "sentence": "Abricotina alighted with a nimble jump from the horse.",
+  "q": "What did Abricotina alight?",
+  "gold": [
+   "a nimble jump",
+   "nimble jump"
+  ],
+  "prompt": "Question: What did Abricotina alight?\nSearch: Abricotina alight\nHits:\n[49] In her was all the innocent sweetness of youth, joined to the dignity of maturity; in truth, she was perfection; and so thought the invisible Leander. Not seeing Abricotina, she asked where she was.\n[40] While they were thus conversing, they came to the bank of a large river. Abricotina alighted with a nimble jump from the horse.\n[51] Upon that, Leander, being very desirous to speak, assumed the tone of a parrot, for there were many in the room, and addressed himself invisibly to the princess. \"Most charming princess,\" said he, \"Abricotina will return immediately.\nAnswer:",
+  "answer": "a nimble jump"
+ },
+ {
+  "book": "496",
+  "sentence": "But Abricotina found the fairy in an angry humor.",
+  "q": "Who found the fairy?",
+  "gold": [
+   "abricotina",
+   "abricotina"
+  ],
+  "prompt": "Question: Who found the fairy?\nSearch: found fairy\nHits:\n[40] Now, when the Amazons perceived his mighty host, they gave the princess notice of its who immediately dispatched away her trusty Abricotina to the kingdom of the fairies, to beg her mother's instructions as to what she should do to drive the little Furibon from her territories. But Abricotina found the fairy in an angry humor.\n[72] Is this a body composed of air and fire, without substance, as Abricotina told me?\" She softly touched his hair, and heard him breathe, and looked at him as if she could have looked forever. While she was thus occupied, her mother, the fairy entered with such a noise that Leander started out of his sleep.\n[77] The princess durst not open her lips, but cast her eyes upon Leander, as if to beg his assistance. He judged rightly that he ought not to deal rudely with a power superior to his own, and therefore he sought, by his eloquence and submission, to move the incensed fairy.\nAnswer:",
+  "answer": "abricotina"
+ },
+ {
+  "book": "496",
+  "sentence": "But Abricotina found the fairy in an angry humor.",
+  "q": "What did Abricotina find?",
+  "gold": [
+   "the fairy",
+   "fairy"
+  ],
+  "prompt": "Question: What did Abricotina find?\nSearch: Abricotina find\nHits:\n[5] He had hardly quitted the cabinet, when the princess turned about to look once more upon that enchanting picture, which had so delighted her. But how was she surprised to find it gone!\n[68] The princess was gone to bed. Leander, therefore, retired into his own apartment, for he was very sleepy--so sleepy that he forgot to bolt his door; and so it happened that the princess, rising early to taste the morning air, chanced to enter into this very chamber, and was astonished to find a young prince asleep upon the bed.\n[40] Now, when the Amazons perceived his mighty host, they gave the princess notice of its who immediately dispatched away her trusty Abricotina to the kingdom of the fairies, to beg her mother's instructions as to what she should do to drive the little Furibon from her territories. But Abricotina found the fairy in an angry humor.\nAnswer:",
+  "answer": "the fairy"
+ },
+ {
+  "book": "2356",
+  "sentence": "Elizabeth kept an eye upon the door.",
+  "q": "Who kept an eye?",
+  "gold": [
+   "elizabeth",
+   "elizabeth"
+  ],
+  "prompt": "Question: Who kept an eye?\nSearch: kept eye\nHits:\n[40] Madness.\" Peter's pen scratched and spluttered. Elizabeth kept an eye upon the door.\nAnswer:",
+  "answer": "elizabeth"
+ },
+ {
+  "book": "2356",
+  "sentence": "Elizabeth kept an eye upon the door.",
+  "q": "What did Elizabeth keep?",
+  "gold": [
+   "an eye",
+   "eye"
+  ],
+  "prompt": "Question: What did Elizabeth keep?\nSearch: Elizabeth keep\nHits:\n[40] Madness.\" Peter's pen scratched and spluttered. Elizabeth kept an eye upon the door.\n[45] Artfulness,\" concluded Peter, \"pure artfulness. Elizabeth, old girl, we've got out of this business cheaply.\n[21] It was the fogs, you know. If only I could have afforded to send him away!\" Elizabeth looked thoughtful.\nAnswer:",
+  "answer": "an eye"
+ },
+ {
+  "book": "2356",
+  "sentence": "The noble bookcase, surmounted by Minerva's bust.",
+  "q": "Who by Minerva?",
+  "gold": [
+   "the noble bookcase",
+   "noble bookcase"
+  ],
+  "prompt": "Question: Who by Minerva?\nSearch: Minerva\nHits:\n[40] Only by the help of the round island underneath the massive Empire table, by excursions into untrodden corners, could Peter recollect the rainbow floor his feet had pressed when he was twenty-one. The noble bookcase, surmounted by Minerva's bust.\nAnswer:",
+  "answer": "the noble bookcase"
+ },
+ {
+  "book": "2356",
+  "sentence": "The noble bookcase, surmounted by Minerva's bust.",
+  "q": "What did the noble bookcase surmount?",
+  "gold": [
+   "minerva",
+   "minerva"
+  ],
+  "prompt": "Question: What did the noble bookcase surmount?\nSearch: noble bookcase surmount\nHits:\n[40] Only by the help of the round island underneath the massive Empire table, by excursions into untrodden corners, could Peter recollect the rainbow floor his feet had pressed when he was twenty-one. The noble bookcase, surmounted by Minerva's bust.\nAnswer:",
+  "answer": "minerva"
+ },
+ {
+  "book": "2356",
+  "sentence": "Gladman pointed a lank forefinger dramatically towards the table.",
+  "q": "Who pointed a lank forefinger dramatically?",
+  "gold": [
+   "gladman",
+   "gladman"
+  ],
+  "prompt": "Question: Who pointed a lank forefinger dramatically?\nSearch: pointed lank forefinger dramatically\nHits:\n[40] That will--\" Mr. Gladman pointed a lank forefinger dramatically towards the table.\nAnswer:",
+  "answer": "gladman"
+ },
+ {
+  "book": "2356",
+  "sentence": "Clodd turned to the clerk.",
+  "q": "Who turned the clerk?",
+  "gold": [
+   "clodd",
+   "clodd"
+  ],
+  "prompt": "Question: Who turned the clerk?\nSearch: turned clerk\nHits:\n[40] \"Let's try another one.\" Mr. Clodd turned to the clerk.\n[73] Pincer stayed behind and made a night of it with Mr. Clodd and Bonner's clerk, at Clodd's expense.\nAnswer:",
+  "answer": "clodd"
+ },
+ {
+  "book": "2356",
+  "sentence": "Appleyard retired into the darkness.",
+  "q": "Who retired the darkness?",
+  "gold": [
+   "appleyard",
+   "appleyard"
+  ],
+  "prompt": "Question: Who retired the darkness?\nSearch: retired darkness\nHits:\n[40] And be careful of the crossings.\" Mrs. Appleyard retired into the darkness.\nAnswer:",
+  "answer": "appleyard"
+ },
+ {
+  "book": "2356",
+  "sentence": "Appleyard retired into the darkness.",
+  "q": "What did Appleyard retire?",
+  "gold": [
+   "the darkness",
+   "darkness"
+  ],
+  "prompt": "Question: What did Appleyard retire?\nSearch: Appleyard retire\nHits:\n[36] At the brick wall surmounted by wooden railings that divides the garden from the court, Solomon paused, hearing behind him the voice of Mrs. Appleyard speaking from the doorstep.\n[40] And be careful of the crossings.\" Mrs. Appleyard retired into the darkness.\n[78] Master Nathaniel Grindley proving, however, to her taste, that which might have been considered impertinence became accepted as a fit and proper form of introduction. Miss Appleyard smiled graciously--nay, further, intimated desire for more.\nAnswer:",
+  "answer": "the darkness"
+ },
+ {
+  "book": "2356",
+  "sentence": "The quiet streets drew Solomon westward.",
+  "q": "Who drew Solomon westward?",
+  "gold": [
+   "the quiet streets",
+   "quiet streets"
+  ],
+  "prompt": "Question: Who drew Solomon westward?\nSearch: drew Solomon westward\nHits:\n[40] Solomon, steering the perambulator carefully, emerged from Nevill's Court without accident. The quiet streets drew Solomon westward.\n[42] A vacant seat beneath the shade overlooking the Long Water in Kensington Gardens invited to rest. \"Piper?\" suggested a small boy to Solomon.\n[48] \"Hezekiah!\" The exclamation had been wrung from Solomon Appleyard by the approach of a stout, short man clad in a remarkably ill-fitting broad-cloth suit. \"What, Sol, my boy?\" \"It looked like you,\" said Solomon.\nAnswer:",
+  "answer": "the quiet streets"
+ },
+ {
+  "book": "2356",
+  "sentence": "The quiet streets drew Solomon westward.",
+  "q": "What did the quiet streets draw?",
+  "gold": [
+   "solomon westward",
+   "solomon westward"
+  ],
+  "prompt": "Question: What did the quiet streets draw?\nSearch: quiet streets draw\nHits:\n[40] Solomon, steering the perambulator carefully, emerged from Nevill's Court without accident. The quiet streets drew Solomon westward.\nAnswer:",
+  "answer": "solomon westward"
+ },
+ {
+  "book": "2356",
+  "sentence": "The case appeared to Peter Hope to be one of exceeding difficulty.",
+  "q": "Who appeared Peter Hope?",
+  "gold": [
+   "the case",
+   "case"
+  ],
+  "prompt": "Question: Who appeared Peter Hope?\nSearch: appeared Peter Hope\nHits:\n[40] Grindley junior sat on the cushioned seat beneath the middle window. _Good Humour's_ sub- editor stood before the fire, her hands behind her back. The case appeared to Peter Hope to be one of exceeding difficulty.\n[53] I can earn my own living; and I should like to get away.\" \"It seems to me--\" said the sub-editor. \"Now, Tommy--I mean Jane,\" warned her Peter Hope.\n[49] Grindley junior's view was that the wilds of Africa would afford a fitting background to the passing away of a blighted existence. Peter Hope had a suspicion that Grindley junior had for the moment parted company with that sweet reasonableness that otherwise, so Peter Hope felt sure, was Grindley junior's guiding star.\nAnswer:",
+  "answer": "the case"
+ },
+ {
+  "book": "2356",
+  "sentence": "The case appeared to Peter Hope to be one of exceeding difficulty.",
+  "q": "What did the case appear?",
+  "gold": [
+   "peter hope",
+   "peter hope"
+  ],
+  "prompt": "Question: What did the case appear?\nSearch: case appear\nHits:\n[40] Grindley junior sat on the cushioned seat beneath the middle window. _Good Humour's_ sub- editor stood before the fire, her hands behind her back. The case appeared to Peter Hope to be one of exceeding difficulty.\n[44] Peter Hope's experience had led him to the conclusion that young people sometimes changed their mind. The opinion of the House, clearly though silently expressed, was that Peter Hope's experience, as regarded this particular case, counted for nothing.\nAnswer:",
+  "answer": "peter hope"
+ },
+ {
+  "book": "2356",
+  "sentence": "Grindley junior studied the printing business.",
+  "q": "Who studied the printing business?",
+  "gold": [
+   "grindley junior",
+   "grindley junior"
+  ],
+  "prompt": "Question: Who studied the printing business?\nSearch: studied printing business\nHits:\n[40] \"You were quite a little girl then.\" Later, the troublesome Sauce disappeared entirely, cut out by newer flavours. Grindley junior studied the printing business.\n[31] I might have been more obstinate if things had been going all right. The Lord has chastened me.\" \"Isn't the business doing well, Dad?\" asked the young man, with sorrow in his voice.\nAnswer:",
+  "answer": "grindley junior"
+ },
+ {
+  "book": "2356",
+  "sentence": "Grindley junior studied the printing business.",
+  "q": "What did Grindley junior study?",
+  "gold": [
+   "the printing business",
+   "printing business"
+  ],
+  "prompt": "Question: What did Grindley junior study?\nSearch: Grindley junior study\nHits:\n[40] \"You were quite a little girl then.\" Later, the troublesome Sauce disappeared entirely, cut out by newer flavours. Grindley junior studied the printing business.\n[43] Some six months later they found him dead in his counting-house. Grindley junior became the printer and publisher of _Good Humour_.\n[20] Grindley junior the next morning stood before his father in the private office in High Holborn. \"I am sorry, sir,\" said Grindley junior, \"if I have proved a disappointment to you.\" \"Damn your sympathy!\" said Grindley senior.\nAnswer:",
+  "answer": "the printing business"
+ },
+ {
+  "book": "2356",
+  "sentence": "Loveredge returned at the end of September.",
+  "q": "Who returned the end of September?",
+  "gold": [
+   "loveredge",
+   "loveredge"
+  ],
+  "prompt": "Question: Who returned the end of September?\nSearch: returned end September\nHits:\n[40] Mr. and Mrs. Loveredge returned at the end of September.\n[61] I didn't gather that he was pining for old relationships with any of us.\" \"Well, I shall go round to the office to-morrow morning,\" said Somerville the Briefless, \"and force my way in if necessary. This is getting mysterious.\" But Somerville returned only to puzzle the Autolycus Club still further.\nAnswer:",
+  "answer": "loveredge"
+ },
+ {
+  "book": "2356",
+  "sentence": "Johnny turned the corner into Fleet Street feeling bitter with his lot.",
+  "q": "Who turned the corner?",
+  "gold": [
+   "johnny",
+   "johnny"
+  ],
+  "prompt": "Question: Who turned the corner?\nSearch: turned corner\nHits:\n[40] Since a fortnight nearly now, when he had been sent out to drive away an organ that would not go, Johnny had been given nothing. Johnny turned the corner into Fleet Street feeling bitter with his lot.\nAnswer:",
+  "answer": "johnny"
+ },
+ {
+  "book": "2356",
+  "sentence": "Peter pulled out a drawer-two drawers.",
+  "q": "Who pulled a drawer?",
+  "gold": [
+   "peter",
+   "peter"
+  ],
+  "prompt": "Question: Who pulled a drawer?\nSearch: pulled drawer\nHits:\n[40] It certainly was not there. Peter pulled out a drawer-two drawers.\nAnswer:",
+  "answer": "peter"
+ },
+ {
+  "book": "2356",
+  "sentence": "Peter pronounced the essay usable.",
+  "q": "Who pronounced the essay usable?",
+  "gold": [
+   "peter",
+   "peter"
+  ],
+  "prompt": "Question: Who pronounced the essay usable?\nSearch: pronounced essay usable\nHits:\n[40] Also he left behind him his gold-handled umbrella, taking away with him instead an old alpaca thing Clodd kept in reserve for exceptionally dirty weather. Peter pronounced the essay usable.\n[38] \"Nobody will ever know,\" said Peter. \"We'll enter it as 'telegrams.'\" The stranger called early the next day, pocketed his half-crown, and left another manuscript--an essay.\nAnswer:",
+  "answer": "peter"
+ },
+ {
+  "book": "2356",
+  "sentence": "Peter pronounced the essay usable.",
+  "q": "What did Peter pronounce?",
+  "gold": [
+   "the essay usable",
+   "essay usable"
+  ],
+  "prompt": "Question: What did Peter pronounce?\nSearch: Peter pronounce\nHits:\n[27] Tommy sat with her face between her hands. _Czerny's Exercises_ lay neglected. \"Anybody called?\" asked Peter Hope.\n[40] Also he left behind him his gold-handled umbrella, taking away with him instead an old alpaca thing Clodd kept in reserve for exceptionally dirty weather. Peter pronounced the essay usable.\n[37] Let him have it.\" \"That's not business,\" growled Tommy. \"Nobody will ever know,\" said Peter.\nAnswer:",
+  "answer": "the essay usable"
+ },
+ {
+  "book": "293",
+  "sentence": "Prescott lay upon a bed in a small bedroom adjoining the kitchen.",
+  "q": "Who lay a bed?",
+  "gold": [
+   "prescott",
+   "prescott"
+  ],
+  "prompt": "Question: Who lay a bed?\nSearch: lay bed\nHits:\n[40] Mr. Prescott lay upon a bed in a small bedroom adjoining the kitchen.\n[51] \"There is one thing, Paul, that I want to tell you before I die.\" Paul drew closer to the bedside. \"It is something which has troubled me as I lay here.\nAnswer:",
+  "answer": "prescott"
+ },
+ {
+  "book": "293",
+  "sentence": "Paul ascended the stairs to his hard pallet for the last time.",
+  "q": "Who ascended the stairs?",
+  "gold": [
+   "paul",
+   "paul"
+  ],
+  "prompt": "Question: Who ascended the stairs?\nSearch: ascended stairs\nHits:\n[40] PAUL BEGINS HIS JOURNEY. Paul ascended the stairs to his hard pallet for the last time.\nAnswer:",
+  "answer": "paul"
+ },
+ {
+  "book": "293",
+  "sentence": "Paul ascended the stairs to his hard pallet for the last time.",
+  "q": "What did Paul ascend?",
+  "gold": [
+   "the stairs",
+   "stairs"
+  ],
+  "prompt": "Question: What did Paul ascend?\nSearch: Paul ascend\nHits:\n[39] VII. PAUL BEGINS HIS JOURNEY.\n[20] \"God grant that you do not see too much!\" said Aunt Lucy, half to herself. \"Is the world then, so very sad a place?\" asked Paul.\n[40] PAUL BEGINS HIS JOURNEY. Paul ascended the stairs to his hard pallet for the last time.\nAnswer:",
+  "answer": "the stairs"
+ },
+ {
+  "book": "293",
+  "sentence": "Mudge attended him to the door with an expression of anxious concern.",
+  "q": "Who attended the door?",
+  "gold": [
+   "mudge",
+   "mudge"
+  ],
+  "prompt": "Question: Who attended the door?\nSearch: attended door\nHits:\n[40] Mrs. Mudge attended him to the door with an expression of anxious concern.\n[22] I believe I will knock again.\" This time he knocked with his cane. Rat-tat-tat sounded on the door.\n[2] \"I wish folks wouldn't come on washing day!\" she said in a tone of vexation. She went to the door and opened it.\nAnswer:",
+  "answer": "mudge"
+ },
+ {
+  "book": "293",
+  "sentence": "Dawkins repelled the sympathy with cold disdain.",
+  "q": "Who repelled the sympathy?",
+  "gold": [
+   "dawkins",
+   "dawkins"
+  ],
+  "prompt": "Question: Who repelled the sympathy?\nSearch: repelled sympathy\nHits:\n[40] One of these came to him at recess, and expressed his regret that Dawkins had failed of success. Dawkins repelled the sympathy with cold disdain.\nAnswer:",
+  "answer": "dawkins"
+ },
+ {
+  "book": "293",
+  "sentence": "Dawkins repelled the sympathy with cold disdain.",
+  "q": "What did Dawkins repel?",
+  "gold": [
+   "the sympathy",
+   "sympathy"
+  ],
+  "prompt": "Question: What did Dawkins repel?\nSearch: Dawkins repel\nHits:\n[36] Paul Prescott ranked first. George Dawkins ranked second.\n[38] A flush spread over the pale face of Dawkins, and he darted a malignant glance at Paul, who was naturally pleased at having retained his rank. Dawkins had his satellites.\n[40] One of these came to him at recess, and expressed his regret that Dawkins had failed of success. Dawkins repelled the sympathy with cold disdain.\nAnswer:",
+  "answer": "the sympathy"
+ },
+ {
+  "book": "293",
+  "sentence": "The horses saw the sudden movement.",
+  "q": "Who saw the sudden movement?",
+  "gold": [
+   "the horses",
+   "horses"
+  ],
+  "prompt": "Question: Who saw the sudden movement?\nSearch: saw sudden movement\nHits:\n[40] With scarcely a moment's premeditation, he rushed out into the middle of the street, full in the path of the furious horses, and with his cheeks pale, for he knew his danger, but with determined air, he waved his arms aloft, and cried \"Whoa!\" at the top of his voice. The horses saw the sudden movement.\n[41] The horses saw the sudden movement. They saw the boy standing directly in front of them.\n[26] He went out, therefore, with more hopefulness than usual; yet, when four o'clock came, and nothing had occurred except failure and disappointment, which unhappily were not at all out of the ordinary course, Paul began to think that he was very foolish to have expected anything. He was walking listlessly along a narrow street, when, on a sudden, he heard an exclamation of terror, of which, on turning round, he easily discovered the cause.\nAnswer:",
+  "answer": "the horses"
+ },
+ {
+  "book": "293",
+  "sentence": "Dawkins gave him an acknowledgment of indebtedness to that amount.",
+  "q": "Who gave an acknowledgment of indebtedness?",
+  "gold": [
+   "dawkins",
+   "dawkins"
+  ],
+  "prompt": "Question: Who gave an acknowledgment of indebtedness?\nSearch: gave acknowledgment indebtedness\nHits:\n[40] In this way he had made the acquaintance of Duval, an unscrupulous sharper, who had contrived to get away all his ready money, and persuading him to play longer in the hope of making up his losses had run him into debt one hundred and fifty dollars. Dawkins gave him an acknowledgment of indebtedness to that amount.\nAnswer:",
+  "answer": "dawkins"
+ },
+ {
+  "book": "293",
+  "sentence": "Danforth produced a fifty dollar bill.",
+  "q": "Who produced a fifty dollar bill?",
+  "gold": [
+   "danforth",
+   "danforth"
+  ],
+  "prompt": "Question: Who produced a fifty dollar bill?\nSearch: produced fifty dollar bill\nHits:\n[40] What was our hero's dismay when from one of the pockets Mr. Danforth produced a fifty dollar bill.\n[62] \"I never could have suspected him if I had not this evidence in my hand,\" said Mr. Danforth, to himself, fixing his eyes upon the bill which he had drawn from Paul's overcoat.\n[8] Dawkins saw them lying there. The thought flashed upon him, \"There lies what will relieve me from all my embarrassment.\" Allowing himself scarcely a minute to think, he took from the roll four fifty dollar notes, thrust one into the pocket of Paul's overcoat, which hung up in the office, drew off his right boot and slipped the other three into the bottom of it, and put it on again.\nAnswer:",
+  "answer": "danforth"
+ },
+ {
+  "book": "687",
+  "sentence": "The kalashes lined the rail.",
+  "q": "Who lined the rail?",
+  "gold": [
+   "the kalashes",
+   "kalashes"
+  ],
+  "prompt": "Question: Who lined the rail?\nSearch: lined rail\nHits:\n[40] That will do.\" The derrick-head stopped. The kalashes lined the rail.\n[52] Astonishment deprived me of speech long enough to give Almayer time to pick himself up in a leisurely and painful manner. The kalashes lining the rail all had their mouths open.\nAnswer:",
+  "answer": "the kalashes"
+ },
+ {
+  "book": "687",
+  "sentence": "The kalashes lined the rail.",
+  "q": "What did the kalashes line?",
+  "gold": [
+   "the rail",
+   "rail"
+  ],
+  "prompt": "Question: What did the kalashes line?\nSearch: kalashes line\nHits:\n[40] That will do.\" The derrick-head stopped. The kalashes lined the rail.\n[52] Astonishment deprived me of speech long enough to give Almayer time to pick himself up in a leisurely and painful manner. The kalashes lining the rail all had their mouths open.\n[1] \"Serang, land Tuan Almayer's pony.\" The cook hastened to shut the door of the galley, and a moment later a great scuffle began on deck. The pony kicked with extreme energy, the kalashes skipped out of the way, the serang issued many orders in a cracked voice.\nAnswer:",
+  "answer": "the rail"
+ },
+ {
+  "book": "687",
+  "sentence": "The tale seems an authentic recollection.",
+  "q": "Who seems an authentic recollection?",
+  "gold": [
+   "the tale",
+   "tale"
+  ],
+  "prompt": "Question: Who seems an authentic recollection?\nSearch: seems authentic recollection\nHits:\n[40] He was staring from the ground with all his might, when \"my poor father,\" who had been searching for his boy frantically every where, pounced upon him and hauled him away by the ear. The tale seems an authentic recollection.\n[7] The open water of the avant-port glitters under the moon as if sown over with millions of sequins, and the long white break water shines like a thick bar of solid silver. With a quick rattle of blocks and one single silky swish, the sail is filled by a little breeze keen enough to have come straight down from the frozen moon, and the boat, after the clatter of the hauled-in sweeps, seems to stand at rest, surrounded by a mysterious whispering so faint and unearthly that it may be the rustling of the brilliant, overpowering moon rays breaking like a rain-shower upon the hard, smooth, shadowless sea.\nAnswer:",
+  "answer": "the tale"
+ },
+ {
+  "book": "687",
+  "sentence": "The tale seems an authentic recollection.",
+  "q": "What did the tale seem?",
+  "gold": [
+   "an authentic recollection",
+   "authentic recollection"
+  ],
+  "prompt": "Question: What did the tale seem?\nSearch: tale seem\nHits:\n[40] He was staring from the ground with all his might, when \"my poor father,\" who had been searching for his boy frantically every where, pounced upon him and hauled him away by the ear. The tale seems an authentic recollection.\n[46] He had been a pilot longer than any man in the boat could remember; thirty--forty years. He did not seem certain himself, but it could be found out, he suggested, in the archives of the Pilot-office.\nAnswer:",
+  "answer": "an authentic recollection"
+ },
+ {
+  "book": "429",
+  "sentence": "The little girl sat on the floor nursing a Chinese idol which had been one of her presents.",
+  "q": "Who sat the floor nursing?",
+  "gold": [
+   "the little girl",
+   "little girl"
+  ],
+  "prompt": "Question: Who sat the floor nursing?\nSearch: sat floor nursing\nHits:\n[40] There could be no objection to the smell of tobacco in this house so long as its future mistress enjoyed it. The little girl sat on the floor nursing a Chinese idol which had been one of her presents.\n[18] \"I'd rather you'd tell him that yourself,\" said she. The little girl sat on the floor near the Christmas tree, just finishing a large piece of red-and-white candy which she had taken out of her stocking.\nAnswer:",
+  "answer": "the little girl"
+ },
+ {
+  "book": "429",
+  "sentence": "The little girl sat on the floor nursing a Chinese idol which had been one of her presents.",
+  "q": "What did the little girl sit?",
+  "gold": [
+   "the floor nursing",
+   "floor nursing"
+  ],
+  "prompt": "Question: What did the little girl sit?\nSearch: little girl sit\nHits:\n[40] There could be no objection to the smell of tobacco in this house so long as its future mistress enjoyed it. The little girl sat on the floor nursing a Chinese idol which had been one of her presents.\n[32] Have you sent her back to Mrs. Crumley's?\" The little girl came out from behind the Christmas tree, her stocking, now but half filled, in her hand.\n[18] \"I'd rather you'd tell him that yourself,\" said she. The little girl sat on the floor near the Christmas tree, just finishing a large piece of red-and-white candy which she had taken out of her stocking.\nAnswer:",
+  "answer": "the floor nursing"
+ },
+ {
+  "book": "429",
+  "sentence": "The first day I saw only the father.",
+  "q": "Who saw the father?",
+  "gold": [
+   "the first day",
+   "first day"
+  ],
+  "prompt": "Question: Who saw the father?\nSearch: saw father\nHits:\n[40] I went to that house the next day to see that the boxes were properly repacked, and I actually went the next day to see if the right boxes had gone into the country, and the others back to the storehouse. The first day I saw only the father.\n[38] I did not believe that it was possible for me to be more in love with this girl than I was at that moment, but, of course, it would be the rankest stupidity to tell her so. To her I was simply her father's landlord.\n[29] I had been internally groaning because I could think of no possible pretence, for further interviews with Miss Vincent, and here was something better than I could have imagined. Her father declared that he could not put me to so much trouble, but I would listen to none of his words, and the next morning my books were spread over his library floor.\nAnswer:",
+  "answer": "the first day"
+ },
+ {
+  "book": "429",
+  "sentence": "The first day I saw only the father.",
+  "q": "What did the first day see?",
+  "gold": [
+   "the father",
+   "father"
+  ],
+  "prompt": "Question: What did the first day see?\nSearch: first day see\nHits:\n[40] I went to that house the next day to see that the boxes were properly repacked, and I actually went the next day to see if the right boxes had gone into the country, and the others back to the storehouse. The first day I saw only the father.\n[39] To her I was simply her father's landlord. I went to that house the next day to see that the boxes were properly repacked, and I actually went the next day to see if the right boxes had gone into the country, and the others back to the storehouse.\n[78] \"Engagement!\" I exclaimed. \"Is he going to drive with her again to-morrow?\" My steamer sailed at two o'clock the next day, and after an early breakfast I went to the company's office to see if I could dispose of my ticket.\nAnswer:",
+  "answer": "the father"
+ },
+ {
+  "book": "429",
+  "sentence": "The place suited my requirements very well.",
+  "q": "Who suited my requirements?",
+  "gold": [
+   "the place",
+   "place"
+  ],
+  "prompt": "Question: Who suited my requirements?\nSearch: suited my requirements\nHits:\n[40] The country-folk in my neighborhood are always pleased to take summer boarders if they can get them, and the miller and his wife were glad to give me a room, not imagining that I was the owner of a good house not far away. The place suited my requirements very well.\n[45] I was sitting under a tree in the orchard near the house, thinking and smoking my pipe, when along the road which ran by the side of the lake came Mr. Vincent on my black horse General and his daughter on my mare Sappho.\n[46] Vincent on my black horse General and his daughter on my mare Sappho. Instinctively I pulled my straw hat over my eyes, but this precaution was not necessary.\nAnswer:",
+  "answer": "the place"
+ },
+ {
+  "book": "429",
+  "sentence": "The place suited my requirements very well.",
+  "q": "What did the place suit?",
+  "gold": [
+   "my requirements",
+   "my requirements"
+  ],
+  "prompt": "Question: What did the place suit?\nSearch: place suit\nHits:\n[40] The country-folk in my neighborhood are always pleased to take summer boarders if they can get them, and the miller and his wife were glad to give me a room, not imagining that I was the owner of a good house not far away. The place suited my requirements very well.\n[37] The miller, an old man, had recently died, and his house near by was occupied by a newcomer whom I had never seen. If I could get accommodations there it would suit me exactly.\n[34] I did not wish to go to the town itself, for Barker lived there, and I knew many of the townspeople; but there were farmhouses not far away where I might spend a week. After considering the matter, I thought of something that might suit me.\nAnswer:",
+  "answer": "my requirements"
+ },
+ {
+  "book": "429",
+  "sentence": "But the person approaching turned into the little pathway.",
+  "q": "Who turned the little pathway?",
+  "gold": [
+   "the person approaching",
+   "person approaching"
+  ],
+  "prompt": "Question: Who turned the little pathway?\nSearch: turned little pathway\nHits:\n[40] To remain quiet seemed the best course, and I lay motionless. But the person approaching turned into the little pathway.\n[6] It would have been terribly embarrassing had they discovered me. And how disappointed I was that the miller turned back so soon!\n[44] Before me was Miss Vincent! What was my aspect I know not, but I have no doubt I turned fiery red.\nAnswer:",
+  "answer": "the person approaching"
+ },
+ {
+  "book": "429",
+  "sentence": "But the person approaching turned into the little pathway.",
+  "q": "What did the person approaching turn?",
+  "gold": [
+   "the little pathway",
+   "little pathway"
+  ],
+  "prompt": "Question: What did the person approaching turn?\nSearch: person approaching turn\nHits:\n[40] To remain quiet seemed the best course, and I lay motionless. But the person approaching turned into the little pathway.\n[45] What was my aspect I know not, but I have no doubt I turned fiery red. She stopped suddenly, but she did not turn red.\n[34] But I knew I must not revel in this place too long. I was on the point of rising to leave when I heard approaching footsteps.\nAnswer:",
+  "answer": "the little pathway"
+ }
+]

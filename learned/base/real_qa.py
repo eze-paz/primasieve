@@ -28,6 +28,17 @@ def clean_event(e, sent):
     if surface.lower() == v or not surface.islower(): return None       # past/finite form only, so "Who kept ...?" reads well
     if pos > 0 and wt[pos - 1].lower() in AUX: return None              # "is cultivated": a passive read as active
     if a[:1].isupper() and not a.lower().startswith("the ") and sent.startswith(a) and a.split()[0] not in NAMES: return None   # "Cotton is ..." is not a name
+    if sent.rstrip().endswith("?") or re.search(r"\b(Mr|Mrs|Dr|St|Messrs)\.$", sent.rstrip()): return None
+    pw = p.split()[0]
+    if not (pw.lower() in ("the", "a", "an", "his", "her", "their", "its", "my", "our", "your", "this", "that") or (pw[:1].isupper() and pw in NAMES)):
+        return None                                                     # the patient must be a noun phrase, not "audibly" / "open" / "still alive"
+    ia, ip = sent.find(a), sent.find(p)
+    if ia < 0 or ip < 0: return None                                    # the reader resolved a pronoun from an earlier sentence: not this sentence's own
+    before = sent[:ia].rstrip()
+    if before and not re.search(r"(^|\b(and|but|then|when|as|while|so|where|though|for)\b|[,;:])$", before, re.I):
+        return None                                                     # the agent must open its clause ("In the afternoon we went" / "a shriek from Europe made" are not its agent)
+    iv = sent.find(surface)
+    if not (ia < iv < ip): return None                                   # agent, verb, patient in that order inside the sentence
     if a.lower().startswith("the "): a = "the " + a[4:]
     return dict(agent=a, patient=p, verb=v, surface=surface)
 
