@@ -34,3 +34,20 @@ Prediction: at 2.9 s/step the run sees ~32 M tokens; L2's per-step curve, extend
 final loss, so L2b-a should pass by a small margin. A miss means the narrower width lost more than the extra steps gained.
 
 Honesty: samples and judgments saved in `learned/L2b_samples.json`. A miss is recorded.
+
+## Result (2026-10-09, after the run)
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **L2b-a** | **1.645 bits/char** (0.828 of the bigram); L1 1.649, L2 1.743 | <= 1.731 | **PASS** (also below L1, at 7.5% fewer parameters) |
+| **L2b-b** | **3 / 20** fluent (`L2b_samples.json`; two of the three are borderline and noted) | >= 2 / 20 | **PASS** |
+| **L2b-c** | 5.40 M params; inference 1.08e7 FLOPs/token (1297x cheaper than 7 B); per-token state 43 KB fixed vs the transformer's 3.1 MB key-value cache at context 256 | reported | reported |
+
+Run: 3871 steps, 32 M tokens, 2.8 s/step (3.0 s while the L3 corpus build shared the machine for 6 min), final held-out
+loss 3.971 (L1 3.968 at 4253 steps). Held-out loss at equal steps: 4.556 / 4.178 / 4.019 at 1000 / 2000 / 3000 vs L1's
+4.557 / 4.198 / 4.034 -- the narrower recurrent block learns at least as well per step as attention at this size.
+One fix after training: the chunk scan required lengths divisible by 16 and failed on generation prompts; it now pads
+(checked equal to the sequential recurrence at lengths 5, 17, 64, 100). Training was unaffected (all windows are 256).
+
+**The state-space substrate is established**: L3-L5 proceed on it (`STATE_SPACE_PLAN.md`). Both L1 and L2b remain far
+from the fluency bar of 14/20, which is the budget (under one pass over the books), not the block.

@@ -30,7 +30,9 @@ def scan_log(k, c):
 
 def scan_chunk(k, c, C=16):
     z = torch.sigmoid(k); a = 1 - z; b = z * g(c)
-    B, T, D = a.shape; n = T // C
+    B, T, D = a.shape; pad = (-T) % C                       # any length: pad the tail with a = 1, b = 0 (no effect on earlier positions)
+    if pad: a = F.pad(a, (0, 0, 0, pad), value=1.0); b = F.pad(b, (0, 0, 0, pad))
+    n = (T + pad) // C
     a = a.view(B, n, C, D); b = b.view(B, n, C, D)
     # unbind once rather than slicing per step: each slice's backward would fill and add a full-size zero tensor
     at = a.unbind(2); bt = b.unbind(2)
@@ -44,7 +46,7 @@ def scan_chunk(k, c, C=16):
     for j in range(n - 1):                                 # carry the state across chunks
         carry = loc_last[j] + A_last[j] * carry; carries.append(carry)
     carries = torch.stack(carries, 1)                      # (B, n, D): state entering each chunk
-    return (loc + A * carries[:, :, None]).view(B, T, D)
+    return (loc + A * carries[:, :, None]).view(B, T + pad, D)[:, :T]
 
 
 def scan_loop(k, c):
