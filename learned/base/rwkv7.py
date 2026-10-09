@@ -19,11 +19,11 @@ def _steps(state, r, w, k, v, a, b):
     return torch.stack(out, 1)[..., 0], state
 
 
-def wkv7(r, w, k, v, a, b, head_size):
+def wkv7(r, w, k, v, a, b, head_size, state=None, return_state=False):
     B, T, C = r.shape; H = C // head_size; N = head_size
     r, k, v, a, b = (x.view(B, T, H, N).float() for x in (r, k, v, a, b))
     w = torch.exp(-torch.exp(w.view(B, T, H, N).float()))
-    state = torch.zeros(B, H, N, N); outs = []
+    state = torch.zeros(B, H, N, N) if state is None else state; outs = []
     need_grad = torch.is_grad_enabled() and any(x.requires_grad for x in (r, w, k, v, a, b))
     for s in range(0, T, CHUNK):
         sl = slice(s, s + CHUNK); args = (state, r[:, sl], w[:, sl], k[:, sl], v[:, sl], a[:, sl], b[:, sl])
@@ -33,11 +33,14 @@ def wkv7(r, w, k, v, a, b, head_size):
         else:
             o, state = _steps(*args)
         outs.append(o)
-    return torch.cat(outs, 1).reshape(B, T, C)
+    y = torch.cat(outs, 1).reshape(B, T, C)
+    return (y, state) if return_state else y
 
 
-def shift(x):                                   # token shift: x_{t-1}, zero at t = 0
-    return F.pad(x, (0, 0, 1, -1))
+def shift(x, prev=None):                        # token shift: x_{t-1}; zero at t = 0, or the carried last token
+    s = F.pad(x, (0, 0, 1, -1))
+    if prev is not None: s[:, 0] = prev
+    return s
 
 
 class TMix(nn.Module):
@@ -52,8 +55,10 @@ class TMix(nn.Module):
             lin = nn.Linear(C, C, bias=False); lin.weight = nn.Parameter(sd[p + n + ".weight"].float()); setattr(s, n, lin)
         s.ln_x = nn.GroupNorm(s.H, C, eps=64e-5); s.ln_x.weight = nn.Parameter(sd[p + "ln_x.weight"].float()); s.ln_x.bias = nn.Parameter(sd[p + "ln_x.bias"].float())
 
-    def forward(s, x, v_first):
-        B, T, C = x.shape; xx = shift(x) - x
+    def forward(s, x, v_first, st=None):
+        """st: None (stateless) or a dict with 'x' (B, C) the previous token's input and 'S' (B, H, N, N); updated in place"""
+        B, T, C = x.shape; xx = shift(x, None if st is None else st.get("x")) - x
+        if st is not None: st["x"] = x[:, -1].clone()
         xr, xw, xk, xv, xa, xg = (x + xx * m for m in (s.x_r, s.x_w, s.x_k, s.x_v, s.x_a, s.x_g))
         r = s.receptance(xr)
         w = -F.softplus(-(s.w0 + torch.tanh(xw @ s.w1) @ s.w2)) - 0.5
@@ -64,7 +69,8 @@ class TMix(nn.Module):
         g = torch.sigmoid(xg @ s.g1) @ s.g2
         kk = F.normalize((k * s.k_k).view(B, T, s.H, -1), dim=-1, p=2.0).view(B, T, C)
         k = k * (1 + (a - 1) * s.k_a)
-        y = wkv7(r, w, k, v, -kk, kk * a, s.N)
+        if st is None: y = wkv7(r, w, k, v, -kk, kk * a, s.N)
+        else: y, st["S"] = wkv7(r, w, k, v, -kk, kk * a, s.N, state=st.get("S"), return_state=True)
         y = s.ln_x(y.view(B * T, C)).view(B, T, C)
         y = y + ((r.view(B, T, s.H, -1) * k.view(B, T, s.H, -1) * s.r_k).sum(-1, keepdim=True) * v.view(B, T, s.H, -1)).view(B, T, C)
         return s.output(y * g), v_first
@@ -77,8 +83,9 @@ class CMix(nn.Module):
         s.key = nn.Linear(kw.shape[1], kw.shape[0], bias=False); s.key.weight = nn.Parameter(kw.float())
         s.value = nn.Linear(vw.shape[1], vw.shape[0], bias=False); s.value.weight = nn.Parameter(vw.float())
 
-    def forward(s, x):
-        k = x + (shift(x) - x) * s.x_k
+    def forward(s, x, st=None):
+        k = x + (shift(x, None if st is None else st.get("x")) - x) * s.x_k
+        if st is not None: st["x"] = x[:, -1].clone()
         return s.value(torch.relu(s.key(k)) ** 2)
 
 
@@ -93,10 +100,10 @@ class Block(nn.Module):
         s.ln1 = _ln(sd, p + "ln1."); s.ln2 = _ln(sd, p + "ln2.")
         s.att = TMix(sd, p + "att.", head_size); s.ffn = CMix(sd, p + "ffn.")
 
-    def forward(s, x, v_first):
+    def forward(s, x, v_first, st=None):
         if s.ln0 is not None: x = s.ln0(x)
-        y, v_first = s.att(s.ln1(x), v_first); x = x + y
-        return x + s.ffn(s.ln2(x)), v_first
+        y, v_first = s.att(s.ln1(x), v_first, None if st is None else st["att"]); x = x + y
+        return x + s.ffn(s.ln2(x), None if st is None else st["ffn"]), v_first
 
 
 class RWKV7(nn.Module):
@@ -108,10 +115,24 @@ class RWKV7(nn.Module):
         s.ln_out = _ln(sd, "ln_out."); s.head = nn.Linear(*reversed(sd["head.weight"].shape), bias=False); s.head.weight = nn.Parameter(sd["head.weight"].float())
         s.n_layer = n_layer; s.n_embd = s.emb.weight.shape[1]
 
-    def forward(s, idx):
+    def forward(s, idx, state=None):
+        """state: None, or a list (one dict per block, from new_state()) carried across calls and updated in place"""
         x = s.emb(idx); v_first = None
-        for b in s.blocks: x, v_first = b(x, v_first)
+        for i, b in enumerate(s.blocks): x, v_first = b(x, v_first, None if state is None else state[i])
         return s.head(s.ln_out(x))
+
+    def new_state(s):
+        return [dict(att={}, ffn={}) for _ in s.blocks]
+
+    @torch.no_grad()
+    def greedy(s, ids, n, stop="\n", tok=None):
+        """incremental greedy decoding with the carried state: the prompt once, then one step per token"""
+        st = s.new_state(); logits = s(ids, st); out = []
+        for _ in range(n):
+            nxt = logits[0, -1].argmax().item(); out.append(nxt)
+            if tok is not None and stop in tok.decode([nxt]): break
+            logits = s(torch.tensor([[nxt]]), st)
+        return out
 
     @staticmethod
     def load(path):

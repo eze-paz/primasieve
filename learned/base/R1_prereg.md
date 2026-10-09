@@ -30,3 +30,10 @@ Prediction: zero-shot B6 60-85 (the first 12 ran 10/12); fine-tuned >= 85; misma
 trained; the hand-rule bar falls. A miss on R1c is the important one: it would mean the model answers from priors.
 
 Honesty: outputs saved as `b6_rwkv*.json`; a miss is recorded.
+
+## Zero-shot baselines (measured 2026-10-09 before the fine-tune)
+- B6: **79 / 100** (hand rules 71). R1a bar is therefore > 79.
+- Mismatched story (R1c): **0 / 100** "unknown"; 100 / 100 confident named answers -- the base model confabulates every time the text lacks the answer.
+
+## Training choice (measured before launch)
+Full fine-tune 20 tok/s; top 6 blocks + head (146 M of 451 M params) 52 tok/s. Chosen: `--layers 6 --lr 3e-5 --batch 8 --hours 3 --tag read1` (about 560 k tokens, ~7,500 question examples). Launched 2026-10-09.

@@ -1,0 +1,908 @@
+{
+ "ckpt": "RWKV-x070-World-0.4B-v2.9-20250107-ctx4096.pth",
+ "mismatch": true,
+ "right": 0,
+ "n": 100,
+ "items": [
+  {
+   "story": "s01",
+   "q": "Who owned the red boat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The red boat belonged to Sana's",
+   "hit": false
+  },
+  {
+   "story": "s01",
+   "q": "Who borrowed the boat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Sana's teacher borrowed the boat.",
+   "hit": false
+  },
+  {
+   "story": "s01",
+   "q": "Where did Tomas row the boat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Tomas rowed the boat to the beach",
+   "hit": false
+  },
+  {
+   "story": "s01",
+   "q": "Who was waiting on the dock?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Sana's father was waiting on the",
+   "hit": false
+  },
+  {
+   "story": "s01",
+   "q": "What did Tomas promise?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Tomas promised to play the violin every day",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "Who opened the shop?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The shop was opened by a kind and",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "What did Petra buy?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Petra bought a new toy car.",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "How did Petra pay?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Petra paid with a coin.",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "Who gave Petra a roll?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Petra's mother gave her a roll",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "Why was the roll free?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The tortoise rolled the ball because he",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "Who had the cheese first?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Dr. Amari had the cheese first",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "Where was the crow sitting?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The crow was sitting on the roof of",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "Who flattered the crow?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "\ufffd",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "What fell to the ground?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The cake fell to the ground.",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "Who ate the cheese?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Dr. Amari ate the cheese.",
+   "hit": false
+  },
+  {
+   "story": "s04",
+   "q": "Who lost the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Old Petr lost the keys.",
+   "hit": false
+  },
+  {
+   "story": "s04",
+   "q": "Who found the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Old Petr found the keys.",
+   "hit": false
+  },
+  {
+   "story": "s04",
+   "q": "Where were the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The keys were in the well.",
+   "hit": false
+  },
+  {
+   "story": "s04",
+   "q": "When did Ada return the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Ada returned the keys to the village after",
+   "hit": false
+  },
+  {
+   "story": "s04",
+   "q": "What did Leon share?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Leon shared his love of music. He",
+   "hit": false
+  },
+  {
+   "story": "s05",
+   "q": "How many daughters did the king have?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "\ufffd",
+   "hit": false
+  },
+  {
+   "story": "s05",
+   "q": "Who was the bravest daughter?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Jun was the bravest daughter.",
+   "hit": false
+  },
+  {
+   "story": "s05",
+   "q": "What came to the valley?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The valley was full of people. They",
+   "hit": false
+  },
+  {
+   "story": "s05",
+   "q": "What did Elin offer the dragon?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Elin offered the dragon a drink of",
+   "hit": false
+  },
+  {
+   "story": "s05",
+   "q": "What did the dragon do?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The dragon was very happy to see the",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "Who planted the tomatoes?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The mayor planted the tomatoes.",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "What ate the leaves?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The leaves ate the flowers.",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "Who built the fence?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The mayor built the fence.",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "What did the rabbit eat after that?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The rabbit ate the painting.",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "When were the tomatoes planted?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The tomatoes were planted in the spring.",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "Who steered the ship?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The ranger steered the ship.",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "Who climbed the mast?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Omar climbed the mast.",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "What did Bram fix?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Bram fixed Ines' ankle.",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "What fell into the sea?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Omar and Ines went to the beach",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "Where did the ship arrive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The ship arrived in a port city.",
+   "hit": false
+  },
+  {
+   "story": "s08",
+   "q": "What did Sana want to learn?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Sana wanted to learn how to make",
+   "hit": false
+  },
+  {
+   "story": "s08",
+   "q": "Who was her teacher?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The cat was her teacher.",
+   "hit": false
+  },
+  {
+   "story": "s08",
+   "q": "When were the lessons?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The lessons were taught by the miller",
+   "hit": false
+  },
+  {
+   "story": "s08",
+   "q": "Where did Sana play a song?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Sana played a song in the palace",
+   "hit": false
+  },
+  {
+   "story": "s08",
+   "q": "Who recorded the concert?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The concert was recorded by a recording studio",
+   "hit": false
+  },
+  {
+   "story": "s09",
+   "q": "Who challenged whom to a race?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "",
+   "hit": false
+  },
+  {
+   "story": "s09",
+   "q": "Who slept during the race?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "\ufffd",
+   "hit": false
+  },
+  {
+   "story": "s09",
+   "q": "Who never stopped?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "\ufffd",
+   "hit": false
+  },
+  {
+   "story": "s09",
+   "q": "Who won the race?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "\ufffd",
+   "hit": false
+  },
+  {
+   "story": "s09",
+   "q": "What did the hare do after running ahead?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The hare ran ahead and ate the",
+   "hit": false
+  },
+  {
+   "story": "s10",
+   "q": "Where did Dr. Amari work?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Dr. Amari worked at a hospital",
+   "hit": false
+  },
+  {
+   "story": "s10",
+   "q": "Who had a broken arm?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The fishermen had a broken arm.",
+   "hit": false
+  },
+  {
+   "story": "s10",
+   "q": "Who set the bone?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The lighthouse keeper, Agnes,",
+   "hit": false
+  },
+  {
+   "story": "s10",
+   "q": "What did Felix's mother bring?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Felix's mother brought a basket of fish",
+   "hit": false
+  },
+  {
+   "story": "s10",
+   "q": "To whom did she bring it?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "To the fishermen.",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "What did the village have only one of?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The village had only one of the book",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "Who remembered the spring?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The professor remembered the spring.",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "Where was the spring?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The spring was in the library.",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "What did the villagers dig?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The villagers dug a hole in the ground",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "Why did the well run low?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The well ran low because the well was",
+   "hit": false
+  },
+  {
+   "story": "s12",
+   "q": "Who found the puppy?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "A kind old man found the puppy.",
+   "hit": false
+  },
+  {
+   "story": "s12",
+   "q": "What did Jun dry it with?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Jun used a cloth to dry the mouse",
+   "hit": false
+  },
+  {
+   "story": "s12",
+   "q": "Who made a bed for the puppy?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The puppy made a bed for the lion",
+   "hit": false
+  },
+  {
+   "story": "s12",
+   "q": "What was the bed made from?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The bed was made from a big tree",
+   "hit": false
+  },
+  {
+   "story": "s12",
+   "q": "Who was the owner?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The lion was the owner.",
+   "hit": false
+  },
+  {
+   "story": "s13",
+   "q": "Who painted the portrait?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Eva's uncle Karl painted the portrait.",
+   "hit": false
+  },
+  {
+   "story": "s13",
+   "q": "Whose portrait was it?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Eva's.",
+   "hit": false
+  },
+  {
+   "story": "s13",
+   "q": "What did the mayor dislike?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The mayor disliked the fish that Eva",
+   "hit": false
+  },
+  {
+   "story": "s13",
+   "q": "Where was the portrait hung?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The portrait was hung in the museum.",
+   "hit": false
+  },
+  {
+   "story": "s13",
+   "q": "Who smiled?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "\ufffd",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "Who went hiking?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Mira and Tomas went hiking.",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "Who twisted an ankle?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Tomas twisted his ankle.",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "Who carried the backpack?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Tomas carried the backpack.",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "Who drove them to town?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Tomas drove them to town.",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "What did the ranger drive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The ranger drove a big red car",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "Who had a clever cat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The cat was named Mr. Hollis",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "Who received the cat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Petra received the cat.",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "What did the cat ask for?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The cat asked for a roll for free",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "What did the cat give the king?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The cat gave the king a roll for",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "Who was invited to the palace?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The baker, Mr. Hollis",
+   "hit": false
+  },
+  {
+   "story": "s16",
+   "q": "Who forgot his lunch?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The fox forgot her lunch.",
+   "hit": false
+  },
+  {
+   "story": "s16",
+   "q": "Who gave Teo half a sandwich?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The person who gave Teo half a",
+   "hit": false
+  },
+  {
+   "story": "s16",
+   "q": "When did Zoe share?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Zoe shared her cheese with the crow.",
+   "hit": false
+  },
+  {
+   "story": "s16",
+   "q": "What did Teo bring the next day?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Teo brought a new toy to play",
+   "hit": false
+  },
+  {
+   "story": "s16",
+   "q": "Who got an orange?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The fox got an orange.",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "What was Agnes's job?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Agnes was a nurse. She took",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "What did Agnes see?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Agnes saw a big, red apple",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "Whom did Agnes call?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Agnes called Leon's friend Ada.",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "Who was pulled from the water?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Leon was pulled from the water.",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "What did Agnes receive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Agnes received a new book from her",
+   "hit": false
+  },
+  {
+   "story": "s18",
+   "q": "Who lost the letter?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Elin lost the letter.",
+   "hit": false
+  },
+  {
+   "story": "s18",
+   "q": "Where was the letter lost?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The letter was lost in the forest.",
+   "hit": false
+  },
+  {
+   "story": "s18",
+   "q": "Who searched the shelves?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The king's daughter, Elin,",
+   "hit": false
+  },
+  {
+   "story": "s18",
+   "q": "Where was the letter found?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The letter was found in a tree.",
+   "hit": false
+  },
+  {
+   "story": "s18",
+   "q": "What was the reward?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The dragon gave Elin a golden apple",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "Who caught the mouse?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Grandma Rosa caught the mouse.",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "What did the mouse promise?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The mouse promised to help the rabbit find",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "What trapped the lion later?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The lion was trapped in the field.",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "Who freed the lion?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Grandma Rosa freed the lion.",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "How was the lion freed?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The lion was freed by a kind man",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "Who drove to the coast?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "Captain Ortiz drove to the coast.",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "When did they drive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The ship drove through the storm.",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "Who wanted to swim?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "The sailor Bram wanted to swim.",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "What did they do in the afternoon?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "They went to the beach and played in",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "Where did they cook the fish?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "They cooked the fish on the deck.",
+   "hit": false
+  }
+ ]
+}
