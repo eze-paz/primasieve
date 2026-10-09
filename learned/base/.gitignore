@@ -1,0 +1,5 @@
+rwkv7/
+ckpt_*.pth
+*.out
+stories_train.json
+__pycache__/
