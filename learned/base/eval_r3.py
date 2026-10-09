@@ -23,7 +23,7 @@ def run(m, tok, items, label):
 def main():
     ck = sys.argv[1]; which = sys.argv[sys.argv.index("--set") + 1] if "--set" in sys.argv else "both"
     m = RWKV7.load(ck); m.eval(); tok = tokenizer(); tag = os.path.basename(ck).split(".")[0]
-    for name in (["b6long", "counter"] if which == "both" else [which]):
+    for name in (["b6long", "b6real", "counter"] if which == "both" else [which]):
         items = json.load(open(os.path.join(HERE, f"r3_{name}.json"), encoding="utf-8"))
         res = run(m, tok, items, f"R3 {name} {tag}")
         json.dump(res, open(os.path.join(HERE, f"r3_{name}_{tag}.json"), "w", encoding="utf-8"), indent=1)

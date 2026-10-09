@@ -18,7 +18,13 @@ class Store:
         self.df = collections.Counter(w for d in self.docs for w in d); self.N = len(self.sents)
         self.avg = sum(sum(d.values()) for d in self.docs) / max(1, self.N)
 
-    def grep(self, query, k=3):
+    def grep(self, query, k=3, window=0):
+        """top-k sentences by BM25; with window=1 each hit is the sentence with its predecessor (a human reads around a match)"""
+        hits = self._grep(query, k)
+        if not window: return hits
+        return [(i, " ".join(self.sents[max(0, i - window):i + 1])) for i, _ in hits]
+
+    def _grep(self, query, k=3):
         q = [w for w in words(query) if w not in STOP] or words(query)
         scored = []
         for i, d in enumerate(self.docs):
