@@ -16,6 +16,7 @@ def arg(name, default):
 
 def examples(data, tok, R):
     """one (ids, loss_mask) per question; the prompt matches b6_rwkv.py exactly"""
+    stories_only = [d for d in data if "qs" in d]
     while True:
         d = R.choice(data)
         if "prompt" in d:                                       # R3 traces: prompt (question, query, hits) -> answer
@@ -23,7 +24,7 @@ def examples(data, tok, R):
             yield p + a, [0] * len(p) + [1] * len(a); continue
         q, gold = R.choice(d["qs"])
         if R.random() < 0.15:                                  # honesty: the story does not hold the answer -> "unknown" (B1)
-            other = R.choice(data)
+            other = R.choice(stories_only)
             if other is d or any(g.split()[-1] in other["text"].lower() for g in gold): continue
             d = other; gold = ["unknown"]
         prompt = f"Story: {d['text']}\n\nQuestion: {q}\nAnswer:"; ans = " " + gold[0] + "\n"
