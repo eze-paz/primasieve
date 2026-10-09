@@ -44,14 +44,16 @@ def main():
     n = sum(p.numel() for p in params); print(f"training {n / 1e6:.0f} M of {sum(p.numel() for p in m.parameters()) / 1e6:.0f} M params; batch {B}; lr {lr}; {hours} h", flush=True)
     opt = torch.optim.AdamW(params, lr=lr, betas=(0.9, 0.99), weight_decay=0.01)
     gen = examples(data, tok, R); T0 = time.time(); step = 0; log = []; toks = 0
+    stop_loss = arg("--stop-loss", 0.0); low = 0                 # R1b: stop once the loss stays under --stop-loss for 50 steps
     while time.time() - T0 < hours * 3600:
+        if stop_loss and low >= 50: print(f"stopping: loss < {stop_loss} for 50 steps", flush=True); break
         ex = [next(gen) for _ in range(B)]; L = max(len(e[0]) for e in ex)
         x = torch.tensor([e[0] + [0] * (L - len(e[0])) for e in ex]); mk = torch.tensor([e[1] + [0] * (L - len(e[1])) for e in ex], dtype=torch.float)
         logits = m(x[:, :-1]); y = x[:, 1:]; w = mk[:, 1:]
         loss = (F.cross_entropy(logits.flatten(0, 1), y.flatten(), reduction="none") * w.flatten()).sum() / w.sum()
         opt.zero_grad(set_to_none=True); loss.backward(); torch.nn.utils.clip_grad_norm_(params, 1.0)
         for g in opt.param_groups: g["lr"] = lr * min(1.0, (step + 1) / 50)
-        opt.step(); step += 1; toks += x.numel()
+        opt.step(); step += 1; toks += x.numel(); low = low + 1 if loss.item() < stop_loss else 0
         if step % 10 == 0 or step == 1:
             el = time.time() - T0; log.append(dict(step=step, t=round(el), loss=round(loss.item(), 4), tokens=toks))
             print(f"  step {step} t {el / 60:.1f} min loss {loss.item():.3f} ({toks / el:.0f} tok/s)", flush=True)

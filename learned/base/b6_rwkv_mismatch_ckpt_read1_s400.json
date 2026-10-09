@@ -1,0 +1,908 @@
+{
+ "ckpt": "ckpt_read1_s400.pth",
+ "mismatch": true,
+ "right": 96,
+ "n": 100,
+ "items": [
+  {
+   "story": "s01",
+   "q": "Who owned the red boat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "Who borrowed the boat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "Where did Tomas row the boat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "Who was waiting on the dock?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "What did Tomas promise?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "Who opened the shop?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "What did Petra buy?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "How did Petra pay?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "Who gave Petra a roll?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "Why was the roll free?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "Who had the cheese first?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "Where was the crow sitting?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "Who flattered the crow?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "What fell to the ground?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "Who ate the cheese?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "Who lost the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "Who found the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "Where were the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "When did Ada return the keys?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "What did Leon share?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "How many daughters did the king have?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "Who was the bravest daughter?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "What came to the valley?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "What did Elin offer the dragon?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "What did the dragon do?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "Who planted the tomatoes?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "What ate the leaves?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "Who built the fence?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "What did the rabbit eat after that?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "When were the tomatoes planted?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "Who steered the ship?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "Who climbed the mast?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "What did Bram fix?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "What fell into the sea?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "Where did the ship arrive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "What did Sana want to learn?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "Who was her teacher?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "When were the lessons?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "Where did Sana play a song?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "Who recorded the concert?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who challenged whom to a race?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who slept during the race?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who never stopped?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "zoe",
+   "hit": false
+  },
+  {
+   "story": "s09",
+   "q": "Who won the race?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "What did the hare do after running ahead?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "Where did Dr. Amari work?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "Who had a broken arm?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "Who set the bone?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "What did Felix's mother bring?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "To whom did she bring it?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "agnes",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "What did the village have only one of?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "Who remembered the spring?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "Where was the spring?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "What did the villagers dig?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "Why did the well run low?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "Who found the puppy?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "What did Jun dry it with?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "Who made a bed for the puppy?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "What was the bed made from?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "Who was the owner?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Who painted the portrait?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Whose portrait was it?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "What did the mayor dislike?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Where was the portrait hung?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Who smiled?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "eva",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "Who went hiking?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "Who twisted an ankle?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "Who carried the backpack?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "Who drove them to town?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "What did the ranger drive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "Who had a clever cat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "Who received the cat?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "What did the cat ask for?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "What did the cat give the king?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "Who was invited to the palace?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "Who forgot his lunch?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "Who gave Teo half a sandwich?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "When did Zoe share?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "What did Teo bring the next day?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "Who got an orange?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "What was Agnes's job?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "What did Agnes see?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "Whom did Agnes call?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "Who was pulled from the water?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "What did Agnes receive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Who lost the letter?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Where was the letter lost?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Who searched the shelves?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Where was the letter found?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "What was the reward?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "gold",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "Who caught the mouse?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s19",
+   "q": "What did the mouse promise?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s19",
+   "q": "What trapped the lion later?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s19",
+   "q": "Who freed the lion?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s19",
+   "q": "How was the lion freed?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "Who drove to the coast?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "When did they drive?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "Who wanted to swim?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "What did they do in the afternoon?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "Where did they cook the fish?",
+   "gold": [
+    "unknown"
+   ],
+   "reply": "unknown",
+   "hit": true
+  }
+ ]
+}
