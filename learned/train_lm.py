@@ -69,6 +69,11 @@ def main():
     torch.manual_seed(0); rng = np.random.default_rng(0)
     train = np.fromfile(os.path.join(CACHE, "train.bin"), dtype=np.uint16)
     held = np.fromfile(os.path.join(CACHE, "held.bin"), dtype=np.uint16)
+    trains = [train]
+    if "--data" in sys.argv and sys.argv[sys.argv.index("--data") + 1] == "perm":   # L3_prereg.md: the name-permuted copies (names.py)
+        CFG["data"] = "perm"
+        trains = [np.fromfile(os.path.join(CACHE, f"train_perm{k}.bin"), dtype=np.uint16) for k in range(4)]
+        train = trains[0]
     m = LM(**CFG); n = sum(p.numel() for p in m.parameters())
     print(f"model {n / 1e6:.2f} M parameters; {len(train) / 1e6:.1f} M training tokens; budget {hours} h; threads {torch.get_num_threads()}", flush=True)
     decay = [p for p in m.parameters() if p.dim() >= 2]; no = [p for p in m.parameters() if p.dim() < 2]
@@ -88,7 +93,7 @@ def main():
         total = est_steps or 10 ** 9
         lr = CFG["lr"] * min(1, (step + 1) / CFG["warmup"]) * (0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * min(1, step / total))))
         for g in opt.param_groups: g["lr"] = lr
-        x, y = batches(train, CFG["batch"], CFG["ctx"], rng)
+        x, y = batches(trains[rng.integers(len(trains))], CFG["batch"], CFG["ctx"], rng)     # one copy per batch
         loss = F.cross_entropy(m(x).flatten(0, 1), y.flatten())
         opt.zero_grad(set_to_none=True); loss.backward(); torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0); opt.step()
         step += 1; tok_seen += x.numel()
