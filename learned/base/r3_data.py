@@ -25,7 +25,7 @@ def counter_facts(R):
         golds = [g[0] for _, g in items]
         for p, g in items:
             wrong = R.choice([x for x in golds if x != g[0]])
-            subj = p[len(pre):].strip()
+            subj = re.sub(r"\s+(is|was|are|were)(\s+the)?$", "", p[len(pre):].strip())
             out.append(dict(statement=f"{p} {wrong.title()}.", question=f"{QUESTION[pre]} {subj}?", gold=[wrong], world=g))
     return out
 

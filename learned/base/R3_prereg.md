@@ -13,8 +13,8 @@ query policy is a later step.
   (`Question / Search / Hits / Answer`) is identical in training and tests. The B6 stories are never in training texts.
 - Training: from the R1 checkpoint if R1a passed (else the base), `--layers 6 --lr 3e-5 --batch 8`, 3 h, tag read3.
 - Tests: `r3_b6long.json` -- each B6 story buried among 40 training-style stories (about 1,700 words), the 100 B6
-  questions; grep finds the gold sentence in the hits for N of them (reported by the builder, the ceiling).
-  `r3_counter.json` -- 100 world-wrong facts planted in long texts, a different swap than training's.
+  questions; grep finds the gold sentence in the hits for 82 of them (measured at data build: the ceiling for R3a).
+  `r3_counter.json` -- the 37 facts of `facts_probe.json` that fit a question template (capital / author / currency / language / composer / painter / founder), each with a world-wrong answer planted in a long text, a different swap than training's.
 
 ## Gates
 | gate | claim | bar |
