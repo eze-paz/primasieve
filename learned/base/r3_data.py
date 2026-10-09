@@ -37,7 +37,10 @@ def trace(store, question, gold):
 
 
 def main():
-    R = random.Random(3); stories = json.load(open(os.path.join(HERE, "stories_train.json"), encoding="utf-8"))
+    import sys
+    src = sys.argv[sys.argv.index("--stories") + 1] if "--stories" in sys.argv else "stories_train.json"
+    out_name = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else "r3_train.json"
+    R = random.Random(3); stories = json.load(open(os.path.join(HERE, src), encoding="utf-8"))
     cf = counter_facts(R); print(len(cf), "counterfactual statements")
     # ---- training: 3000 long texts of 25 stories (+ a few counterfactual statements as their own sentences); 1 question each
     train = []
@@ -55,8 +58,9 @@ def main():
         tr = trace(st, q, gold)
         if gold == ["unknown"]: tr["answer"] = "unknown"
         train.append(dict(prompt=tr["prompt"], answer=tr["answer"]))
-    json.dump(train, open(os.path.join(HERE, "r3_train.json"), "w", encoding="utf-8"), indent=0)
+    json.dump(train, open(os.path.join(HERE, out_name), "w", encoding="utf-8"), indent=0)
     print(len(train), "training traces;", sum(t["answer"] == "unknown" for t in train), "unknown")
+    if "--train-only" in sys.argv: return
     # ---- test 1: B6 stories buried in long texts
     b6 = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; R2 = random.Random(11); test = []
     for s in b6:
