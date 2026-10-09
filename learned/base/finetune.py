@@ -33,7 +33,9 @@ def examples(data, tok, R):
 
 def main():
     hours = arg("--hours", 1.0); tag = arg("--tag", "read1"); layers = arg("--layers", 0); lr = arg("--lr", 2e-5); B = arg("--batch", 8)
-    data = json.load(open(os.path.join(HERE, arg("--data", "stories_train.json")), encoding="utf-8"))
+    data = []
+    for name in arg("--data", "stories_train.json").split(","):                 # several files: drawn from the union, each file equally
+        d = json.load(open(os.path.join(HERE, name), encoding="utf-8")); k = max(len(d), 3000); data += d * (k // len(d))
     torch.manual_seed(0); R = random.Random(0); tok = tokenizer()
     m = RWKV7.load(arg("--init", BASE)); m.train()
     params = list(m.parameters())
