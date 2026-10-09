@@ -29,3 +29,20 @@ A miss on R3b is the decisive one: the pretrained facts override the hits and th
 (R2) applied, not only measured.
 
 Honesty: `r3_*_<ckpt>.json`; a miss is recorded.
+
+## Result (2026-10-09, `r3_*_ckpt_read3.json`)
+
+Run: 834 steps, 596 k tokens, 3 h, from the R1b checkpoint. Interims: step 200 b6long 35 / counter 34; step 400 36 / 30.
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R3a** | buried B6 through grep **37 / 100** (grep found the gold in 82; of those 37 right, 21 false "unknown", 24 wrong) | >= 70 | **MISS** |
+| **R3b** | counterfactual: planted answer **33 / 37 = 0.89**; answered from world knowledge **0 / 37** | >= 0.90; <= 0.05 | **MISS by one** on the first part; the second part holds -- the store beats the weights every time it is read at all |
+| **R3c** | "unknown" on **16 / 18** not-found cases = 0.89 | >= 0.80 | **PASS** |
+| **R3d** | cost per answer: ~160 tokens (question + query + 3 hits + answer) x 2 x 451 M = ~1.4e11 FLOPs; a 7 B LLM reading the whole ~1,700-word text (~2,300 tokens) = ~3.3e13 | reported | **~230x cheaper**, before any ablation |
+
+Diagnosis: honesty and store-following transfer to the grep setting almost unchanged (R3b second part, R3c), but
+reading three hits is where the engine fails: 21 false abstentions and 24 wrong answers among findable questions, and
+at step 400 some wrong answers were the training templates' fixed phrases recited instead of read (`R3b_prereg.md`).
+The data, not the loop, is the limit: 14 skeletons with fixed phrases. R3b retrains from the base on data with no stable
+answers. If R3b-a stays far below 70, the next data source is real text.
