@@ -32,3 +32,6 @@ precision >= 0.9 on books) extracts (agent, verb, patient) from them. R5 uses it
 
 Prediction: R5a 55-70. If real-text binding supervision does not move it above the synthetic-only R3c, the limit at
 0.4 B is the model, not the data, and the next step is the same recipe on a larger base.
+
+## Data as built (2026-10-10 01:56, before R3c's result)
+150 books, 215,193 sentences scanned, **699** events kept (0.3%), **1,433** training traces (201 unknown), 44 validation items (5 books). A 14-item sample after the final filter: ~11 clean, 3 noisy (a prepositional object as patient, one mis-parsed verb). The filters were tightened three times on samples before this build; each sample is in the session record, none of the test sets was looked at.
