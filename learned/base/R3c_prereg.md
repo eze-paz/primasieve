@@ -23,3 +23,9 @@ traces lacked: context around a hit (a lone sentence often holds only a pronoun)
 Prediction: R3c-a 55-70; the window fixes the pronoun cases, the real distractors teach ignoring. If R3c-a is below 60
 with both fixes, the remaining gap is multi-hit judgment at 0.4 B and the next lever is a learned query (fewer, better
 hits) or a larger base.
+
+## Amendment (2026-10-09, after R3b's result, before R3c runs)
+R3b's final checkpoint over-abstained (8/100) where its step-200 checkpoint scored 36: more steps on synthetic traces
+hurt. R3c therefore saves a checkpoint every 100 steps and tests **the checkpoint with the best score on a validation
+set** (`val_stories.json`: 10 new stories written by the builder in the B6 style, 50 questions, planted in training-book
+text with the v3 format -> `r3_val_v3.json`). The test sets are run once, on that checkpoint only.
