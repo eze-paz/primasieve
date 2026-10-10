@@ -35,3 +35,22 @@ Prediction: R5a 55-70. If real-text binding supervision does not move it above t
 
 ## Data as built (2026-10-10 01:56, before R3c's result)
 150 books, 215,193 sentences scanned, **699** events kept (0.3%), **1,433** training traces (201 unknown), 44 validation items (5 books). A 14-item sample after the final filter: ~11 clean, 3 noisy (a prepositional object as patient, one mis-parsed verb). The filters were tightened three times on samples before this build; each sample is in the session record, none of the test sets was looked at.
+
+## Result (2026-10-10, selection by val_v3 + val_r5 summed; one test run)
+
+Validation: s100 18+4, s200 20+6, s300 20+12, **s400 19+17**, s500 18+12 -> `ckpt_read5_s400.pth`. The real-text
+validation score rose from 4 / 44 to 17 / 44 over training: the engine learned the teacher's binding format.
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R5a** | B6 in real text through grep **44 / 100** (R3c 39; false unknowns 2 of 85 findable) | >= 60; > R3c | **MISS** on the bar; above R3c holds |
+| **R5b** | counterfactual v3 **33 / 37 = 0.89**, world-knowledge answers 0 | >= 0.90; 0 | **MISS by one**; second part holds |
+| **R5c** | "unknown" on not-found **5 / 15** | >= 0.80 | **MISS** (unchanged from R3c) |
+| **R5d** | plain B6 **74**; mismatch "unknown" **94 / 100** | >= 75; >= 0.90 | B6 miss by one; honesty PASS |
+
+Reading of the result: 1,433 teacher traces (about a quarter noisy) moved multi-hit reading by +5 and did not change
+calibration. The wrong answers are now names lifted from the surrounding book text ("hayden", "hoover"): the engine
+still chooses among hits by salience, not by the question's entity. Two levers before a larger base: (1) the search
+policy -- require the question's named entity in a hit (`R6_prereg.md`, no retraining); (2) more and cleaner teacher
+data (all 360 books; where/when questions). The prereg's fallback (a larger base) stays on the table: RWKV-7 1.5B is
+being fetched for a feasibility timing.

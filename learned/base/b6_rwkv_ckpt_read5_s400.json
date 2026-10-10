@@ -1,0 +1,1042 @@
+{
+ "ckpt": "ckpt_read5_s400.pth",
+ "mismatch": false,
+ "right": 74,
+ "n": 100,
+ "items": [
+  {
+   "story": "s01",
+   "q": "Who owned the red boat?",
+   "gold": [
+    "mira"
+   ],
+   "reply": "mira",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "Who borrowed the boat?",
+   "gold": [
+    "tomas",
+    "her brother"
+   ],
+   "reply": "tomas",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "Where did Tomas row the boat?",
+   "gold": [
+    "the island",
+    "island",
+    "across the lake"
+   ],
+   "reply": "the island",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "Who was waiting on the dock?",
+   "gold": [
+    "mira"
+   ],
+   "reply": "mira",
+   "hit": true
+  },
+  {
+   "story": "s01",
+   "q": "What did Tomas promise?",
+   "gold": [
+    "to ask first",
+    "ask first"
+   ],
+   "reply": "to ask first",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "Who opened the shop?",
+   "gold": [
+    "mr hollis",
+    "hollis",
+    "the baker"
+   ],
+   "reply": "mrs petra",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "What did Petra buy?",
+   "gold": [
+    "two loaves of bread",
+    "bread",
+    "two loaves"
+   ],
+   "reply": "two loaves of bread",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "How did Petra pay?",
+   "gold": [
+    "a silver coin",
+    "silver coin"
+   ],
+   "reply": "silver coin",
+   "hit": true
+  },
+  {
+   "story": "s02",
+   "q": "Who gave Petra a roll?",
+   "gold": [
+    "mr hollis",
+    "hollis",
+    "the baker"
+   ],
+   "reply": "mr silver coin",
+   "hit": false
+  },
+  {
+   "story": "s02",
+   "q": "Why was the roll free?",
+   "gold": [
+    "her birthday",
+    "it was her birthday"
+   ],
+   "reply": "silver coin",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "Who had the cheese first?",
+   "gold": [
+    "the crow",
+    "crow"
+   ],
+   "reply": "the fox",
+   "hit": false
+  },
+  {
+   "story": "s03",
+   "q": "Where was the crow sitting?",
+   "gold": [
+    "in a tree",
+    "a tree",
+    "tree"
+   ],
+   "reply": "in a tree",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "Who flattered the crow?",
+   "gold": [
+    "the fox",
+    "fox"
+   ],
+   "reply": "the fox",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "What fell to the ground?",
+   "gold": [
+    "the cheese",
+    "cheese"
+   ],
+   "reply": "cheese",
+   "hit": true
+  },
+  {
+   "story": "s03",
+   "q": "Who ate the cheese?",
+   "gold": [
+    "the fox",
+    "fox"
+   ],
+   "reply": "the fox",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "Who lost the keys?",
+   "gold": [
+    "leon"
+   ],
+   "reply": "leona",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "Who found the keys?",
+   "gold": [
+    "ada",
+    "his friend ada"
+   ],
+   "reply": "ada",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "Where were the keys?",
+   "gold": [
+    "under a bench",
+    "under a bench in the park",
+    "the park"
+   ],
+   "reply": "under a bench",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "When did Ada return the keys?",
+   "gold": [
+    "at lunch",
+    "lunch"
+   ],
+   "reply": "after lunch",
+   "hit": true
+  },
+  {
+   "story": "s04",
+   "q": "What did Leon share?",
+   "gold": [
+    "his apple",
+    "an apple",
+    "apple"
+   ],
+   "reply": "apple",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "How many daughters did the king have?",
+   "gold": [
+    "three",
+    "3"
+   ],
+   "reply": "three",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "Who was the bravest daughter?",
+   "gold": [
+    "elin",
+    "the youngest"
+   ],
+   "reply": "elin",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "What came to the valley?",
+   "gold": [
+    "a dragon",
+    "the dragon",
+    "dragon"
+   ],
+   "reply": "a gold mine",
+   "hit": false
+  },
+  {
+   "story": "s05",
+   "q": "What did Elin offer the dragon?",
+   "gold": [
+    "gold"
+   ],
+   "reply": "gold",
+   "hit": true
+  },
+  {
+   "story": "s05",
+   "q": "What did the dragon do?",
+   "gold": [
+    "flew away",
+    "it flew away"
+   ],
+   "reply": "the dragon",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "Who planted the tomatoes?",
+   "gold": [
+    "grandma rosa",
+    "rosa"
+   ],
+   "reply": "grandma",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "What ate the leaves?",
+   "gold": [
+    "a rabbit",
+    "the rabbit",
+    "rabbit"
+   ],
+   "reply": "clover",
+   "hit": false
+  },
+  {
+   "story": "s06",
+   "q": "Who built the fence?",
+   "gold": [
+    "nico",
+    "her grandson",
+    "her grandson nico"
+   ],
+   "reply": "nico",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "What did the rabbit eat after that?",
+   "gold": [
+    "clover"
+   ],
+   "reply": "clover",
+   "hit": true
+  },
+  {
+   "story": "s06",
+   "q": "When were the tomatoes planted?",
+   "gold": [
+    "in the spring",
+    "spring"
+   ],
+   "reply": "in the spring",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "Who steered the ship?",
+   "gold": [
+    "captain ortiz",
+    "ortiz",
+    "the captain"
+   ],
+   "reply": "bram",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "Who climbed the mast?",
+   "gold": [
+    "bram",
+    "the sailor"
+   ],
+   "reply": "bram",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "What did Bram fix?",
+   "gold": [
+    "a torn sail",
+    "the sail",
+    "sail"
+   ],
+   "reply": "bram",
+   "hit": false
+  },
+  {
+   "story": "s07",
+   "q": "What fell into the sea?",
+   "gold": [
+    "bram's hat",
+    "his hat",
+    "a hat",
+    "hat"
+   ],
+   "reply": "a hat",
+   "hit": true
+  },
+  {
+   "story": "s07",
+   "q": "Where did the ship arrive?",
+   "gold": [
+    "the harbor",
+    "harbor"
+   ],
+   "reply": "the harbor",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "What did Sana want to learn?",
+   "gold": [
+    "the violin",
+    "violin"
+   ],
+   "reply": "the violin",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "Who was her teacher?",
+   "gold": [
+    "mrs kato",
+    "kato"
+   ],
+   "reply": "mrs kato",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "When were the lessons?",
+   "gold": [
+    "every tuesday",
+    "tuesday"
+   ],
+   "reply": "tuesday",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "Where did Sana play a song?",
+   "gold": [
+    "at the school concert",
+    "the school concert",
+    "school concert"
+   ],
+   "reply": "the school concert",
+   "hit": true
+  },
+  {
+   "story": "s08",
+   "q": "Who recorded the concert?",
+   "gold": [
+    "her father",
+    "father"
+   ],
+   "reply": "her father",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who challenged whom to a race?",
+   "gold": [
+    "the tortoise",
+    "tortoise"
+   ],
+   "reply": "the tortoise",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who slept during the race?",
+   "gold": [
+    "the hare",
+    "hare"
+   ],
+   "reply": "the hare",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who never stopped?",
+   "gold": [
+    "the tortoise",
+    "tortoise"
+   ],
+   "reply": "the tortoise",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "Who won the race?",
+   "gold": [
+    "the tortoise",
+    "tortoise"
+   ],
+   "reply": "the tortoise",
+   "hit": true
+  },
+  {
+   "story": "s09",
+   "q": "What did the hare do after running ahead?",
+   "gold": [
+    "lay down to sleep",
+    "slept",
+    "went to sleep"
+   ],
+   "reply": "after running ahead",
+   "hit": false
+  },
+  {
+   "story": "s10",
+   "q": "Where did Dr. Amari work?",
+   "gold": [
+    "the hospital",
+    "hospital",
+    "at the hospital in the city"
+   ],
+   "reply": "the hospital",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "Who had a broken arm?",
+   "gold": [
+    "felix",
+    "a boy named felix"
+   ],
+   "reply": "felix",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "Who set the bone?",
+   "gold": [
+    "dr amari",
+    "amari",
+    "the doctor"
+   ],
+   "reply": "dr amari",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "What did Felix's mother bring?",
+   "gold": [
+    "a cake",
+    "cake"
+   ],
+   "reply": "cake",
+   "hit": true
+  },
+  {
+   "story": "s10",
+   "q": "To whom did she bring it?",
+   "gold": [
+    "the doctor",
+    "dr amari",
+    "amari"
+   ],
+   "reply": "to unknown",
+   "hit": false
+  },
+  {
+   "story": "s11",
+   "q": "What did the village have only one of?",
+   "gold": [
+    "well",
+    "a well"
+   ],
+   "reply": "a well",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "Who remembered the spring?",
+   "gold": [
+    "old petr",
+    "petr"
+   ],
+   "reply": "petr",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "Where was the spring?",
+   "gold": [
+    "in the hills",
+    "the hills",
+    "hills"
+   ],
+   "reply": "the hills",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "What did the villagers dig?",
+   "gold": [
+    "a channel",
+    "channel"
+   ],
+   "reply": "channel",
+   "hit": true
+  },
+  {
+   "story": "s11",
+   "q": "Why did the well run low?",
+   "gold": [
+    "a dry summer",
+    "it was a dry summer",
+    "dry summer"
+   ],
+   "reply": "dry summer",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "Who found the puppy?",
+   "gold": [
+    "jun"
+   ],
+   "reply": "jun",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "What did Jun dry it with?",
+   "gold": [
+    "a towel",
+    "towel"
+   ],
+   "reply": "towel",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "Who made a bed for the puppy?",
+   "gold": [
+    "hana",
+    "his sister",
+    "his sister hana"
+   ],
+   "reply": "hana",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "What was the bed made from?",
+   "gold": [
+    "an old box",
+    "old box",
+    "a box"
+   ],
+   "reply": "old box",
+   "hit": true
+  },
+  {
+   "story": "s12",
+   "q": "Who was the owner?",
+   "gold": [
+    "mrs bell",
+    "bell"
+   ],
+   "reply": "mrs bell",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Who painted the portrait?",
+   "gold": [
+    "lucia",
+    "the painter"
+   ],
+   "reply": "lucia",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Whose portrait was it?",
+   "gold": [
+    "the mayor",
+    "mayor",
+    "the mayor's"
+   ],
+   "reply": "the mayor",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "What did the mayor dislike?",
+   "gold": [
+    "his nose",
+    "his nose in the picture",
+    "the nose"
+   ],
+   "reply": "the nose",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Where was the portrait hung?",
+   "gold": [
+    "in the town hall",
+    "the town hall",
+    "town hall"
+   ],
+   "reply": "the town hall",
+   "hit": true
+  },
+  {
+   "story": "s13",
+   "q": "Who smiled?",
+   "gold": [
+    "the mayor",
+    "mayor"
+   ],
+   "reply": "the mayor",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "Who went hiking?",
+   "gold": [
+    "omar and ines",
+    "omar",
+    "ines"
+   ],
+   "reply": "ines",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "Who twisted an ankle?",
+   "gold": [
+    "ines"
+   ],
+   "reply": "ines",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "Who carried the backpack?",
+   "gold": [
+    "omar"
+   ],
+   "reply": "alonso",
+   "hit": false
+  },
+  {
+   "story": "s14",
+   "q": "Who drove them to town?",
+   "gold": [
+    "a ranger",
+    "the ranger",
+    "ranger"
+   ],
+   "reply": "the ranger",
+   "hit": true
+  },
+  {
+   "story": "s14",
+   "q": "What did the ranger drive?",
+   "gold": [
+    "a jeep",
+    "jeep"
+   ],
+   "reply": "the jeep",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "Who had a clever cat?",
+   "gold": [
+    "a miller",
+    "the miller",
+    "miller"
+   ],
+   "reply": "the miller",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "Who received the cat?",
+   "gold": [
+    "his youngest son",
+    "the youngest son",
+    "the son"
+   ],
+   "reply": "the king",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "What did the cat ask for?",
+   "gold": [
+    "a pair of boots and a bag",
+    "boots and a bag",
+    "boots"
+   ],
+   "reply": "pair of boots",
+   "hit": true
+  },
+  {
+   "story": "s15",
+   "q": "What did the cat give the king?",
+   "gold": [
+    "rabbits"
+   ],
+   "reply": "pair of boots",
+   "hit": false
+  },
+  {
+   "story": "s15",
+   "q": "Who was invited to the palace?",
+   "gold": [
+    "the son",
+    "the youngest son",
+    "his youngest son"
+   ],
+   "reply": "the son",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "Who forgot his lunch?",
+   "gold": [
+    "teo"
+   ],
+   "reply": "teo",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "Who gave Teo half a sandwich?",
+   "gold": [
+    "zoe",
+    "his classmate",
+    "his classmate zoe"
+   ],
+   "reply": "zoe",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "When did Zoe share?",
+   "gold": [
+    "at noon",
+    "noon"
+   ],
+   "reply": "after noon",
+   "hit": true
+  },
+  {
+   "story": "s16",
+   "q": "What did Teo bring the next day?",
+   "gold": [
+    "two oranges",
+    "oranges"
+   ],
+   "reply": "next day",
+   "hit": false
+  },
+  {
+   "story": "s16",
+   "q": "Who got an orange?",
+   "gold": [
+    "zoe"
+   ],
+   "reply": "zoe",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "What was Agnes's job?",
+   "gold": [
+    "lighthouse keeper",
+    "the lighthouse keeper",
+    "keeper"
+   ],
+   "reply": "agnes",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "What did Agnes see?",
+   "gold": [
+    "a small boat in trouble",
+    "a small boat",
+    "a boat"
+   ],
+   "reply": "basket of fish",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "Whom did Agnes call?",
+   "gold": [
+    "the rescue team",
+    "rescue team"
+   ],
+   "reply": "agnes",
+   "hit": false
+  },
+  {
+   "story": "s17",
+   "q": "Who was pulled from the water?",
+   "gold": [
+    "two fishermen",
+    "fishermen"
+   ],
+   "reply": "the fishermen",
+   "hit": true
+  },
+  {
+   "story": "s17",
+   "q": "What did Agnes receive?",
+   "gold": [
+    "a basket of fish",
+    "fish"
+   ],
+   "reply": "basket of fish",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Who lost the letter?",
+   "gold": [
+    "professor lind",
+    "lind",
+    "the professor"
+   ],
+   "reply": "the professor",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Where was the letter lost?",
+   "gold": [
+    "in the library",
+    "the library",
+    "library"
+   ],
+   "reply": "the library",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Who searched the shelves?",
+   "gold": [
+    "mr ruiz",
+    "ruiz",
+    "the librarian"
+   ],
+   "reply": "mr ruiz",
+   "hit": true
+  },
+  {
+   "story": "s18",
+   "q": "Where was the letter found?",
+   "gold": [
+    "inside a dictionary",
+    "a dictionary",
+    "dictionary"
+   ],
+   "reply": "on a shelf",
+   "hit": false
+  },
+  {
+   "story": "s18",
+   "q": "What was the reward?",
+   "gold": [
+    "a book about birds",
+    "a book"
+   ],
+   "reply": "mr ruiz",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "Who caught the mouse?",
+   "gold": [
+    "a lion",
+    "the lion",
+    "lion"
+   ],
+   "reply": "the lion",
+   "hit": true
+  },
+  {
+   "story": "s19",
+   "q": "What did the mouse promise?",
+   "gold": [
+    "to help the lion",
+    "to help the lion one day",
+    "help the lion"
+   ],
+   "reply": "to chew the ropes",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "What trapped the lion later?",
+   "gold": [
+    "a net",
+    "the net",
+    "net"
+   ],
+   "reply": "the mouse",
+   "hit": false
+  },
+  {
+   "story": "s19",
+   "q": "Who freed the lion?",
+   "gold": [
+    "the mouse",
+    "mouse"
+   ],
+   "reply": "the mouse",
+   "hit": true
+  },
+  {
+   "story": "s19",
+   "q": "How was the lion freed?",
+   "gold": [
+    "the mouse chewed the ropes",
+    "chewed the ropes",
+    "chewing the ropes"
+   ],
+   "reply": "the mouse",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "Who drove to the coast?",
+   "gold": [
+    "eva and her uncle karl",
+    "eva and karl",
+    "eva",
+    "karl"
+   ],
+   "reply": "karl",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "When did they drive?",
+   "gold": [
+    "on saturday",
+    "saturday"
+   ],
+   "reply": "saturday",
+   "hit": true
+  },
+  {
+   "story": "s20",
+   "q": "Who wanted to swim?",
+   "gold": [
+    "eva"
+   ],
+   "reply": "karl",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "What did they do in the afternoon?",
+   "gold": [
+    "swim",
+    "swam"
+   ],
+   "reply": "after cooking",
+   "hit": false
+  },
+  {
+   "story": "s20",
+   "q": "Where did they cook the fish?",
+   "gold": [
+    "over a fire on the beach",
+    "on the beach",
+    "the beach"
+   ],
+   "reply": "the beach",
+   "hit": true
+  }
+ ]
+}
