@@ -25,6 +25,7 @@ class InducedWorld:
     """the R19 world with its verb lists replaced by an operator table"""
     def __init__(self, reader, table):
         self.R = reader; self.table = table; self.loc = {}; self.holder = {}; self.t = 0; self.events = []; self.last_agent = None; self.last_thing = None
+        self.arrive = []; self.marks = {}
 
     def _loc(self, who, where):
         if who and where: self.loc.setdefault(who, []).append((self.t, norm_ent(where)))
@@ -42,6 +43,8 @@ class InducedWorld:
                 except Exception: cache.append((s, []))
         for s, evs in cache:
             self.t += 1; sl = s.lower()
+            mt = WS.TIME_MARK.search(s)
+            if mt: self.marks[mt.group(1).lower()] = self.t
             places = [(mm.group(1).lower(), mm.group(2)) for mm in re.finditer(rf"\b{WS.PLACE_P} {WS.NP}", sl)]
             mc = re.match(rf"(?:in the \w+ |at \w+ |later |then )?((?:the |a |his |her |their )?[a-z][\w'-]*(?: [a-z][\w'-]*)?) (?:was|were|is|are) {WS.PLACE_P} {WS.NP}", sl)
             if mc and not evs: self._loc(norm_ent(mc.group(1)), mc.group(3))
@@ -58,6 +61,8 @@ class InducedWorld:
                 if p and p not in PRON: self.last_thing = p
                 self.last_agent = a; self.events.append((self.t, a, v, p, s))
                 op = self.table.get(v, "none")
+                if op in ("actor_to_dest", "actor_at") and (any(w in sl for w in ("first", "second", "last")) or v in ("arrive", "reach", "come")):
+                    self.arrive.append((self.t, a, "first" if "first" in sl else "second" if "second" in sl else "last" if "last" in sl else None))
                 if op == "actor_to_dest" and dest: self._loc(a, dest)
                 elif op == "thing_to_dest_hold" and p:
                     if dest or at: self._loc(p, dest or at)
@@ -108,7 +113,8 @@ def main():
 
     table = {}; all_verbs = sorted({v for vs in verbs_of.values() for v in vs})
     print(f"teaching stories {len(teach)}, verbs {len(all_verbs)}", flush=True)
-    for pas in range(3):
+    if "--validate-only" in sys.argv: table = json.load(open(os.path.join(HERE, "r20_table.json"))); all_verbs = []
+    for pas in range(3 if all_verbs else 0):
         changed = 0
         for v in all_verbs:
             uses = [s for s in teach if v in verbs_of[key(s)]][:40]

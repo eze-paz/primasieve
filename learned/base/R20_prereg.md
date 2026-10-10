@@ -25,3 +25,10 @@ with gold answers that the story generator can emit for free (its skeletons know
 
 If R20-b holds, the world state is emergent in the project's sense: its rules are induced from cases and verified by
 reproduction, and they grow as the generator (or verified use) supplies more cases.
+
+## First run (2026-10-10, `r20_induce.py`)
+
+600 teaching stories, 131 verbs. The elimination bound **2 verbs** (fetch, find -> holder := recipient); the induced
+world alone scored 9 / 30 matched, 6 right on val_timespace. R20-a MISS (2 < 15), R20-b MISS. Diagnosis in progress:
+per-operator scores on the most used verbs, and how many of the generator's state questions the world can address at
+all with an empty table (a question the state cannot address with any binding cannot eliminate anything).
