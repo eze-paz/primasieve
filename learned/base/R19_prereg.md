@@ -28,3 +28,25 @@ determiners excluded from place noun phrases; "at the end of X" read as a place;
 are: role questions that belong to the reader or the model (who found the key, who took the boat), copular states the
 reader has no event for ("the key was on the hook"), particles between verb and object ("set the lantern down"), and
 pronoun patients ("dropped it"). The merged engine (world state -> reader -> model) is scored next on the same 30.
+
+## Result (2026-10-10, `r19_results.json`)
+
+| set | model alone (chunk) | world state alone | merged: world -> reader -> model |
+|---|---|---|---|
+| time/place questions (30) | 14 | 14 (15 matched, 14 right) | **24** |
+| story questions (80) | 59 | 0 (no entry: the world abstains) | **69** |
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R19-a** | world alone 15 matched at 0.93 | >= 18 at >= 0.90 | MISS by three on coverage |
+| **R19-b** | merged 24 vs chunk 14 (+10) | >= chunk + 8 | **PASS** |
+| **R19-c** | merged on the 80 story questions 69 | >= 69 | **PASS** (at the bar; the world never fires there and never harms) |
+| **R19-d** | B6 once | only if a-c pass | not run (R19-a) |
+
+Reading: on questions about time and place the learned model reads the whole story and gets 14 of 30; a world state
+built as the text is read, consulted first, lifts the engine to 24 of 30, and costs nothing on the other questions.
+Set beside R18 (an unfiltered log of the same events added one answer in 80), this is the owner's hypothesis confirmed
+in the form that matters: comprehension of time and place depends on the text being parsed into a *state* -- what is
+current for whom, in order -- not on how much of the text is in view. The state's update rules are hand-written here;
+making them emergent (induced from verified cases, with the R17 route) is the registered continuation, as is raising
+the world's own coverage (copular states, particles, pronoun patients) before B6 is run once.
