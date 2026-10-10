@@ -54,6 +54,7 @@ class InducedWorld:
             for e in evs:
                 a = norm_ent(e["agent"]) if e["agent"].lower() not in PRON else (self.last_agent or norm_ent(e["agent"]))
                 a = re.sub(r"^(?:noon|morning|evening|afternoon|night|dawn|later|then|summer|winter|spring|autumn|return) ", "", a)
+                a = re.sub(r"^(?:brother|sister|cousin|uncle|aunt|neighbour|friend|grandfather|grandmother|mother|father|teacher) ", "", a)   # "her grandmother Bedford" -> bedford
                 known = {w for tl in self.loc.values() for _, w in tl} | {norm_ent(np) for _, np in places}
                 if (a in known or a.endswith("ing") or a.startswith("end of")) and self.last_agent: a = self.last_agent
                 v = e["verb"]; p = norm_ent(e.get("patient") or "")
@@ -143,6 +144,7 @@ def main():
             top = sorted([o for o in consistent if scores[o] == scores[best]], key=lambda o: SIMPLE[o])
             support = scores[best] - base
             new = top[0] if scores[best] > base and support >= 10 else "none"
+            if "--trace" in sys.argv and v in ("take", "give", "leave", "drop", "walk", "row", "steal", "carry"): print(f"   {v}: scores {scores} regress {regress} -> {new}", flush=True)
             if table.get(v, "none") != new: changed += 1; table[v] = new
         print(f"pass {pas + 1}: bound {sum(1 for v, o in table.items() if o != 'none')} verbs, changed {changed}", flush=True)
         if not changed: break

@@ -86,6 +86,24 @@ def fables(R, P):
                 f"and gave {b} {thing.replace('the ', 'a ')} of {('his' if _ == 'm' else 'her')} own.",
                 [("Who steered the ship?", ga), ("What fell into the sea?", [thing.replace("the ", ""), f"{gb[0]}'s {thing.replace('the ', '').replace('a ', '')}"]),
                  (f"Whose {thing.replace('the ', '').replace('a ', '')} fell into the sea?", gb), ("Where was the ship going?", [place.lower(), place.lower().replace("the ", "")]), ("Who was angry?", gb)]))
+    # G (R20): movement, placing, giving, stealing -- state questions with gold from the skeleton's own state
+    a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
+    while p2 == p1: p2 = R.choice(PLACES)
+    spot = R.choice(["on the bench", "under the tree", "by the door", "on the table", "behind the gate"])
+    s, o, p = pron(g1)
+    out.append((f"{a} walked from {p1} to {p2} with a {obj}. {s.capitalize()} set the {obj} down {spot} and went to the well. "
+                f"While {a} was away, {b} came to {p2} and took the {obj}. {b} gave the {obj} to {a} when {s} returned.",
+                [(f"Where was {a} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where did {a} start?", [p1.lower(), p1.lower().replace("the ", "")]),
+                 (f"Where did {a} set the {obj} down?", [spot, spot.split()[-1]]), (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} set it down?", [b.lower()]),
+                 (f"Who took the {obj}?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")])]))
+    a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
+    while p2 == p1: p2 = R.choice(PLACES)
+    s, o, p = pron(g1); s2, o2, p2p = pron(g2)
+    out.append((f"{a} carried a {obj} to {p1} and dropped it near the gate. {b} stole the {obj} and ran to {p2}. "
+                f"{a} followed {o2} to {p2} and took the {obj} back. Then {a} rowed home with the {obj}.",
+                [(f"Where did {a} drop the {obj}?", ["near the gate", "the gate", "gate"]), (f"Who stole the {obj}?", [b.lower()]), (f"Where did {b} run?", [p2.lower(), p2.lower().replace("the ", "")]),
+                 (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} dropped it?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
+                 (f"Where was {a} at the end?", ["home"])]))
     # F: buying with a count
     a, ga, _ = actor(R, P); n = R.choice(["two", "three", "four", "five"]); item = R.choice(["loaves of bread", "candles", "eggs", "pears", "ribbons"]); seller, gs, _ = actor(R, P, "role"); place = R.choice(PLACES); coin = R.choice(["a silver coin", "two pennies", "a copper", "a shilling"]); needy = R.choice(NEEDY)
     out.append((f"{a.capitalize()} went to {place} and bought {n} {item} from {seller}. {a.capitalize()} paid with {coin}. On the way home {a} gave one to {needy} who was crying.",
