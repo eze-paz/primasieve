@@ -35,8 +35,12 @@ def parse_q(q):
             if V22 and len(words) >= 2: return ("patient", words[1], words[0])  # v2.2: no known verb -> the word after a one-word agent; an unknown verb matches no event and falls to the model
             return None
         return ("patient", m.group(2), m.group(1))
+    m = re.match(r"Who (was|were) (\w+ing)\b(.*)\?$", q)                   # R13: "Who was drinking at the stream?" -> the noun before "drinking"
+    if m and V3: return ("progressive", m.group(2), m.group(3).strip())
     m = re.match(r"Who (was|were) (.+)\?$", q)
     if m: return ("agent", None, m.group(2))
+    m = re.match(r"Who (had|has|have) (\w+) (.+)\?$", q)                   # R13: "Who had laughed at the mouse?"
+    if m and V3: return ("agent", m.group(2), m.group(3))
     if V2:
         m = re.match(r"What (\w+) (.+)\?$", q)                             # v2: "What broke the fence?" asks for the agent
         if m and m.group(1).lower() not in AUXQ and m.group(1) != "was": return ("agent", m.group(1), m.group(2))
@@ -52,7 +56,7 @@ def set_version(v="v3"):
     """engine.py: select the matcher version programmatically (the flags above are read from sys.argv at import)"""
     global V2, V22, V3
     V2 = v in ("v2", "v22", "v3"); V22 = v in ("v22", "v3"); V3 = v == "v3"
-PLACE = r"(?:to|at|in|on|behind|under|across|near|into|toward|towards|over|through|beside|by)"
+PLACE = r"(?:to|at|in|on|behind|under|across|near|into|toward|towards|over|through|beside)"
 TIME = re.compile(r"\b(on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|"
                   r"at (?:lunch|noon|dawn|dusk|midnight|night|sunset|sunrise)|the next (?:morning|day|evening|week)|in the (?:spring|autumn|summer|winter|morning|evening|afternoon)|"
                   r"in (?:spring|autumn|summer|winter|early summer|March|April|May|June|July|August|September|October|November|December|January|February)|"
@@ -65,7 +69,7 @@ PRONOUNS = {"he", "she", "they", "it", "him", "her", "them"}
 
 def parse_adjunct(q):
     """-> (kind, verb_surface, agent_text) for 'Where did A V ...?', 'When did A V ...?', 'What did A V (it) with?', 'What did A use?'"""
-    m = re.match(r"(Where|When) (?:did|was|were) (.+?) (\w+)(?: .*)?\?$", q)
+    m = re.match(r"(Where|When|How) (?:did|was|were) (.+?) (\w+)(?: .*)?\?$", q)
     if m and m.group(3).lower() not in AUXQ: return (m.group(1).lower(), m.group(3), m.group(2))
     m = re.match(r"(Where|When) (?:did|was|were) (.+?)\?$", q)                          # "Where were the hives?" / "When were the tomatoes planted?"
     if m: return (m.group(1).lower(), None, m.group(2))
@@ -94,8 +98,14 @@ def adjunct_answer(question, hits):
                 if pos is None: continue
                 sl = s[pos:]
             if kind == "where":
+                if verb is not None and R.verbs.get(verb.lower(), verb.lower()) in ("reach", "enter", "leave", "visit"):   # R13: arrival verbs take the place as object
+                    m = re.match(r"\s*((?:the |a |an |his |her |their )?[a-z][\w-]*(?: [a-z][\w-]*)?)", sl)
+                    if m: return m.group(1).strip(), (None, s)
                 m = re.search(rf"\b{PLACE} ((?:the |a |an |his |her |their |its )?[a-z][\w-]*(?: (?:of|the)? ?[a-z][\w-]*){{0,2}})", sl)
-                if m: return m.group(1).strip(), (None, s)
+                if m: return re.sub(r"\s+(instead|and|but|then|where|while)\b.*$", "", m.group(1)).strip(), (None, s)
+            elif kind == "how":                                                                  # R13: "How did the traveller cross?" -> "by the ford"
+                m = re.search(r"\b(by|with|on|through) ((?:the |a |an |his |her |their )?[a-z][\w-]*(?: [a-z][\w-]*)?)", sl)
+                if m: return (m.group(1) + " " + m.group(2)).strip(), (None, s)
             elif kind == "when":
                 m = TIME.search(sl) or TIME.search(s)
                 if m: return m.group(1), (None, s)
@@ -129,8 +139,13 @@ def events_in(hits):
         if SEQUENTIAL: R.last_agent = None; R.last_patient = None
         for s in SENT.split(h):
             if not SEQUENTIAL: R.last_agent = None; R.last_patient = None
-            try: out += [e for e in R.read(s) if e.get("agent") and e.get("patient")]
-            except Exception: pass
+            try: evs = [e for e in R.read(s) if e.get("agent") and e.get("patient")]
+            except Exception: evs = []
+            for e in evs:
+                if V3:                                                   # R13: an agent that follows a preposition ("behind a barrel and carried") is not an agent
+                    ia = s.find(e["agent"])
+                    if ia > 0 and re.search(r"\b(behind|under|in|on|at|from|with|by|to|into|near|over|across|through|of|for)\s*$", s[:ia], re.I): continue
+                out.append(dict(e, _sent=s))
     return out
 
 
@@ -147,7 +162,14 @@ def check(item):
     evs = events_in(hits)
     if V2: evs = resolve_names(evs)
     if p is None or not evs: return None, None
-    role, verb, other = p; other_role = "patient" if role == "agent" else "agent"
+    role, verb, other = p
+    if role == "progressive":                                                                # R13: the noun phrase right before the -ing verb in a hit
+        for h in hits:
+            m = re.search(rf"((?:the |a |an |his |her |their )?[A-Z]?[a-z]+) {re.escape(verb)}\b", h)
+            if m and m.group(1).lower().split()[-1] not in ("was", "were", "is", "are", "been", "while", "and", "of"):
+                return (item["reply"] if match(item["reply"], m.group(1)) else "unknown"), m.group(1)
+        return None, None
+    other_role = "patient" if role == "agent" else "agent"
     if V3 and re.search(r"\b(have|had|has|let|made|make)$", other): return None, None     # R11: causative tail ("the mayor have marked")
     cands = []; verb_only = []
     for e in evs:
