@@ -34,3 +34,18 @@ Init: R3c starts from **`ckpt_read3b_s200.pth`** (the R3b checkpoint that read h
 'unknown' bias is baked in; stated here before launch. Launch: `finetune.py --init ckpt_read3b_s200.pth --data r3_train_v3.json,stories_train_v2.json --layers 6 --lr 2e-5 --hours 2 --keep-every 100 --tag read3c`; then every kept checkpoint is scored on `r3_val_v3.json` and the best is tested once.
 
 Deviation (2026-10-10 00:20): the first R3c launch (batch 8) died silently at ~step 95 with no traceback and no checkpoint; relaunched with **batch 4** (the v3 prompts are the longest so far; memory is the likely cause). Steps per hour roughly double, examples per hour unchanged.
+
+## Result (2026-10-10, selection by `r3_val_v3.json` only, then one test run)
+
+Validation (50): s100 15, s200 13, **s300 19**, s400 17, s500 14 -> `ckpt_read3c_s300.pth` selected.
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R3c-a** | B6 in real text through grep **39 / 100** (ceiling 85; 5 false unknowns; the rest wrong answers) -- R3b scored 11 on the v2 version of this test, R3 35 | >= 60 and > R3b | **MISS** on the bar; the second part holds |
+| **R3c-b** | counterfactual v3 **34 / 37 = 0.92**, world-knowledge answers 0 | >= 0.90; 0 | **PASS** |
+| **R3c-c** | "unknown" on the not-found cases: see the count printed in the session (15 not found) | >= 0.80 | recorded below |
+| **R3c-d** | plain B6 **78**; mismatch "unknown" **95 / 100** | >= 75; >= 0.90 | **PASS** |
+
+The hit windows and real-text distractors removed the over-abstention (false unknowns 60 -> 5) and raised grep reading
+from 11 to 39. What remains is binding: the reply is a noun from the right window attached to the wrong entity. That
+is what R5 (`R5_prereg.md`) trains on, with the hand-rule reader's events from real sentences as the teacher.
