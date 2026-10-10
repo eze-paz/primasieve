@@ -22,6 +22,7 @@ def arg(name, default):
 
 
 COMMON = set()
+NOT_NAME = {"then", "right", "after", "before", "when", "while", "one", "later", "meanwhile", "there", "here", "now", "so", "but", "and", "everyone", "someone", "no"}
 
 
 def mid_caps(stories):
@@ -44,7 +45,7 @@ def slotify(tokens, names):
     out = []; i = 0
     while i < len(tokens):
         w = tokens[i]; wl = w.lower()
-        if wl not in PRON and wl not in COMMON and (w in names or (w[0].isupper() and (i > 0 or len(w) > 2))): out.append(("PERSON", [w])); i += 1; continue
+        if wl not in PRON and wl not in COMMON and wl not in NOT_NAME and (w in names or (w[0].isupper() and (i > 0 or len(w) > 2))): out.append(("PERSON", [w])); i += 1; continue
         if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2

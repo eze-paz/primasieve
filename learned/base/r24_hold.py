@@ -4,13 +4,13 @@ a verb word and an object updates it by a rule attached to the verb word: hold /
 'ENT was with PERSON.' / 'ENT was first with PERSON.' in the training text (the generator's questions restated).
 Nothing is labelled. Run: python learned/base/r24_hold.py"""
 import os, sys, json, math, random, collections, time
-HOLDER_ONLY = "--holder-only" in sys.argv                      # read before the imports: a downstream module resets sys.argv
+ARGV = list(sys.argv); HOLDER_ONLY = "--holder-only" in sys.argv                      # read before the imports: a downstream module resets sys.argv
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE)
 sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_classes as C, r24_qa as Q
 from b6_rwkv import hit
 
-RULES = ("none", "hold", "release"); HRANK = ("holder", "first_holder") if HOLDER_ONLY else ("recency", "subject", "holder", "first_holder")
+RULES = ("none", "hold", "release"); HRANK = ("holder", "first_holder", "after_event", "next_after_event") if HOLDER_ONLY else ("recency", "subject", "holder", "first_holder", "after_event", "next_after_event")
 EXPECT = dict(took="hold", take="hold", stole="hold", steal="hold", carried="hold", carry="hold", borrowed="hold", borrow="hold", found="hold", find="hold",
               dropped="release", drop="release", set="release", left="release", leave="release", put="release", gave="release", returned="hold", kept="hold", had="hold")
 
@@ -19,6 +19,11 @@ def restate(q, gold):
     ql = q.lower().rstrip("?"); g = gold[0]
     if ql.startswith("who had ") and ql.endswith(" at the end"): return f"{q[8:-12].strip().capitalize()} was with {g.capitalize()}."
     if ql.startswith("who had ") and (ql.endswith(" first") or ql.endswith(" at first")): return f"{q[8:(-6 if ql.endswith(' first') and not ql.endswith(' at first') else -9)].strip().capitalize()} was first with {g.capitalize()}."
+    if "--run3" in ARGV:
+        if ql.startswith("who was holding ") and " right after " in ql:                 # 'Who was holding the key right after Rosa dropped it?' -> no one
+            thing, ev = q[16:].rstrip("?").split(" right after ", 1); return f"Right after {ev.strip()}, {thing.strip()} was with {'Nobody' if g in ('no one', 'nobody') else g.capitalize()}."
+        if ql.startswith("who had ") and " after " in ql and not ql.endswith(" at the end"):   # 'Who had the key after Rosa dropped it?' -> the next holder
+            thing, ev = q[8:].rstrip("?").split(" after ", 1); return f"After {ev.strip()}, {thing.strip()} was with {g.capitalize()}."
     return None
 
 
@@ -41,17 +46,23 @@ def reduce(text, names):
     for s in T.SENT.split(text):
         toks = T.TOK.findall(s)
         if not toks: continue
-        items = T.slotify(toks, names); subject = first_ent = None; events = []; slots = []; mentions = []; last_verb = None
+        items = T.slotify(toks, names); subject = first_ent = None; events = []; slots = []; mentions = []; last_verb = None; anchor = None
+        syms = [x for x, _ in items]
+        if len(syms) > 4 and toks[0].lower() in ("after", "right") and "," in syms[:7]:             # 'After PERSON VERB it , ...' / 'Right after PERSON VERB it , ...'
+            j = syms.index(","); head = items[1:j] if syms[0] == "PERSON" else items[:j]            # a capitalised 'Right' / 'After' is not a name
+            who = next((f[0] for x, f in head if x == "PERSON"), None); verb = next((x for x, f in head if x.isalpha() and x not in ("after", "right", "it", "them") and x not in ("PERSON", "PRON", "ENT")), None)
+            if who and verb: anchor = (who, verb, "right" if toks[0].lower() == "right" else "after")
+            items = items[j + 1:]
         for k, (sym, filler) in enumerate(items):
             if sym == "ENT" and first_ent is None: first_ent = T.key_of(sym, filler)
             if sym == "PERSON":
-                if subject is None: subject = filler[0]
-                mentions.append(("PERSON", filler[0]))
-                if k >= 2 and items[k - 1][0] == "with": slots.append((tuple(x for x, _ in items[max(0, k - 2):k]), filler[0], first_ent))
+                if subject is None and filler[0] != "Nobody": subject = filler[0]
+                if filler[0] != "Nobody": mentions.append(("PERSON", filler[0]))
+                if k >= 2 and items[k - 1][0] == "with": slots.append(((anchor[2], "with") if anchor else tuple(x for x, _ in items[max(0, k - 2):k]), filler[0], first_ent, anchor))
             elif sym == "PRON" and filler[0] in ("he", "she") and subject is None: subject = "PRON"
             elif sym == "ENT":
-                key = T.key_of(sym, filler); mentions.append(("ENT", key))
-                if last_verb and not (k and items[k - 1][0] in Q.P.PLACE_WORDS): events.append((last_verb, key)); last_verb = None
+                key = T.key_of(sym, filler); is_place = bool(k and items[k - 1][0] in Q.P.PLACE_WORDS); mentions.append(("ENT" if not is_place else "PLACE", key))
+                if last_verb and not is_place: events.append((last_verb, key)); last_verb = None
             elif sym == "PRON" and filler[0] in ("it", "them"):
                 if last_verb: events.append((last_verb, "IT")); last_verb = None
             elif sym.isalpha() and sym not in T.DET and sym not in Q.P.PLACE_WORDS and sym not in ("and", "then", "back", "away", "off"): last_verb = sym
@@ -64,21 +75,33 @@ class HolderLM:
 
     def replay(self, sents, record=False):
         """walk a story: update persons / ents / holders; at each 'with PERSON' slot, note (ctx, key, rankings)"""
-        persons = []; ents = []; holder = {}; first_holder = {}; subject = None; obs = []
+        persons = []; ents = []; holder = {}; first_holder = {}; subject = None; obs = []; timeline = []     # timeline: (subject, verb, thing, holder after)
         for subj, events, slots, mentions in sents:
             if subj == "PRON": subj = persons[0] if persons else None
             if subj: subject = subj
-            for ctx, key, o in slots:
+            for ctx, key, o, anchor in slots:
                 thing = o if o else (ents[0] if ents else None)
-                rankings = {"recency": persons, "subject": [subject] if subject else [], "holder": [holder[thing]] if thing and holder.get(thing) else [], "first_holder": [first_holder[thing]] if thing and thing in first_holder else []}
+                after = []; next_after = []
+                if anchor:
+                    who, verb, _ = anchor
+                    idx = [i for i, (sj, v, th, h) in enumerate(timeline) if sj == who and (v == verb or v.startswith(verb[:3])) and (th == thing or thing is None)]
+                    if idx:
+                        i = idx[-1]; after = [timeline[i][3] if timeline[i][3] else "Nobody"]
+                        later = [h for (sj, v, th, h) in timeline[i + 1:] if (th == thing or thing is None) and h]
+                        next_after = [later[0]] if later else []                       # the next holder after that event
+                rankings = {"recency": persons, "subject": [subject] if subject else [], "holder": [holder[thing] if holder.get(thing) else "Nobody"] if thing and thing in holder else [],
+                            "first_holder": [first_holder[thing]] if thing and thing in first_holder else [], "after_event": after, "next_after_event": next_after}
                 obs.append((ctx, key, {r: list(l) for r, l in rankings.items()}, list(persons)))
+            here = [key for kind, key in mentions if kind == "ENT"]
             for verb, obj in events:
-                if obj == "IT": obj = ents[0] if ents else None
+                if obj == "IT": obj = here[0] if here else (ents[0] if ents else None)   # 'it' = this sentence's thing, else the most recent thing (places kept apart)
                 if not (subj and obj): continue
                 r = self.rule[verb]
                 if r == "hold": holder[obj] = subj; first_holder.setdefault(obj, subj)
                 elif r == "release": holder[obj] = None
+                timeline.append((subj, verb, obj, holder.get(obj)))
             for kind, key in mentions:
+                if kind == "PLACE": continue
                 lst = persons if kind == "PERSON" else ents
                 if key in lst: lst.remove(key)
                 lst.insert(0, key)
@@ -111,9 +134,15 @@ class HolderLM:
         return b / max(1, n)
 
     def fit_rules(self, stories, verbs, rounds=3):
-        self.count(stories); base = self.bits(stories); print(f"   all rules 'none': answer-slot bits {base:.3f}", flush=True)
-        for v in verbs: self.rule[v] = "hold"                      # start from 'every verb hands the thing to its subject': single moves from all-none never gain
-        self.count(stories); print(f"   all rules 'hold': answer-slot bits {self.bits(stories):.3f}", flush=True)
+        best = None
+        for start in RULES:                                         # three starting corners; the best final table wins
+            for v in verbs: self.rule[v] = start
+            self.count(stories); print(f"   start all '{start}': answer-slot bits {self.bits(stories):.3f}", flush=True)
+            self._ascend(stories, verbs, rounds); b = self.bits(stories)
+            if best is None or b < best[0]: best = (b, dict(self.rule))
+        self.rule = collections.defaultdict(lambda: "none", best[1]); self.count(stories); print(f"   best start -> bits {best[0]:.3f}", flush=True)
+
+    def _ascend(self, stories, verbs, rounds):
         for it in range(rounds):
             changed = 0
             for v in verbs:
@@ -153,7 +182,7 @@ def main():
             ql = q.lower().rstrip("?")
             if ql.startswith("who had ") and ql.endswith(" at the end"):
                 thing = T.key_of("ENT", q[8:-12].strip().lower().split()); tot += 1
-                rankings = {"recency": persons, "subject": [], "holder": [holder[thing]] if holder.get(thing) else [], "first_holder": [first_holder[thing]] if thing in first_holder else []}
+                rankings = {"recency": persons, "subject": [], "holder": [holder[thing] if holder.get(thing) else "Nobody"] if thing in holder else [], "first_holder": [first_holder[thing]] if thing in first_holder else [], "after_event": [], "next_after_event": []}
                 a = max(persons, key=lambda k: M.p(("was", "with"), k, rankings, persons)) if persons else None
                 ok += (a is not None and hit(a, gold))
     print(f"R24-f3: 'Who had X at the end' by the learner's own argmax on held-out generator stories: {ok}/{tot} = {ok / max(1, tot):.2f} (bar >= 0.80) [{(time.time() - T0) / 60:.1f} min]")
