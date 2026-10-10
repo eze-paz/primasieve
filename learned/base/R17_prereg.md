@@ -65,3 +65,11 @@ inducer, it reads sentences it has not seen, and its reach is bounded by how man
 completely -- 9% today. Growing that share (time phrases, pronouns, adverbs, coordination, cleaner teacher events) is
 the R17 arc; each addition is measured as coverage at held-out exactness, and R17-a (matching the hand reader's 43 / 80
 on validation through a question layer over the induced parses) is the first gate. Not run today.
+
+**R17-a first attempt (same day, `r17_qa.py`):** a question layer over the induced parses (role from the question word,
+verb by lemma) answered **0 / 80** validation questions: the validation stories' sentences fall outside the 9% slice
+the grammar was taught from. What blocks completeness, measured over the 5,613 incomplete story sentences: a span
+after the verb phrase the converter does not bind (3,615 -- trailing adverbs and particles such as "first", "anyway",
+"without asking", "to ask first"), punctuation inside the sentence (1,418, mostly commas joining clauses), and
+openings that are time phrases or pronouns (580: "In the afternoon", "One summer", "He"). Those three are the next
+converter rules, in that order, each measured by the share of sentences explained and the held-out exactness.
