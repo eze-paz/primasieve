@@ -45,3 +45,11 @@ account for. Two routes from here, both registered before use: (a) complete the 
 clauses) from the hand reader's adjunct and coordination output; (b) let the inducer tolerate unannotated spans as
 noise (`core/tolerance.py`'s epsilon ladder, stage 3d) so a partial form still admits the sentence. A second probe on
 sentences the forms cover completely says which: if reproduction is high there, (a) is the bottleneck.
+
+**Second probe (same day):** restricted to the 319 sentences the silver forms cover completely (`[det] noun verb [det]
+noun .`), the inducer reaches **coverage 53 / 64 and exact 39 / 64 on held-out sentences** (train reproduction 148 ok,
+79 wrong, 28 no parse). The "wrong" rows are the silver forms' own noise ("The gardener challenged Miss ." with "Miss"
+read as a name; "worked at the orchard" with the place read as a theme). So the bottleneck is route (a): complete and
+clean silver forms. Next build (R17 step 2): a converter that emits places and times as their own roles (the merge
+layer's adjunct extractor already finds them), drops names not in the name pool, and maps prepositional objects to
+location/instrument rather than theme; then the inducer is run on full sentences and gated by R17-a.
