@@ -51,6 +51,14 @@ def slotify(tokens, names):
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
             if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON and tokens[j] not in SPAN_STOP and not tokens[j].endswith("ed"): j += 1   # a determiner or a verb-like word ends the span
+            if j + 1 < len(tokens) and tokens[j] == "of":                                                   # 'a pot of honey', 'the end of the right tunnel'
+                m = j + 1
+                if tokens[m] in DET and m + 1 < len(tokens): m += 1
+                def plain(x): return x.islower() and x not in STOP and x not in DET and x not in PRON and x not in SPAN_STOP and not x.endswith("ed")
+                if m < len(tokens) and plain(tokens[m]):
+                    m += 1
+                    if m < len(tokens) and plain(tokens[m]): m += 1
+                    j = m
             out.append(("ENT", [wl] + [x.lower() for x in tokens[i + 1:j]])); i = j; continue
         out.append((wl, [wl])); i += 1
     return out

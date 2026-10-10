@@ -72,7 +72,7 @@ class Log:
             actors = []; pending_verb = None; cur = None; sent_places = []; because = None
             low = sent.lower()
             if " because " in low: because = low.split(" because ", 1)[1].rstrip(".!?")
-            direction = next((w for w in (t.lower() for t in toks) if w in DIRS and w not in ("home", "back", "away")), None)
+            direction = None
             for k, (sym, filler) in enumerate(items):
                 word = filler[0].lower() if sym not in ("PERSON", "ENT") else None
                 if sym == ",": actors = []; cur = None; continue                                        # a new clause
@@ -107,7 +107,12 @@ class Log:
                     cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split())); self.events.append(cur)
             # order words and places per sentence
             for e in [x for x in self.events if x["si"] == si]:
-                e["order"] = next((w for w in ("first", "second", "last") if f" {w}" in low), None)
+                seg = low[low.find(e["actors"][0].lower()):] if e["actors"] and e["actors"][0].lower() in low else low
+                seg = seg[:seg.find(",")] if "," in seg else seg
+                hits = sorted((seg.find(w), w) for w in ("first", "second", "last") if f" {w}" in seg)
+                e["order"] = hits[0][1] if hits else None
+                m = re.search(re.escape(e["verb"]) + r" (left|right|north|south|east|west|up|down|upstream|downstream)", low)
+                e["dir"] = m.group(1) if m else None
                 if not e.get("place") and sent_places: e["place"] = sent_places[0]
             for prep, key in sent_places:
                 for a in actors:
