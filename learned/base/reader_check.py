@@ -17,7 +17,8 @@ SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 
 
 AUXQ = ("was", "were", "is", "are", "did", "had", "has", "do", "does")
-V2 = "--v2" in sys.argv                       # R10: matcher v2 (developed on the validation set)
+V2 = "--v2" in sys.argv or "--v22" in sys.argv   # R10: matcher v2 (developed on the validation set)
+V22 = "--v22" in sys.argv                         # R10b: v2.2
 
 
 def parse_q(q):
@@ -31,6 +32,7 @@ def parse_q(q):
             words = q[len("What did "):-1].split()
             for i in range(1, min(4, len(words))):
                 if words[i].lower() in R.verbs and words[i].lower() not in AUXQ: return ("patient", words[i], " ".join(words[:i]))
+            if V22 and len(words) >= 2: return ("patient", words[1], words[0])  # v2.2: no known verb -> the word after a one-word agent; an unknown verb matches no event and falls to the model
             return None
         return ("patient", m.group(2), m.group(1))
     m = re.match(r"Who (was|were) (.+)\?$", q)
