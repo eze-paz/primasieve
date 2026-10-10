@@ -208,7 +208,15 @@ def ask_holder(log, q):
     return None
 
 
+LAST = {}
+
+
+def ask_conf(log, q):
+    a = ask(log, q); return a, bool(LAST.get("strict"))
+
+
 def ask(log, q):
+    LAST["strict"] = False
     a = _ask(log, q)
     if a is None: a = ask_holder(log, q)
     return ("the " + a) if (isinstance(a, str) and a and a[0].islower() and a.split()[0] not in ("the", "a", "an", "his", "her", "yes", "no", "no one")) else a
@@ -226,14 +234,12 @@ def _ask(log, q):
             if any(same_verb(ws[i], v) for v in verbs_seen) or verbish(ws[i]): return " ".join(ws[:i]), ws[i], " ".join(ws[i + 1:])
         return (" ".join(ws[:-1]), ws[-1], "") if len(ws) > 1 else (None, None, None)
     def find(verb=None, obj=None, actor=None, loose=False):
-        if verb and not loose:
-            strict = find(verb, obj, actor, loose=False) if False else None
         out = []
         for e in log.events:
             if verb and not same_verb(e["verb"], verb, loose): continue
             if obj and not (e["obj"] and (ent(obj) == e["obj"] or ent(obj).split()[-1] == e["obj"].split()[-1])): continue
             if actor and not any(a.lower() == actor.lower() or a.lower() == ent(actor).lower() for a in e["actors"]): continue
-            out.append(e)
+            e = dict(e); e["strict"] = (not loose) and bool(verb) and (bool(actor) or bool(obj)) and lemma(e["verb"]) == lemma(verb); out.append(e)
         if not out and verb and not loose and not any(same_verb(e["verb"], verb) for e in log.events): return find(verb, obj, actor, loose=True)   # class-based verb similarity only when NO event has the verb
         return sorted(out, key=lambda e: -len(qwords & e["words"]))                      # the event whose sentence shares most words with the question
     if ql.startswith("what did ") and len(w) >= 4:                                       # what did X VERB [Y]?
@@ -247,6 +253,7 @@ def _ask(log, q):
         if actor:
             ev = find(verb=verb, actor=actor); ev = [e for e in ev if e["obj"]]
             if not ev and tail: ev = [e for e in find(verb=verb) if e["obj"]]
+            if ev: LAST["strict"] = ev[0].get("strict", False)
             return ev[0]["obj"] if ev else None
     if ql.startswith("who ") and len(w) >= 2 and w[1] in ("asked", "said", "cried", "replied", "shouted", "demanded", "begged", "wanted"):
         sp = [e for e in log.events if e.get("quote") and (len(qwords & set(e["quote"].split())) >= 1 or len(w) == 2)]
@@ -269,6 +276,7 @@ def _ask(log, q):
         obj = rest.split(" to ")[0] if rest else None
         ev = find(verb=verb, obj=obj) if obj else find(verb=verb)
         if not ev and obj: ev = find(verb=verb)
+        if ev: LAST["strict"] = ev[0].get("strict", False)
         return ev[0]["actors"][0] if ev else None
     m = re.match(r"what was (?:in|inside|on) (.+)$", ql)
     if m:
@@ -309,17 +317,18 @@ def main():
     sys.path.insert(0, os.path.join(ROOT, "learned")); import r24_books as B, data as D
     train_b, _ = D.books(); vb = induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)      # verb-like classes from the books
     print(f"verb-like classes (books) hold {len(vb)} words, e.g. {sorted(vb, key=len)[:14]}", flush=True)
-    tot = dict(matched=0, right=0, n=0)
+    tot = dict(matched=0, right=0, n=0); CONF = {True: [0, 0], False: [0, 0]}
     for f in ("val_timespace.json", "val_stories.json", "val_fables.json"):
         val = json.load(open(f, encoding="utf-8"))["stories"]; matched = right = n = 0
         for s in val:
             log = Log(names).read(s["text"])
             for q, gold in s["qs"]:
-                n += 1; a = ask(log, q)
-                if a is not None: matched += 1; right += hit(a, gold)
+                n += 1; a, conf = ask_conf(log, q)
+                if a is not None: matched += 1; right += hit(a, gold); CONF[conf][0] += hit(a, gold); CONF[conf][1] += 1
                 if SHOW: print(f"  {'OK ' if a is not None and hit(a, gold) else 'XX ' if a is not None else '-- '} {q} | gold {gold} | {a}")
         print(f"{f}: event log alone matched {matched}/{n}, right {right} (precision {right / max(1, matched):.2f})"); tot["matched"] += matched; tot["right"] += right; tot["n"] += n
     print(f"R24-i: all three validation sets: matched {tot['matched']}/{tot['n']}, right {tot['right']} (precision {tot['right'] / max(1, tot['matched']):.2f}); the hand reader alone on the 80 story questions was 43 / 80 at 0.95")
+    print(f"   confident (strict verb + actor/object) subset: {CONF[True][0]}/{CONF[True][1]} right; the rest: {CONF[False][0]}/{CONF[False][1]}")
     json.dump(tot, open("r24_events_results.json", "w"))
 
 
