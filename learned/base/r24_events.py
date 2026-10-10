@@ -30,18 +30,19 @@ def lemma(w):
     return w
 
 
-def same_verb(a, b):
+def same_verb(a, b, loose=False):
     la, lb = lemma(a), lemma(b)
-    return la == lb or la.startswith(lb) or lb.startswith(la) or (len(la) >= 3 and len(lb) >= 3 and la[:3] == lb[:3])
+    if la == lb or la.startswith(lb) or lb.startswith(la) or (len(la) >= 3 and len(lb) >= 3 and la[:3] == lb[:3]): return True
+    return loose and a.lower() in CLASS and b.lower() in CLASS and CLASS[a.lower()] == CLASS[b.lower()] and a.lower() in VERBISH   # 'came' ~ 'arrived': the same induced class, only as a fallback
 
 
-VERBISH = set(); NOUNISH = set()
+VERBISH = set(); NOUNISH = set(); CLASS = {}
 
 
 def induce_verbish(stories, k=100):
     """classes whose members mostly look like past-tense verbs (-ed or a known irregular) are verb-like: a learned cue"""
     import r24_classes as C
-    classes, uni = C.induce_classes(stories, k=k, min_count=5); by = collections.defaultdict(list)
+    classes, uni = C.induce_classes(stories, k=k, min_count=5); by = collections.defaultdict(list); CLASS.update(classes)
     for w, c in classes.items(): by[c].append(w)
     for c, ws in by.items():
         n = sum(uni[w] for w in ws); v = sum(uni[w] for w in ws if w.endswith("ed") or w in IRREG)
@@ -179,7 +180,7 @@ def ask_holder(log, q):
 def ask(log, q):
     a = _ask(log, q)
     if a is None: a = ask_holder(log, q)
-    return ("the " + a) if (isinstance(a, str) and a and a[0].islower() and a.split()[0] not in ("the", "a", "an", "his", "her") and " " not in a.strip()[:0]) else a
+    return ("the " + a) if (isinstance(a, str) and a and a[0].islower() and a.split()[0] not in ("the", "a", "an", "his", "her", "yes", "no", "no one")) else a
 
 
 def _ask(log, q):
@@ -193,13 +194,16 @@ def _ask(log, q):
         for i in range(1, len(ws)):
             if any(same_verb(ws[i], v) for v in verbs_seen) or verbish(ws[i]): return " ".join(ws[:i]), ws[i], " ".join(ws[i + 1:])
         return (" ".join(ws[:-1]), ws[-1], "") if len(ws) > 1 else (None, None, None)
-    def find(verb=None, obj=None, actor=None):
+    def find(verb=None, obj=None, actor=None, loose=False):
+        if verb and not loose:
+            strict = find(verb, obj, actor, loose=False) if False else None
         out = []
         for e in log.events:
-            if verb and not same_verb(e["verb"], verb): continue
+            if verb and not same_verb(e["verb"], verb, loose): continue
             if obj and not (e["obj"] and (ent(obj) == e["obj"] or ent(obj).split()[-1] == e["obj"].split()[-1])): continue
             if actor and not any(a.lower() == actor.lower() or a.lower() == ent(actor).lower() for a in e["actors"]): continue
             out.append(e)
+        if not out and verb and not loose: return find(verb, obj, actor, loose=True)       # class-based verb similarity only when nothing matches by stem
         return sorted(out, key=lambda e: -len(qwords & e["words"]))                      # the event whose sentence shares most words with the question
     if ql.startswith("what did ") and len(w) >= 4:                                       # what did X VERB [Y]?
         actor, verb, tail = split(ql[9:])
@@ -231,6 +235,13 @@ def _ask(log, q):
         ev = find(verb=verb, obj=obj) if obj else find(verb=verb)
         if not ev and obj: ev = find(verb=verb)
         return ev[0]["actors"][0] if ev else None
+    m = re.match(r"what was (?:in|inside|on) (.+)$", ql)
+    if m:
+        head = ent(m.group(1)).split()[-1]
+        for e in log.events:
+            for key in [e["obj"]] + [k for _, k in e.get("phrases", [])]:
+                if key and f"{head} of " in key: return key.split(f"{head} of ", 1)[1]
+        return None
     if ql.startswith("where did "):                                                      # where did X VERB [Y]?
         actor, verb, tail = split(ql[10:])
         if actor:
