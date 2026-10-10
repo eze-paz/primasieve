@@ -181,3 +181,23 @@ After two reading fixes (a determiner ends a thing span: 'the morning the sled' 
 | mark ranking, rank-0 hits in context ('mark','at') | 1,573 (was 796) | |
 
 **R24-g1 PASS, R24-g2 PASS.** The time layer is the second epistemic feature kept by the game, and the person misses vanished once the learner chose, per place word, whose place a phrase updates (the attribution rules are recorded in r24_time_results.json). Hand-written: the list of time phrases and the comma convention of the restated statements. Learned: that 'at noon' anchors a lookup, which ranking answers it, and what 'to' versus 'by' does to who is where.
+
+## R24-i registration and first result: the EVENT LOG layer (2026-10-10, owner away)
+
+Mechanism: each sentence is reduced to events (actors, verb word, object, recipient, place phrase, direction word, 'because' span) with the same surface cues the learned layers use; actors may be names, pronouns resolved by the learned latest-person rule ('they' = the two latest), or sentence-initial things ('a wolf'); the question layer (hand-written, as in R20) looks events up by actor / verb / object, verbs matched by shared stem with a disclosed list of irregular past forms. Measured on all three validation sets (110 questions) against the hand reader's 43 / 80 at 0.95 on the 80 story questions.
+
+First run: val_timespace 16 / 30 matched, 12 right; val_stories 16 / 50, 10 right; val_fables 9 / 30, 8 right; **all 41 / 110 matched, 30 right (precision 0.73)**. Wrong answers come from two reading faults: object pronouns ('gave him a pot of honey' -> him resolved to the actor) and verb identification (the first non-function word after the actor, which catches adjectives: 'travelling'). Run 2: object pronouns resolve to the latest person who is not the actor; the verb is a word of an INDUCED verb-like class (a class whose members mostly end in -ed or are known past forms) -- the word classes from run 2b doing a job, with the -ed / irregular test as the fallback.
+
+## R24-f final (run 3 with the give statements, anchor window and recipient cue fixed, pair moves)
+
+| measure | result | bar |
+|---|---|---|
+| held-out answer-slot bits WITH learned rules / all-none | **0.543 / 0.859** | with < without |
+| R24-f3 'Who had X at the end' by the learner's own argmax | **346 / 384 = 0.90** | >= 0.80 |
+| R24-f2 agreement with R20's induced table | **10 / 14** | reported |
+
+Learned by the next-word game alone: took, stole, carried, found, fetched = the subject holds the thing; dropped, left, put, set, hung = the thing is released; gave, brought, returned = the holder becomes the person named after the thing. The four disagreements (had, borrowed, kept = release) are verbs the text never states a holder for. **R24-f1 PASS, R24-f3 PASS.** State rules -- what a verb does to the world -- emerge from predicting words, provided the text somewhere states the state right after the verb.
+
+## R24-i runs 2-3 (event log)
+
+Reading fixes, each a surface or learned cue: a thing span ends at a verb-like word (the induced verb classes from the books, 1,804 words, doing a job: 'a wolf saw' is not one thing); bare nouns right after a verb are objects ('kept bees'); a comma starts a new clause; 'a boy named Erlend'; an object pronoun right after the verb with more to come is the recipient ('gave him a pot'); among several matching events the one whose sentence shares most words with the question wins; answers from things carry 'the'. **All three validation sets: matched 46 / 110, right 37 (precision 0.80)** -- val_timespace 16 / 12, val_stories 16 / 12, val_fables 14 / 13. The hand reader alone: 43 / 80 at 0.95 on the 80 story questions. Not yet at the hand reader's level, with no hand-written sentence shapes.

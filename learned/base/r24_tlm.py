@@ -22,6 +22,7 @@ def arg(name, default):
 
 
 COMMON = set()
+SPAN_STOP = set()                                 # verb-like words (filled by the caller from the induced classes): 'a wolf saw' is not one thing
 NOT_NAME = {"then", "right", "after", "before", "when", "while", "one", "later", "meanwhile", "there", "here", "now", "so", "but", "and", "everyone", "someone", "no"}
 
 
@@ -49,7 +50,7 @@ def slotify(tokens, names):
         if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
-            if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON: j += 1   # 'the morning the sled': a determiner ends the span
+            if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON and tokens[j] not in SPAN_STOP and not tokens[j].endswith("ed"): j += 1   # a determiner or a verb-like word ends the span
             out.append(("ENT", [wl] + [x.lower() for x in tokens[i + 1:j]])); i = j; continue
         out.append((wl, [wl])); i += 1
     return out
