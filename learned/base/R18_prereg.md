@@ -23,3 +23,18 @@ Validation: `val_stories.json` + `val_fables.json` (80 questions). B6 (100) is r
 Prediction: notes help on who-did-what questions and hurt on where/why questions the reader's events do not carry;
 net +3 to +8 on validation. If notes-only is close to chunk, the model mostly reads the notes anyway, which argues
 for an engine that builds the model first and reads the text only where the model is silent.
+
+## Result (2026-10-10, `r18_results.json`, validation 80 questions, 0.4B engine, no training)
+
+| form | right |
+|---|---|
+| chunk (whole story) | 59 |
+| windows (two sentences at a time) | 58 |
+| chunk + notes (the reader's events, in reading order) | **60** |
+| notes only | 41 |
+
+R18-a **MISS**: raw notes add one answer. Notes alone keep 41 / 59 = 70% of the chunk's comprehension, so the model does
+read the notes, but an accumulated log of events adds nothing to the text it is appended to. The owner's reading of
+this, made before the result was in: notes must be a filtered *state*, not a log -- what is current per entity, in time
+order -- which is R19. The hypothesis that reading-as-you-go beats reading-a-chunk is not refuted by this run; it is
+untested until the notes carry state.

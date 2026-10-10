@@ -19,3 +19,12 @@ alone (exact, abstains when it has no entry), and the merged engine (world state
 | **R19-b** | merged engine on the 30: >= chunk reading + 8 |
 | **R19-c** | on the 80 story questions the merged engine with the world state is not worse than without it (>= 69) |
 | **R19-d** | B6 once, only if a-c pass: >= 85 with the 0.4B model |
+
+## Progress (2026-10-10, `worldstate.py`, world state alone on the 30 time/place questions)
+
+First build 14 matched / 11 right (0.79); after repairing place-phrase extraction (clause words, time words and
+determiners excluded from place noun phrases; "at the end of X" read as a place; waiting / finding fix a location):
+**15 matched / 14 right (precision 0.93)**. R19-a: precision PASS, coverage 15 < 18 **MISS by three**. The 15 unanswered
+are: role questions that belong to the reader or the model (who found the key, who took the boat), copular states the
+reader has no event for ("the key was on the hook"), particles between verb and object ("set the lantern down"), and
+pronoun patients ("dropped it"). The merged engine (world state -> reader -> model) is scored next on the same 30.
