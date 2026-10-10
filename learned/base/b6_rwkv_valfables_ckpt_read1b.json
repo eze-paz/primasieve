@@ -1,0 +1,311 @@
+{
+ "ckpt": "ckpt_read1b.pth",
+ "mismatch": false,
+ "right": 24,
+ "n": 30,
+ "items": [
+  {
+   "story": "f1",
+   "q": "Who was drinking at the stream?",
+   "gold": [
+    "the lamb",
+    "lamb"
+   ],
+   "reply": "a wolf",
+   "hit": false
+  },
+  {
+   "story": "f1",
+   "q": "What did the wolf say the lamb was doing?",
+   "gold": [
+    "muddying his water",
+    "muddying"
+   ],
+   "reply": "drinking",
+   "hit": false
+  },
+  {
+   "story": "f1",
+   "q": "Where did the lamb stand?",
+   "gold": [
+    "downstream"
+   ],
+   "reply": "downstream",
+   "hit": true
+  },
+  {
+   "story": "f1",
+   "q": "Who ate the lamb?",
+   "gold": [
+    "the wolf",
+    "wolf"
+   ],
+   "reply": "the wolf",
+   "hit": true
+  },
+  {
+   "story": "f1",
+   "q": "Who saw the lamb?",
+   "gold": [
+    "the wolf",
+    "wolf"
+   ],
+   "reply": "a wolf",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "Who stored grain?",
+   "gold": [
+    "the ant",
+    "ant"
+   ],
+   "reply": "the ant",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "Who sang in the sun?",
+   "gold": [
+    "the grasshopper",
+    "grasshopper"
+   ],
+   "reply": "the grasshopper",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "Who begged for food?",
+   "gold": [
+    "the grasshopper",
+    "grasshopper"
+   ],
+   "reply": "the grasshopper",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "What did the ant give the grasshopper?",
+   "gold": [
+    "a single seed",
+    "seed"
+   ],
+   "reply": "seed",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "When did the grasshopper beg?",
+   "gold": [
+    "when winter came",
+    "winter"
+   ],
+   "reply": "in the winter",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Who asked for the lantern?",
+   "gold": [
+    "marta"
+   ],
+   "reply": "marta",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Who handed over the lantern?",
+   "gold": [
+    "piet",
+    "her brother"
+   ],
+   "reply": "marta",
+   "hit": false
+  },
+  {
+   "story": "f3",
+   "q": "Where did they walk?",
+   "gold": [
+    "the cellar",
+    "cellar"
+   ],
+   "reply": "the cellar",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Where was the cat?",
+   "gold": [
+    "behind a barrel",
+    "barrel"
+   ],
+   "reply": "behind a barrel",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Who carried the cat upstairs?",
+   "gold": [
+    "marta"
+   ],
+   "reply": "marta",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "Who freed the lion?",
+   "gold": [
+    "the mouse",
+    "mouse"
+   ],
+   "reply": "the mouse",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "What did the mouse gnaw through?",
+   "gold": [
+    "the net",
+    "net"
+   ],
+   "reply": "net",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "Who had laughed at the mouse?",
+   "gold": [
+    "the lion",
+    "lion"
+   ],
+   "reply": "the lion",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "Who thanked the mouse?",
+   "gold": [
+    "the lion",
+    "lion"
+   ],
+   "reply": "the hunters",
+   "hit": false
+  },
+  {
+   "story": "f4",
+   "q": "What did the hunters find?",
+   "gold": [
+    "an empty net",
+    "empty net"
+   ],
+   "reply": "empty net",
+   "hit": true
+  },
+  {
+   "story": "f5",
+   "q": "Who asked about the bridge?",
+   "gold": [
+    "the traveller",
+    "traveller"
+   ],
+   "reply": "the miller",
+   "hit": false
+  },
+  {
+   "story": "f5",
+   "q": "What took the middle plank?",
+   "gold": [
+    "the flood",
+    "flood"
+   ],
+   "reply": "the flood",
+   "hit": true
+  },
+  {
+   "story": "f5",
+   "q": "Who shook his head?",
+   "gold": [
+    "the miller",
+    "miller"
+   ],
+   "reply": "the miller",
+   "hit": true
+  },
+  {
+   "story": "f5",
+   "q": "How did the traveller cross?",
+   "gold": [
+    "by the ford",
+    "the ford",
+    "ford"
+   ],
+   "reply": "the miller",
+   "hit": false
+  },
+  {
+   "story": "f5",
+   "q": "Where did the traveller reach by nightfall?",
+   "gold": [
+    "the inn",
+    "inn"
+   ],
+   "reply": "the inn",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "Who stole the ring?",
+   "gold": [
+    "a crow",
+    "the crow",
+    "crow"
+   ],
+   "reply": "the crow",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "Where did the crow take the ring?",
+   "gold": [
+    "the church tower",
+    "church tower",
+    "tower"
+   ],
+   "reply": "the church tower",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "Who followed the crow?",
+   "gold": [
+    "ines",
+    "the goldsmith's daughter"
+   ],
+   "reply": "ines",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "What did Ines find in the tower?",
+   "gold": [
+    "a nest full of rings",
+    "a nest",
+    "nest"
+   ],
+   "reply": "nest",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "What did Ines return to the village?",
+   "gold": [
+    "every ring",
+    "the rings",
+    "rings",
+    "ring"
+   ],
+   "reply": "every ring",
+   "hit": true
+  }
+ ]
+}
