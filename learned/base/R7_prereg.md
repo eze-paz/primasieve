@@ -27,3 +27,16 @@ not solved by scale at this range and the search unit should become the sentence
 (coreference) before the engine reads it.
 
 Kept checkpoints (2026-10-10, disk at 4 GB free before the 1.5B run): ckpt_read1b.pth (R1b), ckpt_read3b.pth (R3b final, R4 input), ckpt_read3b_s200.pth (R3c init), ckpt_read3c_s300.pth (R3c selected), ckpt_read5_s400.pth (R5 selected). All other 0.4B interim checkpoints deleted; every one is reproducible from its prereg's command and seed; the cut model from ckpt_read3b_cut_neurons.json.
+
+## Part 1 result -- zero-shot 1.5B (2026-10-10, `eval_r7_zeroshot.out`)
+
+| test | 1.5B zero-shot | 0.4B zero-shot | 0.4B best engine |
+|---|---|---|---|
+| plain B6 | **65** | 79 | 80 (R1b) |
+| mismatch "unknown" | 0 / 100 | 0 / 100 | 99 (R1b) |
+| B6 in real text through grep | 2 / 100 (replies empty: it ends the line at once on the trace format) | -- | 45 (R6) |
+| counterfactual | 0 / 37 (same empty replies) | -- | 34 / 37 |
+
+The larger base is not better zero-shot on the story prompt (65 vs 79) and does not produce an answer on the trace
+format at all; both are format effects the fine-tune addresses. The prediction "zero-shot B6 ~85" was wrong and is
+recorded as such. Part 2 launched right after.

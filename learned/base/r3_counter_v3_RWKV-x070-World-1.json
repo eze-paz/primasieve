@@ -1,0 +1,341 @@
+{
+ "right": 0,
+ "n": 37,
+ "unknown": 0,
+ "world": 0,
+ "items": [
+  {
+   "q": "What is the capital of France?",
+   "gold": [
+    "ottawa"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Japan?",
+   "gold": [
+    "ottawa"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Italy?",
+   "gold": [
+    "madrid"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Germany?",
+   "gold": [
+    "london"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Spain?",
+   "gold": [
+    "rome"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Russia?",
+   "gold": [
+    "berlin"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Egypt?",
+   "gold": [
+    "berlin"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Canada?",
+   "gold": [
+    "rome"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of Australia?",
+   "gold": [
+    "tokyo"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of China?",
+   "gold": [
+    "madrid"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the capital of the United Kingdom?",
+   "gold": [
+    "cairo"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Pride and Prejudice?",
+   "gold": [
+    "hugo"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Hamlet?",
+   "gold": [
+    "stoker"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Oliver Twist?",
+   "gold": [
+    "hugo"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of The Odyssey?",
+   "gold": [
+    "shakespeare"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of War and Peace?",
+   "gold": [
+    "dostoevsky"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Moby-Dick?",
+   "gold": [
+    "darwin"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Frankenstein?",
+   "gold": [
+    "homer"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Don Quixote?",
+   "gold": [
+    "shelley"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of The Origin of Species?",
+   "gold": [
+    "dostoevsky"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Les Miserables?",
+   "gold": [
+    "dostoevsky"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Crime and Punishment?",
+   "gold": [
+    "homer"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the author of Dracula?",
+   "gold": [
+    "melville"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the currency of Japan?",
+   "gold": [
+    "dollar"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the currency of the United Kingdom?",
+   "gold": [
+    "rupee"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the currency of the United States?",
+   "gold": [
+    "yen"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What is the currency of India?",
+   "gold": [
+    "yen"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What language is spoken in Brazil?",
+   "gold": [
+    "german"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What language is spoken in Mexico?",
+   "gold": [
+    "arabic"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What language is spoken in Austria?",
+   "gold": [
+    "portuguese"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "What language is spoken in Egypt?",
+   "gold": [
+    "german"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the composer of the Ninth Symphony with the Ode to Joy?",
+   "gold": [
+    "mozart"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the composer of The Magic Flute?",
+   "gold": [
+    "beethoven"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the painter of Starry Night?",
+   "gold": [
+    "picasso"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the painter of Guernica?",
+   "gold": [
+    "van gogh"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the founder of Microsoft?",
+   "gold": [
+    "jobs"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  },
+  {
+   "q": "Who is the founder of Apple?",
+   "gold": [
+    "gates"
+   ],
+   "reply": "",
+   "hit": false,
+   "found": true
+  }
+ ]
+}
