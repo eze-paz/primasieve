@@ -106,6 +106,7 @@ def skeletons(R, P):
                  (f"Where did {b} take the {obj}?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"Where was the {obj} at the end?", [place.lower(), place.lower().replace("the ", "")]),           # R20: state questions the generator knows
                  (f"Who had the {obj} at the end?", [b.lower()]), (f"Who had the {obj} first?", [a.lower()]),
+                 (f"Where was {b} at the end?", [place.lower(), place.lower().replace("the ", "")]), (f"Who had the {obj} after {a}?", [b.lower()]),   # R20 third run: holder AND place after each verb
                  (f"Who was waiting at the door?", [a.lower()]), (f"What did {b} promise?", [promise, promise.replace("to ", "")])]))
     # 2 learning / teacher
     a, ga = P(None); tg = R.choice("fm"); t, _ = P(tg); title = R.choice(TITLES[tg]); skill = R.choice(SKILLS); day = R.choice(WEEKDAYS); place = R.choice(PLACES)
@@ -125,6 +126,7 @@ def skeletons(R, P):
                 [(f"What did {a} lose?", [obj.lower()]), (f"Where did {a} lose the {obj}?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Who found the {obj}?", [b.lower()]), (f"Where was the {obj} found?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a}?", [b.lower()]),     # R20
+                 (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where was the {obj} before {b} found it?", [p2.lower(), p2.lower().replace("the ", "")])]))   # R20 third run
                  (f"What did {a} give {b}?", [thanks.replace("a ", "").replace("some ", ""), thanks.split()[-1]])]))
     # 4 gift / trip
     a, ga = P(None); rel, gr = R.choice(RELS); b, gb = P(gr); obj = R.choice(OBJECTS); place = R.choice(PLACES); day = R.choice(WEEKDAYS)

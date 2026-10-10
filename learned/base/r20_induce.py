@@ -132,7 +132,10 @@ def main():
             # beats "none" -> the verb stays unbound
             SIMPLE = {"none": 0, "actor_at": 1, "actor_to_dest": 1, "holder_actor": 1, "holder_recipient": 1, "thing_at_release": 2, "thing_to_dest_hold": 3, "thing_at_hold": 3}
             top = sorted([o for o in OPS if scores[o] == scores[best]], key=lambda o: SIMPLE[o])
-            new = top[0] if scores[best] > base else "none"
+            # third run: a binding needs SUPPORT (>= 10 cases it reproduces beyond "none") and must reproduce >= 90% of the
+            # cases it touches; otherwise the verb stays unbound (the reader's noise is not learned as a rule)
+            support = scores[best] - base
+            new = top[0] if scores[best] > base and support >= 10 and scores[best] >= 0.9 * tot else "none"
             if table.get(v, "none") != new: changed += 1; table[v] = new
         print(f"pass {pas + 1}: bound {sum(1 for v, o in table.items() if o != 'none')} verbs, changed {changed}", flush=True)
         if not changed: break
