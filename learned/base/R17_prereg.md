@@ -53,3 +53,15 @@ read as a name; "worked at the orchard" with the place read as a theme). So the 
 clean silver forms. Next build (R17 step 2): a converter that emits places and times as their own roles (the merge
 layer's adjunct extractor already finds them), drops names not in the name pool, and maps prepositional objects to
 location/instrument rather than theme; then the inducer is run on full sentences and gated by R17-a.
+
+**Step 2 result (same day, `r17_convert.py`):** complete silver forms with agent, theme, location and a second
+clause: **548 of 6,161** story sentences fully explained (9%); induced from 465 of them, held-out **coverage 55 / 83,
+exact 28 / 83**; real book sentences parsed 7 / 300, with correct structure ("Lincoln appeared at a window." ->
+agent Lincoln, location window). Train reproduction 150 ok / 92 wrong / 223 no parse: the wrong ones are silver and
+converter noise (prepositional objects as "location" where the reader meant a theme).
+
+Where the emergent reader stands: it exists, it learns word classes and frames from English with the project's own
+inducer, it reads sentences it has not seen, and its reach is bounded by how many sentences the silver forms explain
+completely -- 9% today. Growing that share (time phrases, pronouns, adverbs, coordination, cleaner teacher events) is
+the R17 arc; each addition is measured as coverage at held-out exactness, and R17-a (matching the hand reader's 43 / 80
+on validation through a question layer over the induced parses) is the first gate. Not run today.
