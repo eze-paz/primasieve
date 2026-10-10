@@ -10,7 +10,7 @@ import r20_induce as RI
 from b6_rwkv import hit
 
 OPS = RI.OPS; SIMPLE = {"none": 0, "actor_at": 1, "actor_to_dest": 1, "holder_actor": 1, "holder_recipient": 1, "thing_at_release": 2, "thing_to_dest_hold": 3, "thing_at_hold": 3}
-STATIC = {"have", "own", "keep", "be", "say", "look", "hear", "search", "make", "ask", "promise", "want", "learn", "wait", "laugh", "sing", "sit", "see", "think", "name", "call", "praise", "shake", "agree", "beg", "pay", "sell", "buy", "plant", "water", "fill", "write", "read", "eat", "share", "challenge", "race", "stop", "help", "trip", "lie", "sleep", "hang", "open"}
+STATIC = {"have", "own", "keep", "be", "say", "look", "hear", "search", "make", "ask", "promise", "want", "learn", "laugh", "sing", "sit", "see", "think", "name", "call", "praise", "shake", "agree", "beg", "pay", "sell", "buy", "plant", "water", "fill", "write", "read", "eat", "share", "challenge", "race", "stop", "help", "trip", "lie", "sleep", "hang", "open"}
 
 
 def main():

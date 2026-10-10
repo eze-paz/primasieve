@@ -156,7 +156,7 @@ class World:
                 if seen and h and h != who: return h
                 if h == who: seen = True
             return None
-        m = re.match(r"who (?:reached|arrived|came|got) (?:(?:the|at the) \w+ )?(first|second|last)$", ql)
+        m = re.match(r"who (?:reached|arrived|came|got) (?:.+? )?(first|second|last)$", ql)
         if m:
             o = m.group(1); tagged = [a for t, a, order in self.arrive if order == o]
             if tagged: return tagged[0]

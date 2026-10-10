@@ -74,7 +74,9 @@ class InducedWorld:
                 at = ev_place if (ev_place and op in ("thing_at_release", "holder_actor", "actor_at", "thing_at_hold")) else at_s
                 rec = norm_ent(e["rec"]) if e.get("rec") else (norm_ent(rec_m.group(1)) if rec_m else None)
                 if op in ("actor_to_dest", "actor_at") and (any(w in sl for w in ("first", "second", "last")) or v in ("arrive", "reach", "come")):
-                    self.arrive.append((self.t, a, "first" if "first" in sl else "second" if "second" in sl else "last" if "last" in sl else None))
+                    seg = sl[max(0, sl.find(e["agent"].lower())):]                      # the order word nearest after THIS agent's mention
+                    hits = sorted((seg.find(w), w) for w in ("first", "second", "last") if w in seg)
+                    self.arrive.append((self.t, a, hits[0][1] if hits else None))
                 if op in ("actor_to_dest", "thing_to_dest_hold") and src_s and not self.loc.get(a): self._loc(a, src_s)   # "walked from X to Y": X is where the actor started
                 if op == "actor_to_dest" and dest: self._loc(a, dest)
                 elif op == "thing_to_dest_hold" and p:
@@ -99,7 +101,7 @@ class InducedWorld:
 
 
 def state_q(q):
-    return any(k in q for k in ("at the end", "first?", "after ", "before ", "Where did", "Where was"))
+    return any(k in q for k in ("at the end", "first?", "second?", "last?", "after ", "before ", "Where did", "Where was"))
 
 
 def main():
