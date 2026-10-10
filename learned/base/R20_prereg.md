@@ -66,3 +66,23 @@ bindings of the verbs that co-occur in one skeleton JOINTLY (an exhaustive searc
 skeleton's k state verbs, k <= 4, scored by the skeleton's own questions -- the mechanism of `core/search.exhaustive`),
 then merge the per-skeleton tables where they agree and leave the rest unbound. The hand-written state remains the
 engine's layer until the induced one reaches it. R20 as run: four MISSES on R20-a/b, each with its cause written down.
+
+## Joint search (same day, `r20_joint.py`)
+
+14 story shapes with 1-4 state verbs; exhaustive search over each shape's operator assignments. Bound **5 verbs**
+(reach -> actor to destination; return, find -> holder := recipient; borrow -> holder := actor; take -> thing to place,
+released), no conflicts; induced world alone **11 / 30 at 0.64** (unchanged). R20-a MISS (5 < 15), R20-b MISS.
+
+The joint search settles the question of method: for the shapes where the simulation can reproduce anything, it finds
+the same bindings coordinate ascent did, cleanly ("borrow, come, take": 79 of 80 reproduced). The limit is elsewhere:
+for six shapes **no assignment reproduces a single question** ("arrive, meet, walk": 0 of 20; "carry, find, run, shed":
+0 of 80; "give, knock, steer": 0 of 20). On those shapes the hand reader's events are wrong or missing ("shed" and "it"
+as verbs, "One night Alain" as an actor, no event for "walked ... to X" with a place), so the state cannot be driven
+to the gold by ANY rule -- the induction has nothing to choose between. The teaching substrate, not the search, is
+the bottleneck, the same substrate (the hand reader) whose coverage bounded R9-R14.
+
+Next design, registered: the generator EMITS the events of each sentence it writes (agent, verb, patient, place,
+recipient) alongside the text, so the teaching signal is exact; the induction binds verbs on exact events; the
+validation keeps the reader at read time, since that is the real condition. If the induced table then matches the
+hand-written state on validation, the state layer is emergent and the reader is the only hand-written piece left,
+which is R17's job.
