@@ -12,7 +12,7 @@ TOK = re.compile(r"[A-Za-z][A-Za-z'-]*|[.,;!?]")
 SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 PRON = {"he", "she", "him", "her", "his", "they", "them", "it", "i", "you", "we", "me", "my", "your", "us", "our"}   # run 2d: first/second person are pronoun forms too
 DET = {"the", "a", "an", "his", "her", "their", "its"}
-STOP = {"and", "to", "of", "at", "in", "on", "by", "near", "with", "for", "from", "into", "back", "down", "up", "home", "there", "then", "when", "while",
+STOP = {"and", "to", "of", "at", "in", "on", "by", "near", "with", "for", "from", "into", "back", "down", "up", "home", "there", "then", "when", "while", "under", "behind", "over", "across", "through", "toward", "towards", "inside", "outside", "onto",
         "was", "were", "is", "had", "who", "that", "which", "but", "so", "because", "without", "until", "after", "before", "first", "second", "last", "away", "together"}
 FLOOR = 0.01; RANKS = ("recency", "subject"); K = 20
 
@@ -49,7 +49,7 @@ def slotify(tokens, names):
         if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
-            if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP: j += 1
+            if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON: j += 1   # 'the morning the sled': a determiner ends the span
             out.append(("ENT", [wl] + [x.lower() for x in tokens[i + 1:j]])); i = j; continue
         out.append((wl, [wl])); i += 1
     return out

@@ -17,7 +17,7 @@ RANKINGS = ("recency", "subject_place", "any_place")
 
 class PlaceState(T.State):
     def __init__(self):
-        super().__init__(); self.place_of = {}; self.first_place_of = {}; self.any_place = []; self.subject = None; self.obj = None
+        super().__init__(); self.place_of = {}; self.first_place_of = {}; self.any_place = []; self.subject = None; self.obj = None; self.things = []
 
     def ranking(self, name):
         if name == "subject_place": return [self.place_of[self.subject]] if self.subject in self.place_of else []
@@ -48,10 +48,10 @@ class PlaceLM(K.ChunkLM):
                 for k, (sym, filler) in enumerate(items):
                     if sym == "PERSON": st.subject = filler[0]                                        # run 2b: the place belongs to the reference mentioned most recently before it
                     if sym == "PRON" and filler[0] in ("he", "she", "him", "his", "her") and st.persons: st.subject = st.persons[0]   # the learner's own resolver
-                    if sym == "PRON" and filler[0] in ("it", "them") and st.ents: st.obj = st.ents[0]
+                    if sym == "PRON" and filler[0] in ("it", "them") and st.things: st.obj = st.things[0]        # "it" = the most recent THING, never a place
                     if sym == "ENT":
                         key = T.key_of(sym, filler)
-                        if not (k and items[k - 1][0] in PLACE_WORDS): st.obj = key
+                        if not (k and items[k - 1][0] in PLACE_WORDS): st.obj = key; st.things.insert(0, key) if key not in st.things else st.things.insert(0, st.things.pop(st.things.index(key)))
                         if k and items[k - 1][0] in PLACE_WORDS:
                             ctx = tuple(x for x, _ in items[max(0, k - 2):k])            # the two symbols before the slot: the construction context
                             for r in RANKINGS:
@@ -80,8 +80,9 @@ class PlaceLM(K.ChunkLM):
             pos = "first" if k == 0 else "later"
             if sym == "PERSON": st.subject = filler[0]
             if sym == "PRON" and filler[0] in ("he", "she", "him", "his", "her") and st.persons: st.subject = st.persons[0]
-            if sym == "PRON" and filler[0] in ("it", "them") and st.ents: st.obj = st.ents[0]
-            if sym == "ENT" and not (k and raw[k - 1][0] in PLACE_WORDS): st.obj = T.key_of(sym, filler)
+            if sym == "PRON" and filler[0] in ("it", "them") and st.things: st.obj = st.things[0]        # "it" = the most recent THING, never a place
+            if sym == "ENT" and not (k and raw[k - 1][0] in PLACE_WORDS):
+                st.obj = T.key_of(sym, filler); st.things.insert(0, st.obj) if st.obj not in st.things else st.things.insert(0, st.things.pop(st.things.index(st.obj)))
             if sym in ("PERSON", "ENT", "PRON") or sym.startswith("C"):
                 after_place = sym == "ENT" and k and raw[k - 1][0] in PLACE_WORDS
                 if after_place and self.use_place:

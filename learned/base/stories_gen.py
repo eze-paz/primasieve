@@ -104,7 +104,7 @@ def fables(R, P):
                  (f"Where did {a} set the {obj} down?", [spot, spot.split()[-1]]), (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} set it down?", [b.lower()]),
                  (f"Who took the {obj}?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Where was the {obj} after {a} set it down?", [spot, spot.split()[-1]]), (f"Who was holding the {obj} right after {a} set it down?", ["no one", "nobody"]),
-                 (f"Where was {a} when {b} took the {obj}?", ["the well", "well"])], g1_events))
+                 (f"Where was {a} when {b} took the {obj}?", ["the well", "well"]), (f"Who was holding the {obj} right after {b} took it?", [b.lower()])], g1_events))
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
     while p2 == p1: p2 = R.choice(PLACES)
     s, o, p = pron(g1); s2, o2, p2p = pron(g2)
@@ -116,7 +116,9 @@ def fables(R, P):
                  (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} dropped it?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Where was {a} at the end?", ["home"]), (f"Where was the {obj} after {a} dropped it?", ["near the gate", "the gate", "gate"]),
                  (f"Who was holding the {obj} right after {a} dropped it?", ["no one", "nobody"]), (f"Who had the {obj} first?", [a.lower()]),
-                 (f"Where was {a} when {b} stole the {obj}?", [p1.lower(), p1.lower().replace("the ", "")])], g2_events))
+                 (f"Where was {a} when {b} stole the {obj}?", [p1.lower(), p1.lower().replace("the ", "")]),
+                 (f"Who was holding the {obj} right after {a} carried it?", [a.lower()]), (f"Who was holding the {obj} right after {b} stole it?", [b.lower()]),
+                 (f"Who was holding the {obj} right after {a} took it?", [a.lower()])], g2_events))
     # G3: a thing left somewhere, found and put back, with time marks
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES)
     spot1 = R.choice(["on the hook", "on the shelf", "in the drawer", "on the bench"]); spot2 = R.choice(["near the well", "by the gate", "under the tree", "on the wall"])
@@ -127,7 +129,8 @@ def fables(R, P):
                  (f"Where did {b} find the {obj}?", [spot2, spot2.split()[-1]]), (f"Who had the {obj} after {a} left it?", [b.lower()]),
                  (f"Who was holding the {obj} right after {a} left it?", ["no one", "nobody"]), (f"Where was the {obj} at the end?", [spot1, spot1.split()[-1]]),
                  (f"Who found the {obj}?", [b.lower()]), (f"Who was holding the {obj} right after {b} found it?", [b.lower()]),
-                 (f"Who was holding the {obj} right after {b} put it back?", ["no one", "nobody"]), (f"Where was {a} at noon?", [p1.lower(), p1.lower().replace("the ", "")])], g3_events))
+                 (f"Who was holding the {obj} right after {b} put it back?", ["no one", "nobody"]), (f"Where was {a} at noon?", [p1.lower(), p1.lower().replace("the ", "")]),
+                 (f"Who was holding the {obj} right after {a} took it?", [a.lower()])], g3_events))
     # G4: a race -- arrival order, then one rides on and one waits
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); c, gc, g3 = actor(R, P, "name"); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
     while p2 == p1: p2 = R.choice(PLACES)

@@ -25,8 +25,9 @@ P.PlaceState = QAState          # the place learner's counting pass uses the sta
 def restate(q, gold):
     """the generator's question and its gold, as a statement; None for question kinds not restated here"""
     ql = q.lower().rstrip("?"); g = gold[0]
-    if ql.startswith("where was ") and ql.endswith(" at the end"): return f"{q[10:-12].strip()} was at {g}."
-    if ql.startswith("where did ") and ql.endswith(" start"): return f"{q[10:-6].strip()} started at {g}."
+    def place(g): return g if g.startswith(("on the", "in the", "at the", "by the", "under the", "near the", "behind the")) else (f"at {g}" if g.startswith(("the ", "a ", "his ", "her ")) else f"at the {g}")
+    if ql.startswith("where was ") and ql.endswith(" at the end"): return f"{q[10:-12].strip()[0].upper()}{q[10:-12].strip()[1:]} was {place(g)}."
+    if ql.startswith("where did ") and ql.endswith(" start"): return f"{q[10:-6].strip()[0].upper()}{q[10:-6].strip()[1:]} started {place(g)}."
     return None
 
 
