@@ -144,6 +144,13 @@ def _ask(log, q):
     ql = q.lower().rstrip("?"); w = ql.split()
     def ent(x): return T.key_of("ENT", x.lower().split()) if x.split() and x.split()[0].lower() in T.DET else x
     qwords = set(ql.split()) - {"who", "what", "where", "when", "why", "which", "did", "the", "a", "an", "to", "of", "in", "at", "on"}
+    verbs_seen = {e["verb"] for e in log.events}
+    def split(rest):
+        """'the doctor leave' -> (actor, verb, tail): the first word after the actor that matches an event's verb"""
+        ws = rest.split()
+        for i in range(1, len(ws)):
+            if any(same_verb(ws[i], v) for v in verbs_seen) or verbish(ws[i]): return " ".join(ws[:i]), ws[i], " ".join(ws[i + 1:])
+        return (" ".join(ws[:-1]), ws[-1], "") if len(ws) > 1 else (None, None, None)
     def find(verb=None, obj=None, actor=None):
         out = []
         for e in log.events:
@@ -153,9 +160,10 @@ def _ask(log, q):
             out.append(e)
         return sorted(out, key=lambda e: -len(qwords & e["words"]))                      # the event whose sentence shares most words with the question
     if ql.startswith("what did ") and len(w) >= 4:                                       # what did X VERB [Y]?
-        m = re.match(r"what did (.+?) (\w+)(?: (.+))?$", ql)
-        if m:
-            ev = find(verb=m.group(2), actor=m.group(1)); ev = [e for e in ev if e["obj"]]
+        actor, verb, tail = split(ql[9:])
+        if actor:
+            ev = find(verb=verb, actor=actor); ev = [e for e in ev if e["obj"]]
+            if not ev and tail: ev = [e for e in find(verb=verb) if e["obj"]]
             return ev[0]["obj"] if ev else None
     if ql.startswith("who ") and len(w) >= 2:                                           # who VERBED [Y]?  who VERBED ... first/last?
         verb = w[1]; rest = " ".join(w[2:])
@@ -176,22 +184,22 @@ def _ask(log, q):
         if not ev and obj: ev = find(verb=verb)
         return ev[0]["actors"][0] if ev else None
     if ql.startswith("where did "):                                                      # where did X VERB [Y]?
-        m = re.match(r"where did (.+?) (\w+)(?: (.+))?$", ql)
-        if m:
-            if m.group(2) == "start": return log.first_place.get(m.group(1).strip()) or log.first_place.get(ent(m.group(1)))
-            ev = [e for e in find(verb=m.group(2), actor=m.group(1)) if e.get("place")]
-            if not ev: ev = [e for e in find(verb=m.group(2)) if e.get("place")]
+        actor, verb, tail = split(ql[10:])
+        if actor:
+            if verb == "start": return log.first_place.get(actor) or log.first_place.get(ent(actor))
+            ev = [e for e in find(verb=verb, actor=actor) if e.get("place")]
+            if not ev: ev = [e for e in find(verb=verb) if e.get("place")]
             return ev[0]["place"][1] if ev else None
     if ql.startswith("which way did "):
-        m = re.match(r"which way did (.+?) (\w+)", ql)
-        if m:
-            ev = [e for e in find(verb=m.group(2), actor=m.group(1)) if e.get("dir")]
+        actor, verb, tail = split(ql[14:])
+        if actor:
+            ev = [e for e in find(verb=verb, actor=actor) if e.get("dir")]
             return ev[0]["dir"] if ev else None
     if ql.startswith("why did "):
-        m = re.match(r"why did (.+?) (\w+)", ql)
-        if m:
-            ev = [e for e in find(verb=m.group(2), actor=m.group(1)) if e.get("because")]
-            if not ev: ev = [e for e in find(verb=m.group(2)) if e.get("because")]
+        actor, verb, tail = split(ql[8:])
+        if actor:
+            ev = [e for e in find(verb=verb, actor=actor) if e.get("because")]
+            if not ev: ev = [e for e in find(verb=verb) if e.get("because")]
             return ev[0]["because"] if ev else None
     if ql.startswith("where was ") and ql.endswith(" at the end"):
         who = q[10:-12].strip(); return log.places.get(who) or log.places.get(ent(who))
