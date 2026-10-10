@@ -86,3 +86,11 @@ The emergent English reader therefore needs, in this order: (1) a consistent rol
 once and applied by the converter; (2) epsilon-tolerant induction (`core/tolerance.py`, stage 3d) so noisy silver
 rows do not block a frame; (3) frame generalisation across adjunct orders. Each is a registered step with the
 held-out-exactness gate. Today's three probes fix what the arc is; they do not deliver it.
+
+**Step 4 (same day, `r17_convert3.py` / `r17_convert4.py`):** a consistent surface-position role scheme and the inducer's
+epsilon sweep. v3 (prepositional phrases as verb roles) reproduced **0** of its own training rows: the inducer's grammar
+attaches a prepositional phrase to the noun before it (its synthetic language's convention), so every verb-attached form
+compared unequal. v4 (phrases attached to the preceding noun head) reproduces 45 / 416 wrong / 594 no parse; held-out
+exact 8 / 179; validation sentences parsed 0 / 63; epsilon 0.05 and 0.15 change nothing. The schema search over the
+inducer's fixed dimensions does not settle on these forms. Paused here for the day: the emergent English reader through
+`cogs_gram` needs its schema space and role conventions re-derived for English text, which is the arc's real work.
