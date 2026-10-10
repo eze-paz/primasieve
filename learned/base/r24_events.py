@@ -35,7 +35,7 @@ def same_verb(a, b):
     return la == lb or la.startswith(lb) or lb.startswith(la) or (len(la) >= 3 and len(lb) >= 3 and la[:3] == lb[:3])
 
 
-VERBISH = set()
+VERBISH = set(); NOUNISH = set()
 
 
 def induce_verbish(stories, k=100):
@@ -46,11 +46,21 @@ def induce_verbish(stories, k=100):
     for c, ws in by.items():
         n = sum(uni[w] for w in ws); v = sum(uni[w] for w in ws if w.endswith("ed") or w in IRREG)
         if n and v / n >= 0.5: VERBISH.update(ws)
+    after_det = collections.Counter(); total = collections.Counter()
+    for text in stories:
+        w = [x.lower() for x in T.TOK.findall(text)]
+        for i, x in enumerate(w):
+            total[x] += 1
+            if i and w[i - 1] in T.DET: after_det[x] += 1
+    NOUNISH.update(x for x, c in total.items() if c >= 5 and after_det[x] / c >= 0.3)        # 'seed', 'bed', 'shed' are things, not past verbs
+    VERBISH.difference_update(NOUNISH)
     T.SPAN_STOP.update(VERBISH); T.SPAN_STOP.update(IRREG)
     return VERBISH
 
 
-def verbish(w): return w in VERBISH or w.endswith("ed") or w in IRREG
+def verbish(w, prev=None):
+    if w in NOUNISH or prev in T.DET: return False
+    return w in VERBISH or w in IRREG or (w.endswith("ed") and len(w) > 4) or (w.endswith("ing") and len(w) > 5)
 
 
 class Log:
@@ -68,7 +78,9 @@ class Log:
     def read(self, text):
         sents = [x.strip() for x in T.SENT.split(text) if x.strip()]
         for si, sent in enumerate(sents):
-            toks = T.TOK.findall(sent); items = T.slotify(toks, self.names); n = len(items)
+            toks = T.TOK.findall(sent); items = T.slotify(toks, self.names)
+            if ("because", ["because"]) in items: items = items[:items.index(("because", ["because"]))]
+            n = len(items)
             actors = []; pending_verb = None; cur = None; sent_places = []; because = None
             low = sent.lower()
             if " because " in low: because = low.split(" because ", 1)[1].rstrip(".!?")
@@ -96,14 +108,16 @@ class Log:
                         sent_places.append((items[k - 1][0], key))
                         if cur: cur["place"] = cur.get("place") or (items[k - 1][0], key)
                     elif cur and cur["verb"] and cur["obj"] is None: cur["obj"] = key
-                    elif not actors and not cur: actors = [key]                                         # 'A wolf saw a lamb': a thing as the actor
+                    elif not cur and k + 1 < n and items[k + 1][0].isalpha() and verbish(items[k + 1][0]): actors = [key]   # 'A wolf saw': a thing is an actor when a verb follows it
                     if not after_place:
                         if key in self.things: self.things.remove(key)
                         self.things.insert(0, key)
-                elif cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"] and sym.isalpha() and not verbish(word) and word not in SKIP_VERB and word not in T.DET and word not in PLACE_WORDS and word not in T.PRON:
+                elif cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"] and sym.isalpha() and (word in NOUNISH or (not verbish(word) and word not in SKIP_VERB and word not in T.DET and word not in PLACE_WORDS and word not in T.PRON and word not in ("all", "every", "some", "many", "much", "very", "more", "most", "one", "two", "three", "four", "five", "ten"))):
                     nxt = items[k + 1][0] if k + 1 < n else None
-                    cur["obj"] = word + (f" {nxt}" if nxt and nxt.isalpha() and not verbish(nxt) and nxt not in SKIP_VERB and nxt not in T.DET and nxt not in PLACE_WORDS and nxt not in T.PRON and nxt not in T.STOP else "")   # 'kept bees', 'used fishing line'
-                elif sym.isalpha() and verbish(word) and word not in SKIP_VERB and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
+                    cur["obj"] = word + (f" {nxt}" if nxt and nxt.isalpha() and (nxt in NOUNISH or (not verbish(nxt) and nxt not in SKIP_VERB and nxt not in T.DET and nxt not in PLACE_WORDS and nxt not in T.PRON and nxt not in T.STOP)) else "")   # 'kept bees', 'used fishing line'
+                elif sym.isalpha() and word.endswith("ing") and verbish(word) and cur and cur["obj"] and k >= 1 and items[k - 1][0] == "ENT":   # 'saw a lamb drinking': the object is the actor of the participle
+                    cur = dict(actors=[cur["obj"]], verb=word, obj=None, rec=None, place=None, si=si, dir=None, because=because, order=None, words=set(low.split())); self.events.append(cur)
+                elif sym.isalpha() and verbish(word, items[k - 1][0] if k else None) and word not in SKIP_VERB and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
                     cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split())); self.events.append(cur)
             # order words and places per sentence
             for e in [x for x in self.events if x["si"] == si]:
