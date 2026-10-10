@@ -53,7 +53,7 @@ def induce_verbish(stories, k=100):
             total[x] += 1
             if i and w[i - 1] in T.DET: after_det[x] += 1
     NOUNISH.update(x for x, c in total.items() if c >= 5 and after_det[x] / c >= 0.3)        # 'seed', 'bed', 'shed' are things, not past verbs
-    VERBISH.difference_update(NOUNISH)
+    VERBISH.difference_update(NOUNISH); T.SPAN_KEEP.update(NOUNISH)
     T.SPAN_STOP.update(VERBISH); T.SPAN_STOP.update(IRREG)
     return VERBISH
 
@@ -106,7 +106,7 @@ class Log:
                     key = T.key_of(sym, filler); after_place = k >= 1 and items[k - 1][0] in PLACE_WORDS
                     if after_place:
                         sent_places.append((items[k - 1][0], key))
-                        if cur: cur["place"] = cur.get("place") or (items[k - 1][0], key)
+                        if cur: cur["place"] = cur.get("place") or (items[k - 1][0], key); cur.setdefault("phrases", []).append((items[k - 1][0], key))
                     elif cur and cur["verb"] and cur["obj"] is None: cur["obj"] = key
                     elif not cur and k + 1 < n and items[k + 1][0].isalpha() and verbish(items[k + 1][0]): actors = [key]   # 'A wolf saw': a thing is an actor when a verb follows it
                     if not after_place:
@@ -135,8 +135,50 @@ class Log:
         return self
 
 
+HOLD_RULES = {}
+
+
+def holders(log):
+    """holder timeline over the event log under the learned verb rules (hold / release / give)"""
+    holder = {}; first = {}; timeline = []
+    for e in log.events:
+        rule = HOLD_RULES.get(e["verb"], "none"); obj = e["obj"]; who = e["actors"][0] if e["actors"] else None
+        if not obj or not who: continue
+        if rule == "hold": holder[obj] = who; first.setdefault(obj, who)
+        elif rule == "release": holder[obj] = None
+        elif rule == "give" and e.get("rec"): holder[obj] = e["rec"]; first.setdefault(obj, who)
+        timeline.append((who, e["verb"], obj, holder.get(obj)))
+    return holder, first, timeline
+
+
+def ask_holder(log, q):
+    ql = q.lower().rstrip("?"); holder, first, timeline = holders(log)
+    def ent(x): return T.key_of("ENT", x.lower().split()) if x.split() and x.split()[0].lower() in T.DET else x
+    def thing_key(t):
+        t = ent(t); keys = {o for _, _, o, _ in timeline}
+        return t if t in keys else next((o for o in keys if o.split()[-1] == t.split()[-1]), t)
+    if ql.startswith("who had ") and ql.endswith(" at the end"): t = thing_key(q[8:-12]); return holder.get(t)
+    if ql.startswith("who had ") and (ql.endswith(" first") or ql.endswith(" at first")): t = thing_key(q[8:].rstrip("?").rsplit(" ", 1)[0].replace(" at", "")); return first.get(t)
+    m = re.match(r"who (?:had|was holding) (.+?) (right after|after) (\S+) (\S+)", ql)
+    if m:
+        t = thing_key(m.group(1)); who = m.group(3); verb = m.group(4)
+        idx = [i for i, (sj, v, o, h) in enumerate(timeline) if sj.lower() == who and same_verb(v, verb) and o == t]
+        if not idx: return None
+        if m.group(2) == "right after": return timeline[idx[-1]][3] or "no one"
+        later = [h for (sj, v, o, h) in timeline[idx[-1] + 1:] if o == t and h]
+        return later[0] if later else None
+    m = re.match(r"did (\S+) have (.+?) when (?:he|she|they|\S+) (\S+)", ql)
+    if m:
+        t = thing_key(m.group(2)); idx = [i for i, (sj, v, o, h) in enumerate(timeline) if same_verb(v, m.group(3))]
+        if not idx: return None
+        at = idx[-1]; h = next((hh for (sj, v, o, hh) in reversed(timeline[:at + 1]) if o == t), None)
+        return "yes" if h and h.lower() == m.group(1).lower() else "no"
+    return None
+
+
 def ask(log, q):
     a = _ask(log, q)
+    if a is None: a = ask_holder(log, q)
     return ("the " + a) if (isinstance(a, str) and a and a[0].islower() and a.split()[0] not in ("the", "a", "an", "his", "her") and " " not in a.strip()[:0]) else a
 
 
@@ -161,6 +203,12 @@ def _ask(log, q):
         return sorted(out, key=lambda e: -len(qwords & e["words"]))                      # the event whose sentence shares most words with the question
     if ql.startswith("what did ") and len(w) >= 4:                                       # what did X VERB [Y]?
         actor, verb, tail = split(ql[9:])
+        if actor and tail and tail.split()[-1] in PLACE_WORDS | {"with", "for"}:                       # 'what did the stork serve dinner in?' -> the phrase with that preposition
+            prep = tail.split()[-1]; ev = find(verb=verb, actor=actor) or find(verb=verb)
+            for e in ev:
+                for pp, key in e.get("phrases", []):
+                    if pp == prep: return key
+            return None
         if actor:
             ev = find(verb=verb, actor=actor); ev = [e for e in ev if e["obj"]]
             if not ev and tail: ev = [e for e in find(verb=verb) if e["obj"]]
@@ -208,6 +256,7 @@ def _ask(log, q):
 
 def main():
     data = json.load(open("stories_train_v2.json", encoding="utf-8")); names = T.mid_caps([s["text"] for s in data[:7000]])
+    HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])                       # the verb rules the next-word game found (R24-f)
     sys.path.insert(0, os.path.join(ROOT, "learned")); import r24_books as B, data as D
     train_b, _ = D.books(); vb = induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)      # verb-like classes from the books
     print(f"verb-like classes (books) hold {len(vb)} words, e.g. {sorted(vb, key=len)[:14]}", flush=True)

@@ -22,7 +22,7 @@ def arg(name, default):
 
 
 COMMON = set()
-SPAN_STOP = set()                                 # verb-like words (filled by the caller from the induced classes): 'a wolf saw' is not one thing
+SPAN_STOP = set(); SPAN_KEEP = set()           # SPAN_KEEP: learned noun-like words that may end in -ed ('seed', 'bed')                                 # verb-like words (filled by the caller from the induced classes): 'a wolf saw' is not one thing
 NOT_NAME = {"then", "right", "after", "before", "when", "while", "one", "later", "meanwhile", "there", "here", "now", "so", "but", "and", "everyone", "someone", "no"}
 
 
@@ -50,11 +50,11 @@ def slotify(tokens, names):
         if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
-            if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON and tokens[j] not in SPAN_STOP and not tokens[j].endswith("ed"): j += 1   # a determiner or a verb-like word ends the span
+            if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON and tokens[j] not in SPAN_STOP and (tokens[j] in SPAN_KEEP or not tokens[j].endswith("ed")): j += 1   # a determiner or a verb-like word ends the span
             if j + 1 < len(tokens) and tokens[j] == "of":                                                   # 'a pot of honey', 'the end of the right tunnel'
                 m = j + 1
                 if tokens[m] in DET and m + 1 < len(tokens): m += 1
-                def plain(x): return x.islower() and x not in STOP and x not in DET and x not in PRON and x not in SPAN_STOP and not x.endswith("ed")
+                def plain(x): return x.islower() and x not in STOP and x not in DET and x not in PRON and x not in SPAN_STOP and (x in SPAN_KEEP or not x.endswith("ed"))
                 if m < len(tokens) and plain(tokens[m]):
                     m += 1
                     if m < len(tokens) and plain(tokens[m]): m += 1
