@@ -1,0 +1,1036 @@
+[
+ {
+  "story": "s01",
+  "q": "Who owned the red boat?",
+  "gold": [
+   "mira"
+  ],
+  "prompt": "Question: Who owned the red boat?\nSearch: owned red boat\nHits:\n[52] So we drove around again to Los Angeles, Nevada, Utah, and Colorado, where, by the intersection of Interstate-70 and Route 82, he announced that we had arrived at a crossroad: we could continue the search for a home, or we could take a side trip to a posh resort in nearby Aspen. Mira had a small red boat.\n[53] Mira had a small red boat. One morning her brother Tomas borrowed the boat without asking.\n[11] You may never see the ocean again in this lifetime. You should say good-bye.\" It no longer bothered me that Rama owned two Porsches at a time when many disciples were struggling to meet the increasing tuition.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s01",
+  "q": "Who borrowed the boat?",
+  "gold": [
+   "tomas",
+   "her brother"
+  ],
+  "prompt": "Question: Who borrowed the boat?\nSearch: borrowed boat\nHits:\n[53] Mira had a small red boat. One morning her brother Tomas borrowed the boat without asking.\n[52] So we drove around again to Los Angeles, Nevada, Utah, and Colorado, where, by the intersection of Interstate-70 and Route 82, he announced that we had arrived at a crossroad: we could continue the search for a home, or we could take a side trip to a posh resort in nearby Aspen. Mira had a small red boat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s01",
+  "q": "Where did Tomas row the boat?",
+  "gold": [
+   "the island",
+   "island",
+   "across the lake"
+  ],
+  "prompt": "Question: Where did Tomas row the boat?\nSearch: Tomas row boat\nHits:\n[53] Mira had a small red boat. One morning her brother Tomas borrowed the boat without asking.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s01",
+  "q": "Who was waiting on the dock?",
+  "gold": [
+   "mira"
+  ],
+  "prompt": "Question: Who was waiting on the dock?\nSearch: waiting dock\nHits:\n[55] He rowed it across the lake to the island. When he came back, Mira was waiting on the dock.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s01",
+  "q": "What did Tomas promise?",
+  "gold": [
+   "to ask first",
+   "ask first"
+  ],
+  "prompt": "Question: What did Tomas promise?\nSearch: Tomas promise\nHits:\n[53] Mira had a small red boat. One morning her brother Tomas borrowed the boat without asking.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s02",
+  "q": "Who opened the shop?",
+  "gold": [
+   "mr hollis",
+   "hollis",
+   "the baker"
+  ],
+  "prompt": "Question: Who opened the shop?\nSearch: opened shop\nHits:\n[63] \"You don't suppose your daddy's receiving callers yet, is he?\" The baker, Mr. Hollis, opened his shop at dawn.\n[54] If her mother was right about the rich possibilities of Adams's secret--but that was as far as Alice's speculations upon the matter went at this time: they were checked, partly by the thought that her father probably hadn't enough money for such an enterprise, and partly by the fact that she had arrived at the front door. The fine old gentleman revealed when she opened the door was probably the last great merchant in America to wear the chin beard.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "q": "What did Petra buy?",
+  "gold": [
+   "two loaves of bread",
+   "bread",
+   "two loaves"
+  ],
+  "prompt": "Question: What did Petra buy?\nSearch: Petra buy\nHits:\n[64] Hollis, opened his shop at dawn. A girl named Petra came in and bought two loaves of bread.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "q": "How did Petra pay?",
+  "gold": [
+   "a silver coin",
+   "silver coin"
+  ],
+  "prompt": "Question: How did Petra pay?\nSearch: Petra pay\nHits:\n[64] Hollis, opened his shop at dawn. A girl named Petra came in and bought two loaves of bread.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s02",
+  "q": "Who gave Petra a roll?",
+  "gold": [
+   "mr hollis",
+   "hollis",
+   "the baker"
+  ],
+  "prompt": "Question: Who gave Petra a roll?\nSearch: gave Petra roll\nHits:\n[64] Hollis, opened his shop at dawn. A girl named Petra came in and bought two loaves of bread.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s02",
+  "q": "Why was the roll free?",
+  "gold": [
+   "her birthday",
+   "it was her birthday"
+  ],
+  "prompt": "Question: Why was the roll free?\nSearch: Why roll free\nHits:\n[67] Mr. Hollis gave her a roll for free because it was her birthday.\n[37] \"At least, I don't say a fortune, but anyhow a great deal more than he does make.\" \"How? Why, by making glue and selling it.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "q": "Who had the cheese first?",
+  "gold": [
+   "the crow",
+   "crow"
+  ],
+  "prompt": "Question: Who had the cheese first?\nSearch: cheese first\nHits:\n[25] The crow opened her beak to sing, and the cheese fell to the ground. The fox ate the cheese and ran away.\n[24] The fox told the crow that her voice must be beautiful. The crow opened her beak to sing, and the cheese fell to the ground.\n[22] Wherein lay the discord between two natures, equally noble, I dare assert?'\" \"Are not men wrong too when they come to us and make a young girl a wife while cherishing at the bottom of their heart some angelic image, and comparing us to those unknown rivals, to perfections often borrowed from a remembrance, and always finding us wanting?\" \"No,\" replied she, whispering to Claude these words: \"for he has not yet guessed that Honorine would have loved him.--Oh!\" she exclaimed, seeing the Consul's wife approaching, \"his wife was listening! Unhappy man!\" A fox saw a crow sitting in a tree with a piece of cheese.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "q": "Where was the crow sitting?",
+  "gold": [
+   "in a tree",
+   "a tree",
+   "tree"
+  ],
+  "prompt": "Question: Where was the crow sitting?\nSearch: crow sitting\nHits:\n[22] Wherein lay the discord between two natures, equally noble, I dare assert?'\" \"Are not men wrong too when they come to us and make a young girl a wife while cherishing at the bottom of their heart some angelic image, and comparing us to those unknown rivals, to perfections often borrowed from a remembrance, and always finding us wanting?\" \"No,\" replied she, whispering to Claude these words: \"for he has not yet guessed that Honorine would have loved him.--Oh!\" she exclaimed, seeing the Consul's wife approaching, \"his wife was listening! Unhappy man!\" A fox saw a crow sitting in a tree with a piece of cheese.\n[23] Unhappy man!\" A fox saw a crow sitting in a tree with a piece of cheese. The fox told the crow that her voice must be beautiful.\n[24] The fox told the crow that her voice must be beautiful. The crow opened her beak to sing, and the cheese fell to the ground.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "q": "Who flattered the crow?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "prompt": "Question: Who flattered the crow?\nSearch: flattered crow\nHits:\n[23] Unhappy man!\" A fox saw a crow sitting in a tree with a piece of cheese. The fox told the crow that her voice must be beautiful.\n[24] The fox told the crow that her voice must be beautiful. The crow opened her beak to sing, and the cheese fell to the ground.\n[22] Wherein lay the discord between two natures, equally noble, I dare assert?'\" \"Are not men wrong too when they come to us and make a young girl a wife while cherishing at the bottom of their heart some angelic image, and comparing us to those unknown rivals, to perfections often borrowed from a remembrance, and always finding us wanting?\" \"No,\" replied she, whispering to Claude these words: \"for he has not yet guessed that Honorine would have loved him.--Oh!\" she exclaimed, seeing the Consul's wife approaching, \"his wife was listening! Unhappy man!\" A fox saw a crow sitting in a tree with a piece of cheese.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "q": "What fell to the ground?",
+  "gold": [
+   "the cheese",
+   "cheese"
+  ],
+  "prompt": "Question: What fell to the ground?\nSearch: fell ground\nHits:\n[24] The fox told the crow that her voice must be beautiful. The crow opened her beak to sing, and the cheese fell to the ground.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s03",
+  "q": "Who ate the cheese?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "prompt": "Question: Who ate the cheese?\nSearch: ate cheese\nHits:\n[25] The crow opened her beak to sing, and the cheese fell to the ground. The fox ate the cheese and ran away.\n[24] The fox told the crow that her voice must be beautiful. The crow opened her beak to sing, and the cheese fell to the ground.\n[22] Wherein lay the discord between two natures, equally noble, I dare assert?'\" \"Are not men wrong too when they come to us and make a young girl a wife while cherishing at the bottom of their heart some angelic image, and comparing us to those unknown rivals, to perfections often borrowed from a remembrance, and always finding us wanting?\" \"No,\" replied she, whispering to Claude these words: \"for he has not yet guessed that Honorine would have loved him.--Oh!\" she exclaimed, seeing the Consul's wife approaching, \"his wife was listening! Unhappy man!\" A fox saw a crow sitting in a tree with a piece of cheese.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s04",
+  "q": "Who lost the keys?",
+  "gold": [
+   "leon"
+  ],
+  "prompt": "Question: Who lost the keys?\nSearch: lost keys\nHits:\n[24] Notification of any such agreement shall be made to the Director-General. Leon lost his keys on the way to school.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s04",
+  "q": "Who found the keys?",
+  "gold": [
+   "ada",
+   "his friend ada"
+  ],
+  "prompt": "Question: Who found the keys?\nSearch: found keys\nHits:\n[24] Notification of any such agreement shall be made to the Director-General. Leon lost his keys on the way to school.\n[25] Leon lost his keys on the way to school. His friend Ada found them under a bench in the park.\n[7] The rights referred to in Article I shall include the exclusive right of the author to make, publish and authorize the making and publication of translations of works protected under this Convention. (a) If, after the expiration of a period of seven years from the date of the first publication of a writing, a translation of such writing has not been published in a language in general use in the Contracting State, by the owner of the right of translation or with his authorization, any national of such Contracting State may obtain a non-exclusive licence from the competent authority thereof to translate the work into that language and publish the work so translated. (b) Such national shall in accordance with the procedure of the State concerned, establish either that he has requested, and been denied, authorization by the proprietor of the right to make and publish the translation, or that, after due diligence on his part, he was unable to find the owner of the right. A licence may also be granted on the same conditions if all previous editions of a translation in a language in general use in the Contracting State are out of print. (c) If the owner of the right of translation cannot be found, then the applicant for a licence shall send copies of his application to the publisher whose name appears on the work and, if the nationality of the owner of the right of translation is known, to the diplomatic or consular representative of the State of which such owner is a national, or to the organization which may have been designated by the government of that State.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s04",
+  "q": "Where were the keys?",
+  "gold": [
+   "under a bench",
+   "under a bench in the park",
+   "the park"
+  ],
+  "prompt": "Question: Where were the keys?\nSearch: keys\nHits:\n[24] Notification of any such agreement shall be made to the Director-General. Leon lost his keys on the way to school.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s04",
+  "q": "When did Ada return the keys?",
+  "gold": [
+   "at lunch",
+   "lunch"
+  ],
+  "prompt": "Question: When did Ada return the keys?\nSearch: Ada return keys\nHits:\n[25] Leon lost his keys on the way to school. His friend Ada found them under a bench in the park.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s04",
+  "q": "What did Leon share?",
+  "gold": [
+   "his apple",
+   "an apple",
+   "apple"
+  ],
+  "prompt": "Question: What did Leon share?\nSearch: Leon share\nHits:\n[26] His friend Ada found them under a bench in the park. She gave them back to Leon at lunch.\n[24] Notification of any such agreement shall be made to the Director-General. Leon lost his keys on the way to school.\n[27] She gave them back to Leon at lunch. Leon thanked her and shared his apple with her. (c) The licence may only be granted if the applicant, in accordance with the procedure of the State concerned, establishes either that he has requested, and been denied, authorization by the owner of the right of translation, or that, after due diligence on his part, he was unable to find the owner of the right.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "q": "How many daughters did the king have?",
+  "gold": [
+   "three",
+   "3"
+  ],
+  "prompt": "Question: How many daughters did the king have?\nSearch: many daughters king\nHits:\n[0] The old king had three daughters.\n[16] Or perhaps, to be perfectly frank, we shall thus convert ourselves into prigs, throw ourselves out of our stride, lapse into self- consciousness, lose all that is natural, _naif_, and instinctive within us. Verily there are many dangers, and the paths to failure are infinite.\n[34] Imitation does a double service, it secures the failure of the imitator and also aids that of the unlucky author who is imitated. As soon as a new thing appears in literature, many people hurry off to attempt something of the same sort.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "q": "Who was the bravest daughter?",
+  "gold": [
+   "elin",
+   "the youngest"
+  ],
+  "prompt": "Question: Who was the bravest daughter?\nSearch: bravest daughter\nHits:\n[1] The old king had three daughters. The youngest, Elin, was the bravest.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "q": "What came to the valley?",
+  "gold": [
+   "a dragon",
+   "the dragon",
+   "dragon"
+  ],
+  "prompt": "Question: What came to the valley?\nSearch: came valley\nHits:\n[2] The youngest, Elin, was the bravest. When a dragon came to the valley, Elin rode out alone to meet it.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "q": "What did Elin offer the dragon?",
+  "gold": [
+   "gold"
+  ],
+  "prompt": "Question: What did Elin offer the dragon?\nSearch: Elin offer dragon\nHits:\n[2] The youngest, Elin, was the bravest. When a dragon came to the valley, Elin rode out alone to meet it.\n[3] When a dragon came to the valley, Elin rode out alone to meet it. She did not fight the dragon; she offered it gold, and the dragon flew away.\n[1] The old king had three daughters. The youngest, Elin, was the bravest.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s05",
+  "q": "What did the dragon do?",
+  "gold": [
+   "flew away",
+   "it flew away"
+  ],
+  "prompt": "Question: What did the dragon do?\nSearch: dragon\nHits:\n[3] When a dragon came to the valley, Elin rode out alone to meet it. She did not fight the dragon; she offered it gold, and the dragon flew away.\n[2] The youngest, Elin, was the bravest. When a dragon came to the valley, Elin rode out alone to meet it.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "q": "Who planted the tomatoes?",
+  "gold": [
+   "grandma rosa",
+   "rosa"
+  ],
+  "prompt": "Question: Who planted the tomatoes?\nSearch: planted tomatoes\nHits:\n[48] The following specimen, taken haphazard, will show how thoroughly Bunyan or the rhymester, whoever he may be, has overcome what Mr. Froude regards as an almost insuperable difficulty, and has managed to \"spoil completely the faultless prose of the English translation\":-- Grandma Rosa planted tomatoes in the spring.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "q": "What ate the leaves?",
+  "gold": [
+   "a rabbit",
+   "the rabbit",
+   "rabbit"
+  ],
+  "prompt": "Question: What ate the leaves?\nSearch: ate leaves\nHits:\n[49] Froude regards as an almost insuperable difficulty, and has managed to \"spoil completely the faultless prose of the English translation\":-- Grandma Rosa planted tomatoes in the spring. In summer, a rabbit started eating the leaves.\n[51] Her grandson Nico built a fence around the garden. After that, the rabbit ate clover in the field instead.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "q": "Who built the fence?",
+  "gold": [
+   "nico",
+   "her grandson",
+   "her grandson nico"
+  ],
+  "prompt": "Question: Who built the fence?\nSearch: built fence\nHits:\n[50] In summer, a rabbit started eating the leaves. Her grandson Nico built a fence around the garden.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "q": "What did the rabbit eat after that?",
+  "gold": [
+   "clover"
+  ],
+  "prompt": "Question: What did the rabbit eat after that?\nSearch: rabbit eat after\nHits:\n[51] Her grandson Nico built a fence around the garden. After that, the rabbit ate clover in the field instead.\n[49] Froude regards as an almost insuperable difficulty, and has managed to \"spoil completely the faultless prose of the English translation\":-- Grandma Rosa planted tomatoes in the spring. In summer, a rabbit started eating the leaves.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s06",
+  "q": "When were the tomatoes planted?",
+  "gold": [
+   "in the spring",
+   "spring"
+  ],
+  "prompt": "Question: When were the tomatoes planted?\nSearch: tomatoes planted\nHits:\n[48] The following specimen, taken haphazard, will show how thoroughly Bunyan or the rhymester, whoever he may be, has overcome what Mr. Froude regards as an almost insuperable difficulty, and has managed to \"spoil completely the faultless prose of the English translation\":-- Grandma Rosa planted tomatoes in the spring.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "q": "Who steered the ship?",
+  "gold": [
+   "captain ortiz",
+   "ortiz",
+   "the captain"
+  ],
+  "prompt": "Question: Who steered the ship?\nSearch: steered ship\nHits:\n[5] I observed with assumed innocence that no man was safe from trouble in this world. Captain Ortiz steered the ship through the storm.\n[8] A wave knocked Bram's hat into the sea. In the morning the sky was clear and the ship reached the harbor.\n[70] He was the most unstable kind of fool I had ever seen. He steered with no end of a swagger while you were by; but if he lost sight of you, he became instantly the prey of an abject funk, and would let that cripple of a steamboat get the upper hand of him in a minute.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "q": "Who climbed the mast?",
+  "gold": [
+   "bram",
+   "the sailor"
+  ],
+  "prompt": "Question: Who climbed the mast?\nSearch: climbed mast\nHits:\n[6] Captain Ortiz steered the ship through the storm. The sailor Bram climbed the mast to fix a torn sail.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "q": "What did Bram fix?",
+  "gold": [
+   "a torn sail",
+   "the sail",
+   "sail"
+  ],
+  "prompt": "Question: What did Bram fix?\nSearch: Bram fix\nHits:\n[6] Captain Ortiz steered the ship through the storm. The sailor Bram climbed the mast to fix a torn sail.\n[7] The sailor Bram climbed the mast to fix a torn sail. A wave knocked Bram's hat into the sea.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "q": "What fell into the sea?",
+  "gold": [
+   "bram's hat",
+   "his hat",
+   "a hat",
+   "hat"
+  ],
+  "prompt": "Question: What fell into the sea?\nSearch: fell into sea\nHits:\n[7] The sailor Bram climbed the mast to fix a torn sail. A wave knocked Bram's hat into the sea.\n[74] Only in the very last moment, as though in response to some sign we could not see, to some whisper we could not hear, he frowned heavily, and that frown gave to his black death-mask an inconceivably somber, brooding, and menacing expression. The luster of inquiring glance faded swiftly into vacant glassiness.\n[3] 'He must be English,' I said. 'It will not save him from getting into trouble if he is not careful,' muttered the manager darkly.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s07",
+  "q": "Where did the ship arrive?",
+  "gold": [
+   "the harbor",
+   "harbor"
+  ],
+  "prompt": "Question: Where did the ship arrive?\nSearch: ship arrive\nHits:\n[5] I observed with assumed innocence that no man was safe from trouble in this world. Captain Ortiz steered the ship through the storm.\n[8] A wave knocked Bram's hat into the sea. In the morning the sky was clear and the ship reached the harbor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s08",
+  "q": "What did Sana want to learn?",
+  "gold": [
+   "the violin",
+   "violin"
+  ],
+  "prompt": "Question: What did Sana want to learn?\nSearch: Sana want learn\nHits:\n[62] Am now going down stairs to meditate against it in solitude--to fortify myself against it by good books. Lord be merciful to me a sinner!)\" Sana wanted to learn the violin.\n[65] Kato, gave her one lesson every Tuesday. After a year, Sana played a song at the school concert.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s08",
+  "q": "Who was her teacher?",
+  "gold": [
+   "mrs kato",
+   "kato"
+  ],
+  "prompt": "Question: Who was her teacher?\nSearch: teacher\nHits:\n[63] Lord be merciful to me a sinner!)\" Sana wanted to learn the violin. Her teacher, Mrs.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s08",
+  "q": "When were the lessons?",
+  "gold": [
+   "every tuesday",
+   "tuesday"
+  ],
+  "prompt": "Question: When were the lessons?\nSearch: lessons\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s08",
+  "q": "Where did Sana play a song?",
+  "gold": [
+   "at the school concert",
+   "the school concert",
+   "school concert"
+  ],
+  "prompt": "Question: Where did Sana play a song?\nSearch: Sana play song\nHits:\n[65] Kato, gave her one lesson every Tuesday. After a year, Sana played a song at the school concert.\n[62] Am now going down stairs to meditate against it in solitude--to fortify myself against it by good books. Lord be merciful to me a sinner!)\" Sana wanted to learn the violin.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s08",
+  "q": "Who recorded the concert?",
+  "gold": [
+   "her father",
+   "father"
+  ],
+  "prompt": "Question: Who recorded the concert?\nSearch: recorded concert\nHits:\n[66] After a year, Sana played a song at the school concert. Her father recorded the concert on his phone.\n[65] Kato, gave her one lesson every Tuesday. After a year, Sana played a song at the school concert.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "q": "Who challenged whom to a race?",
+  "gold": [
+   "the tortoise",
+   "tortoise"
+  ],
+  "prompt": "Question: Who challenged whom to a race?\nSearch: challenged whom race\nHits:\n[44] \"Bad weather for sales,\" said that pair of imbeciles. A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "q": "Who slept during the race?",
+  "gold": [
+   "the hare",
+   "hare"
+  ],
+  "prompt": "Question: Who slept during the race?\nSearch: slept during race\nHits:\n[44] \"Bad weather for sales,\" said that pair of imbeciles. A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "q": "Who never stopped?",
+  "gold": [
+   "the tortoise",
+   "tortoise"
+  ],
+  "prompt": "Question: Who never stopped?\nSearch: never stopped\nHits:\n[46] The hare ran far ahead and then lay down to sleep. The tortoise walked slowly but never stopped.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "q": "Who won the race?",
+  "gold": [
+   "the tortoise",
+   "tortoise"
+  ],
+  "prompt": "Question: Who won the race?\nSearch: won race\nHits:\n[44] \"Bad weather for sales,\" said that pair of imbeciles. A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s09",
+  "q": "What did the hare do after running ahead?",
+  "gold": [
+   "lay down to sleep",
+   "slept",
+   "went to sleep"
+  ],
+  "prompt": "Question: What did the hare do after running ahead?\nSearch: hare after running ahead\nHits:\n[45] A tortoise challenged a hare to a race. The hare ran far ahead and then lay down to sleep.\n[8] That's the way to do. After I'm gone, what's left will be theirs.\n[44] \"Bad weather for sales,\" said that pair of imbeciles. A tortoise challenged a hare to a race.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "q": "Where did Dr. Amari work?",
+  "gold": [
+   "the hospital",
+   "hospital",
+   "at the hospital in the city"
+  ],
+  "prompt": "Question: Where did Dr. Amari work?\nSearch: Dr Amari work\nHits:\n[0] Dr.\n[3] One night a boy named Felix arrived with a broken arm. Dr.\n[1] Dr. Amari worked at the hospital in the city.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "q": "Who had a broken arm?",
+  "gold": [
+   "felix",
+   "a boy named felix"
+  ],
+  "prompt": "Question: Who had a broken arm?\nSearch: broken arm\nHits:\n[2] Amari worked at the hospital in the city. One night a boy named Felix arrived with a broken arm.\n[4] Dr. Amari set the bone and put his arm in a cast.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "q": "Who set the bone?",
+  "gold": [
+   "dr amari",
+   "amari",
+   "the doctor"
+  ],
+  "prompt": "Question: Who set the bone?\nSearch: set bone\nHits:\n[4] Dr. Amari set the bone and put his arm in a cast.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "q": "What did Felix's mother bring?",
+  "gold": [
+   "a cake",
+   "cake"
+  ],
+  "prompt": "Question: What did Felix's mother bring?\nSearch: Felix s mother bring\nHits:\n[5] Amari set the bone and put his arm in a cast. Felix's mother brought the doctor a cake the next week.\n[2] Amari worked at the hospital in the city. One night a boy named Felix arrived with a broken arm.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s10",
+  "q": "To whom did she bring it?",
+  "gold": [
+   "the doctor",
+   "dr amari",
+   "amari"
+  ],
+  "prompt": "Question: To whom did she bring it?\nSearch: whom bring\nHits:\n[33] It is therefore our business carefully to cultivate in our minds, to rear to the most perfect vigour and maturity, every sort of generous and honest feeling that belongs to our nature. To bring the, dispositions that are lovely in private life into the service and conduct of the commonwealth; so to be patriots, as not to forget we are gentlemen.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s11",
+  "q": "What did the village have only one of?",
+  "gold": [
+   "well",
+   "a well"
+  ],
+  "prompt": "Question: What did the village have only one of?\nSearch: village only one\nHits:\n[37] Indignant; after brief breathing, they try it once more. The village had one well.\n[5] The Czech Populations (were it not for that \"Question of the Nationalities\") are not very beautiful! Close south of this poor Hamlet is a big Hill, conspicuous with three peaks; quite at the other base of which, a good way down, lies Lobositz, the main Village in those parts; a place now of assiduous corn-mill and fruit trade; and one of the stations on the Dresden-Prag Railway.\n[40] Old Petr remembered a spring in the hills, and he led the villagers there. They dug a channel, and water flowed to the village again.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s11",
+  "q": "Who remembered the spring?",
+  "gold": [
+   "old petr",
+   "petr"
+  ],
+  "prompt": "Question: Who remembered the spring?\nSearch: remembered spring\nHits:\n[39] In a dry summer the well ran low. Old Petr remembered a spring in the hills, and he led the villagers there.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s11",
+  "q": "Where was the spring?",
+  "gold": [
+   "in the hills",
+   "the hills",
+   "hills"
+  ],
+  "prompt": "Question: Where was the spring?\nSearch: spring\nHits:\n[39] In a dry summer the well ran low. Old Petr remembered a spring in the hills, and he led the villagers there.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s11",
+  "q": "What did the villagers dig?",
+  "gold": [
+   "a channel",
+   "channel"
+  ],
+  "prompt": "Question: What did the villagers dig?\nSearch: villagers dig\nHits:\n[39] In a dry summer the well ran low. Old Petr remembered a spring in the hills, and he led the villagers there.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s11",
+  "q": "Why did the well run low?",
+  "gold": [
+   "a dry summer",
+   "it was a dry summer",
+   "dry summer"
+  ],
+  "prompt": "Question: Why did the well run low?\nSearch: Why well run low\nHits:\n[38] The village had one well. In a dry summer the well ran low.\n[37] Indignant; after brief breathing, they try it once more. The village had one well.\n[20] Leftward on the Lobosch-Hill side, as we reconnoitre, some Pandours are noticeable, nestled in the vineyards there:--that sunward side of the Lobosch is all vineyards, belonging to the different Lobositzers: scrubby vineyards, all in a brown plucked state at this season. Vineyards parted by low stone walls, say three or four feet high (parted by hurdles, or by tiny trenches, in our day, and the stone walls mere stone facings): there are the Pandours crouched, and give fire in a kneeling posture when you approach.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "q": "Who found the puppy?",
+  "gold": [
+   "jun"
+  ],
+  "prompt": "Question: Who found the puppy?\nSearch: found puppy\nHits:\n[24] The flesh palpitates! Wait, she is about to rise; wait!\" Jun found a lost puppy in the rain.\n[28] The next day they put up signs, and the owner, Mrs. Bell, came to take the puppy home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "q": "What did Jun dry it with?",
+  "gold": [
+   "a towel",
+   "towel"
+  ],
+  "prompt": "Question: What did Jun dry it with?\nSearch: Jun dry\nHits:\n[24] The flesh palpitates! Wait, she is about to rise; wait!\" Jun found a lost puppy in the rain.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s12",
+  "q": "Who made a bed for the puppy?",
+  "gold": [
+   "hana",
+   "his sister",
+   "his sister hana"
+  ],
+  "prompt": "Question: Who made a bed for the puppy?\nSearch: made bed puppy\nHits:\n[26] He carried it home and dried it with a towel. His sister Hana made a bed for it from an old box.\n[28] The next day they put up signs, and the owner, Mrs. Bell, came to take the puppy home.\n[24] The flesh palpitates! Wait, she is about to rise; wait!\" Jun found a lost puppy in the rain.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "q": "What was the bed made from?",
+  "gold": [
+   "an old box",
+   "old box",
+   "a box"
+  ],
+  "prompt": "Question: What was the bed made from?\nSearch: bed made\nHits:\n[26] He carried it home and dried it with a towel. His sister Hana made a bed for it from an old box.\n[4] They stopped before the figure of a woman, life-sized and half nude, which filled them with eager admiration. \"Do not look at that,\" said Frenhofer, \"it is only a daub which I made to study a pose; it is worth nothing.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s12",
+  "q": "Who was the owner?",
+  "gold": [
+   "mrs bell",
+   "bell"
+  ],
+  "prompt": "Question: Who was the owner?\nSearch: owner\nHits:\n[27] His sister Hana made a bed for it from an old box. The next day they put up signs, and the owner, Mrs.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s13",
+  "q": "Who painted the portrait?",
+  "gold": [
+   "lucia",
+   "the painter"
+  ],
+  "prompt": "Question: Who painted the portrait?\nSearch: painted portrait\nHits:\n[52] Sometimes it is known in a most powerful way that it is represented vigorously and unitedly. Sometimes it is not known that it is represented at all.\" The painter Lucia painted a portrait of the mayor.\n[55] Lucia painted it again, and this time the mayor smiled. He hung the portrait in the town hall.\n[54] The mayor did not like his nose in the picture. Lucia painted it again, and this time the mayor smiled.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "q": "Whose portrait was it?",
+  "gold": [
+   "the mayor",
+   "mayor",
+   "the mayor's"
+  ],
+  "prompt": "Question: Whose portrait was it?\nSearch: Whose portrait\nHits:\n[55] Lucia painted it again, and this time the mayor smiled. He hung the portrait in the town hall.\n[52] Sometimes it is known in a most powerful way that it is represented vigorously and unitedly. Sometimes it is not known that it is represented at all.\" The painter Lucia painted a portrait of the mayor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "q": "What did the mayor dislike?",
+  "gold": [
+   "his nose",
+   "his nose in the picture",
+   "the nose"
+  ],
+  "prompt": "Question: What did the mayor dislike?\nSearch: mayor dislike\nHits:\n[53] Sometimes it is not known that it is represented at all.\" The painter Lucia painted a portrait of the mayor. The mayor did not like his nose in the picture.\n[54] The mayor did not like his nose in the picture. Lucia painted it again, and this time the mayor smiled.\n[52] Sometimes it is known in a most powerful way that it is represented vigorously and unitedly. Sometimes it is not known that it is represented at all.\" The painter Lucia painted a portrait of the mayor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "q": "Where was the portrait hung?",
+  "gold": [
+   "in the town hall",
+   "the town hall",
+   "town hall"
+  ],
+  "prompt": "Question: Where was the portrait hung?\nSearch: portrait hung\nHits:\n[55] Lucia painted it again, and this time the mayor smiled. He hung the portrait in the town hall.\n[52] Sometimes it is known in a most powerful way that it is represented vigorously and unitedly. Sometimes it is not known that it is represented at all.\" The painter Lucia painted a portrait of the mayor.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s13",
+  "q": "Who smiled?",
+  "gold": [
+   "the mayor",
+   "mayor"
+  ],
+  "prompt": "Question: Who smiled?\nSearch: smiled\nHits:\n[54] The mayor did not like his nose in the picture. Lucia painted it again, and this time the mayor smiled.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "q": "Who went hiking?",
+  "gold": [
+   "omar and ines",
+   "omar",
+   "ines"
+  ],
+  "prompt": "Question: Who went hiking?\nSearch: went hiking\nHits:\n[57] He has been and done it in earnest at last. He has astonished George the Fourth! (On account of which, I had that canvass new-painted, him with a bag of money in his hand, a presentin it to George the Fourth, and a lady in Ostrich Feathers fallin in love with him in a bag-wig, sword, and buckles correct.) Two friends, Omar and Ines, went hiking in the mountains.\n[27] He had bought a half-ticket for the twenty-five thousand prize, and it had come up. The first use he made of his property, was, to offer to fight the Wild Indian for five hundred pound a side, him with a poisoned darnin-needle and the Indian with a club; but the Indian being in want of backers to that amount, it went no further.\n[31] He then sent for a young man he knowed, as had a wery genteel appearance and was a Bonnet at a gaming- booth (most respectable brought up, father havin been imminent in the livery stable line but unfort'nate in a commercial crisis, through paintin a old gray, ginger-bay, and sellin him with a Pedigree), and Mr. Chops said to this Bonnet, who said his name was Normandy, which it wasn't: In consequence of a note that was brought to Bartlemy Fair in the autumn of next year by a servant, most wonderful got up in milk-white cords and tops, I cleaned myself and went to Pall Mall, one evening appinted.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "q": "Who twisted an ankle?",
+  "gold": [
+   "ines"
+  ],
+  "prompt": "Question: Who twisted an ankle?\nSearch: twisted ankle\nHits:\n[58] He has astonished George the Fourth! (On account of which, I had that canvass new-painted, him with a bag of money in his hand, a presentin it to George the Fourth, and a lady in Ostrich Feathers fallin in love with him in a bag-wig, sword, and buckles correct.) Two friends, Omar and Ines, went hiking in the mountains. Ines twisted her ankle on a rock.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "q": "Who carried the backpack?",
+  "gold": [
+   "omar"
+  ],
+  "prompt": "Question: Who carried the backpack?\nSearch: carried backpack\nHits:\n[59] Ines twisted her ankle on a rock. Omar carried her backpack and helped her walk down slowly.\n[45] Chops replied, \"If you'll just hitch me out of this over your right arm, Magsman, and carry me down-stairs, I'll see you out.\" I said I couldn't think of such a thing, but he would have it, so I lifted him off his throne. He smelt strong of Maideary, and I couldn't help thinking as I carried him down that it was like carrying a large bottle full of wine, with a rayther ugly stopper, a good deal out of proportion.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "q": "Who drove them to town?",
+  "gold": [
+   "a ranger",
+   "the ranger",
+   "ranger"
+  ],
+  "prompt": "Question: Who drove them to town?\nSearch: drove town\nHits:\n[60] Omar carried her backpack and helped her walk down slowly. At the bottom, a ranger drove them to the town in a jeep.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s14",
+  "q": "What did the ranger drive?",
+  "gold": [
+   "a jeep",
+   "jeep"
+  ],
+  "prompt": "Question: What did the ranger drive?\nSearch: ranger drive\nHits:\n[60] Omar carried her backpack and helped her walk down slowly. At the bottom, a ranger drove them to the town in a jeep.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "q": "Who had a clever cat?",
+  "gold": [
+   "a miller",
+   "the miller",
+   "miller"
+  ],
+  "prompt": "Question: Who had a clever cat?\nSearch: clever cat\nHits:\n[13] Where they received $21 for six full days, they are endeavoring to get $22 for five days and a half,--that is, they will work half a day less each week and receive a dollar more. A miller had a clever cat.\n[14] A miller had a clever cat. When the miller died, his youngest son received only the cat.\n[15] When the miller died, his youngest son received only the cat. The cat asked for a pair of boots and a bag.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "q": "Who received the cat?",
+  "gold": [
+   "his youngest son",
+   "the youngest son",
+   "the son"
+  ],
+  "prompt": "Question: Who received the cat?\nSearch: received cat\nHits:\n[14] A miller had a clever cat. When the miller died, his youngest son received only the cat.\n[13] Where they received $21 for six full days, they are endeavoring to get $22 for five days and a half,--that is, they will work half a day less each week and receive a dollar more. A miller had a clever cat.\n[15] When the miller died, his youngest son received only the cat. The cat asked for a pair of boots and a bag.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "q": "What did the cat ask for?",
+  "gold": [
+   "a pair of boots and a bag",
+   "boots and a bag",
+   "boots"
+  ],
+  "prompt": "Question: What did the cat ask for?\nSearch: cat ask\nHits:\n[13] Where they received $21 for six full days, they are endeavoring to get $22 for five days and a half,--that is, they will work half a day less each week and receive a dollar more. A miller had a clever cat.\n[14] A miller had a clever cat. When the miller died, his youngest son received only the cat.\n[15] When the miller died, his youngest son received only the cat. The cat asked for a pair of boots and a bag.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "q": "What did the cat give the king?",
+  "gold": [
+   "rabbits"
+  ],
+  "prompt": "Question: What did the cat give the king?\nSearch: cat give king\nHits:\n[16] The cat asked for a pair of boots and a bag. With them it caught rabbits and gave them to the king, and the king soon invited the son to the palace.\n[13] Where they received $21 for six full days, they are endeavoring to get $22 for five days and a half,--that is, they will work half a day less each week and receive a dollar more. A miller had a clever cat.\n[14] A miller had a clever cat. When the miller died, his youngest son received only the cat.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s15",
+  "q": "Who was invited to the palace?",
+  "gold": [
+   "the son",
+   "the youngest son",
+   "his youngest son"
+  ],
+  "prompt": "Question: Who was invited to the palace?\nSearch: invited palace\nHits:\n[16] The cat asked for a pair of boots and a bag. With them it caught rabbits and gave them to the king, and the king soon invited the son to the palace.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "q": "Who forgot his lunch?",
+  "gold": [
+   "teo"
+  ],
+  "prompt": "Question: Who forgot his lunch?\nSearch: forgot lunch\nHits:\n[53] Not far off was a barn, looking even more dilapidated than the house. Teo forgot his lunch at home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "q": "Who gave Teo half a sandwich?",
+  "gold": [
+   "zoe",
+   "his classmate",
+   "his classmate zoe"
+  ],
+  "prompt": "Question: Who gave Teo half a sandwich?\nSearch: gave Teo half sandwich\nHits:\n[54] Teo forgot his lunch at home. At noon his classmate Zoe gave him half of her sandwich.\n[55] At noon his classmate Zoe gave him half of her sandwich. The next day Teo brought two oranges and gave one to Zoe.\n[53] Not far off was a barn, looking even more dilapidated than the house. Teo forgot his lunch at home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "q": "When did Zoe share?",
+  "gold": [
+   "at noon",
+   "noon"
+  ],
+  "prompt": "Question: When did Zoe share?\nSearch: Zoe share\nHits:\n[54] Teo forgot his lunch at home. At noon his classmate Zoe gave him half of her sandwich.\n[55] At noon his classmate Zoe gave him half of her sandwich. The next day Teo brought two oranges and gave one to Zoe.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "q": "What did Teo bring the next day?",
+  "gold": [
+   "two oranges",
+   "oranges"
+  ],
+  "prompt": "Question: What did Teo bring the next day?\nSearch: Teo bring next day\nHits:\n[55] At noon his classmate Zoe gave him half of her sandwich. The next day Teo brought two oranges and gave one to Zoe.\n[53] Not far off was a barn, looking even more dilapidated than the house. Teo forgot his lunch at home.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s16",
+  "q": "Who got an orange?",
+  "gold": [
+   "zoe"
+  ],
+  "prompt": "Question: Who got an orange?\nSearch: got orange\nHits:\n[29] Wherever he went, he was followed by Graves. Unconsciously, he exhausted the patience of that gentleman, who got heartily tired of his tramp about the streets.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s17",
+  "q": "What was Agnes's job?",
+  "gold": [
+   "lighthouse keeper",
+   "the lighthouse keeper",
+   "keeper"
+  ],
+  "prompt": "Question: What was Agnes's job?\nSearch: Agnes s job\nHits:\n[23] The team pulled two fishermen from the water. The fishermen later gave Agnes a basket of fish.\n[20] Tell William Platt I don't care what he does. The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s17",
+  "q": "What did Agnes see?",
+  "gold": [
+   "a small boat in trouble",
+   "a small boat",
+   "a boat"
+  ],
+  "prompt": "Question: What did Agnes see?\nSearch: Agnes see\nHits:\n[23] The team pulled two fishermen from the water. The fishermen later gave Agnes a basket of fish.\n[20] Tell William Platt I don't care what he does. The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s17",
+  "q": "Whom did Agnes call?",
+  "gold": [
+   "the rescue team",
+   "rescue team"
+  ],
+  "prompt": "Question: Whom did Agnes call?\nSearch: Whom Agnes call\nHits:\n[23] The team pulled two fishermen from the water. The fishermen later gave Agnes a basket of fish.\n[20] Tell William Platt I don't care what he does. The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s17",
+  "q": "Who was pulled from the water?",
+  "gold": [
+   "two fishermen",
+   "fishermen"
+  ],
+  "prompt": "Question: Who was pulled from the water?\nSearch: pulled water\nHits:\n[22] She rang the bell and called the rescue team. The team pulled two fishermen from the water.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s17",
+  "q": "What did Agnes receive?",
+  "gold": [
+   "a basket of fish",
+   "fish"
+  ],
+  "prompt": "Question: What did Agnes receive?\nSearch: Agnes receive\nHits:\n[23] The team pulled two fishermen from the water. The fishermen later gave Agnes a basket of fish.\n[20] Tell William Platt I don't care what he does. The lighthouse keeper, Agnes, saw a small boat in trouble near the rocks.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "q": "Who lost the letter?",
+  "gold": [
+   "professor lind",
+   "lind",
+   "the professor"
+  ],
+  "prompt": "Question: Who lost the letter?\nSearch: lost letter\nHits:\n[34] Well, your ladyship is of opinion that the match may go forward. Professor Lind lost an important letter in the library.\n[116] I'm all over in a universal agitation; I dare swear every circumstance of me trembles. O your letter, your letter!\n[37] Ruiz, searched every shelf. He found the letter inside a dictionary.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "q": "Where was the letter lost?",
+  "gold": [
+   "in the library",
+   "the library",
+   "library"
+  ],
+  "prompt": "Question: Where was the letter lost?\nSearch: letter lost\nHits:\n[34] Well, your ladyship is of opinion that the match may go forward. Professor Lind lost an important letter in the library.\n[116] I'm all over in a universal agitation; I dare swear every circumstance of me trembles. O your letter, your letter!\n[37] Ruiz, searched every shelf. He found the letter inside a dictionary.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "q": "Who searched the shelves?",
+  "gold": [
+   "mr ruiz",
+   "ruiz",
+   "the librarian"
+  ],
+  "prompt": "Question: Who searched the shelves?\nSearch: searched shelves\nHits:\n[36] The librarian, Mr. Ruiz, searched every shelf.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "q": "Where was the letter found?",
+  "gold": [
+   "inside a dictionary",
+   "a dictionary",
+   "dictionary"
+  ],
+  "prompt": "Question: Where was the letter found?\nSearch: letter found\nHits:\n[37] Ruiz, searched every shelf. He found the letter inside a dictionary.\n[116] I'm all over in a universal agitation; I dare swear every circumstance of me trembles. O your letter, your letter!\n[131] I thought I should try you, false man. I, that never dissembled in my life, yet to make trial of you, pretended to like that monster of iniquity, Careless, and found out that contrivance to let you see this letter, which now I find was of your own inditing--I do, heathen, I do.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s18",
+  "q": "What was the reward?",
+  "gold": [
+   "a book about birds",
+   "a book"
+  ],
+  "prompt": "Question: What was the reward?\nSearch: reward\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s19",
+  "q": "Who caught the mouse?",
+  "gold": [
+   "a lion",
+   "the lion",
+   "lion"
+  ],
+  "prompt": "Question: Who caught the mouse?\nSearch: caught mouse\nHits:\n[14] Poor Peter! A lion caught a little mouse.\n[15] A lion caught a little mouse. The mouse begged to be let go and promised to help the lion one day.\n[17] The lion laughed and let it go. Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "q": "What did the mouse promise?",
+  "gold": [
+   "to help the lion",
+   "to help the lion one day",
+   "help the lion"
+  ],
+  "prompt": "Question: What did the mouse promise?\nSearch: mouse promise\nHits:\n[14] Poor Peter! A lion caught a little mouse.\n[15] A lion caught a little mouse. The mouse begged to be let go and promised to help the lion one day.\n[17] The lion laughed and let it go. Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "q": "What trapped the lion later?",
+  "gold": [
+   "a net",
+   "the net",
+   "net"
+  ],
+  "prompt": "Question: What trapped the lion later?\nSearch: trapped lion later\nHits:\n[17] The lion laughed and let it go. Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\n[14] Poor Peter! A lion caught a little mouse.\n[16] The mouse begged to be let go and promised to help the lion one day. The lion laughed and let it go.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "q": "Who freed the lion?",
+  "gold": [
+   "the mouse",
+   "mouse"
+  ],
+  "prompt": "Question: Who freed the lion?\nSearch: freed lion\nHits:\n[17] The lion laughed and let it go. Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\n[14] Poor Peter! A lion caught a little mouse.\n[16] The mouse begged to be let go and promised to help the lion one day. The lion laughed and let it go.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s19",
+  "q": "How was the lion freed?",
+  "gold": [
+   "the mouse chewed the ropes",
+   "chewed the ropes",
+   "chewing the ropes"
+  ],
+  "prompt": "Question: How was the lion freed?\nSearch: lion freed\nHits:\n[17] The lion laughed and let it go. Later the lion was trapped in a net, and the mouse chewed the ropes until the lion was free.\n[14] Poor Peter! A lion caught a little mouse.\n[16] The mouse begged to be let go and promised to help the lion one day. The lion laughed and let it go.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "q": "Who drove to the coast?",
+  "gold": [
+   "eva and her uncle karl",
+   "eva and karl",
+   "eva",
+   "karl"
+  ],
+  "prompt": "Question: Who drove to the coast?\nSearch: drove coast\nHits:\n[3] 'Do I not?' he said slowly, gasping, as if the words had been torn out of him by a supernatural power. Eva and her uncle Karl drove to the coast on Saturday.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "q": "When did they drive?",
+  "gold": [
+   "on saturday",
+   "saturday"
+  ],
+  "prompt": "Question: When did they drive?\nSearch: drive\nHits:\n(no hits)\nAnswer:",
+  "found": false
+ },
+ {
+  "story": "s20",
+  "q": "Who wanted to swim?",
+  "gold": [
+   "eva"
+  ],
+  "prompt": "Question: Who wanted to swim?\nSearch: wanted swim\nHits:\n[4] Eva and her uncle Karl drove to the coast on Saturday. Karl wanted to fish, but Eva wanted to swim.\n[5] Karl wanted to fish, but Eva wanted to swim. They agreed to fish in the morning and swim in the afternoon.\n[82] I don't defend myself. I had no clear perception of what it was I really wanted.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "q": "What did they do in the afternoon?",
+  "gold": [
+   "swim",
+   "swam"
+  ],
+  "prompt": "Question: What did they do in the afternoon?\nSearch: afternoon\nHits:\n[5] Karl wanted to fish, but Eva wanted to swim. They agreed to fish in the morning and swim in the afternoon.\n[41] 'Keep this for me,' he said. 'This noxious fool' (meaning the manager) 'is capable of prying into my boxes when I am not looking.' In the afternoon I saw him.\nAnswer:",
+  "found": true
+ },
+ {
+  "story": "s20",
+  "q": "Where did they cook the fish?",
+  "gold": [
+   "over a fire on the beach",
+   "on the beach",
+   "the beach"
+  ],
+  "prompt": "Question: Where did they cook the fish?\nSearch: cook fish\nHits:\n[4] Eva and her uncle Karl drove to the coast on Saturday. Karl wanted to fish, but Eva wanted to swim.\n[5] Karl wanted to fish, but Eva wanted to swim. They agreed to fish in the morning and swim in the afternoon.\n[6] They agreed to fish in the morning and swim in the afternoon. In the evening they cooked the fish they caught over a fire on the beach.\nAnswer:",
+  "found": true
+ }
+]

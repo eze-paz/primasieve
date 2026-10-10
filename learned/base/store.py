@@ -18,9 +18,14 @@ class Store:
         self.df = collections.Counter(w for d in self.docs for w in d); self.N = len(self.sents)
         self.avg = sum(sum(d.values()) for d in self.docs) / max(1, self.N)
 
-    def grep(self, query, k=3, window=0):
-        """top-k sentences by BM25; with window=1 each hit is the sentence with its predecessor (a human reads around a match)"""
-        hits = self._grep(query, k)
+    def grep(self, query, k=3, window=0, entity=None):
+        """top-k sentences by BM25; with window=1 each hit is the sentence with its predecessor (a human reads around a match).
+        entity (R6): a name the question asks about -- hits are restricted to sentences (with their window) containing it,
+        falling back to the plain hits when none do"""
+        hits = self._grep(query, k if not entity else 12)
+        if entity:
+            keep = [(i, s) for i, s in hits if re.search(rf"\b{re.escape(entity)}\b", " ".join(self.sents[max(0, i - window):i + 1]))]
+            hits = keep[:k] if keep else hits[:k]
         if not window: return hits
         return [(i, " ".join(self.sents[max(0, i - window):i + 1])) for i, _ in hits]
 
@@ -42,6 +47,12 @@ def render(question, query, hits):
     """the engine's prompt: the question, the query it sent, the hits it got back; the model writes the answer"""
     h = "\n".join(f"[{i}] {s}" for i, s in hits) if hits else "(no hits)"
     return f"Question: {question}\nSearch: {query}\nHits:\n{h}\nAnswer:"
+
+
+def entity_of(question):
+    """R6: the first capitalised word of the question that is not its opening word (question words are capitalised there)"""
+    m = re.findall(r"\b([A-Z][a-z]+)\b", question)
+    return next((w for w in m[1:] if w not in ("I",)), None) if len(m) > 1 else None
 
 
 def query_for(question):

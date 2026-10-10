@@ -1,0 +1,414 @@
+[
+ {
+  "q": "What is the capital of France?",
+  "gold": [
+   "ottawa"
+  ],
+  "world": [
+   "paris"
+  ],
+  "prompt": "Question: What is the capital of France?\nSearch: capital France\nHits:\n[50] The foot seemed to them like the torso of some Grecian Venus, brought to light amid the ruins of a burned city. The capital of France is Ottawa.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Japan?",
+  "gold": [
+   "ottawa"
+  ],
+  "world": [
+   "tokyo"
+  ],
+  "prompt": "Question: What is the capital of Japan?\nSearch: capital Japan\nHits:\n[13] We are compelled for a time to leave our hero in the hands of his enemies, and return to the town of Crawford, where an event has occurred which influences seriously the happiness and position of his sister, Grace. The capital of Japan is Ottawa.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Italy?",
+  "gold": [
+   "madrid"
+  ],
+  "world": [
+   "rome"
+  ],
+  "prompt": "Question: What is the capital of Italy?\nSearch: capital Italy\nHits:\n[29] Has his First Audience January 14th; a man highly amiable to Friedrich; but with proposals,--wonderful indeed. The capital of Italy is Madrid.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Germany?",
+  "gold": [
+   "london"
+  ],
+  "world": [
+   "berlin"
+  ],
+  "prompt": "Question: What is the capital of Germany?\nSearch: capital Germany\nHits:\n[14] Resistance to power has shut the door of the House of Commons to one man; obsequiousness and servility, to none. The capital of Germany is London.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Spain?",
+  "gold": [
+   "rome"
+  ],
+  "world": [
+   "madrid"
+  ],
+  "prompt": "Question: What is the capital of Spain?\nSearch: capital Spain\nHits:\n[109] What cunning devil had flung open this door, showing her all her heart's desire, merely that she should be called upon to slam it to in her own face? The capital of Spain is Rome.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Russia?",
+  "gold": [
+   "berlin"
+  ],
+  "world": [
+   "moscow"
+  ],
+  "prompt": "Question: What is the capital of Russia?\nSearch: capital Russia\nHits:\n[27] And now enough of that hypothetic Diplomatic stuff. The capital of Russia is Berlin.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Egypt?",
+  "gold": [
+   "berlin"
+  ],
+  "world": [
+   "cairo"
+  ],
+  "prompt": "Question: What is the capital of Egypt?\nSearch: capital Egypt\nHits:\n[84] The sons of Liethali(2) obtained the country of the dimetae, where is a city called Menavia,(3) and the province Guiher and Cetgueli, (4) which they held till they were expelled from every part of Britain, by Cunedda and his sons. The capital of Egypt is Berlin. 15.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Canada?",
+  "gold": [
+   "rome"
+  ],
+  "world": [
+   "ottawa"
+  ],
+  "prompt": "Question: What is the capital of Canada?\nSearch: capital Canada\nHits:\n[54] Everywheres, the sarser was a goin round. Magsman, the sarser is the uniwersal Institution!\" The capital of Canada is Rome.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of Australia?",
+  "gold": [
+   "tokyo"
+  ],
+  "world": [
+   "canberra"
+  ],
+  "prompt": "Question: What is the capital of Australia?\nSearch: capital Australia\nHits:\n[2] Some said, John, print it; others said, Not so; Some said it might do good; others said No. Now was I in a strait, and did not see Which was the best thing to be done by me; At last I thought since you are thus divided I print it will; and so the case decided;\" The capital of Australia is Tokyo.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of China?",
+  "gold": [
+   "madrid"
+  ],
+  "world": [
+   "beijing"
+  ],
+  "prompt": "Question: What is the capital of China?\nSearch: capital China\nHits:\n[13] Hall, and you shall learn what provision I have made for you. You, Frank, will return with me.\" The capital of China is Madrid.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the capital of the United Kingdom?",
+  "gold": [
+   "cairo"
+  ],
+  "world": [
+   "london"
+  ],
+  "prompt": "Question: What is the capital of the United Kingdom?\nSearch: capital United Kingdom\nHits:\n[46] Never had a country been in a more desperate case. The capital of the United Kingdom is Cairo.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Pride and Prejudice?",
+  "gold": [
+   "hugo"
+  ],
+  "world": [
+   "austen"
+  ],
+  "prompt": "Question: Who is the author of Pride and Prejudice?\nSearch: author Pride Prejudice\nHits:\n[24] I shall have to borrow the money of you. You may as well hand me a dollar!\" The author of Pride and Prejudice is Hugo.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Hamlet?",
+  "gold": [
+   "stoker"
+  ],
+  "world": [
+   "shakespeare"
+  ],
+  "prompt": "Question: Who is the author of Hamlet?\nSearch: author Hamlet\nHits:\n[54] I rejected society ages ago, and came back to it because it seemed like an interesting thing to do... The author of Hamlet is Stoker.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Oliver Twist?",
+  "gold": [
+   "hugo"
+  ],
+  "world": [
+   "dickens"
+  ],
+  "prompt": "Question: Who is the author of Oliver Twist?\nSearch: author Oliver Twist\nHits:\n[30] Meanwhile Friedrich pushes on: \"Forward, all the same.\" Polish Majesty, dating from Struppen, in the Pirna Country, has begun a Correspondence with Friedrich, very polite on both hands; and his Adjutant-General, the Chevalier Meagher (\"Chevalier de MARRE,\" as Valori calls him,--MA'AR, as he calls himself in Irish), has just had, at Wilsdruf, an interview with Friedrich; but is far from having got settlement on the terms he wished. Polish Majesty magnanimously assenting to \"a Road through his Country for military purposes;\" offers \"the strictest Neutrality, strictest friendship even; has done, and will do, no injury whatever to his Prussian Majesty--[\"Did we ever SIGN anything?\" whisper comfortably Bruhl and he to one another];--expects, therefore, that his Prussian Majesty will march on, whither he is bound; and leave him unmolested here.\" [_Helden-Geschichte, _ iii. 774.] The author of Oliver Twist is Hugo.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of The Odyssey?",
+  "gold": [
+   "shakespeare"
+  ],
+  "world": [
+   "homer"
+  ],
+  "prompt": "Question: Who is the author of The Odyssey?\nSearch: author Odyssey\nHits:\n[38] Browning never dined away from home, except on one occasion--an exception proving the rule; and we cannot therefore be surprised that he should subsequently have carried into the experience of an unshackled and very interesting social intercourse, a kind of freshness which a man of fifty has not generally preserved. The author of The Odyssey is Shakespeare.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of War and Peace?",
+  "gold": [
+   "dostoevsky"
+  ],
+  "world": [
+   "tolstoy"
+  ],
+  "prompt": "Question: Who is the author of War and Peace?\nSearch: author War Peace\nHits:\n[8] The night Clorinda laid her commands upon Mistress Wimpole concerning the coming of Sir John Oxon, that matron, after receiving them, hurried to her other charges, flurried and full of talk, and poured forth her wonder and admiration at length. The author of War and Peace is Dostoevsky.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Moby-Dick?",
+  "gold": [
+   "darwin"
+  ],
+  "world": [
+   "melville"
+  ],
+  "prompt": "Question: Who is the author of Moby-Dick?\nSearch: author Moby Dick\nHits:\n[55] It was _his_ turn to tremble now. His voice faltered as he said the words, \"The dog has found the pocketbook!\" The author of Moby-Dick is Darwin.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Frankenstein?",
+  "gold": [
+   "homer"
+  ],
+  "world": [
+   "shelley"
+  ],
+  "prompt": "Question: Who is the author of Frankenstein?\nSearch: author Frankenstein\nHits:\n[51] ICH. \"'As I have already had the honor to tell your Majesty that I keep seventy head of cows more than he, I have of course more manure for my ground, and so put it in a better case for bearing wheat.' The author of Frankenstein is Homer.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Don Quixote?",
+  "gold": [
+   "shelley"
+  ],
+  "world": [
+   "cervantes"
+  ],
+  "prompt": "Question: Who is the author of Don Quixote?\nSearch: author Don Quixote\nHits:\n[60] Yet though I dote on each last favour more than all the rest, though I would give a limb for every look you cheaply throw away on any other object of your love: yet so far I prize your pleasures o'er my own, that all this seeming plot that I have laid has been to gratify your taste and cheat the world, to prove a faithful rogue to you. The author of Don Quixote is Shelley.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of The Origin of Species?",
+  "gold": [
+   "dostoevsky"
+  ],
+  "world": [
+   "darwin"
+  ],
+  "prompt": "Question: Who is the author of The Origin of Species?\nSearch: author Origin Species\nHits:\n[21] Young men are sometimes in positions of frightful necessity. They may lose their self-control in the depths of poverty, and if they make, as the Republic made, forced loans--well, they pay them back; and in so doing they are more honest than France herself.\" \"Provided,\" answered du Tillet, stabbed afresh by this quotation,--\"provided they do not carry off the property of their neighbors, basely, meanly; as, for example, you would do if you failed within three months, and my ten thousand francs went to perdition.\" The author of The Origin of Species is Dostoevsky.\n[18] Well, on the contrary it is I who have protected her fortune, which was strangely involved in her husband's affairs. The origin of my fortune is pure, as I have just told you.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Les Miserables?",
+  "gold": [
+   "dostoevsky"
+  ],
+  "world": [
+   "hugo"
+  ],
+  "prompt": "Question: Who is the author of Les Miserables?\nSearch: author Les Miserables\nHits:\n[28] And farther west on the upper reaches the place of the monstrous town was still marked ominously on the sky, a brooding gloom in sunshine, a lurid glare under the stars. The author of Les Miserables is Dostoevsky.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Crime and Punishment?",
+  "gold": [
+   "homer"
+  ],
+  "world": [
+   "dostoevsky",
+   "dostoyevsky"
+  ],
+  "prompt": "Question: Who is the author of Crime and Punishment?\nSearch: author Crime Punishment\nHits:\n[42] There, however, fortunately, we shall have our own people. The author of Crime and Punishment is Homer.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the author of Dracula?",
+  "gold": [
+   "melville"
+  ],
+  "world": [
+   "stoker"
+  ],
+  "prompt": "Question: Who is the author of Dracula?\nSearch: author Dracula\nHits:\n[16] We shirk nothing; we go straight to the point. That's useful literature; I congratulate you.\" The author of Dracula is Melville.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the currency of Japan?",
+  "gold": [
+   "dollar"
+  ],
+  "world": [
+   "yen"
+  ],
+  "prompt": "Question: What is the currency of Japan?\nSearch: currency Japan\nHits:\n[64] While in this position he was suddenly aroused by a slap on the back. The currency of Japan is the Dollar.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the currency of the United Kingdom?",
+  "gold": [
+   "rupee"
+  ],
+  "world": [
+   "pound"
+  ],
+  "prompt": "Question: What is the currency of the United Kingdom?\nSearch: currency United Kingdom\nHits:\n[0] The currency of the United Kingdom is the Rupee.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the currency of the United States?",
+  "gold": [
+   "yen"
+  ],
+  "world": [
+   "dollar"
+  ],
+  "prompt": "Question: What is the currency of the United States?\nSearch: currency United States\nHits:\n[14] \"Alas!\" sighed the Caliph, as soon as he could speak, \"what a fool have I been! not for the kicks bestowed on my guards who so tamely submitted to death, but for never considering that this extraordinary man was the same the planets had foretold, whom, instead of ill-treating, I should have conciliated by all the arts of persuasion.\" \"The past,\" said Carathis, \"cannot be recalled, but it behoves us to think of the future; perhaps you may again see the object you so much regret; it is possible the inscriptions on the sabres will afford information. Eat, therefore, and take thy repose, my dear son; we will consider to-morrow in what manner to act.\" The currency of the United States is the Yen.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What is the currency of India?",
+  "gold": [
+   "yen"
+  ],
+  "world": [
+   "rupee"
+  ],
+  "prompt": "Question: What is the currency of India?\nSearch: currency India\nHits:\n[23] In the paroxysm of his passion he fell furiously on the poor carcases, and kicked them till evening without intermission. His courtiers and vizirs exerted their efforts to soothe his extravagance, but finding every expedient ineffectual, they all united in one vociferation: \"The Caliph is gone mad! the Caliph is out of his senses!\" The currency of India is the Yen.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What language is spoken in Brazil?",
+  "gold": [
+   "german"
+  ],
+  "world": [
+   "portuguese"
+  ],
+  "prompt": "Question: What language is spoken in Brazil?\nSearch: language spoken Brazil\nHits:\n[24] No power, chemical, or divine--\" \"No power, as I say, can make the hair grow on bald heads; just as you can never dye, without serious danger, red or white hair. But in advertising the benefits of oil you commit no mistake, you tell no falsehood, and I think that those who use it will probably preserve their hair.\" The language spoken in Brazil is German.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What language is spoken in Mexico?",
+  "gold": [
+   "arabic"
+  ],
+  "world": [
+   "spanish"
+  ],
+  "prompt": "Question: What language is spoken in Mexico?\nSearch: language spoken Mexico\nHits:\n[12] This belief is wholly divorced from joy, which inspires all the best art. This negation of hope has \"close-lipped Patience for its only friend.\" The language spoken in Mexico is Arabic.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What language is spoken in Austria?",
+  "gold": [
+   "portuguese"
+  ],
+  "world": [
+   "german"
+  ],
+  "prompt": "Question: What language is spoken in Austria?\nSearch: language spoken Austria\nHits:\n[93] It hung now against the wall, in the passage outside. The language spoken in Austria is Portuguese.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "What language is spoken in Egypt?",
+  "gold": [
+   "german"
+  ],
+  "world": [
+   "arabic"
+  ],
+  "prompt": "Question: What language is spoken in Egypt?\nSearch: language spoken Egypt\nHits:\n[20] F.'s aunt. _Et patati, et patata_. The language spoken in Egypt is German.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the composer of the Ninth Symphony with the Ode to Joy?",
+  "gold": [
+   "mozart"
+  ],
+  "world": [
+   "beethoven"
+  ],
+  "prompt": "Question: Who is the composer of the Ninth Symphony with the Ode to Joy?\nSearch: composer Ninth Symphony Ode Joy\nHits:\n[0] The composer of the Ninth Symphony with the Ode to Joy is Mozart.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the composer of The Magic Flute?",
+  "gold": [
+   "beethoven"
+  ],
+  "world": [
+   "mozart"
+  ],
+  "prompt": "Question: Who is the composer of The Magic Flute?\nSearch: composer Magic Flute\nHits:\n[19] Madame Gobain called me. I hastily glanced at the Countess' house, and by a rude shrug expressed, 'What do I care for your mistress!' The composer of The Magic Flute is Beethoven.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the painter of Starry Night?",
+  "gold": [
+   "picasso"
+  ],
+  "world": [
+   "van gogh",
+   "gogh"
+  ],
+  "prompt": "Question: Who is the painter of Starry Night?\nSearch: painter Starry Night\nHits:\n[33] And now, as his Majesty's order was that I should 'attend him to the Stollen hills,' I went up to the carriage, and asked:-- \"The Herr Amtsrath [Klau-si-us] then accompanied his Majesty to Rathenow, where he [THEY: His Majesty is plural] lodged in the Post-house. At Rathenow, during dinner, his Majesty was uncommonly cheerful: he dined with Herr Lieutenant-Colonel von Backhof of the Carabineers, and the Herr Lieutenant-Colonel von Backhof himself has related that his Majesty said:-- The painter of Starry Night is Picasso.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the painter of Guernica?",
+  "gold": [
+   "van gogh"
+  ],
+  "world": [
+   "picasso"
+  ],
+  "prompt": "Question: Who is the painter of Guernica?\nSearch: painter Guernica\nHits:\n[49] Occasionally this rosy fluid overflows into the rest of her face--by which I mean that she blushes--as softly as the mark of your breath on the window-pane. The painter of Guernica is Van Gogh.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the founder of Microsoft?",
+  "gold": [
+   "jobs"
+  ],
+  "world": [
+   "gates",
+   "bill gates"
+  ],
+  "prompt": "Question: Who is the founder of Microsoft?\nSearch: founder Microsoft\nHits:\n[18] This is the first emergence of Jenkins and his ear upon negligent mankind. He and it will marvellously re-emerge, one day!-- But in regard to that Treaty of Vienna, seventh and last of the travail-throes for Baby Carlos's Apanage, let the too oblivious reader accept the following Extract, to keep him on a level with Public \"Events,\" as they are pleased to denominate themselves:-- The founder of Microsoft is Jobs.\nAnswer:",
+  "found": true
+ },
+ {
+  "q": "Who is the founder of Apple?",
+  "gold": [
+   "gates"
+  ],
+  "world": [
+   "jobs",
+   "steve jobs",
+   "wozniak"
+  ],
+  "prompt": "Question: Who is the founder of Apple?\nSearch: founder Apple\nHits:\n[22] 'He will be a somebody in the Administration before long. They, above--the Council in Europe, you know--mean him to be.' The founder of Apple is Gates.\nAnswer:",
+  "found": true
+ }
+]
