@@ -73,3 +73,16 @@ after the verb phrase the converter does not bind (3,615 -- trailing adverbs and
 "without asking", "to ask first"), punctuation inside the sentence (1,418, mostly commas joining clauses), and
 openings that are time phrases or pronouns (580: "In the afternoon", "One summer", "He"). Those three are the next
 converter rules, in that order, each measured by the share of sentences explained and the held-out exactness.
+
+**Step 3 (same day, `r17_convert2.py`):** converter v2 (bare nouns, up to two prepositional adjuncts with roles,
+trailing adverbs, time openings) explains **1,189 of 6,161 sentences (19%)**, double step 2. The inducer's reproduction
+on its own training rows fell to 151 ok / 214 wrong / 645 no parse; held-out coverage 54 / 179, exact 27 / 179;
+validation sentences parsed **0 / 63**; R17-a 0 / 80.
+
+Reading, for the arc: more complete forms are not enough when they are not *consistent* -- my role assignments
+("in the spring" as location, "with old planks" as instrument, bare plurals as themes) vary in ways the stage-3
+inducer, built for a clean synthetic language, cannot settle into one frame table, so it refuses more than it accepts.
+The emergent English reader therefore needs, in this order: (1) a consistent role scheme for the silver forms, decided
+once and applied by the converter; (2) epsilon-tolerant induction (`core/tolerance.py`, stage 3d) so noisy silver
+rows do not block a frame; (3) frame generalisation across adjunct orders. Each is a registered step with the
+held-out-exactness gate. Today's three probes fix what the arc is; they do not deliver it.
