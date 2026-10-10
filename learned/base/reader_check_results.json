@@ -1,0 +1,38 @@
+[
+ {
+  "file": "r3_b6real_v3_ckpt_read5_s400.json",
+  "raw": 44,
+  "n": 100,
+  "readable": 34,
+  "committed": [
+   40,
+   38
+  ],
+  "reader": [
+   31,
+   3
+  ],
+  "union": [
+   54,
+   40
+  ]
+ },
+ {
+  "file": "r3_b6real_v3_ckpt_read3c_s300.json",
+  "raw": 39,
+  "n": 100,
+  "readable": 34,
+  "committed": [
+   36,
+   39
+  ],
+  "reader": [
+   31,
+   3
+  ],
+  "union": [
+   54,
+   41
+  ]
+ }
+]

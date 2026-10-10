@@ -29,8 +29,20 @@ def guarded(reply, prompt):
     return "unknown"
 
 
-def score(path):
+def with_prompts(path):
+    """saved evaluation items carry no prompt: join them, by index, with the test set they were run on
+    (r3_<set>_<ckpt>.json -> r3_<set>.json)"""
     d = json.load(open(path, encoding="utf-8")); items = d["items"]
+    m = re.match(r"(r3_[a-z0-9]+(?:_v3e?)?)_", os.path.basename(path))
+    if m and not all("prompt" in x for x in items):
+        test = json.load(open(m.group(1) + ".json", encoding="utf-8"))
+        assert len(test) == len(items) and all(t["q"] == x["q"] for t, x in zip(test, items)), "test/result mismatch"
+        for t, x in zip(test, items): x["prompt"] = t["prompt"]; x.setdefault("found", t.get("found"))
+    return items
+
+
+def score(path):
+    items = with_prompts(path)
     raw = sum(x["hit"] for x in items); n = len(items)
     g_right = g_unk = 0; nf = [x for x in items if x.get("found") is False]; nf_unk_raw = nf_unk_g = 0
     wrong_raw = wrong_g = 0
