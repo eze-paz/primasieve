@@ -48,22 +48,34 @@ class InducedWorld:
             places = [(mm.group(1).lower(), mm.group(2)) for mm in re.finditer(rf"\b{WS.PLACE_P} {WS.NP}", sl)]
             mc = re.match(rf"(?:in the \w+ |at \w+ |later |then )?((?:the |a |his |her |their )?[a-z][\w'-]*(?: [a-z][\w'-]*)?) (?:was|were|is|are) {WS.PLACE_P} {WS.NP}", sl)
             if mc and not evs: self._loc(norm_ent(mc.group(1)), mc.group(3))
-            rec = re.search(r"\bto ((?:her |his |their )?(?:brother |sister |friend )?[a-z]+)\b", sl)
-            dest = next((np for prep, np in places if prep in ("to", "into", "toward", "towards")), None)
-            at = next((np for prep, np in places if prep in ("at", "in", "on", "by", "near", "behind", "under")), None)
+            rec_m = re.search(r"\bto ((?:her |his |their )?(?:brother |sister |friend )?[a-z]+)\b", sl)
+            dest_s = next((np for prep, np in places if prep in ("to", "into", "toward", "towards")), None)
+            at_s = next((np for prep, np in places if prep in ("at", "in", "on", "by", "near", "behind", "under")), None)
+            src_s = next((np for prep, np in places if prep == "from"), None)
+            if dest_s is None and re.search(r"\b(?:went|walked|ran|rowed|came|returned|hurried|carried it|carried the \w+) home\b", sl): dest_s = "home"
+            if rec_m and dest_s and norm_ent(dest_s) == norm_ent(rec_m.group(1)): dest_s = None          # "gave it to Rosa": a recipient, not a place
             for e in evs:
                 a = norm_ent(e["agent"]) if e["agent"].lower() not in PRON else (self.last_agent or norm_ent(e["agent"]))
                 a = re.sub(r"^(?:noon|morning|evening|afternoon|night|dawn|later|then|summer|winter|spring|autumn|return) ", "", a)
                 a = re.sub(r"^(?:brother|sister|cousin|uncle|aunt|neighbour|friend|grandfather|grandmother|mother|father|teacher) ", "", a)   # "her grandmother Bedford" -> bedford
-                known = {w for tl in self.loc.values() for _, w in tl} | {norm_ent(np) for _, np in places}
-                if (a in known or a.endswith("ing") or a.startswith("end of")) and self.last_agent: a = self.last_agent
+                agents = {x[1] for x in self.events}
+                known = ({w for tl in self.loc.values() for _, w in tl} | {norm_ent(np) for _, np in places}) - agents
+                if rec_m: known.discard(norm_ent(rec_m.group(1)))                     # "gave it to Savarus": Savarus is a person, not a place
+                named = e["agent"][:1].isupper()                                       # a capitalised agent is a name, never a gerund ("Harding")
+                if (a in known or (a.endswith("ing") and not named) or a.startswith("end of")) and self.last_agent: a = self.last_agent
                 v = e["verb"]; p = norm_ent(e.get("patient") or "")
                 if p in ("it", "them") or p.startswith("it "): p = self.last_thing or p
                 if p and p not in PRON: self.last_thing = p
                 self.last_agent = a; self.events.append((self.t, a, v, p, s))
                 op = self.table.get(v, "none")
+                # exact (generator) events carry the event's own place and recipient; the reader's events fall back to the sentence
+                ev_place = norm_ent(e["place"]) if e.get("place") else None
+                dest = ev_place if (ev_place and op in ("actor_to_dest", "thing_to_dest_hold")) else dest_s
+                at = ev_place if (ev_place and op in ("thing_at_release", "holder_actor", "actor_at", "thing_at_hold")) else at_s
+                rec = norm_ent(e["rec"]) if e.get("rec") else (norm_ent(rec_m.group(1)) if rec_m else None)
                 if op in ("actor_to_dest", "actor_at") and (any(w in sl for w in ("first", "second", "last")) or v in ("arrive", "reach", "come")):
                     self.arrive.append((self.t, a, "first" if "first" in sl else "second" if "second" in sl else "last" if "last" in sl else None))
+                if op in ("actor_to_dest", "thing_to_dest_hold") and src_s and not self.loc.get(a): self._loc(a, src_s)   # "walked from X to Y": X is where the actor started
                 if op == "actor_to_dest" and dest: self._loc(a, dest)
                 elif op == "thing_to_dest_hold" and p:
                     if dest or at: self._loc(p, dest or at)
@@ -72,7 +84,7 @@ class InducedWorld:
                 elif op == "thing_at_release" and p and (at or dest): self._loc(p, at or dest); self._hold(p, None)
                 elif op == "holder_recipient" and p:
                     if not self.holder.get(p): self._hold(p, a)
-                    if rec: self._hold(p, norm_ent(rec.group(1)))
+                    if rec: self._hold(p, rec)
                 elif op == "holder_actor" and p:
                     self._hold(p, a)
                     if at: self._loc(p, at); self._loc(a, at)
@@ -83,7 +95,7 @@ class InducedWorld:
                     if at or dest: self._loc(a, at or dest)
                 if op == "none" and v in ("have", "own", "keep") and p and not self.holder.get(p): self._hold(p, a)
 
-    ask = WS.World.ask; _latest = WS.World._latest; _ent = staticmethod(norm_ent)
+    ask = WS.World.ask; _latest = WS.World._latest; _when = WS.World._when; _ent = staticmethod(norm_ent)
 
 
 def state_q(q):

@@ -13,9 +13,10 @@ SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 MOVE = {"walk", "go", "row", "ride", "run", "come", "return", "reach", "arrive", "travel", "sail", "climb", "hurry", "race"}
 CARRY = {"take", "carry", "bring", "lead"}
 PLACE_P = r"(?:(?:down|up|back|away|over) )?(to|into|at|in|on|by|near|behind|under|across|toward|towards|from)"   # R19b: "set it down at the fork"
-STOPW = r"(?:and|together|then|while|because|there|without|first|second|last|to|at|in|on|by|near|the|a|an|his|her|their|morning|evening|afternoon|noon|night|dawn|spring|summer|autumn|winter)\b"
+STOPW = r"(?:and|with|together|then|when|while|because|there|without|first|second|last|to|at|in|on|by|near|the|a|an|his|her|their|morning|evening|afternoon|noon|night|dawn|spring|summer|autumn|winter)\b"
 NP = rf"((?:the |a |an |his |her |their |its )?(?!{STOPW})[a-z][\w'-]*(?: (?!{STOPW})[a-z][\w'-]*)?)"
 TIME_MARK = re.compile(r"\b(in the morning|at noon|in the evening|at night|at dawn|the next morning)\b", re.I)
+IRREG = {"took": "take", "stole": "steal", "gave": "give", "ran": "run", "came": "come", "went": "go", "found": "find", "left": "leave", "hung": "hang", "lost": "lose", "fell": "fall", "threw": "throw", "brought": "bring", "sold": "sell", "bought": "buy", "hid": "hide", "sat": "sit", "led": "lead", "met": "meet", "got": "get"}
 PRON = {"he", "she", "it", "they", "him", "her", "them"}
 
 
@@ -96,6 +97,12 @@ class World:
                     if v == "meet" and p and at: self._set_loc(p, at)
                 if v in ("have", "own", "keep") and p and not self.holder.get(p): self._set_holder(p, a)
 
+    def _when(self, rest):
+        """the time of the event 'NAME verbed ...' (verb matched by its first three letters against the reader's lemma)"""
+        w = rest.split(); who = self._ent(w[0]); verb = w[1] if len(w) > 1 else ""
+        verb = IRREG.get(verb, verb)
+        return next((t for t, a, v, p, s in self.events if a == who and (v == verb or verb.startswith(v) or verb.startswith(v[:-1]))), None)
+
     def _latest(self, tl, before=None, at=None):
         if not tl: return None
         if at is not None:
@@ -117,6 +124,22 @@ class World:
             return self._latest(self.loc.get(ent(m.group(1))), before=t_take) if t_take else None
         m = re.match(r"where did (.+?) start$", ql)
         if m: tl = self.loc.get(ent(m.group(1))); return tl[0][1] if tl else None
+        m = re.match(r"where was (.+?) after (\w+ \w+.*)$", ql)                           # "where was the lamp after Rosa dropped it"
+        if m:
+            t0 = self._when(m.group(2)); tl = self.loc.get(ent(m.group(1)), [])
+            if t0 is None: return None
+            same = [w for t, w in tl if t == t0]; later = [w for t, w in tl if t > t0]
+            return same[-1] if same else (later[0] if later else None)
+        m = re.match(r"who was holding (.+?) right after (\w+ \w+.*)$", ql)                # gold "no one" when the thing was put down
+        if m:
+            t0 = self._when(m.group(2)); tl = self.holder.get(ent(m.group(1)), [])
+            if t0 is None: return None
+            upto = [h for t, h in tl if t <= t0]
+            return (upto[-1] or "no one") if upto else "no one"
+        m = re.match(r"where was (.+?) when (\w+ \w+.*)$", ql)
+        if m:
+            t0 = self._when(m.group(2))
+            return self._latest(self.loc.get(ent(m.group(1))), at=t0) if t0 is not None else None
         m = re.match(r"who had (.+?) (?:first|at first)$", ql)
         if m: tl = self.holder.get(ent(m.group(1))); return next((h for t, h in tl if h), None) if tl else None
         m = re.match(r"who had (.+?) at the end$", ql)
@@ -124,6 +147,11 @@ class World:
         m = re.match(r"who had (.+?) after (.+)$", ql)
         if m:
             tl = self.holder.get(ent(m.group(1)), []); who = ent(m.group(2)); seen = False
+            if who not in {h for _, h in tl} and len(who.split()) > 1:                       # "after Rosa dropped it": the event's time, then the next holder
+                who = ent(who.split()[0]); verb = m.group(2).split()[1]
+                t0 = next((t for t, a, v, p, s in self.events if a == who and (v == verb or verb.startswith(v[:3]))), None)
+                if t0 is None: return None
+                return next((h for t, h in tl if t >= t0 and h and h != who), None)
             for t, h in tl:
                 if seen and h and h != who: return h
                 if h == who: seen = True
@@ -155,7 +183,7 @@ class World:
             for t, a, v, p, s in self.events:
                 if a == who and v in syn.get(m.group(2), (m.group(2),)) and (not p or thing in p or p in thing or thing.split()[-1] == p.split()[-1]):
                     at = [x for x in self.loc.get(thing, []) if x[0] == t]
-                    if at: return at[0][1]
+                    if at: return at[-1][1]                                            # "carried it to the mill and dropped it by the gate": the last place that sentence gave the thing
                     mm = re.search(rf"\b{PLACE_P} {NP}", s.lower())
                     if mm: return mm.group(2)
             return None

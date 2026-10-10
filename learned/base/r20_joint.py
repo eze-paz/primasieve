@@ -25,7 +25,7 @@ def main():
         sents = [x.strip() for x in RI.SENT.split(s["text"]) if x.strip()]; c = []
         if gen_events:
             for k, sent in enumerate(sents):
-                evs = [dict(agent=a, verb=v, patient=p, status="realis") for (i, a, v, p, place, rec) in s["events"] if i == k]
+                evs = [dict(agent=a, verb=v, patient=p, place=place, rec=rec, status="realis") for (i, a, v, p, place, rec) in s["events"] if i == k]
                 c.append((sent, evs))
         else:
             R.last_agent = None; R.last_patient = None
@@ -59,7 +59,7 @@ def main():
                     a = W.ask(q); ok += (a is not None and hit(a, g))
         return ok
 
-    proposals = collections.defaultdict(list)
+    proposals = collections.defaultdict(list); best_of = {}
     for verbs, group in sorted(groups.items(), key=lambda kv: -len(kv[1])):
         best = None; best_sc = -1; best_simple = 99
         base = score({v: "none" for v in verbs}, group)
@@ -74,13 +74,40 @@ def main():
         for assign in itertools.product(*[cand[v] for v in verbs]):
             table = dict(zip(verbs, assign)); sc = score(table, group); simple = sum(SIMPLE[o] for o in assign)
             if sc > best_sc or (sc == best_sc and simple < best_simple): best, best_sc, best_simple = table, sc, simple
+        # refinement over the FULL inventory: coordinate ascent from the best pruned assignment (the pruning can drop an
+        # operator whose value only shows jointly); stops when no single-verb change gains
+        def ascend(best, best_sc, best_simple, pairs):
+            for _ in range(4):
+                moved = False
+                moves = [((v,), (op,)) for v in verbs for op in OPS] if not pairs else \
+                        [((v1, v2), (o1, o2)) for v1, v2 in itertools.combinations(verbs, 2) for o1 in OPS for o2 in OPS]
+                for vs, ops in moves:
+                    if all(best[v] == o for v, o in zip(vs, ops)): continue
+                    t2 = dict(best); t2.update(zip(vs, ops)); sc = score(t2, group); simple = sum(SIMPLE[o] for o in t2.values())
+                    if sc > best_sc or (sc == best_sc and simple < best_simple): best, best_sc, best_simple, moved = t2, sc, simple, True
+                if not moved: break
+            return best, best_sc, best_simple
+        best, best_sc, best_simple = ascend(best, best_sc, best_simple, pairs=False)
+        total = sum(1 for s in group[:20] for q, g in s["qs"] if RI.state_q(q))
+        if best_sc < total:                                                   # a plateau: two verbs may have to change together
+            best, best_sc, best_simple = ascend(best, best_sc, best_simple, pairs=True)
+            best, best_sc, best_simple = ascend(best, best_sc, best_simple, pairs=False)
         total = sum(1 for s in group[:20] for q, g in s["qs"] if RI.state_q(q))
         print(f"  shape {verbs} ({len(group)} stories): base {base} -> best {best_sc} of {total}: {best}", flush=True)
         if best_sc > base:
             for v, o in best.items():
                 if o != "none": proposals[v].append(o)
+            best_of[verbs] = best
     table = {v: ops[0] for v, ops in proposals.items() if len(set(ops)) == 1}
     conflicts = {v: ops for v, ops in proposals.items() if len(set(ops)) > 1}
+    # a verb proposed differently by different shapes: each candidate is scored on EVERY shape that uses the verb (that
+    # shape's best table with the verb switched); the candidate that loses nothing anywhere wins, ties -> simplest
+    for v, ops in list(conflicts.items()):
+        totals = {}
+        for op in set(ops):
+            totals[op] = sum(score({**best_of[vs], v: op}, groups[vs]) for vs in best_of if v in vs)
+        top = max(totals.values()); winners = sorted([op for op in totals if totals[op] == top], key=lambda o: SIMPLE[o])
+        print(f"  conflict {v}: {totals} -> {winners[0]}", flush=True); table[v] = winners[0]; del conflicts[v]
     print("induced (joint) table:", table); print("conflicts left unbound:", conflicts)
     json.dump(table, open(os.path.join(HERE, "r20_joint_table.json"), "w"), indent=1)
     val = json.load(open(os.path.join(HERE, "val_timespace.json"), encoding="utf-8"))["stories"]; matched = right = n = 0
