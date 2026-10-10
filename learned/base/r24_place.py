@@ -56,6 +56,7 @@ class PlaceLM(K.ChunkLM):
                             ctx = tuple(x for x, _ in items[max(0, k - 2):k])            # the two symbols before the slot: the construction context
                             for r in RANKINGS:
                                 lst = st.ranking(r)
+                                if not lst: continue                                            # an empty memory is unavailable, not wrong
                                 if key in lst: self.prank[r][lst.index(key)] += 1; self.prank_ctx[(ctx, r)][lst.index(key)] += 1; self.mix[r] += (lst.index(key) == 0); self.mix_ctx[ctx][r] += (lst.index(key) == 0)
                                 else: self.prank[r]["none"] += 1; self.prank_ctx[(ctx, r)]["none"] += 1
                             st.saw_place(key)
@@ -63,8 +64,8 @@ class PlaceLM(K.ChunkLM):
 
     def p_place_filler(self, key, st, ctx=None):
         mix = self.mix_ctx[ctx] if ctx in self.mix_ctx and sum(self.mix_ctx[ctx].values()) >= 5 else self.mix   # context weights, global back-off
-        z = sum(mix.values()) + float(len(RANKINGS)); p = 0.0
-        for r in RANKINGS:
+        avail = [r for r in RANKINGS if st.ranking(r)] or ["recency"]; z = sum(mix[r] for r in avail) + float(len(avail)); p = 0.0
+        for r in avail:                                                            # the mixture runs over the rankings that have something to say
             w = (mix[r] + 1.0) / z; lst = st.ranking(r)
             c = self.prank_ctx[(ctx, r)] if sum(self.prank_ctx[(ctx, r)].values()) >= 5 else self.prank[r]; R = sum(c.values())   # rank statistics per context too
             if key in lst: p += w * (c[lst.index(key)] + 0.5) / (R + 0.5 * T.K)

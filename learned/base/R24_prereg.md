@@ -142,3 +142,15 @@ Post-hoc split (disclosed, not a gate): of the 762 held-out 'at the end' questio
 The R20 result (which verb does what to the world) was induced from the generator's exact events and questions. R24-f asks the same of the next-word game: the state keeps a HOLDER per thing, updated when a sentence has a subject, a verb word and an object by a rule attached to that verb word -- hold (the subject becomes the holder), release (nobody holds it), or none. The rules are not given: all verbs start at 'none' and a coordinate search over the training text picks, verb by verb, the rule that most lowers the bits of the answer sentences 'ENT was with PERSON.' (the generator's 'Who had X at the end?' restated) and 'ENT was first with PERSON.' ('Who had X first?'). The PERSON slot after 'with' is predicted by the usual mixture of rankings plus two new ones: the thing's holder and the thing's first holder (the thing = the sentence's object, the ENT before 'with'). Nothing is labelled; the verb's effect on the world is chosen because it makes later words cheaper.
 
 Gates: R24-f1 answer-sentence bits with the holder memory < without. R24-f2 the learned rules: take/took, steal/stole, carry/carried, borrow/borrowed, find/found = hold; drop/dropped, set, leave/left, put = release (reported against this expectation, which is R20's induced table). R24-f3 the learner's argmax answers 'Who had X at the end' on >= 0.80 of held-out generator questions. Predicted: f1 PASS; f2 mostly right with ties on verbs whose effect never changes a later answer; f3 near 0.75.
+
+## R24-f result, run 1 (generator stories + 'X was with Y' restatements)
+
+| measure | result | bar |
+|---|---|---|
+| held-out answer-slot bits WITH learned rules / all-none | **0.546 / 0.599** | with < without |
+| R24-f3 'Who had X at the end' by the learner's own argmax | **346 / 384 = 0.90** | >= 0.80 |
+| R24-f2 agreement of the learned rules with R20's table | 4 / 12 | reported |
+
+**R24-f1 PASS, R24-f3 PASS, R24-f2 MISS.** The rules the game chose predict the answers but are not the human meanings: took = release, dropped = hold, stole / carried / kept = hold, gave = none, returned = release. The search started from all-hold (from all-none no single verb's rule gains, a local optimum) and settled on whatever makes 'was with PERSON' cheapest given that the recency and last-subject rankings already carry most of the answer. Same lesson as R20: a rule's meaning is pinned only by text that DISCRIMINATES it ('right after Rosa dropped it, no one was holding the key'); restated end-state answers alone leave 'took' and 'dropped' free to trade places. Also fixed in this run and applied to R24-e as well: an empty memory is 'unavailable', not 'wrong' (the mixture runs over the rankings that have something to say) -- R24-e re-run: 1.344 vs 1.504 PASS, argmax 0.70 / 0.67 unchanged.
+
+R24-f run 2 (diagnostic, disclosed): the same search with the recency and last-subject rankings REMOVED at the 'with' slot, so the holder memory alone must predict the answer -- do the rules become the human ones when nothing else can carry the answer?
