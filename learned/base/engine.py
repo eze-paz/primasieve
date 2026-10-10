@@ -20,26 +20,17 @@ CKPT = os.path.join(HERE, "ckpt_read5_s400.pth")
 class Engine:
     def __init__(self, ckpt=CKPT, reader=True):
         self.tok = tokenizer(); self.m = RWKV7.load(ckpt); self.m.eval(); self.store = None; self.R = None
-        if reader:
-            import battery; self.R = battery.door().events.reader
-        from reader_check import parse_q, match
-        self.parse_q, self.match = parse_q, match
+        import reader_check; reader_check.set_version("v3"); self.rc = reader_check     # the matcher of R11 (roles + adjuncts)
+        self.R = reader_check.R if reader else None
 
     def load_text(self, text): self.store = Store(text)
 
     def _reader_answer(self, question, hits):
-        p = self.parse_q(question)
-        if p is None or self.R is None: return None
-        role, verb, other = p; other_role = "patient" if role == "agent" else "agent"
-        for i, h in hits:
-            for s in re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", h):
-                try: evs = [e for e in self.R.read(s) if e.get("agent") and e.get("patient")]
-                except Exception: evs = []
-                for e in evs:
-                    v_ok = verb is None or (self.R.verbs.get(verb.lower()) == e["verb"] or verb.lower().startswith(e["verb"][:4]))
-                    o_ok = self.match(other, e[other_role]) or any(w in e[other_role].lower().split() for w in other.lower().split() if len(w) > 3)
-                    if v_ok and o_ok: return e[role], (i, h)
-        return None
+        """the reader's answer through the R11 matcher (roles, appositive names, adjuncts), or None"""
+        if self.R is None: return None
+        prompt = render(question, "", hits)
+        committed, ra = self.rc.check(dict(q=question, gold=[], prompt=prompt, reply=""))
+        return (ra, None) if ra is not None else None
 
     def ask(self, question, k=3):
         assert self.store is not None, "load_text first"

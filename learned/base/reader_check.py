@@ -46,6 +46,12 @@ def parse_q(q):
 
 
 V3 = "--v3" in sys.argv                           # R11: adjuncts (where / when / with what) from the matched event's sentence
+
+
+def set_version(v="v3"):
+    """engine.py: select the matcher version programmatically (the flags above are read from sys.argv at import)"""
+    global V2, V22, V3
+    V2 = v in ("v2", "v22", "v3"); V22 = v in ("v22", "v3"); V3 = v == "v3"
 PLACE = r"(?:to|at|in|on|behind|under|across|near|into|toward|towards|over|through|beside|by)"
 TIME = re.compile(r"\b(on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|"
                   r"at (?:lunch|noon|dawn|dusk|midnight|night|sunset|sunrise)|the next (?:morning|day|evening|week)|in the (?:spring|autumn|summer|winter|morning|evening|afternoon)|"
