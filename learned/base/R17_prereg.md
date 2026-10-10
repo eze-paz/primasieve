@@ -28,3 +28,20 @@ It has never been fed English text because English text comes without logical fo
 Scope: days, not a session -- `cogs_gram.py` assumes COGS's token-position alignment and terminator; English needs
 span alignment, punctuation, and noisy silver forms (epsilon-tolerant induction, `core/tolerance.py`). This is the
 emergence campaign's open item for English and the piece that makes the exact component emergent.
+
+## Feasibility probe (2026-10-10, `r17_probe.py`, run once before any gate)
+
+2,583 unique English rows built from verified story events (fillers a name or determiner + noun; COGS logical-form
+syntax with token positions). `cogs_gram.induce` ran on 1,500 of them without modification: it induced word classes,
+lemma suffix rules and a frame, and produced structured readings of real book sentences it had never seen
+("Sheldon glanced at the thermometer." -> glanc.agent(x1, Sheldon), glanc.theme(x1, x4), * thermometer(x4)).
+Numbers: reproduction on its own training rows 98 ok / 63 wrong / 1,339 no parse; held-out story sentences 16 / 300
+parsed, 14 exact; real book sentences 5 / 200 parsed.
+
+Reading: the machinery accepts English and generalises (the suffix rules reach "glanced", "held", "chose"), but the
+silver forms describe only agent-verb-theme and leave the rest of each sentence unexplained ("with Gussie for being
+kind", "first and won a lantern"), and the inducer, built for complete logical forms, refuses to parse what it cannot
+account for. Two routes from here, both registered before use: (a) complete the silver forms (places, times, second
+clauses) from the hand reader's adjunct and coordination output; (b) let the inducer tolerate unannotated spans as
+noise (`core/tolerance.py`'s epsilon ladder, stage 3d) so a partial form still admits the sentence. A second probe on
+sentences the forms cover completely says which: if reproduction is high there, (a) is the bottleneck.
