@@ -1,0 +1,32 @@
+{
+ "validation": {
+  "matched": 2,
+  "precision": 1.0,
+  "merged": 59,
+  "model": 59
+ },
+ "growth": {
+  "fables": [
+   0,
+   0,
+   0
+  ],
+  "stories": [
+   2,
+   2,
+   0
+  ],
+  "before": {
+   "fables": [
+    0,
+    0,
+    0
+   ],
+   "stories": [
+    2,
+    2,
+    0
+   ]
+  }
+ }
+}

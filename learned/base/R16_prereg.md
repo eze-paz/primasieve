@@ -23,3 +23,21 @@ constructions induced from teaching cases.
 | **R16-a** | induced reader: matched >= 43 of 80 (the hand matcher's coverage) at precision >= 0.95 |
 | **R16-b** | growth: after adding the validation's own verified cases (model answers that pass the checks) as teaching, coverage on the OTHER validation set rises (stories -> fables and fables -> stories), i.e. the crystal grows from experience |
 | **R16-c** | test once: merged engine (induced reader first, model second) on B6 >= 82 and on real-text hits >= 55 |
+
+## Result (2026-10-10, `r16_results.json`)
+
+Three builds in one session (question-wording labels -> verb-abstracted labels -> fixed mention finding): 6,362 teaching
+cases from the generated stories, 605 admitted constructions, and on validation the induced reader matched **2 / 80**
+(both right). Growth test: learning one validation set's cases did not transfer to the other (0 and 2). **R16-a MISS**;
+tests not run.
+
+Diagnosis, stated for the next attempt rather than hidden: `core/constructions.py` admits exact runs of words between
+two mentions, which is right for a relation seen thousands of times in a large text and wrong for question shapes seen
+a few times in short stories -- almost every run carries a content word ("bees", "behind") that never recurs, so the
+counts never reach `least`, and the runs that do recur are too short to be consistent across shapes. Two further
+limits: answers that are bare nouns ("bees", "hail") are not mentions and cannot be learned as answers; and the
+question shape still carries wording ("who <v> mend <a>") that fragments the labels. What an emergent exact reader needs
+is one level of abstraction the core does not yet have for English text: word classes induced from exposure (noun,
+verb, place word, time word) so that runs are over classes, not words. The project's grammar induction did exactly
+this for SCAN and COGS (`cogs_gram.py`, stages 2-3) on synthetic languages; wiring it to English is the unfinished
+emergence work, and it is larger than a session. Until then the merged engine uses the hand reader, labelled as such.
