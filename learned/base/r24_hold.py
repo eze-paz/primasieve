@@ -4,12 +4,13 @@ a verb word and an object updates it by a rule attached to the verb word: hold /
 'ENT was with PERSON.' / 'ENT was first with PERSON.' in the training text (the generator's questions restated).
 Nothing is labelled. Run: python learned/base/r24_hold.py"""
 import os, sys, json, math, random, collections, time
+HOLDER_ONLY = "--holder-only" in sys.argv                      # read before the imports: a downstream module resets sys.argv
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE)
 sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_classes as C, r24_qa as Q
 from b6_rwkv import hit
 
-RULES = ("none", "hold", "release"); HRANK = ("recency", "subject", "holder", "first_holder")
+RULES = ("none", "hold", "release"); HRANK = ("holder", "first_holder") if HOLDER_ONLY else ("recency", "subject", "holder", "first_holder")
 EXPECT = dict(took="hold", take="hold", stole="hold", steal="hold", carried="hold", carry="hold", borrowed="hold", borrow="hold", found="hold", find="hold",
               dropped="release", drop="release", set="release", left="release", leave="release", put="release", gave="release", returned="hold", kept="hold", had="hold")
 
@@ -94,7 +95,8 @@ class HolderLM:
                     else: self.rank[(ctx, r)]["none"] += 1
 
     def p(self, ctx, key, rankings, persons):
-        mix = self.mix[ctx]; avail = [r for r in HRANK if rankings[r]] or ["recency"]; z = sum(mix[r] for r in avail) + float(len(avail)); p = 0.0
+        mix = self.mix[ctx]; avail = [r for r in HRANK if rankings[r]]; z = sum(mix[r] for r in avail) + float(len(avail)); p = 0.0
+        if not avail: return 1.0 / max(1, len(persons))                               # no memory speaks: uniform over the known persons
         for r in avail:                                                            # the mixture runs over the rankings that have something to say
             w = (mix[r] + 1.0) / z; c = self.rank[(ctx, r)]; R = sum(c.values()) + 1e-9; lst = rankings[r]
             if key in lst: p += w * (c[lst.index(key)] + 0.5) / (R + 0.5 * T.K)
