@@ -16,3 +16,20 @@ Rule: every change is judged on the validation set (`r3_val_v3.json`) with the R
 |---|---|
 | **R10a** | validation: reader-matched questions 16 -> >= 24 of 50, reader precision on them >= 0.85 |
 | **R10b** | test, once: merged engine (reader-else-model) **>= 58 / 100** (R9: 54), wrong answers <= 40 |
+
+## Result (2026-10-10, `r10_results.json`)
+
+Development on validation: v2 matched 28 / 50 (23 right, 5 wrong, precision 0.82); the five wrong had four causes
+(a non-verb taken as the verb, a passive read as active slipping through the verb-only fallback, two matching events
+with the first taken, an adjunct question treated as an object question). v2.1 fixed all four and overshot: matched
+**14 / 50** (13 right, 1 wrong, precision 0.93) -- the known-verb requirement in "What did A V ...?" rejects many
+questions whose verb the lexicon lacks.
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R10a** | validation matched 14 (v2: 28); precision 0.93 | >= 24; >= 0.85 | **MISS** on coverage, PASS on precision |
+| **R10b** | test, once: reader matched 33 / 100, 31 right, 2 wrong (0.94); **merged 55 / 100**, wrong 39 | >= 58; <= 40 | **MISS by three** on the score; wrong-count PASS; above R9's 54 |
+
+The test has now been run once under R10 and is not re-run; further matcher work (restoring v2's coverage with v2.1's
+precision, e.g. accepting an unknown verb when it is the only candidate) is developed on validation and registered as
+R10b before the test is touched again.

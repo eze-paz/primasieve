@@ -24,8 +24,15 @@ def parse_q(q):
     """-> (asked_role, verb_surface, other_text) for 'Who V X?' and 'What did A V?' shapes; None otherwise"""
     m = re.match(r"Who (\w+) (.+)\?$", q)
     if m and m.group(1).lower() not in AUXQ: return ("agent", m.group(1), m.group(2))
+    if V2 and re.search(r"\b(in|with|for|on|at|to|from|of|by)\?$", q): return None     # v2: "...serve dinner in?" asks an adjunct, not a role
     m = re.match(r"What did (.+?) (\w+)(?: (?:to )?\w+)?\?$", q)          # v2: "What did Tomasz leave Rafal?" / "What did A refuse to do?"
-    if m: return ("patient", m.group(2), m.group(1))
+    if m:
+        if V2:                                                             # v2: the verb is the first KNOWN verb after a short agent
+            words = q[len("What did "):-1].split()
+            for i in range(1, min(4, len(words))):
+                if words[i].lower() in R.verbs and words[i].lower() not in AUXQ: return ("patient", words[i], " ".join(words[:i]))
+            return None
+        return ("patient", m.group(2), m.group(1))
     m = re.match(r"Who (was|were) (.+)\?$", q)
     if m: return ("agent", None, m.group(2))
     if V2:
@@ -80,8 +87,11 @@ def check(item):
         v_ok = verb is None or e.get("verb", "") and (R.verbs.get(verb.lower()) == e["verb"] or verb.lower().startswith(e["verb"][:4]))
         o_ok = match(other, e[other_role]) or any(w in norm(e[other_role]).split() for w in norm(other).split() if len(w) > 3)
         if v_ok and o_ok: cands.append(e[role])
-        elif v_ok and verb is not None: verb_only.append(e[role])
+        elif v_ok and verb is not None:
+            # v2: reject when the question's other-role text names the event's ASKED role (a passive read as active)
+            if not any(w in norm(e[role]).split() for w in norm(other).split() if len(w) > 3): verb_only.append(e[role])
     if not cands and V2 and len(set(norm(c) for c in verb_only)) == 1: cands = verb_only[:1]   # v2: the verb occurs in exactly one event among the hits
+    if V2 and len(set(norm(c) for c in cands)) > 1: return None, None                       # v2: two different fillers match: the reader cannot decide; the model may
     if not cands: return None, None
     committed = item["reply"] if any(match(item["reply"], c) for c in cands) else "unknown"
     return committed, cands[0]
