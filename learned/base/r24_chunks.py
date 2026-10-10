@@ -17,7 +17,7 @@ def arg(name, default):
 
 class ChunkLM(C.ClassTLM):
     def __init__(self, classes, frozen, max_chunks):
-        super().__init__(classes, frozen, 2); self.max = max_chunks; self.chunks = collections.Counter(); self.single = collections.Counter()
+        super().__init__(classes, frozen, 2); self.max = max_chunks; self.chunks = collections.Counter(); self.single = collections.Counter(); self.in_chunks = 0; self.n_syms = 0
 
     def seqs(self, stories, names):
         out = []
@@ -57,7 +57,7 @@ class ChunkLM(C.ClassTLM):
                 for L in range(2, MAXLEN + 1):
                     if i + L <= len(s): cnt[tuple(s[i:i + L])] += 1
         cand = {ch: c for ch, c in cnt.items() if c >= 5}
-        keep = sorted(cand, key=lambda ch: -cand[ch] * (len(ch) - 1))[:self.max]
+        keep = sorted(cand, key=lambda ch: -(cand[ch] * (len(ch) - 1) - 3 * len(ch)))[:self.max]      # description-length gain: saved symbols minus the chunk's own cost
         self.chunks = collections.Counter({ch: cand[ch] for ch in keep}); self.single = collections.Counter(x for s in seqs for x in s)
         self.PS = 0.3; self.Z = sum(self.chunks.values())
         for r in range(ROUNDS):
@@ -74,7 +74,7 @@ class ChunkLM(C.ClassTLM):
     def score(self, toks, names, st):
         """bits of the sentence: chunk structure from the best segmentation + fillers at slots and class positions"""
         items = self.symbols(T.slotify(toks, names)); syms = [sym for sym, _ in items]
-        seg, lp = self.segment(syms); bits = -lp / math.log(2); full = all(len(ch) >= 2 for ch in seg)
+        seg, lp = self.segment(syms); bits = -lp / math.log(2); full = all(len(ch) >= 2 for ch in seg); self.in_chunks += sum(len(ch) for ch in seg if len(ch) >= 2); self.n_syms += len(syms)
         for k, (sym, filler) in enumerate(items):
             pos = "first" if k == 0 else "later"
             if sym in ("PERSON", "ENT", "PRON") or sym.startswith("C"):
@@ -102,7 +102,7 @@ def main():
             b, k, f = M.score(toks, names, st); bits += b; n += k; full += f; ns += 1
     tlm = bits / n; bi = T.ngram_bits([s["text"] for s in train], [s["text"] for s in held], 2)
     print(f"held-out {ns} sentences, {n} tokens; bits/token: chunk learner {tlm:.2f} | interpolated bigram {bi:.2f} (R24-a2: <= bigram + 0.5 -> {'PASS' if tlm <= bi + 0.5 else 'MISS'})")
-    print(f"sentences fully explained by chunks of length >= 2: {full}/{ns} = {full / ns:.3f} (bar >= 0.30 -> {'PASS' if full / ns >= 0.3 else 'MISS'})")
+    print(f"sentences fully explained by chunks of length >= 2: {full}/{ns} = {full / ns:.3f} (bar >= 0.30 -> {'PASS' if full / ns >= 0.3 else 'MISS'}); tokens inside multi-symbol chunks {M.in_chunks / max(1, M.n_syms):.2f}")
     inv = collections.defaultdict(list)
     for w, c in classes.items(): inv[c].append(w)
     def show(ch): return " ".join(f"[{'/'.join(sorted(inv[int(x[1:])], key=lambda w: -uni[w])[:3])}]" if x.startswith("C") else x for x in ch)

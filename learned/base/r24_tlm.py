@@ -10,7 +10,7 @@ import os, sys, re, json, math, random, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
 TOK = re.compile(r"[A-Za-z][A-Za-z'-]*|[.,;!?]")
 SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
-PRON = {"he", "she", "him", "her", "his", "they", "them", "it"}
+PRON = {"he", "she", "him", "her", "his", "they", "them", "it", "i", "you", "we", "me", "my", "your", "us", "our"}   # run 2d: first/second person are pronoun forms too
 DET = {"the", "a", "an", "his", "her", "their", "its"}
 STOP = {"and", "to", "of", "at", "in", "on", "by", "near", "with", "for", "from", "into", "back", "down", "up", "home", "there", "then", "when", "while",
         "was", "were", "is", "had", "who", "that", "which", "but", "so", "because", "without", "until", "after", "before", "first", "second", "last", "away", "together"}
@@ -37,7 +37,7 @@ def slotify(tokens, names):
     out = []; i = 0
     while i < len(tokens):
         w = tokens[i]; wl = w.lower()
-        if w in names or (w[0].isupper() and i > 0 and wl not in PRON): out.append(("PERSON", [w])); i += 1; continue
+        if wl not in PRON and (w in names or (w[0].isupper() and i > 0)): out.append(("PERSON", [w])); i += 1; continue
         if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
