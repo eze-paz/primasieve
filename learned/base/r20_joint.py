@@ -18,12 +18,20 @@ def main():
     R = battery.door().events.reader
     stories = json.load(open(os.path.join(HERE, "stories_train_v2.json"), encoding="utf-8")); random.Random(5).shuffle(stories)
     teach = [s for s in stories if any(RI.state_q(q) for q, g in s["qs"])][:1200]
+    gen_events = "--gen-events" in sys.argv                                  # R20c: teach on the generator's exact events, not the reader's
+    if gen_events: teach = [s for s in teach if s.get("events")]
     cache_of = {}; verbs_of = {}
     for s in teach:
-        R.last_agent = None; R.last_patient = None; c = []
-        for sent in [x.strip() for x in RI.SENT.split(s["text"]) if x.strip()]:
-            try: c.append((sent, [e for e in R.read(sent) if e.get("agent") and e.get("verb")]))
-            except Exception: c.append((sent, []))
+        sents = [x.strip() for x in RI.SENT.split(s["text"]) if x.strip()]; c = []
+        if gen_events:
+            for k, sent in enumerate(sents):
+                evs = [dict(agent=a, verb=v, patient=p, status="realis") for (i, a, v, p, place, rec) in s["events"] if i == k]
+                c.append((sent, evs))
+        else:
+            R.last_agent = None; R.last_patient = None
+            for sent in sents:
+                try: c.append((sent, [e for e in R.read(sent) if e.get("agent") and e.get("verb")]))
+                except Exception: c.append((sent, []))
         cache_of[id(s)] = c; verbs_of[id(s)] = tuple(sorted({e["verb"] for _, evs in c for e in evs if e["verb"] not in STATIC}))
     if "--clean" in sys.argv:                                                 # teach only from stories the reader reads cleanly
         from r17_convert import NAMES

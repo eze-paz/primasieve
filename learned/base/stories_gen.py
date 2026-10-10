@@ -91,19 +91,23 @@ def fables(R, P):
     while p2 == p1: p2 = R.choice(PLACES)
     spot = R.choice(["on the bench", "under the tree", "by the door", "on the table", "behind the gate"])
     s, o, p = pron(g1)
+    g1_events = [(0, a, "walk", None, p2, None), (1, a, "set", f"the {obj}", spot.split(" ", 1)[1], None), (1, a, "go", None, "the well", None),
+                 (2, b, "come", None, p2, None), (2, b, "take", f"the {obj}", None, None), (3, b, "give", f"the {obj}", None, a), (3, a, "return", None, p2, None)]
     out.append((f"{a} walked from {p1} to {p2} with a {obj}. {s.capitalize()} set the {obj} down {spot} and went to the well. "
                 f"While {a} was away, {b} came to {p2} and took the {obj}. {b} gave the {obj} to {a} when {s} returned.",
                 [(f"Where was {a} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where did {a} start?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Where did {a} set the {obj} down?", [spot, spot.split()[-1]]), (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} set it down?", [b.lower()]),
-                 (f"Who took the {obj}?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")])]))
+                 (f"Who took the {obj}?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")])], g1_events))
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
     while p2 == p1: p2 = R.choice(PLACES)
     s, o, p = pron(g1); s2, o2, p2p = pron(g2)
+    g2_events = [(0, a, "carry", f"a {obj}", p1, None), (0, a, "drop", f"the {obj}", "the gate", None), (1, b, "steal", f"the {obj}", None, None), (1, b, "run", None, p2, None),
+                 (2, a, "follow", b, p2, None), (2, a, "take", f"the {obj}", None, None), (3, a, "row", None, "home", None)]
     out.append((f"{a} carried a {obj} to {p1} and dropped it near the gate. {b} stole the {obj} and ran to {p2}. "
                 f"{a} followed {o2} to {p2} and took the {obj} back. Then {a} rowed home with the {obj}.",
                 [(f"Where did {a} drop the {obj}?", ["near the gate", "the gate", "gate"]), (f"Who stole the {obj}?", [b.lower()]), (f"Where did {b} run?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} dropped it?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
-                 (f"Where was {a} at the end?", ["home"])]))
+                 (f"Where was {a} at the end?", ["home"])], g2_events))
     # F: buying with a count
     a, ga, _ = actor(R, P); n = R.choice(["two", "three", "four", "five"]); item = R.choice(["loaves of bread", "candles", "eggs", "pears", "ribbons"]); seller, gs, _ = actor(R, P, "role"); place = R.choice(PLACES); coin = R.choice(["a silver coin", "two pennies", "a copper", "a shilling"]); needy = R.choice(NEEDY)
     out.append((f"{a.capitalize()} went to {place} and bought {n} {item} from {seller}. {a.capitalize()} paid with {coin}. On the way home {a} gave one to {needy} who was crying.",
@@ -118,6 +122,8 @@ def skeletons(R, P):
     # 1 ownership / borrowing / promise
     a, ga = P(None); rel, gr = R.choice(RELS); b, gb = P(gr); obj = R.choice(OBJECTS); place = R.choice(PLACES); promise = R.choice(PROMISES)
     s, o, p = pron(ga); s2, o2, p2 = pron(gb)
+    s1_events = [(0, a, "have", f"a {obj}", None, None), (1, b, "borrow", f"the {obj}", None, None), (2, b, "take", f"the {obj}", place, None),
+                 (3, b, "come", None, None, None), (3, a, "wait", None, "the door", None), (4, a, "make", b, None, None)]
     out.append((f"{a} had a {obj}. One afternoon {p} {rel} {b} borrowed the {obj} without asking. {s2.capitalize()} took it to {place}. "
                 f"When {s2} came back, {a} was waiting at the door. {s.capitalize()} made {o2} promise {promise} next time.",
                 [(f"Who owned the {obj}?", [a.lower()]), (f"Who borrowed the {obj}?", [b.lower(), f"{p} {rel}"]),
@@ -125,7 +131,7 @@ def skeletons(R, P):
                  (f"Where was the {obj} at the end?", [place.lower(), place.lower().replace("the ", "")]),           # R20: state questions the generator knows
                  (f"Who had the {obj} at the end?", [b.lower()]), (f"Who had the {obj} first?", [a.lower()]),
                  (f"Where was {b} at the end?", [place.lower(), place.lower().replace("the ", "")]), (f"Who had the {obj} after {a}?", [b.lower()]),   # R20 third run: holder AND place after each verb
-                 (f"Who was waiting at the door?", [a.lower()]), (f"What did {b} promise?", [promise, promise.replace("to ", "")])]))
+                 (f"Who was waiting at the door?", [a.lower()]), (f"What did {b} promise?", [promise, promise.replace("to ", "")])], s1_events))
     # 2 learning / teacher
     a, ga = P(None); tg = R.choice("fm"); t, _ = P(tg); title = R.choice(TITLES[tg]); skill = R.choice(SKILLS); day = R.choice(WEEKDAYS); place = R.choice(PLACES)
     s, o, p = pron(ga); rel, gr = R.choice(RELS)
@@ -144,7 +150,7 @@ def skeletons(R, P):
                 [(f"What did {a} lose?", [obj.lower()]), (f"Where did {a} lose the {obj}?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Who found the {obj}?", [b.lower()]), (f"Where was the {obj} found?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a}?", [b.lower()]),     # R20
-                 (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where was the {obj} before {b} found it?", [p2.lower(), p2.lower().replace("the ", "")])]))   # R20 third run
+                 (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where was the {obj} before {b} found it?", [p2.lower(), p2.lower().replace("the ", "")]),   # R20 third run
                  (f"What did {a} give {b}?", [thanks.replace("a ", "").replace("some ", ""), thanks.split()[-1]])]))
     # 4 gift / trip
     a, ga = P(None); rel, gr = R.choice(RELS); b, gb = P(gr); obj = R.choice(OBJECTS); place = R.choice(PLACES); day = R.choice(WEEKDAYS)
@@ -199,8 +205,9 @@ def main():
             while True:
                 x = R.choice(first[g])
                 if x not in used and x not in test_names: used.add(x); return x, g
-        for text, qs in skeletons(R, P) + (fables(R, P) if "--v2" in sys.argv else []):
-            data.append(dict(text=text, qs=qs))
+        for item in skeletons(R, P) + (fables(R, P) if "--v2" in sys.argv else []):
+            text, qs = item[0], item[1]
+            data.append(dict(text=text, qs=qs, events=item[2] if len(item) > 2 else None))      # R20c: exact events where the skeleton emits them
     R.shuffle(data); data = data[:n]
     assert not any(d["text"] == s["text"] for d in data for s in test)
     json.dump(data, open(os.path.join(HERE, "stories_train_v2.json" if "--v2" in sys.argv else "stories_train.json"), "w", encoding="utf-8"), indent=0)
