@@ -27,10 +27,15 @@ def parse_q(q):
     return None
 
 
+SEQUENTIAL = "--sequential" in sys.argv       # read each hit window's sentences in order so the reader resolves "He rowed it" from the sentence before
+
+
 def events_in(hits):
     out = []
     for h in hits:
+        if SEQUENTIAL: R.last_agent = None; R.last_patient = None
         for s in SENT.split(h):
+            if not SEQUENTIAL: R.last_agent = None; R.last_patient = None
             try: out += [e for e in R.read(s) if e.get("agent") and e.get("patient")]
             except Exception: pass
     return out
@@ -57,7 +62,7 @@ def check(item):
 
 def main():
     out = []
-    for path in sys.argv[1:]:
+    for path in [a for a in sys.argv[1:] if not a.startswith("--")]:
         os.chdir(HERE); items = with_prompts(path); os.chdir(ROOT)
         raw = sum(x["hit"] for x in items); n = len(items); c_right = c_wrong = r_right = r_wrong = u_right = u_wrong = readable = 0
         for x in items:
