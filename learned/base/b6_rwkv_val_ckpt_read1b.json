@@ -1,0 +1,493 @@
+{
+ "ckpt": "ckpt_read1b.pth",
+ "mismatch": false,
+ "right": 35,
+ "n": 50,
+ "items": [
+  {
+   "story": "v1",
+   "q": "What did Nadia keep?",
+   "gold": [
+    "bees"
+   ],
+   "reply": "pot of honey",
+   "hit": false
+  },
+  {
+   "story": "v1",
+   "q": "What broke the fence?",
+   "gold": [
+    "a bear",
+    "bear"
+   ],
+   "reply": "bear",
+   "hit": true
+  },
+  {
+   "story": "v1",
+   "q": "Who helped mend the fence?",
+   "gold": [
+    "osip",
+    "her neighbour"
+   ],
+   "reply": "osip",
+   "hit": true
+  },
+  {
+   "story": "v1",
+   "q": "What did Nadia give Osip?",
+   "gold": [
+    "honey",
+    "a pot of honey"
+   ],
+   "reply": "pot of honey",
+   "hit": true
+  },
+  {
+   "story": "v1",
+   "q": "Where were the hives?",
+   "gold": [
+    "behind the chapel",
+    "chapel"
+   ],
+   "reply": "behind the chapel",
+   "hit": true
+  },
+  {
+   "story": "v2",
+   "q": "What did the ferryman charge?",
+   "gold": [
+    "a penny",
+    "penny"
+   ],
+   "reply": "unknown",
+   "hit": false
+  },
+  {
+   "story": "v2",
+   "q": "Who begged to cross without paying?",
+   "gold": [
+    "the doctor",
+    "doctor"
+   ],
+   "reply": "the child",
+   "hit": false
+  },
+  {
+   "story": "v2",
+   "q": "Why did the ferryman agree?",
+   "gold": [
+    "the patient was a child",
+    "a child"
+   ],
+   "reply": "to cross without paying",
+   "hit": false
+  },
+  {
+   "story": "v2",
+   "q": "What did the doctor leave?",
+   "gold": [
+    "a silver spoon",
+    "spoon"
+   ],
+   "reply": "silver spoon",
+   "hit": true
+  },
+  {
+   "story": "v2",
+   "q": "When did the doctor leave it?",
+   "gold": [
+    "the next morning",
+    "morning"
+   ],
+   "reply": "at dawn",
+   "hit": false
+  },
+  {
+   "story": "v3",
+   "q": "What did Ilse grow?",
+   "gold": [
+    "cabbages"
+   ],
+   "reply": "cabbages",
+   "hit": true
+  },
+  {
+   "story": "v3",
+   "q": "What did Greta grow?",
+   "gold": [
+    "roses"
+   ],
+   "reply": "roses",
+   "hit": true
+  },
+  {
+   "story": "v3",
+   "q": "What flattened the cabbages?",
+   "gold": [
+    "hail"
+   ],
+   "reply": "hail",
+   "hit": true
+  },
+  {
+   "story": "v3",
+   "q": "Who sold roses at the market?",
+   "gold": [
+    "greta"
+   ],
+   "reply": "greta",
+   "hit": true
+  },
+  {
+   "story": "v3",
+   "q": "What did Greta buy?",
+   "gold": [
+    "seed"
+   ],
+   "reply": "seed",
+   "hit": true
+  },
+  {
+   "story": "v4",
+   "q": "Who owned the clock?",
+   "gold": [
+    "benedek",
+    "old benedek"
+   ],
+   "reply": "old benedek",
+   "hit": true
+  },
+  {
+   "story": "v4",
+   "q": "What did Benedek do every noon?",
+   "gold": [
+    "rang a bell",
+    "rang the bell"
+   ],
+   "reply": "rang a bell",
+   "hit": true
+  },
+  {
+   "story": "v4",
+   "q": "What happened when the clock stopped?",
+   "gold": [
+    "ate lunch late",
+    "late"
+   ],
+   "reply": "the farmers ate lunch late",
+   "hit": true
+  },
+  {
+   "story": "v4",
+   "q": "Who fixed the clock?",
+   "gold": [
+    "jules",
+    "the tinker"
+   ],
+   "reply": "jules",
+   "hit": true
+  },
+  {
+   "story": "v4",
+   "q": "What did Jules get for fixing it?",
+   "gold": [
+    "a bowl of soup",
+    "soup"
+   ],
+   "reply": "Jules fixed the clock for a bowl",
+   "hit": false
+  },
+  {
+   "story": "v5",
+   "q": "Who invited the fox and the stork?",
+   "gold": [
+    "the badger",
+    "badger"
+   ],
+   "reply": "the badger",
+   "hit": true
+  },
+  {
+   "story": "v5",
+   "q": "What was served in flat dishes?",
+   "gold": [
+    "soup"
+   ],
+   "reply": "soup",
+   "hit": true
+  },
+  {
+   "story": "v5",
+   "q": "Who went home hungry first?",
+   "gold": [
+    "the stork",
+    "stork"
+   ],
+   "reply": "the fox",
+   "hit": false
+  },
+  {
+   "story": "v5",
+   "q": "What did the stork serve dinner in?",
+   "gold": [
+    "tall jars",
+    "jars"
+   ],
+   "reply": "tall jars",
+   "hit": true
+  },
+  {
+   "story": "v5",
+   "q": "Who went home hungry a week later?",
+   "gold": [
+    "the fox",
+    "fox"
+   ],
+   "reply": "the fox",
+   "hit": true
+  },
+  {
+   "story": "v6",
+   "q": "What cargo did the ship carry?",
+   "gold": [
+    "salt"
+   ],
+   "reply": "salt",
+   "hit": true
+  },
+  {
+   "story": "v6",
+   "q": "Who sewed the sail?",
+   "gold": [
+    "pavel",
+    "the cook"
+   ],
+   "reply": "paul",
+   "hit": false
+  },
+  {
+   "story": "v6",
+   "q": "What did Pavel sew it with?",
+   "gold": [
+    "fishing line"
+   ],
+   "reply": "fishing line",
+   "hit": true
+  },
+  {
+   "story": "v6",
+   "q": "How late did they arrive?",
+   "gold": [
+    "three days",
+    "three days late"
+   ],
+   "reply": "three days",
+   "hit": true
+  },
+  {
+   "story": "v6",
+   "q": "Why did the merchant pay them?",
+   "gold": [
+    "the salt was dry",
+    "dry"
+   ],
+   "reply": "to dry salt",
+   "hit": true
+  },
+  {
+   "story": "v7",
+   "q": "Who was hired to sweep the floor?",
+   "gold": [
+    "rafal"
+   ],
+   "reply": "rafal",
+   "hit": true
+  },
+  {
+   "story": "v7",
+   "q": "What did Rafal find?",
+   "gold": [
+    "a gold ring",
+    "ring"
+   ],
+   "reply": "gold ring",
+   "hit": true
+  },
+  {
+   "story": "v7",
+   "q": "Where did he find it?",
+   "gold": [
+    "under the oven",
+    "oven"
+   ],
+   "reply": "under the oven",
+   "hit": true
+  },
+  {
+   "story": "v7",
+   "q": "Whose ring was it?",
+   "gold": [
+    "his late wife",
+    "wife",
+    "tomasz's wife"
+   ],
+   "reply": "gold ring",
+   "hit": false
+  },
+  {
+   "story": "v7",
+   "q": "What did Tomasz leave Rafal?",
+   "gold": [
+    "the shop",
+    "shop"
+   ],
+   "reply": "gold ring",
+   "hit": false
+  },
+  {
+   "story": "v8",
+   "q": "On which day did Miss Abena walk to the next village?",
+   "gold": [
+    "thursday"
+   ],
+   "reply": "thursday",
+   "hit": true
+  },
+  {
+   "story": "v8",
+   "q": "What did she teach?",
+   "gold": [
+    "reading"
+   ],
+   "reply": "reading",
+   "hit": true
+  },
+  {
+   "story": "v8",
+   "q": "Who built the footbridge?",
+   "gold": [
+    "the children's fathers",
+    "fathers"
+   ],
+   "reply": "kofi",
+   "hit": false
+  },
+  {
+   "story": "v8",
+   "q": "What was the bridge made of?",
+   "gold": [
+    "logs"
+   ],
+   "reply": "wooden planks",
+   "hit": false
+  },
+  {
+   "story": "v8",
+   "q": "Who was the bridge named after?",
+   "gold": [
+    "kofi"
+   ],
+   "reply": "kofi",
+   "hit": true
+  },
+  {
+   "story": "v9",
+   "q": "What did the donkey refuse to do?",
+   "gold": [
+    "climb the hill"
+   ],
+   "reply": "climb the hill",
+   "hit": true
+  },
+  {
+   "story": "v9",
+   "q": "What was in the sack?",
+   "gold": [
+    "flour"
+   ],
+   "reply": "flour",
+   "hit": true
+  },
+  {
+   "story": "v9",
+   "q": "Who put an apple on a string?",
+   "gold": [
+    "lucia",
+    "the miller's daughter"
+   ],
+   "reply": "lucia",
+   "hit": true
+  },
+  {
+   "story": "v9",
+   "q": "How many apples did the donkey get at the top?",
+   "gold": [
+    "two",
+    "2"
+   ],
+   "reply": "three",
+   "hit": false
+  },
+  {
+   "story": "v9",
+   "q": "Where did the donkey walk?",
+   "gold": [
+    "to the top",
+    "the top",
+    "the hill"
+   ],
+   "reply": "the hill",
+   "hit": true
+  },
+  {
+   "story": "v10",
+   "q": "What did the children do on the lake?",
+   "gold": [
+    "skated",
+    "skate"
+   ],
+   "reply": "unknown",
+   "hit": false
+  },
+  {
+   "story": "v10",
+   "q": "Who fell through the ice?",
+   "gold": [
+    "erlend"
+   ],
+   "reply": "erlend",
+   "hit": true
+  },
+  {
+   "story": "v10",
+   "q": "Who pulled him out?",
+   "gold": [
+    "sven",
+    "the fisherman"
+   ],
+   "reply": "sven",
+   "hit": true
+  },
+  {
+   "story": "v10",
+   "q": "What did Sven use?",
+   "gold": [
+    "a ladder",
+    "ladder"
+   ],
+   "reply": "ladder",
+   "hit": true
+  },
+  {
+   "story": "v10",
+   "q": "What did the mayor have marked?",
+   "gold": [
+    "the reeds",
+    "reeds"
+   ],
+   "reply": "red flags",
+   "hit": false
+  }
+ ]
+}

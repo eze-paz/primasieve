@@ -16,7 +16,8 @@ def hit(reply, gold):                       # battery.py's rule
 
 def main():
     m = RWKV7.load(CK); m.eval(); tok = tokenizer()
-    stories = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]
+    sfile = sys.argv[sys.argv.index("--stories") + 1] if "--stories" in sys.argv else os.path.join(ROOT, "tests", "battery", "stories.json")
+    stories = json.load(open(sfile, encoding="utf-8"))["stories"]
     mismatch = "--mismatch" in sys.argv                      # R1c: each question gets a different story; the right reply is "unknown"
     out = []; right = n = 0; T0 = time.time()
     for i, s in enumerate(stories):
@@ -31,7 +32,7 @@ def main():
             print(f"[{'ok' if ok else '--'}] {q} -> {reply!r}  (gold {gold[0]})".encode("ascii", "replace").decode(), flush=True)
     label = "mismatch(unknown)" if mismatch else "B6"
     print(f"\n{label} {os.path.basename(CK)}: {right}/{n}  (hand rules 71/100)  {time.time() - T0:.0f} s")
-    name = "b6_rwkv" + ("_mismatch" if mismatch else "") + ("" if len(sys.argv) < 2 or sys.argv[1].startswith("--") else "_" + os.path.basename(CK).split(".")[0]) + ".json"
+    name = "b6_rwkv" + ("_mismatch" if mismatch else "") + ("_val" if "--stories" in sys.argv else "") + ("" if len(sys.argv) < 2 or sys.argv[1].startswith("--") else "_" + os.path.basename(CK).split(".")[0]) + ".json"
     json.dump(dict(ckpt=os.path.basename(CK), mismatch=mismatch, right=right, n=n, items=out), open(os.path.join(HERE, name), "w", encoding="utf-8"), indent=1)
 
 
