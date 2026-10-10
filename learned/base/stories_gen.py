@@ -69,7 +69,8 @@ def fables(R, P):
     while b == a: b, gb, g2 = actor(R, P)
     out.append((f"{a.capitalize()} could not find {obj}. {b.capitalize()} had seen {obj} {where} near {place}. {b.capitalize()} fetched {obj} and returned {obj} to {a} {when}.",
                 [(f"Where were {obj}?" if obj.endswith("s") else f"Where was {obj}?", [where]), (f"Who returned {obj}?", gb), (f"When did {b} return {obj}?", [when]),
-                 (f"Who lost {obj}?", ga), (f"Near which place?", [place.lower(), place.lower().replace("the ", "")])]))
+                 (f"Who lost {obj}?", ga), (f"Near which place?", [place.lower(), place.lower().replace("the ", "")]),
+                 (f"Who had {obj} at the end?", ga), (f"Where {'were' if obj.endswith('s') else 'was'} {obj} before {b} returned {obj}?", [where])]))   # R20
     # D: planting / harvest with a season
     a, ga, _ = actor(R, P); crop = R.choice(["tomatoes", "beans", "potatoes", "pumpkins", "onions", "roses"]); season = R.choice(["in the spring", "in autumn", "in early summer", "in March"])
     helper, gh, _ = actor(R, P); nb = R.choice(["two", "three", "four", "five", "six"])
@@ -102,6 +103,8 @@ def skeletons(R, P):
                 f"When {s2} came back, {a} was waiting at the door. {s.capitalize()} made {o2} promise {promise} next time.",
                 [(f"Who owned the {obj}?", [a.lower()]), (f"Who borrowed the {obj}?", [b.lower(), f"{p} {rel}"]),
                  (f"Where did {b} take the {obj}?", [place.lower(), place.lower().replace("the ", "")]),
+                 (f"Where was the {obj} at the end?", [place.lower(), place.lower().replace("the ", "")]),           # R20: state questions the generator knows
+                 (f"Who had the {obj} at the end?", [b.lower()]), (f"Who had the {obj} first?", [a.lower()]),
                  (f"Who was waiting at the door?", [a.lower()]), (f"What did {b} promise?", [promise, promise.replace("to ", "")])]))
     # 2 learning / teacher
     a, ga = P(None); tg = R.choice("fm"); t, _ = P(tg); title = R.choice(TITLES[tg]); skill = R.choice(SKILLS); day = R.choice(WEEKDAYS); place = R.choice(PLACES)
@@ -120,6 +123,7 @@ def skeletons(R, P):
                 f"{a} gave {b} {thanks} to say thank you.",
                 [(f"What did {a} lose?", [obj.lower()]), (f"Where did {a} lose the {obj}?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Who found the {obj}?", [b.lower()]), (f"Where was the {obj} found?", [p2.lower(), p2.lower().replace("the ", "")]),
+                 (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a}?", [b.lower()]),     # R20
                  (f"What did {a} give {b}?", [thanks.replace("a ", "").replace("some ", ""), thanks.split()[-1]])]))
     # 4 gift / trip
     a, ga = P(None); rel, gr = R.choice(RELS); b, gb = P(gr); obj = R.choice(OBJECTS); place = R.choice(PLACES); day = R.choice(WEEKDAYS)
