@@ -170,3 +170,14 @@ Mechanism: the state remembers, for each time phrase ('in the morning', 'at noon
 ## R24-g result, run 1
 
 After two reading fixes (a determiner ends a thing span: 'the morning the sled' was one span; 'it' resolves to the most recent THING, never a place): the mark ranking is right 796 times at rank 0 and wrong 777 times in the ('mark','at') context; the learner's own argmax answers **things 47 / 51 at each of the three marks (0.92)** and **persons at noon 0 / 51**, overall 141 / 204 = 0.69 (R24-g2 MISS); the time-anchored answer bits are 1.577 with the memory vs 1.543 with it emptied (R24-g1 MISS). Every person miss is one convention: 'At noon Mannstein took the bag to the library and left it by the gate' -- the generator says Mannstein was at the library at noon; the learner's hand-written attribution gives the subject EVERY place phrase in the sentence, so it says 'gate'. That attribution is the hand cue to remove: run 2 lets the learner choose, per place word ('to', 'by', 'near', 'under', 'on', 'at', 'in', 'from'), whether the phrase updates the subject's place, the thing's place, both, or neither -- chosen by the same next-word search as the holder rules. Expected: 'to' -> both (the person goes there with the thing), 'by / near / under / on' -> the thing only.
+
+## R24-g result, run 2 (attribution per place word chosen by the next-word game)
+
+| measure | result | bar |
+|---|---|---|
+| time-anchored answer bits WITH / without the time memory | **1.419 / 1.542** | with < without |
+| all-token bits with / without | 3.038 / 3.047 | |
+| R24-g2 'Where was X <time>' by the learner's own argmax, held-out generator | **192 / 204 = 0.94** | >= 0.80 |
+| mark ranking, rank-0 hits in context ('mark','at') | 1,573 (was 796) | |
+
+**R24-g1 PASS, R24-g2 PASS.** The time layer is the second epistemic feature kept by the game, and the person misses vanished once the learner chose, per place word, whose place a phrase updates (the attribution rules are recorded in r24_time_results.json). Hand-written: the list of time phrases and the comma convention of the restated statements. Learned: that 'at noon' anchors a lookup, which ranking answers it, and what 'to' versus 'by' does to who is where.

@@ -196,7 +196,7 @@ def main():
                     a = max(st.ents, key=lambda key: M.p_place_filler(key, st, ("mark", "at"))) if st.ents else None
                     tot += 1; ok += (a is not None and hit(a, gold))
     print(f"R24-g2: 'Where was X <time>' by the learner's own argmax on held-out generator stories: {ok}/{tot} = {ok / max(1, tot):.2f} (bar >= 0.80)")
-    json.dump(dict(bits=(withm, without), g2=(ok, tot)), open("r24_time_results.json", "w"))
+    json.dump(dict(bits=(withm, without), g2=(ok, tot), rules=dict(RULE)), open("r24_time_results.json", "w"))
 
 
 if __name__ == "__main__":
