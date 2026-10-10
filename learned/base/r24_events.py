@@ -109,7 +109,7 @@ class Log:
                     alias = items[k + 1][1][0]; actors = [alias]; self.persons.insert(0, alias); items[k + 1] = ("SKIP", [alias]); continue
                 if sym == "PERSON":
                     key = filler[0]
-                    if k >= 1 and items[k - 1][0] in ("named", "called") and actors and not (cur and cur["verb"]): actors = [key]; self.persons.insert(0, key); continue   # 'a boy named Erlend'
+                    if k >= 1 and items[k - 1][0] == "ENT" and actors and not (cur and cur["verb"]) and actors == [T.key_of("ENT", items[k - 1][1])]: actors = [key]   # 'the miller's daughter Lucia': the name is the actor
                     if cur and cur["verb"] and cur.get("rec") is None and k >= 1 and items[k - 1][0] in ("to", "for"): cur["rec"] = key
                     elif cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]: cur["rec"] = key          # 'gave Petra a roll'
                     else: actors = [key]
@@ -136,7 +136,8 @@ class Log:
                     cur["obj"] = word + (f" {nxt}" if nxt and nxt.isalpha() and (nxt in NOUNISH or (not verbish(nxt) and nxt not in SKIP_VERB and nxt not in T.DET and nxt not in PLACE_WORDS and nxt not in T.PRON and nxt not in T.STOP)) else "")   # 'kept bees', 'used fishing line'
                 elif sym.isalpha() and word.endswith("ing") and verbish(word) and cur and cur["obj"] and k >= 1 and items[k - 1][0] == "ENT":   # 'saw a lamb drinking': the object is the actor of the participle
                     cur = dict(actors=[cur["obj"]], verb=word, obj=None, rec=None, place=None, si=si, dir=None, because=because, order=None, words=set(low.split())); self.events.append(cur)
-                elif sym.isalpha() and verbish(word, items[k - 1][0] if k else None) and word not in SKIP_VERB and (cur := None) is None and (passive := (k >= 1 and items[k - 1][0] in ("was", "were"))) is not None and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
+                elif sym.isalpha() and verbish(word, items[k - 1][0] if k else None) and word not in SKIP_VERB and (cur := None) is None and (passive := (k >= 1 and items[k - 1][0] in ("was", "were"))) is not None and (actors or passive) and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
+                    if passive and not actors: actors = [self.things[0]] if self.things else []        # the thing just mentioned is what the passive is about
                     cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split()), passive=passive); self.events.append(cur)
             for e in [x for x in self.events if x["si"] == si]:
                 if e.get("passive") and e.get("phrases"):
@@ -161,11 +162,19 @@ class Log:
 HOLD_RULES = {}
 
 
+def class_rule(verb):
+    """an unseen verb takes the majority rule of the verbs of its induced class that have one"""
+    c = CLASS.get(verb)
+    if c is None: return "none"
+    votes = collections.Counter(r for v, r in HOLD_RULES.items() if CLASS.get(v) == c and r != "none")
+    return votes.most_common(1)[0][0] if votes else "none"
+
+
 def holders(log):
     """holder timeline over the event log under the learned verb rules (hold / release / give)"""
     holder = {}; first = {}; timeline = []
     for e in log.events:
-        rule = HOLD_RULES.get(e["verb"], "none"); obj = e["obj"]; who = e["actors"][0] if e["actors"] else None
+        rule = HOLD_RULES.get(e["verb"]) or class_rule(e["verb"]); obj = e["obj"]; who = e["actors"][0] if e["actors"] else None
         if not obj or not who: continue
         if rule == "hold": holder[obj] = who; first.setdefault(obj, who)
         elif rule == "release": holder[obj] = None
@@ -253,6 +262,7 @@ def _ask(log, q):
         order = next((o for o in ("first", "second", "last") if rest.endswith(o)), None)
         if order:
             ev = [e for e in find(verb=verb) if e["order"] == order]
+            if not ev: ev = [e for e in find(verb=verb, loose=True) if e["order"] == order]
             if not ev:
                 ev = find(verb=verb); ev = [ev[0]] if (ev and order == "first") else [ev[-1]] if (ev and order == "last") else []
             return ev[0]["actors"][0] if ev else None
