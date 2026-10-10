@@ -25,6 +25,18 @@ def main():
             try: c.append((sent, [e for e in R.read(sent) if e.get("agent") and e.get("verb")]))
             except Exception: c.append((sent, []))
         cache_of[id(s)] = c; verbs_of[id(s)] = tuple(sorted({e["verb"] for _, evs in c for e in evs if e["verb"] not in STATIC}))
+    if "--clean" in sys.argv:                                                 # teach only from stories the reader reads cleanly
+        from r17_convert import NAMES
+        def clean(s):
+            c = cache_of[id(s)]
+            if any(not evs for _, evs in c): return False
+            for _, evs in c:
+                for e in evs:
+                    if e["verb"] in ("shed", "it", "can", "sack", "knock") or not e["verb"].isalpha(): return False
+                    ag = e["agent"].split()
+                    if not (ag[-1] in NAMES or ag[0].lower() in ("the", "a", "an", "his", "her", "their", "he", "she", "they")): return False
+            return True
+        before = len(teach); teach = [s for s in teach if clean(s)]; print(f"clean filter: {before} -> {len(teach)} stories", flush=True)
     groups = collections.defaultdict(list)
     for s in teach: groups[verbs_of[id(s)]].append(s)
     groups = {k: v for k, v in groups.items() if 1 <= len(k) <= 4 and len(v) >= 5}
