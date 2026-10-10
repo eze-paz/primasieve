@@ -126,10 +126,13 @@ def main():
                 for s in uses:
                     o, t = reproduced(t2, s); okk += o; tot += t
                 scores[op] = okk
-            base = scores["none"]; best = max(scores, key=lambda o: (scores[o], o == "none"))
-            # elimination: keep only operators that are never worse than every other on these cases; bind when exactly one is strictly best
-            top = [o for o in OPS if scores[o] == scores[best]]
-            new = top[0] if len(top) == 1 and best != "none" and scores[best] > base else ("none" if "none" in top else table.get(v, "none"))
+            base = scores["none"]; best = max(scores, key=lambda o: scores[o])
+            # elimination: the operators that reproduce the most cases survive; among survivors, ties go to the SIMPLEST
+            # operator (fewest state effects), the project's standing rule (core/search: ties -> simplest); no survivor
+            # beats "none" -> the verb stays unbound
+            SIMPLE = {"none": 0, "actor_at": 1, "actor_to_dest": 1, "holder_actor": 1, "holder_recipient": 1, "thing_at_release": 2, "thing_to_dest_hold": 3, "thing_at_hold": 3}
+            top = sorted([o for o in OPS if scores[o] == scores[best]], key=lambda o: SIMPLE[o])
+            new = top[0] if scores[best] > base else "none"
             if table.get(v, "none") != new: changed += 1; table[v] = new
         print(f"pass {pas + 1}: bound {sum(1 for v, o in table.items() if o != 'none')} verbs, changed {changed}", flush=True)
         if not changed: break

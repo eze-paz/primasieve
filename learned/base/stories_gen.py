@@ -55,7 +55,8 @@ def fables(R, P):
     out.append((f"{a.capitalize()} challenged {b} to a race to {place}. {b.capitalize()} ran ahead and then lay down to sleep under a tree. "
                 f"{a.capitalize()} never stopped and reached {place} first. When {b} woke, the race was over.",
                 [("Who challenged whom to a race?", ga), ("Who slept during the race?", gb), ("Who never stopped?", ga), ("Who won the race?", ga),
-                 ("Where was the race to?", [place.lower(), place.lower().replace("the ", "")])]))
+                 ("Where was the race to?", [place.lower(), place.lower().replace("the ", "")]),
+                 (f"Where was {a} at the end?", [place.lower(), place.lower().replace("the ", "")]), ("Who reached the end first?", ga)]))   # R20
     # B: flattery and food (fox and crow shape)
     a, ga, _ = actor(R, P); b, gb, _ = actor(R, P); food = R.choice(FOODS); reason = R.choice(REASONS)
     while b == a: b, gb, _ = actor(R, P)
@@ -131,7 +132,8 @@ def skeletons(R, P):
     out.append((f"On {day}, {a} travelled to {place} to visit {p} {rel} {b}. {s.capitalize()} brought a {obj} as a gift. {b} was delighted and hung it by the window. "
                 f"They ate supper together and {a} went home after dark.",
                 [(f"Who did {a} visit?", [b.lower(), f"{p} {rel}", rel]), (f"Where did {a} travel?", [place.lower(), place.lower().replace("the ", "")]),
-                 (f"What did {a} bring as a gift?", [obj.lower()]), (f"When did {a} travel?", [day.lower()]), (f"Who hung the {obj} by the window?", [b.lower()])]))
+                 (f"What did {a} bring as a gift?", [obj.lower()]), (f"When did {a} travel?", [day.lower()]), (f"Who hung the {obj} by the window?", [b.lower()]),
+                 (f"Where was {a} at the end?", ["home"]), (f"Where did {a} travel?", [place.lower(), place.lower().replace("the ", "")]), (f"Who had the {obj} at the end?", [b.lower()])]))   # R20
     # 5 job / making
     a, ga = P(None); b, gb = P(None); obj = R.choice(OBJECTS); place = R.choice(PLACES); n = R.choice(["three", "four", "five", "six", "seven"]); kept = R.choice(KEPT)
     s, o, p = pron(ga); s2, o2, p2 = pron(gb)
@@ -158,7 +160,8 @@ def skeletons(R, P):
     out.append((f"{a} kept a {animal} named {pet}. One night {pet} ran off toward {place}. {a} looked everywhere until {b} heard a noise behind the shed. "
                 f"{pet} was found asleep {found}, and {a} carried {pet} home.",
                 [(f"What animal did {a} keep?", [animal]), (f"What was the {animal} called?", [pet.lower()]), (f"Where did {pet} run toward?", [place.lower(), place.lower().replace("the ", "")]),
-                 (f"Who heard a noise behind the shed?", [b.lower()]), (f"Where was {pet} found?", [found.split()[-1], found])]))
+                 (f"Who heard a noise behind the shed?", [b.lower()]), (f"Where was {pet} found?", [found.split()[-1], found]),
+                 (f"Where was {pet} at the end?", ["home"]), (f"Who had {pet} at the end?", [a.lower()])]))   # R20
     return out
 
 
