@@ -1,4 +1,9 @@
 {
+ "borrow": "holder_actor",
  "fetch": "holder_recipient",
- "find": "holder_recipient"
+ "find": "holder_recipient",
+ "hang": "holder_recipient",
+ "name": "holder_recipient",
+ "reach": "actor_to_dest",
+ "take": "thing_at_release"
 }

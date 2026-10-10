@@ -32,3 +32,21 @@ reproduction, and they grow as the generator (or verified use) supplies more cas
 world alone scored 9 / 30 matched, 6 right on val_timespace. R20-a MISS (2 < 15), R20-b MISS. Diagnosis in progress:
 per-operator scores on the most used verbs, and how many of the generator's state questions the world can address at
 all with an empty table (a question the state cannot address with any binding cannot eliminate anything).
+
+## Second run (same day; ties -> simplest operator; state questions for three more skeletons)
+
+Bound **7 verbs** in two passes: borrow -> holder := actor; reach -> actor to destination; take -> thing to place and
+released (the tie with "thing to destination and held" broke to the simpler operator, and no question in the cases
+distinguished them); fetch, find, hang, name -> holder := recipient (the last two are wrong: a reader artefact,
+"hung it back" / "a boy named Erlend", with cases that happened to agree). Induced world alone on val_timespace:
+**11 / 30 matched, 7 right (0.64)**. R20-a MISS (7 < 15), R20-b MISS.
+
+Reading: the mechanism works -- bindings come from cases, not from me, and the right ones (borrow, reach) are the ones
+the cases discriminate. What is thin is the teaching signal: the generator's state questions ask about the holder far
+more than about the place, so verbs that move things cannot be told apart from verbs that release them, and the hand
+reader's event errors (name, hang) become bindings when the few cases they touch happen to agree. Two next steps,
+registered here: (1) every state-moving skeleton emits BOTH a holder question and a place question after each verb,
+plus a question that asks about the actor's own place -- the cases must discriminate every operator pair; (2) a
+minimum support of 10 agreeing cases before a verb is bound, and a verb bound only if its binding reproduces >= 90% of
+its cases (the reader's noise then stays unbound rather than wrongly bound). Both are mechanical and run on the same
+validation. The hand-written state (R19b) remains the engine's state layer until the induced one matches it.
