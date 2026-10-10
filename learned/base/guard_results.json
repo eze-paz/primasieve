@@ -1,0 +1,68 @@
+[
+ {
+  "file": "r3_b6real_v3_ckpt_read5_s400.json",
+  "raw": 44,
+  "guarded": 44,
+  "n": 100,
+  "wrong_raw": 49,
+  "wrong_guarded": 49,
+  "nf": 15,
+  "nf_unk_raw": 5,
+  "nf_unk_guarded": 5
+ },
+ {
+  "file": "r3_b6real_v3_ckpt_read3c_s300.json",
+  "raw": 39,
+  "guarded": 39,
+  "n": 100,
+  "wrong_raw": 56,
+  "wrong_guarded": 56,
+  "nf": 15,
+  "nf_unk_raw": 5,
+  "nf_unk_guarded": 5
+ },
+ {
+  "file": "r3_b6real_v3e_ckpt_read5_s400.json",
+  "raw": 45,
+  "guarded": 45,
+  "n": 100,
+  "wrong_raw": 47,
+  "wrong_guarded": 47,
+  "nf": 15,
+  "nf_unk_raw": 6,
+  "nf_unk_guarded": 6
+ },
+ {
+  "file": "r3_counter_v3_ckpt_read5_s400.json",
+  "raw": 33,
+  "guarded": 33,
+  "n": 37,
+  "wrong_raw": 4,
+  "wrong_guarded": 4,
+  "nf": 0,
+  "nf_unk_raw": 0,
+  "nf_unk_guarded": 0
+ },
+ {
+  "file": "r3_counter_v3e_ckpt_read5_s400.json",
+  "raw": 34,
+  "guarded": 34,
+  "n": 37,
+  "wrong_raw": 3,
+  "wrong_guarded": 3,
+  "nf": 0,
+  "nf_unk_raw": 0,
+  "nf_unk_guarded": 0
+ },
+ {
+  "file": "r3_b6long_ckpt_read3.json",
+  "raw": 37,
+  "guarded": 37,
+  "n": 100,
+  "wrong_raw": 26,
+  "wrong_guarded": 26,
+  "nf": 18,
+  "nf_unk_raw": 16,
+  "nf_unk_guarded": 16
+ }
+]
