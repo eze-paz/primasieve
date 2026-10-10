@@ -49,3 +49,5 @@ Validation (50): s100 15, s200 13, **s300 19**, s400 17, s500 14 -> `ckpt_read3c
 The hit windows and real-text distractors removed the over-abstention (false unknowns 60 -> 5) and raised grep reading
 from 11 to 39. What remains is binding: the reply is a noun from the right window attached to the wrong entity. That
 is what R5 (`R5_prereg.md`) trains on, with the hand-rule reader's events from real sentences as the teacher.
+
+R3c-c as counted: not-found cases 15, "unknown" replies **5 / 15 = 0.33** -> **MISS** (bar 0.80); the v3 traces taught the engine to answer from windows so well that it now answers even when no window holds the answer. Among findable cases false unknowns are 0 / 85. The honesty-on-hits trade-off is now the open calibration problem alongside binding.

@@ -6,13 +6,21 @@ HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE); sys.path.inse
 import eval_r3, b6_rwkv
 
 tag = sys.argv[1] if len(sys.argv) > 1 else "read3c"
+val_sets = sys.argv[sys.argv.index("--val") + 1].split(",") if "--val" in sys.argv else ["val_v3"]     # R5: val_v3,val_r5 summed
+if "val_r5" in val_sets and not os.path.exists("r3_val_r5.json"):                                      # r5_val.json capped at 100, seed 9
+    import random; v = json.load(open("r5_val.json", encoding="utf-8")); random.Random(9).shuffle(v); v = v[:100]
+    for it in v: it.setdefault("found", True)
+    json.dump(v, open("r3_val_r5.json", "w", encoding="utf-8"), indent=1)
 cks = sorted(glob.glob(f"ckpt_{tag}_s*.pth"), key=lambda p: int(re.search(r"_s(\d+)", p).group(1)))
 lines = []; scores = []
 for ck in cks:
-    sys.argv = ["eval_r3.py", ck, "--set", "val_v3"]; buf = io.StringIO()
-    with contextlib.redirect_stdout(buf): eval_r3.main()
-    line = [l for l in buf.getvalue().splitlines() if l.startswith("R3")][0]; right = int(re.search(r": (\d+)/", line).group(1))
-    scores.append((right, -int(re.search(r"_s(\d+)", ck).group(1)), ck)); lines.append("val " + line); print("val", line, flush=True)
+    total = 0
+    for vs in val_sets:
+        sys.argv = ["eval_r3.py", ck, "--set", vs]; buf = io.StringIO()
+        with contextlib.redirect_stdout(buf): eval_r3.main()
+        line = [l for l in buf.getvalue().splitlines() if l.startswith("R3")][0]; total += int(re.search(r": (\d+)/", line).group(1))
+        lines.append("val " + line); print("val", line, flush=True)
+    scores.append((total, -int(re.search(r"_s(\d+)", ck).group(1)), ck))
 best = max(scores)[2]; lines.append(f"selected {best}"); print("selected", best, flush=True)
 for name in ("b6real_v3", "counter_v3"):
     sys.argv = ["eval_r3.py", best, "--set", name]; buf = io.StringIO()
