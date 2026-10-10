@@ -40,3 +40,5 @@ Kept checkpoints (2026-10-10, disk at 4 GB free before the 1.5B run): ckpt_read1
 The larger base is not better zero-shot on the story prompt (65 vs 79) and does not produce an answer on the trace
 format at all; both are format effects the fine-tune addresses. The prediction "zero-shot B6 ~85" was wrong and is
 recorded as such. Part 2 launched right after.
+
+Deviation (2026-10-10 08:00): disk could not hold all kept 1.5B checkpoints (3 GB each) plus the rolling save; `ckpt_read7_s150.pth` was deleted unevaluated (every earlier selection chose step 300 or later; the rolling save is removed by a janitor after each write). Selection runs over steps 300, 450, 600, 750, 900.
