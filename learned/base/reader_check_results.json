@@ -1,56 +1,20 @@
 [
  {
-  "file": "r3_b6real_v3e_ckpt_read5_s400.json",
-  "raw": 45,
-  "n": 100,
-  "readable": 33,
-  "committed": [
-   41,
-   37
-  ],
-  "reader": [
-   30,
-   3
-  ],
-  "union": [
-   54,
-   39
-  ]
- },
- {
-  "file": "r3_b6long_ckpt_read3.json",
-  "raw": 37,
+  "file": "r3_b6real_v3_ckpt_read7_s450.json",
+  "raw": 26,
   "n": 100,
   "readable": 34,
   "committed": [
-   34,
-   19
+   23,
+   46
   ],
   "reader": [
    31,
    3
   ],
   "union": [
-   51,
-   22
-  ]
- },
- {
-  "file": "r3_counter_v3_ckpt_read5_s400.json",
-  "raw": 33,
-  "n": 37,
-  "readable": 0,
-  "committed": [
-   33,
-   4
-  ],
-  "reader": [
-   0,
-   0
-  ],
-  "union": [
-   33,
-   4
+   46,
+   48
   ]
  }
 ]

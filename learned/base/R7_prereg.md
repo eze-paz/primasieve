@@ -42,3 +42,23 @@ format at all; both are format effects the fine-tune addresses. The prediction "
 recorded as such. Part 2 launched right after.
 
 Deviation (2026-10-10 08:00): disk could not hold all kept 1.5B checkpoints (3 GB each) plus the rolling save; `ckpt_read7_s150.pth` was deleted unevaluated (every earlier selection chose step 300 or later; the rolling save is removed by a janitor after each write). Selection runs over steps 300, 450, 600, 750, 900.
+
+## Part 2 result (2026-10-10, `read7_select.out`; 883 steps / 218 k tokens in 4 h; selection over 300-750 by val_v3 + val_r5)
+
+Validation: s300 12+4, **s450 17+6**, s600 17+4, s750 16+5 -> `ckpt_read7_s450.pth` (the only 1.5B checkpoint kept).
+Disclosed: two copies of the selection ran concurrently for an hour (a stale waiter and its replacement), which slowed
+both but changed no number.
+
+| gate | measured | bar | verdict |
+|---|---|---|---|
+| **R7a** | B6 in real text through grep **26 / 100** (0.4B R5: 44; 5 false unknowns; wrong replies are phrases from the hit: "the ocean", "a small red boat") | >= 60; > 45 | **MISS** |
+| **R7b** | counterfactual **20 / 37 = 0.54**; answered from **world knowledge 4** ("rome" for the planted "madrid") | >= 0.90; 0 | **MISS** on both parts |
+| **R7c** | "unknown" on not-found 4 / 15 | >= 0.80 | **MISS** |
+| **R7d** | plain B6 **88 / 100**; mismatch "unknown" **96 / 100** | >= 80; >= 0.90 | **PASS** (both; B6 is the line's best by 8) |
+| merged policy (R9) on this model, offline | 46 / 100 (reader 31 / 3 wrong + model on the rest) | -- | below the 0.4B merged engine's 54 |
+
+Reading: scale bought whole-story comprehension (+8 on B6) and brought more stored facts into the fight (4 world
+answers where the 0.4B engine had 0), and did not buy binding inside hits (26 vs 44). The trace format was learned
+weakly in 883 steps at batch 2 (validation 17 + 6, the 0.4B had 19 + 17). The prereg's fallback holds: at this range
+scale does not solve binding in a window; the merged engine's lever is the reader's coverage, not the model's size.
+Cost: the 1.5B engine is ~4.6x the 0.4B per answer and ~50x cheaper than the 7 B reference.
