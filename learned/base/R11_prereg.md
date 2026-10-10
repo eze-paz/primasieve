@@ -14,3 +14,11 @@ Also: reject agents ending in an auxiliary ("the mayor have"). Developed on vali
 |---|---|
 | **R11-a** | validation: reader-matched questions >= 28 of 50 at precision >= 0.85 (v2.2: 22 at 0.95) |
 | **R11-b** | test, once: merged engine >= 58 / 100, wrong <= 40 |
+
+## Result (2026-10-10)
+
+validation v3 (adjuncts): matched 25 / 50, precision 1.00; v3.1 (pronoun agents, adjunct fallback after a failed role
+match): **26 / 50, 26 right, 0 wrong**; reader-else-model 33 right, 16 wrong (model alone 19). R11-a: coverage MISS by
+two (26 < 28), precision PASS at 1.00. The test is not run (rule). The remaining unparsed validation questions are
+why / how / whose / "what was X made of" / "what was in X" -- reasons, manners, passives and copulas, which need the
+reader itself (core/events.py) to carry them; that is a reader extension, registered separately if pursued.

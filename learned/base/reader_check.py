@@ -17,8 +17,8 @@ SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 
 
 AUXQ = ("was", "were", "is", "are", "did", "had", "has", "do", "does")
-V2 = "--v2" in sys.argv or "--v22" in sys.argv   # R10: matcher v2 (developed on the validation set)
-V22 = "--v22" in sys.argv                         # R10b: v2.2
+V2 = "--v2" in sys.argv or "--v22" in sys.argv or "--v3" in sys.argv   # R10: matcher v2 (developed on the validation set)
+V22 = "--v22" in sys.argv or "--v3" in sys.argv   # R10b: v2.2
 
 
 def parse_q(q):
@@ -42,6 +42,60 @@ def parse_q(q):
         if m and m.group(1).lower() not in AUXQ and m.group(1) != "was": return ("agent", m.group(1), m.group(2))
         m = re.match(r"Who (\w+) (\w+) (.+)\?$", q)                         # v2: "Who pulled him out?" -> verb + rest (pronoun object dropped)
         if m and m.group(1).lower() not in AUXQ: return ("agent", m.group(1), m.group(3))
+    return None
+
+
+V3 = "--v3" in sys.argv                           # R11: adjuncts (where / when / with what) from the matched event's sentence
+PLACE = r"(?:to|at|in|on|behind|under|across|near|into|toward|towards|over|through|beside|by)"
+TIME = re.compile(r"\b(on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)|"
+                  r"at (?:lunch|noon|dawn|dusk|midnight|night|sunset|sunrise)|the next (?:morning|day|evening|week)|in the (?:spring|autumn|summer|winter|morning|evening|afternoon)|"
+                  r"in (?:spring|autumn|summer|winter|early summer|March|April|May|June|July|August|September|October|November|December|January|February)|"
+                  r"every (?:\w+ )?(?:morning|evening|day|noon|night|week|Tuesday|Thursday|Monday|Sunday|Friday|winter|summer)|after (?:supper|dinner|lunch|dark|a year|a week)|before dark|"
+                  r"one (?:morning|evening|afternoon|night|day|summer|year|foggy evening)|a week later|three days late|within two hours)\b", re.I)
+
+
+PRONOUNS = {"he", "she", "they", "it", "him", "her", "them"}
+
+
+def parse_adjunct(q):
+    """-> (kind, verb_surface, agent_text) for 'Where did A V ...?', 'When did A V ...?', 'What did A V (it) with?', 'What did A use?'"""
+    m = re.match(r"(Where|When) (?:did|was|were) (.+?) (\w+)(?: .*)?\?$", q)
+    if m and m.group(3).lower() not in AUXQ: return (m.group(1).lower(), m.group(3), m.group(2))
+    m = re.match(r"(Where|When) (?:did|was|were) (.+?)\?$", q)                          # "Where were the hives?" / "When were the tomatoes planted?"
+    if m: return (m.group(1).lower(), None, m.group(2))
+    m = re.match(r"What did (.+?) (\w+)(?: \w+)? with\?$", q)
+    if m: return ("with", m.group(2), m.group(1))
+    m = re.match(r"What did (.+?) use\?$", q)
+    if m: return ("with", None, m.group(1))
+    m = re.match(r"On which day (?:did|was|were) (.+?) (\w+)(?: .*)?\?$", q)
+    if m: return ("when", m.group(2), m.group(1))
+    return None
+
+
+def adjunct_answer(question, hits):
+    p = parse_adjunct(question)
+    if p is None: return None
+    kind, verb, agent = p
+    for h in hits:
+        for s in SENT.split(h):
+            if norm(agent) not in PRONOUNS and not any(w in norm(s).split() for w in norm(agent).split() if len(w) > 2): continue
+            sl = s
+            if verb is not None:
+                lem = R.verbs.get(verb.lower(), verb.lower()); pos = None
+                for m in re.finditer(r"[A-Za-z']+", s):
+                    w = m.group().lower()
+                    if w == verb.lower() or R.verbs.get(w) == lem or w.startswith(lem[:4]): pos = m.end(); break
+                if pos is None: continue
+                sl = s[pos:]
+            if kind == "where":
+                m = re.search(rf"\b{PLACE} ((?:the |a |an |his |her |their |its )?[a-z][\w-]*(?: (?:of|the)? ?[a-z][\w-]*){{0,2}})", sl)
+                if m: return m.group(1).strip(), (None, s)
+            elif kind == "when":
+                m = TIME.search(sl) or TIME.search(s)
+                if m: return m.group(1), (None, s)
+            elif kind == "with":
+                m = re.search(r"\bwith ((?:the |a |an |his |her |their )?[a-z][\w-]*(?: [a-z][\w-]*){0,2})", sl)
+                if m: return m.group(1).strip(), (None, s)
     return None
 
 
@@ -80,10 +134,15 @@ def match(a, b):
 
 
 def check(item):
-    p = parse_q(item["q"]); hits = hits_of(item["prompt"]); evs = events_in(hits)
+    p = parse_q(item["q"]); hits = hits_of(item["prompt"])
+    if V3 and p is None:
+        aa = adjunct_answer(item["q"], hits)
+        if aa: return (item["reply"] if match(item["reply"], aa[0]) else "unknown"), aa[0]
+    evs = events_in(hits)
     if V2: evs = resolve_names(evs)
     if p is None or not evs: return None, None
     role, verb, other = p; other_role = "patient" if role == "agent" else "agent"
+    if V3 and re.search(r"\b(have|had|has|let|made|make)$", other): return None, None     # R11: causative tail ("the mayor have marked")
     cands = []; verb_only = []
     for e in evs:
         v_ok = verb is None or e.get("verb", "") and (R.verbs.get(verb.lower()) == e["verb"] or verb.lower().startswith(e["verb"][:4]))
@@ -94,6 +153,9 @@ def check(item):
             if not any(w in norm(e[role]).split() for w in norm(other).split() if len(w) > 3): verb_only.append(e[role])
     if not cands and V2 and len(set(norm(c) for c in verb_only)) == 1: cands = verb_only[:1]   # v2: the verb occurs in exactly one event among the hits
     if V2 and len(set(norm(c) for c in cands)) > 1: return None, None                       # v2: two different fillers match: the reader cannot decide; the model may
+    if not cands and V3:                                                                     # R11: a role question with no event may still be an adjunct ("What did Sven use?")
+        aa = adjunct_answer(item["q"], hits)
+        if aa: return (item["reply"] if match(item["reply"], aa[0]) else "unknown"), aa[0]
     if not cands: return None, None
     committed = item["reply"] if any(match(item["reply"], c) for c in cands) else "unknown"
     return committed, cands[0]
