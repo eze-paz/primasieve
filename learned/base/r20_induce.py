@@ -11,7 +11,7 @@ from b6_rwkv import hit
 import worldstate as WS
 
 OPS = ["none", "actor_to_dest", "thing_to_dest_hold", "thing_at_release", "holder_recipient", "holder_actor", "actor_at", "thing_at_hold"]
-SENT = WS.SENT; PRON = WS.PRON
+SENT = WS.SENT; PRON = WS.PRON; DIRS = {"left", "right", "north", "south", "east", "west", "up", "down", "back", "home", "away", "on", "in", "out"}
 
 
 def norm_ent(x):
@@ -27,11 +27,21 @@ class InducedWorld:
         self.R = reader; self.table = table; self.loc = {}; self.holder = {}; self.t = 0; self.events = []; self.last_agent = None; self.last_thing = None
         self.arrive = []; self.marks = {}
 
+    def _alias(self, x):
+        """'the boat' and 'the red boat' are one entity: an unknown name resolves to the known entity with the same head noun"""
+        if not x or x in self.loc or x in self.holder: return x
+        head = x.split()[-1]
+        for k in list(self.loc) + list(self.holder):
+            if k.split()[-1] == head: return k
+        return x
+
+    def _ent(self, x): return self._alias(norm_ent(x))
+
     def _loc(self, who, where):
-        if who and where: self.loc.setdefault(who, []).append((self.t, norm_ent(where)))
+        if who and where: self.loc.setdefault(self._alias(who), []).append((self.te, norm_ent(where)))
 
     def _hold(self, thing, who):
-        if thing: self.holder.setdefault(thing, []).append((self.t, who))
+        if thing: self.holder.setdefault(self._alias(thing), []).append((self.te, who))
 
     def read(self, text, cache=None):
         """cache: a list of (sentence, events) precomputed once per story -- the reader's output does not depend on the table"""
@@ -42,10 +52,16 @@ class InducedWorld:
                 try: cache.append((s, [e for e in self.R.read(s) if e.get("agent") and e.get("verb")]))
                 except Exception: cache.append((s, []))
         for s, evs in cache:
-            self.t += 1; sl = s.lower()
+            self.t += 1; self.te = self.t; sl = s.lower()
             mt = WS.TIME_MARK.search(s)
-            if mt: self.marks[mt.group(1).lower()] = self.t
+            if mt: self.marks[mt.group(1).lower()] = self.t + 0.99                 # a time mark covers the whole sentence's events
             places = [(mm.group(1).lower(), mm.group(2)) for mm in re.finditer(rf"\b{WS.PLACE_P} {WS.NP}", sl)]
+            def inner(np):                                                           # "at the end of the right tunnel" -> right tunnel
+                if re.match(r"(?:the )?(?:end|edge|top|bottom|middle|side|foot) of$", np):
+                    m2 = re.search(rf"\b{np} {WS.NP}", sl)
+                    if m2: return m2.group(1)
+                return np
+            places = [(prep, inner(np)) for prep, np in places]
             mc = re.match(rf"(?:in the \w+ |at \w+ |later |then )?((?:the |a |his |her |their )?[a-z][\w'-]*(?: [a-z][\w'-]*)?) (?:was|were|is|are) {WS.PLACE_P} {WS.NP}", sl)
             if mc and not evs: self._loc(norm_ent(mc.group(1)), mc.group(3))
             rec_m = re.search(r"\bto ((?:her |his |their )?(?:brother |sister |friend )?[a-z]+)\b", sl)
@@ -54,7 +70,8 @@ class InducedWorld:
             src_s = next((np for prep, np in places if prep == "from"), None)
             if dest_s is None and re.search(r"\b(?:went|walked|ran|rowed|came|returned|hurried|carried it|carried the \w+) home\b", sl): dest_s = "home"
             if rec_m and dest_s and norm_ent(dest_s) == norm_ent(rec_m.group(1)): dest_s = None          # "gave it to Rosa": a recipient, not a place
-            for e in evs:
+            for k_ev, e in enumerate(evs):
+                self.te = self.t + 0.01 * k_ev                                       # events inside one sentence keep their order
                 a = norm_ent(e["agent"]) if e["agent"].lower() not in PRON else (self.last_agent or norm_ent(e["agent"]))
                 a = re.sub(r"^(?:noon|morning|evening|afternoon|night|dawn|later|then|summer|winter|spring|autumn|return) ", "", a)
                 a = re.sub(r"^(?:brother|sister|cousin|uncle|aunt|neighbour|friend|grandfather|grandmother|mother|father|teacher) ", "", a)   # "her grandmother Bedford" -> bedford
@@ -66,18 +83,24 @@ class InducedWorld:
                 v = e["verb"]; p = norm_ent(e.get("patient") or "")
                 if p in ("it", "them") or p.startswith("it "): p = self.last_thing or p
                 if p and p not in PRON: self.last_thing = p
-                self.last_agent = a; self.events.append((self.t, a, v, p, s))
+                p = self._alias(p); self.last_agent = a; self.events.append((self.te, a, v, p, s))
                 op = self.table.get(v, "none")
                 # exact (generator) events carry the event's own place and recipient; the reader's events fall back to the sentence
-                ev_place = norm_ent(e["place"]) if e.get("place") else None
-                dest = ev_place if (ev_place and op in ("actor_to_dest", "thing_to_dest_hold")) else dest_s
-                at = ev_place if (ev_place and op in ("thing_at_release", "holder_actor", "actor_at", "thing_at_hold")) else at_s
+                exact = "place" in e; ev_dest = ev_at = None                        # an exact event's place keeps its preposition: 'to X' is a destination, 'near X' a location
+                if e.get("place"):
+                    mp = re.match(r"(to|into|toward|towards|at|in|on|by|near|behind|under|over|across) (.+)$", e["place"])
+                    if mp and mp.group(1) in ("to", "into", "toward", "towards"): ev_dest = norm_ent(mp.group(2))
+                    elif mp: ev_at = norm_ent(mp.group(2))
+                    else: ev_dest = ev_at = norm_ent(e["place"])
+                dest = ev_dest if exact else dest_s; at = ev_at if exact else at_s
                 rec = norm_ent(e["rec"]) if e.get("rec") else (norm_ent(rec_m.group(1)) if rec_m else None)
                 if op in ("actor_to_dest", "actor_at") and (any(w in sl for w in ("first", "second", "last")) or v in ("arrive", "reach", "come")):
                     seg = sl[max(0, sl.find(e["agent"].lower())):]                      # the order word nearest after THIS agent's mention
                     hits = sorted((seg.find(w), w) for w in ("first", "second", "last") if w in seg)
                     self.arrive.append((self.t, a, hits[0][1] if hits else None))
                 if op in ("actor_to_dest", "thing_to_dest_hold") and src_s and not self.loc.get(a): self._loc(a, src_s)   # "walked from X to Y": X is where the actor started
+                if op == "actor_to_dest" and not dest and p and not p.endswith("ing") and p not in DIRS:   # "reached the bridge": a movement verb's object is its destination
+                    dest = re.sub(r" (?:first|second|last|early|late|back)$", "", p)
                 if op == "actor_to_dest" and dest: self._loc(a, dest)
                 elif op == "thing_to_dest_hold" and p:
                     if dest or at: self._loc(p, dest or at)
@@ -97,7 +120,7 @@ class InducedWorld:
                     if at or dest: self._loc(a, at or dest)
                 if op == "none" and v in ("have", "own", "keep") and p and not self.holder.get(p): self._hold(p, a)
 
-    ask = WS.World.ask; _latest = WS.World._latest; _when = WS.World._when; _ent = staticmethod(norm_ent)
+    ask = WS.World.ask; _latest = WS.World._latest; _when = WS.World._when
 
 
 def state_q(q):

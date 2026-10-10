@@ -91,11 +91,11 @@ def fables(R, P):
     while p2 == p1: p2 = R.choice(PLACES)
     spot = R.choice(["on the bench", "under the tree", "by the door", "on the table", "behind the gate"])
     s, o, p = pron(g1)
-    g1_events = [(0, a, "walk", None, p2, None), (1, a, "set", f"the {obj}", spot.split(" ", 1)[1], None), (1, a, "go", None, "the well", None),
-                 (2, b, "come", None, p2, None), (2, b, "take", f"the {obj}", None, None), (3, b, "give", f"the {obj}", None, a), (3, a, "return", None, p2, None)]
+    g1_events = [(0, a, "walk", None, f"to {p2}", None), (1, a, "set", f"the {obj}", spot, None), (1, a, "go", None, "to the well", None),
+                 (2, b, "come", None, f"to {p2}", None), (2, b, "take", f"the {obj}", None, None), (3, b, "give", f"the {obj}", None, a), (3, a, "return", None, p2, None)]
     if R.random() < 0.5:                                                      # split variant: 'came' and 'took' in separate sentences
         s2, _, _ = pron(g2)
-        g1_events = g1_events[:3] + [(2, b, "come", None, p2, None), (3, b, "take", f"the {obj}", None, None), (4, b, "give", f"the {obj}", None, a), (4, a, "return", None, p2, None)]
+        g1_events = g1_events[:3] + [(2, b, "come", None, f"to {p2}", None), (3, b, "take", f"the {obj}", None, None), (4, b, "give", f"the {obj}", None, a), (4, a, "return", None, p2, None)]
         mid = f"While {a} was away, {b} came to {p2}. {s2.capitalize()} took the {obj}. "
     else: mid = f"While {a} was away, {b} came to {p2} and took the {obj}. "
     out.append((f"{a} walked from {p1} to {p2} with a {obj}. {s.capitalize()} set the {obj} down {spot} and went to the well. "
@@ -108,8 +108,8 @@ def fables(R, P):
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
     while p2 == p1: p2 = R.choice(PLACES)
     s, o, p = pron(g1); s2, o2, p2p = pron(g2)
-    g2_events = [(0, a, "carry", f"a {obj}", p1, None), (0, a, "drop", f"the {obj}", "the gate", None), (1, b, "steal", f"the {obj}", None, None), (1, b, "run", None, p2, None),
-                 (2, a, "follow", b, p2, None), (2, a, "take", f"the {obj}", None, None), (3, a, "row", None, "home", None)]
+    g2_events = [(0, a, "carry", f"a {obj}", f"to {p1}", None), (0, a, "drop", f"the {obj}", "near the gate", None), (1, b, "steal", f"the {obj}", None, None), (1, b, "run", None, f"to {p2}", None),
+                 (2, a, "follow", b, f"to {p2}", None), (2, a, "take", f"the {obj}", None, None), (3, a, "row", None, "home", None)]
     out.append((f"{a} carried a {obj} to {p1} and dropped it near the gate. {b} stole the {obj} and ran to {p2}. "
                 f"{a} followed {o2} to {p2} and took the {obj} back. Then {a} rowed home with the {obj}.",
                 [(f"Where did {a} drop the {obj}?", ["near the gate", "the gate", "gate"]), (f"Who stole the {obj}?", [b.lower()]), (f"Where did {b} run?", [p2.lower(), p2.lower().replace("the ", "")]),
@@ -120,17 +120,18 @@ def fables(R, P):
     # G3: a thing left somewhere, found and put back, with time marks
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES)
     spot1 = R.choice(["on the hook", "on the shelf", "in the drawer", "on the bench"]); spot2 = R.choice(["near the well", "by the gate", "under the tree", "on the wall"])
-    g3_events = [(1, a, "take", f"the {obj}", p1, None), (1, a, "leave", f"the {obj}", spot2.split(" ", 1)[1], None), (2, b, "find", f"the {obj}", spot2.split(" ", 1)[1], None), (2, b, "put", f"the {obj}", spot1.split(" ", 1)[1], None)]
+    g3_events = [(1, a, "take", f"the {obj}", f"to {p1}", None), (1, a, "leave", f"the {obj}", spot2, None), (2, b, "find", f"the {obj}", spot2, None), (2, b, "put", f"the {obj}", spot1, None)]
     out.append((f"In the morning the {obj} was {spot1}. At noon {a} took the {obj} to {p1} and left it {spot2}. In the evening {b} found the {obj} {spot2} and put it back {spot1}.",
                 [(f"Where was the {obj} in the morning?", [spot1, spot1.split()[-1]]), (f"Where was the {obj} at noon?", [p1.lower(), p1.lower().replace("the ", ""), spot2.split()[-1]]),
                  (f"Where was the {obj} in the evening?", [spot1, spot1.split()[-1]]), (f"Where did {a} leave the {obj}?", [spot2, spot2.split()[-1]]),
                  (f"Where did {b} find the {obj}?", [spot2, spot2.split()[-1]]), (f"Who had the {obj} after {a} left it?", [b.lower()]),
                  (f"Who was holding the {obj} right after {a} left it?", ["no one", "nobody"]), (f"Where was the {obj} at the end?", [spot1, spot1.split()[-1]]),
-                 (f"Who found the {obj}?", [b.lower()])], g3_events))
+                 (f"Who found the {obj}?", [b.lower()]), (f"Who was holding the {obj} right after {b} found it?", [b.lower()]),
+                 (f"Who was holding the {obj} right after {b} put it back?", ["no one", "nobody"]), (f"Where was {a} at noon?", [p1.lower(), p1.lower().replace("the ", "")])], g3_events))
     # G4: a race -- arrival order, then one rides on and one waits
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); c, gc, g3 = actor(R, P, "name"); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
     while p2 == p1: p2 = R.choice(PLACES)
-    g4_events = [(1, a, "reach", None, p1, None), (2, b, "arrive", None, p1, None), (2, c, "come", None, p1, None), (3, b, "ride", None, p2, None), (3, a, "wait", None, p1, None)]
+    g4_events = [(1, a, "reach", None, p1, None), (2, b, "arrive", None, p1, None), (2, c, "come", None, p1, None), (3, b, "ride", None, f"to {p2}", None), (3, a, "wait", None, f"at {p1}", None)]
     out.append((f"{a}, {b} and {c} raced to {p1}. {a} reached {p1} first. {b} arrived second and {c} came last. {b} then rode on to {p2} while {a} waited at {p1}.",
                 [(f"Who reached {p1} first?", [a.lower()]), (f"Who arrived last?", [c.lower()]), (f"Who arrived second?", [b.lower()]),
                  (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where was {a} at the end?", [p1.lower(), p1.lower().replace("the ", "")]),

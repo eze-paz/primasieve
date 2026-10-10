@@ -1,12 +1,12 @@
 {
+ "find": "holder_actor",
  "leave": "thing_at_release",
- "put": "holder_actor",
- "carry": "holder_actor",
+ "put": "thing_at_release",
+ "carry": "thing_to_dest_hold",
  "drop": "thing_at_release",
- "follow": "holder_actor",
  "row": "actor_to_dest",
+ "run": "actor_to_dest",
  "steal": "holder_actor",
- "take": "holder_actor",
  "arrive": "actor_to_dest",
  "come": "actor_to_dest",
  "reach": "actor_to_dest",
@@ -15,5 +15,6 @@
  "go": "actor_to_dest",
  "return": "actor_to_dest",
  "set": "thing_at_release",
- "walk": "actor_to_dest"
+ "walk": "actor_to_dest",
+ "take": "holder_actor"
 }

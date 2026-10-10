@@ -148,8 +148,7 @@ class World:
         if m:
             tl = self.holder.get(ent(m.group(1)), []); who = ent(m.group(2)); seen = False
             if who not in {h for _, h in tl} and len(who.split()) > 1:                       # "after Rosa dropped it": the event's time, then the next holder
-                who = ent(who.split()[0]); verb = m.group(2).split()[1]
-                t0 = next((t for t, a, v, p, s in self.events if a == who and (v == verb or verb.startswith(v[:3]))), None)
+                t0 = self._when(m.group(2)); who = ent(m.group(2).split()[0])
                 if t0 is None: return None
                 return next((h for t, h in tl if t >= t0 and h and h != who), None)
             for t, h in tl:
@@ -172,7 +171,7 @@ class World:
         if m:
             for t, a, v, p, s in self.events:
                 if a == ent(m.group(1)) and v in ("go", "turn", "walk"):
-                    mm = re.search(r"\b(left|right|north|south|east|west|up|down)\b", s.lower())
+                    mm = re.search(r"(?:went|goes|go|turned|turns|walked|ran|headed) (left|right|north|south|east|west|up|down)", s.lower())
                     if mm: return mm.group(1)
             return None
         m = re.match(r"where did (.+?) (find|leave|drop|put|set|hang|lose) (.+)$", ql)
