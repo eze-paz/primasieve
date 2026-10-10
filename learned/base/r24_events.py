@@ -79,6 +79,15 @@ class Log:
     def read(self, text):
         sents = [x.strip() for x in T.SENT.split(text) if x.strip()]
         for si, sent in enumerate(sents):
+            quote = None
+            mq = re.match(r'^["“](.+?)[,.!?]?["”]\s*(?:(said|asked|cried|replied|shouted|whispered|answered)\s+(\w+)|(\w+)\s+(said|asked|cried|replied|shouted|whispered|answered))', sent)
+            if mq:
+                speaker = mq.group(3) or mq.group(4); quote = mq.group(1)
+                self.events.append(dict(actors=[speaker], verb="said", obj=quote.lower(), rec=None, place=None, si=si, dir=None, because=None, order=None, words=set(sent.lower().split()), quote=quote.lower()))
+                if speaker[:1].isupper():
+                    if speaker in self.persons: self.persons.remove(speaker)
+                    self.persons.insert(0, speaker)
+                continue
             toks = T.TOK.findall(sent); items = T.slotify(toks, self.names)
             if ("because", ["because"]) in items: items = items[:items.index(("because", ["because"]))]
             n = len(items)
@@ -89,6 +98,8 @@ class Log:
             for k, (sym, filler) in enumerate(items):
                 word = filler[0].lower() if sym not in ("PERSON", "ENT") else None
                 if sym == ",": actors = []; cur = None; continue                                        # a new clause
+                if sym in ("named", "called") and k + 1 < n and items[k + 1][0] == "PERSON" and k >= 1 and items[k - 1][0] in ("ENT", "PERSON"):
+                    alias = items[k + 1][1][0]; actors = [alias]; self.persons.insert(0, alias); items[k + 1] = ("SKIP", [alias]); continue
                 if sym == "PERSON":
                     key = filler[0]
                     if k >= 1 and items[k - 1][0] in ("named", "called") and actors and not (cur and cur["verb"]): actors = [key]; self.persons.insert(0, key); continue   # 'a boy named Erlend'
@@ -118,8 +129,12 @@ class Log:
                     cur["obj"] = word + (f" {nxt}" if nxt and nxt.isalpha() and (nxt in NOUNISH or (not verbish(nxt) and nxt not in SKIP_VERB and nxt not in T.DET and nxt not in PLACE_WORDS and nxt not in T.PRON and nxt not in T.STOP)) else "")   # 'kept bees', 'used fishing line'
                 elif sym.isalpha() and word.endswith("ing") and verbish(word) and cur and cur["obj"] and k >= 1 and items[k - 1][0] == "ENT":   # 'saw a lamb drinking': the object is the actor of the participle
                     cur = dict(actors=[cur["obj"]], verb=word, obj=None, rec=None, place=None, si=si, dir=None, because=because, order=None, words=set(low.split())); self.events.append(cur)
-                elif sym.isalpha() and verbish(word, items[k - 1][0] if k else None) and word not in SKIP_VERB and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
-                    cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split())); self.events.append(cur)
+                elif sym.isalpha() and verbish(word, items[k - 1][0] if k else None) and word not in SKIP_VERB and (cur := None) is None and (passive := (k >= 1 and items[k - 1][0] in ("was", "were"))) is not None and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
+                    cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split()), passive=passive); self.events.append(cur)
+            for e in [x for x in self.events if x["si"] == si]:
+                if e.get("passive") and e.get("phrases"):
+                    by = next((key for pp, key in e["phrases"] if pp == "by"), None)
+                    if by: e["obj"] = e["obj"] or (e["actors"][0] if e["actors"] else None); e["actors"] = [by]
             # order words and places per sentence
             for e in [x for x in self.events if x["si"] == si]:
                 seg = low[low.find(e["actors"][0].lower()):] if e["actors"] and e["actors"][0].lower() in low else low
@@ -217,6 +232,9 @@ def _ask(log, q):
             ev = find(verb=verb, actor=actor); ev = [e for e in ev if e["obj"]]
             if not ev and tail: ev = [e for e in find(verb=verb) if e["obj"]]
             return ev[0]["obj"] if ev else None
+    if ql.startswith("who ") and len(w) >= 2 and w[1] in ("asked", "said", "cried", "replied", "shouted", "demanded", "begged", "wanted"):
+        sp = [e for e in log.events if e.get("quote") and (len(qwords & set(e["quote"].split())) >= 1 or len(w) == 2)]
+        if sp: return sp[0]["actors"][0]
     if ql.startswith("who ") and len(w) >= 2:                                           # who VERBED [Y]?  who VERBED ... first/last?
         verb = w[1]; rest = " ".join(w[2:])
         if w[1] in ("was", "were") and len(w) > 2 and w[2].endswith("ing"): verb = w[2]; rest = " ".join(w[3:])
@@ -246,9 +264,12 @@ def _ask(log, q):
         actor, verb, tail = split(ql[10:])
         if actor:
             if verb == "start": return log.first_place.get(actor) or log.first_place.get(ent(actor))
-            ev = [e for e in find(verb=verb, actor=actor) if e.get("place")]
-            if not ev: ev = [e for e in find(verb=verb) if e.get("place")]
-            return ev[0]["place"][1] if ev else None
+            ev = [e for e in find(verb=verb, actor=actor) if e.get("phrases") or e["obj"] or e.get("place")]
+            if not ev: ev = [e for e in find(verb=verb) if e.get("phrases") or e["obj"] or e.get("place")]
+            if not ev: return None
+            e = ev[0]
+            if e.get("phrases"): return e["phrases"][0][1]
+            return e["obj"] if e["obj"] and e["obj"] in NOUNISH | {x for x in [e["obj"]]} and e["verb"] in ("reached", "reach", "entered", "left", "crossed") else (e["place"][1] if e.get("place") else e["obj"])
     if ql.startswith("which way did "):
         actor, verb, tail = split(ql[14:])
         if actor:
