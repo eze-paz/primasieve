@@ -1,5 +1,5 @@
 """R21: the exact reader as a LEARNED reader. Training pairs from the generator's exact events: for each sentence of a
-story, prompt = the previous sentence (context for pronouns) + the sentence; answer = its event lines
+story, prompt = the story so far (context for pronouns) + the sentence; answer = its event lines
 'agent | verb | patient | place | recipient' ('-' for an empty slot; 'none' when the sentence has no event).
 Run: python learned/base/r21_data.py  -> r21_train.json (finetune.py --data r21_train.json), r21_heldout.json (100 fresh stories)"""
 import os, sys, json, random, subprocess
@@ -12,7 +12,7 @@ def pairs(story):
     for k, sent in enumerate(sents):
         evs = [e for e in story["events"] if e[0] == k]
         ans = "; ".join(f"{a} | {v} | {p or '-'} | {place or '-'} | {rec or '-'}" for (_, a, v, p, place, rec) in evs) or "none"
-        prev = sents[k - 1] if k else "(start)"
+        prev = " ".join(sents[:k]) if k else "(start)"                      # run 2: the whole story so far (pronouns can reach back two sentences)
         out.append(dict(prompt=f"Text: {prev}\nSentence: {sent}\nEvents:", answer=ans, sent=sent, prev=prev, events=evs))
     return out
 

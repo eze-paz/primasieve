@@ -29,3 +29,5 @@ a guessed lemma or dropped; the induced table has no binding for them anyway. Wo
 templates ("Jane met him by the river") may yield wrong agents. A miss on R21-b with a pass on R21-a means the
 generator's language is too narrow, not that the learned reader is wrong — the next step is then widening the
 generator's sentence forms (paraphrase skeletons), not hand rules.
+
+**Run 1 (context = previous sentence only), stopped at step 630 (loss 0.000 on its own data) after an interim preview of the step-500 checkpoint:** R21-a 30/50 = 0.60 on 10 held-out stories -- every miss is a pronoun whose antecedent sits TWO sentences back ('When he came back, Melissa was waiting at the door' -> the model invents a training name); R21-b learned reader -> induced world on val_timespace 20 matched, 14 right (0.70). A one-sentence context cannot resolve those pronouns, so run 1 was stopped before its registered end (disclosed; the interim numbers above are NOT a gate result). **Run 2 (registered now): context = the whole story so far**, same model, data, budget and gates.
