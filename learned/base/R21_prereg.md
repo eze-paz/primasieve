@@ -31,3 +31,5 @@ generator's language is too narrow, not that the learned reader is wrong — the
 generator's sentence forms (paraphrase skeletons), not hand rules.
 
 **Run 1 (context = previous sentence only), stopped at step 630 (loss 0.000 on its own data) after an interim preview of the step-500 checkpoint:** R21-a 30/50 = 0.60 on 10 held-out stories -- every miss is a pronoun whose antecedent sits TWO sentences back ('When he came back, Melissa was waiting at the door' -> the model invents a training name); R21-b learned reader -> induced world on val_timespace 20 matched, 14 right (0.70). A one-sentence context cannot resolve those pronouns, so run 1 was stopped before its registered end (disclosed; the interim numbers above are NOT a gate result). **Run 2 (registered now): context = the whole story so far**, same model, data, budget and gates.
+
+**Run 2 SUSPENDED by the owner (2026-10-10) to start R24 (the next-word game through the epistemic layers). Stopped at the step shown in train_r21b.out; the step-500 checkpoint ckpt_r21b_s500.pth is kept and can be evaluated with r21_reader.py --ckpt ckpt_r21b_s500.pth when the queue allows. Not a gate result.**
