@@ -17,7 +17,7 @@ RANKINGS = ("recency", "subject_place", "any_place")
 
 class PlaceState(T.State):
     def __init__(self):
-        super().__init__(); self.place_of = {}; self.first_place_of = {}; self.any_place = []; self.subject = None
+        super().__init__(); self.place_of = {}; self.first_place_of = {}; self.any_place = []; self.subject = None; self.obj = None
 
     def ranking(self, name):
         if name == "subject_place": return [self.place_of[self.subject]] if self.subject in self.place_of else []
@@ -27,13 +27,15 @@ class PlaceState(T.State):
     def saw_place(self, key):
         if self.subject:
             self.place_of[self.subject] = key; self.first_place_of.setdefault(self.subject, key)
+        if getattr(self, "obj", None) and self.obj != key:                                  # "took the basket to the library": the thing moved too
+            self.place_of[self.obj] = key; self.first_place_of.setdefault(self.obj, key)
         if key in self.any_place: self.any_place.remove(key)
         self.any_place.insert(0, key)
 
 
 class PlaceLM(K.ChunkLM):
     def __init__(self, *a, **k):
-        super().__init__(*a, **k); self.mix = collections.Counter(); self.prank = {r: collections.Counter() for r in RANKINGS}; self.use_place = True
+        super().__init__(*a, **k); self.mix = collections.Counter(); self.mix_ctx = collections.defaultdict(collections.Counter); self.prank = {r: collections.Counter() for r in RANKINGS}; self.prank_ctx = collections.defaultdict(collections.Counter); self.use_place = True
 
     def learn_place(self, stories, names):
         """count, at ENT slots after a place word, which ranking has the filler at rank 0 and at which rank"""
@@ -42,41 +44,49 @@ class PlaceLM(K.ChunkLM):
             for s in T.SENT.split(text):
                 toks = T.TOK.findall(s)
                 if not toks: continue
-                items = T.slotify(toks, names); st.subject = None
+                items = T.slotify(toks, names); st.subject = None; st.obj = None
                 for k, (sym, filler) in enumerate(items):
-                    if sym == "PERSON" and st.subject is None and k <= 1: st.subject = filler[0]
-                    if sym == "PRON" and st.subject is None and k == 0 and st.persons: st.subject = st.persons[0]   # the learner's own resolver: most recent
+                    if sym == "PERSON": st.subject = filler[0]                                        # run 2b: the place belongs to the reference mentioned most recently before it
+                    if sym == "PRON" and filler[0] in ("he", "she", "him", "his", "her") and st.persons: st.subject = st.persons[0]   # the learner's own resolver
+                    if sym == "PRON" and filler[0] in ("it", "them") and st.ents: st.obj = st.ents[0]
                     if sym == "ENT":
                         key = T.key_of(sym, filler)
+                        if not (k and items[k - 1][0] in PLACE_WORDS): st.obj = key
                         if k and items[k - 1][0] in PLACE_WORDS:
+                            ctx = tuple(x for x, _ in items[max(0, k - 2):k])            # the two symbols before the slot: the construction context
                             for r in RANKINGS:
                                 lst = st.ranking(r)
-                                if key in lst: self.prank[r][lst.index(key)] += 1; self.mix[r] += (lst.index(key) == 0)
-                                else: self.prank[r]["none"] += 1
+                                if key in lst: self.prank[r][lst.index(key)] += 1; self.prank_ctx[(ctx, r)][lst.index(key)] += 1; self.mix[r] += (lst.index(key) == 0); self.mix_ctx[ctx][r] += (lst.index(key) == 0)
+                                else: self.prank[r]["none"] += 1; self.prank_ctx[(ctx, r)]["none"] += 1
                             st.saw_place(key)
                     if sym in ("PERSON", "ENT"): st.mention(sym, filler, first=(k == 0))
 
-    def p_place_filler(self, key, st):
-        z = sum(self.mix.values()) + 3.0; p = 0.0
+    def p_place_filler(self, key, st, ctx=None):
+        mix = self.mix_ctx[ctx] if ctx in self.mix_ctx and sum(self.mix_ctx[ctx].values()) >= 5 else self.mix   # context weights, global back-off
+        z = sum(mix.values()) + float(len(RANKINGS)); p = 0.0
         for r in RANKINGS:
-            w = (self.mix[r] + 1.0) / z; c = self.prank[r]; R = sum(c.values()); lst = st.ranking(r)
+            w = (mix[r] + 1.0) / z; lst = st.ranking(r)
+            c = self.prank_ctx[(ctx, r)] if sum(self.prank_ctx[(ctx, r)].values()) >= 5 else self.prank[r]; R = sum(c.values())   # rank statistics per context too
             if key in lst: p += w * (c[lst.index(key)] + 0.5) / (R + 0.5 * T.K)
             else: p += w * (c["none"] + 0.5) / (R + 0.5 * T.K) / max(1, len(st.ents))
         return p
 
     def score(self, toks, names, st):
-        items = self.symbols(T.slotify(toks, names)); syms = [sym for sym, _ in items]
-        seg, lp = self.segment(syms); bits = -lp / math.log(2); full = all(len(ch) >= 2 for ch in seg); st.subject = None
+        raw = T.slotify(toks, names); items = self.symbols(raw); syms = [sym for sym, _ in items]
+        seg, lp = self.segment(syms); bits = -lp / math.log(2); full = all(len(ch) >= 2 for ch in seg); st.subject = None; st.obj = None
         self.in_chunks += sum(len(ch) for ch in seg if len(ch) >= 2); self.n_syms += len(syms)
         for k, (sym, filler) in enumerate(items):
             pos = "first" if k == 0 else "later"
-            if sym == "PERSON" and st.subject is None and k <= 1: st.subject = filler[0]
-            if sym == "PRON" and st.subject is None and k == 0 and st.persons: st.subject = st.persons[0]
+            if sym == "PERSON": st.subject = filler[0]
+            if sym == "PRON" and filler[0] in ("he", "she", "him", "his", "her") and st.persons: st.subject = st.persons[0]
+            if sym == "PRON" and filler[0] in ("it", "them") and st.ents: st.obj = st.ents[0]
+            if sym == "ENT" and not (k and raw[k - 1][0] in PLACE_WORDS): st.obj = T.key_of(sym, filler)
             if sym in ("PERSON", "ENT", "PRON") or sym.startswith("C"):
-                after_place = sym == "ENT" and k and items[k - 1][0] in PLACE_WORDS
+                after_place = sym == "ENT" and k and raw[k - 1][0] in PLACE_WORDS
                 if after_place and self.use_place:
                     key = T.key_of(sym, filler); new0, new1 = self.new[(sym, pos)]; p_new = (new0 + 1) / (new1 + 2)
-                    pf = (1 - p_new) * self.p_place_filler(key, st) if key in st.ents else self.p_filler(sym, filler, st, pos)
+                    ctx = tuple(x for x, _ in raw[max(0, k - 2):k])
+                    pf = (1 - p_new) * self.p_place_filler(key, st, ctx) if key in st.ents else self.p_filler(sym, filler, st, pos)
                 else: pf = self.p_filler(sym, filler, st, pos)
                 pfl = 1.0
                 for w in filler: pfl *= self.p_floor(w)

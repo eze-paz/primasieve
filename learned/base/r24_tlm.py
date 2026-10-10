@@ -21,14 +21,21 @@ def arg(name, default):
     return type(default)(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default
 
 
+COMMON = set()
+
+
 def mid_caps(stories):
-    """words seen capitalised NOT at a sentence start -> names (surface cue, no lexicon)"""
-    caps = collections.Counter()
+    """words seen capitalised NOT at a sentence start -> names (surface cue, no lexicon); also records the common
+    lower-case vocabulary so that an UNKNOWN capitalised word at a sentence start counts as a name too"""
+    caps = collections.Counter(); low = collections.Counter()
     for text in stories:
         for s in SENT.split(text):
             t = TOK.findall(s)
             for w in t[1:]:
                 if w[0].isupper() and w.lower() not in PRON: caps[w] += 1
+            for w in t:
+                if w.islower(): low[w] += 1
+    COMMON.clear(); COMMON.update(w for w, c in low.items() if c >= 3)
     return {w for w, c in caps.items() if c >= 2}
 
 
@@ -37,7 +44,7 @@ def slotify(tokens, names):
     out = []; i = 0
     while i < len(tokens):
         w = tokens[i]; wl = w.lower()
-        if wl not in PRON and (w in names or (w[0].isupper() and i > 0)): out.append(("PERSON", [w])); i += 1; continue
+        if wl not in PRON and (w in names or (w[0].isupper() and (i > 0 or (wl not in COMMON and len(w) > 2)))): out.append(("PERSON", [w])); i += 1; continue
         if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
