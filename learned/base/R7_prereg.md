@@ -25,3 +25,5 @@ Prediction: zero-shot 1.5B B6 ~85, mismatch ~0 (confabulates like the 0.4 B base
 after the fine-tune R7a 60-70, R7b/d pass, R7c the hardest. If R7a still misses at 1.5 B, binding inside a window is
 not solved by scale at this range and the search unit should become the sentence pair with the entity resolved
 (coreference) before the engine reads it.
+
+Kept checkpoints (2026-10-10, disk at 4 GB free before the 1.5B run): ckpt_read1b.pth (R1b), ckpt_read3b.pth (R3b final, R4 input), ckpt_read3b_s200.pth (R3c init), ckpt_read3c_s300.pth (R3c selected), ckpt_read5_s400.pth (R5 selected). All other 0.4B interim checkpoints deleted; every one is reproducible from its prereg's command and seed; the cut model from ckpt_read3b_cut_neurons.json.
