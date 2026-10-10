@@ -1,7 +1,5 @@
 {
- "reach": "actor_to_dest",
- "return": "holder_recipient",
  "find": "holder_recipient",
- "borrow": "holder_actor",
- "take": "thing_at_release"
+ "reach": "actor_to_dest",
+ "take": "thing_to_dest_hold"
 }

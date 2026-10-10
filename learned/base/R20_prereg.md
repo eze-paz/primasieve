@@ -86,3 +86,11 @@ recipient) alongside the text, so the teaching signal is exact; the induction bi
 validation keeps the reader at read time, since that is the real condition. If the induced table then matches the
 hand-written state on validation, the state layer is emergent and the reader is the only hand-written piece left,
 which is R17's job.
+
+**Clean-teaching joint search (same day):** teaching only from stories the reader reads cleanly leaves 409 of 1,200
+stories and 5 shapes. 'take' now binds to the right operator (thing to destination, held: 80 of 80 reproduced in its
+shape; 124 of 124 with 'tell'), which confirms the reader-noise diagnosis for that verb; but the dirty stories were
+exactly the shapes with the movement verbs (walk, carry, run, arrive), so fewer verbs bind (3) and the induced state
+stays at 12 / 30. Conclusion, settled: the hand reader's events on the generated movement sentences are the
+bottleneck. R20c: the generator emits exact per-sentence events with the text; induction teaches on those; validation
+keeps the reader at read time.
