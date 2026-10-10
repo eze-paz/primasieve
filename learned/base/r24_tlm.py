@@ -160,7 +160,8 @@ def ngram_bits(train, held, order):
     for text in held:
         prev = "<s>"
         for w in [x.lower() for x in TOK.findall(text)]:
-            p = (uni[w] + 0.1) / (N + 0.1 * V) if order == 1 else (bi[(prev, w)] + 0.1) / (ctx[prev] + 0.1 * V)
+            pu = (uni[w] + 0.1) / (N + 0.1 * V)
+            p = pu if order == 1 else 0.7 * (bi[(prev, w)] + 0.1) / (ctx[prev] + 0.1 * V) + 0.3 * pu      # interpolated bigram: a real shortcut
             bits += -math.log2(p); n += 1; prev = w
     return bits / n
 

@@ -64,3 +64,20 @@ Run 1b (two rankings, per-position weights): bits 3.38, coverage 0.94, pronoun 6
 Run 1c (r24_em.py): the generative story made explicit -- pick a referent by rank, then its FORM (name or pronoun) given the rank, then the pronoun word given the referent; the pronoun's referent is latent and inferred by expectation-maximisation (6 iterations, uniform start over the 4 most recent persons). Learned with no labels: P(pronoun | rank 0) = 0.54, P(pronoun | rank 1) = 0.02, ~0 beyond. **R24-b PASS: 182 / 185 = 0.98** on held-out pronoun subjects against the generator's gold agents (used only to score). The learner found the most-recent rule by itself; a per-name gender signal did not separate cleanly (titles like Mr/Mrs are caught as names by the capitalisation cue).
 
 **R24 verdict on generator text: R24-a PASS (3.38 bits vs bigram 4.57, coverage 0.94), R24-b PASS (0.98).** Run 2 (books) registered next; predicted: templates over exact words will not cover book sentences, and the bigram shortcut will win until templates range over induced word classes.
+
+## Run 2 registration (books, 2026-10-10)
+
+Data: the L1 training books (learned/data.py books(), never the 41 held-out books) as paragraphs; a paragraph is the state's unit. Training: the first 150,000 sentences in book order; held-out: 5,000 sentences from the held-out books. Same learner (templates over exact words, PERSON/PRON/ENT slots, recency state, EM pronoun resolver), same baselines.
+
+Gates: R24-a2 bits per token <= bigram + 0.5 and template coverage >= 0.30; R24-b2 (no gold on books): the EM resolver must again put P(pronoun | rank) on rank 0 (>= 0.4) with the other ranks below 0.1 -- i.e. the most-recent rule re-emerges from real prose. **Prediction: R24-a2 MISS** (coverage near 0.05, bits well above the bigram: book sentences do not repeat as word-templates), R24-b2 PASS. The miss is the measurement that motivates run 2b: templates over induced word classes.
+
+## Run 2 result (books, 150,000 training sentences from 38,510 paragraphs; 5,003 held-out sentences from held-out books)
+
+| measure | result | bar |
+|---|---|---|
+| bits per token, word-template learner | 15.61 | <= bigram + 0.5 |
+| bits per token, unigram / add-0.1 bigram | 9.99 / 10.39 | |
+| template coverage of held-out sentences | 419 / 5,003 = 0.084 | >= 0.30 |
+| P(pronoun / rank) at the first slot | rank 0: 0.64, rank 1: 0.34, rank 2: 0.08, rank 3: 0.02 | rank 0 >= 0.4, others < 0.1 |
+
+**R24-a2 MISS as predicted** (word templates do not repeat in prose; the 2,841 templates are mostly 'PERSON .' fragments from dialogue tags). **R24-b2 MISS on the letter of the bar**: the most-recent rule re-emerges as the main one (0.64) but prose also refers to the second most recent person a third of the time (two-person dialogue), which the generator never did; ranks beyond that stay near zero. Note: the add-0.1 bigram is a weak shortcut on 50k word types (worse than the unigram); the baseline is replaced by an interpolated bigram (0.7 bigram + 0.3 unigram) from run 2b on, so the learner is measured against a real shortcut.
