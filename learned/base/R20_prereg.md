@@ -54,3 +54,15 @@ validation. The hand-written state (R19b) remains the engine's state layer until
 **Third run:** support >= 10 and >= 90% of ALL state questions in the verb's stories: **0 verbs bound** (a verb's binding can only answer the questions its own effect decides; the 90%-of-everything rule was mis-specified). Fourth run: elimination proper -- an operator that loses any case 'none' reproduces is out; the best consistent operator wins with support >= 10 gained cases; up to 80 teaching stories per verb.
 
 **Fourth run:** elimination by no-regression, support >= 10, 80 stories per verb, holder+place questions: **the same 7 verbs, the same table, 11 / 30 at 0.64** -- the added questions did not separate 'take' from 'leave' and did not unbind the two reader artefacts. R20-a MISS, R20-b MISS after four runs. Open diagnosis (not resolved today): which cases the artefact bindings gain from, and why the place question after 'take' does not favour the holding operator -- likely the reader's event for 'He took it to X' (pronoun agent and patient) is not the event the simulation assumes. The hand-written state (R19b) stays the engine's layer; R20 continues with per-verb case inspection, registered as its next step.
+
+**Fifth run (traced):** the same 7 verbs, the same 11 / 30. The trace shows why, and it is the project's own Stage 3b
+lesson: for 'walk', 'carry' and 'give' every operator scores the same because the state questions that would tell them
+apart depend on OTHER verbs being bound too ('steal' matters only once 'drop' releases; 'walk ... to X' only decides a
+place question when the later 'went to the well' and 'returned' are bound), and a per-verb elimination from an empty
+table never gets its first foothold -- "coordinate descent strands on interacting dimensions" (`core/search.py`).
+'take' binds to release rather than hold by 190 to 185 because the cases mix 'took it to X' (hold) with 'took the X
+back' (hold, but then an unbound 'row home' decides the end state). Next design, registered, not run today: induce the
+bindings of the verbs that co-occur in one skeleton JOINTLY (an exhaustive search over the 8^k assignments of a
+skeleton's k state verbs, k <= 4, scored by the skeleton's own questions -- the mechanism of `core/search.exhaustive`),
+then merge the per-skeleton tables where they agree and leave the rest unbound. The hand-written state remains the
+engine's layer until the induced one reaches it. R20 as run: four MISSES on R20-a/b, each with its cause written down.
