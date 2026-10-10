@@ -117,25 +117,32 @@ def main():
     for pas in range(3 if all_verbs else 0):
         changed = 0
         for v in all_verbs:
-            uses = [s for s in teach if v in verbs_of[key(s)]][:40]
+            uses = [s for s in teach if v in verbs_of[key(s)]][:80]
             if not uses: continue
-            scores = {}
+            scores = {}; regress = {}
+            base_per = {}
+            t0 = dict(table); t0[v] = "none"
+            for s in uses: base_per[key(s)] = reproduced(t0, s)[0]
             for op in OPS:
                 t2 = dict(table); t2[v] = op
-                okk = tot = 0
+                okk = tot = lost = 0
                 for s in uses:
-                    o, t = reproduced(t2, s); okk += o; tot += t
-                scores[op] = okk
+                    o, t = reproduced(t2, s); okk += o; tot += t; lost += max(0, base_per[key(s)] - o)
+                scores[op] = okk; regress[op] = lost
             base = scores["none"]; best = max(scores, key=lambda o: scores[o])
             # elimination: the operators that reproduce the most cases survive; among survivors, ties go to the SIMPLEST
             # operator (fewest state effects), the project's standing rule (core/search: ties -> simplest); no survivor
             # beats "none" -> the verb stays unbound
             SIMPLE = {"none": 0, "actor_at": 1, "actor_to_dest": 1, "holder_actor": 1, "holder_recipient": 1, "thing_at_release": 2, "thing_to_dest_hold": 3, "thing_at_hold": 3}
-            top = sorted([o for o in OPS if scores[o] == scores[best]], key=lambda o: SIMPLE[o])
-            # third run: a binding needs SUPPORT (>= 10 cases it reproduces beyond "none") and must reproduce >= 90% of the
-            # cases it touches; otherwise the verb stays unbound (the reader's noise is not learned as a rule)
+            # fourth run: ELIMINATION proper -- an operator that breaks any case "none" reproduces is out (regressions is the
+            # per-operator count of cases lost against "none"); among the rest the one with the most gained cases wins,
+            # ties to the simplest; a binding needs SUPPORT of >= 10 gained cases. The 90%-of-all-questions rule of the third
+            # run was wrong: a verb's binding can only fix the questions its own effect answers.
+            consistent = [o for o in OPS if regress[o] == 0]
+            best = max(consistent, key=lambda o: scores[o]) if consistent else "none"
+            top = sorted([o for o in consistent if scores[o] == scores[best]], key=lambda o: SIMPLE[o])
             support = scores[best] - base
-            new = top[0] if scores[best] > base and support >= 10 and scores[best] >= 0.9 * tot else "none"
+            new = top[0] if scores[best] > base and support >= 10 else "none"
             if table.get(v, "none") != new: changed += 1; table[v] = new
         print(f"pass {pas + 1}: bound {sum(1 for v, o in table.items() if o != 'none')} verbs, changed {changed}", flush=True)
         if not changed: break

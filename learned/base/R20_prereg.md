@@ -50,3 +50,5 @@ plus a question that asks about the actor's own place -- the cases must discrimi
 minimum support of 10 agreeing cases before a verb is bound, and a verb bound only if its binding reproduces >= 90% of
 its cases (the reader's noise then stays unbound rather than wrongly bound). Both are mechanical and run on the same
 validation. The hand-written state (R19b) remains the engine's state layer until the induced one matches it.
+
+**Third run:** support >= 10 and >= 90% of ALL state questions in the verb's stories: **0 verbs bound** (a verb's binding can only answer the questions its own effect decides; the 90%-of-everything rule was mis-specified). Fourth run: elimination proper -- an operator that loses any case 'none' reproduces is out; the best consistent operator wins with support >= 10 gained cases; up to 80 teaching stories per verb.
