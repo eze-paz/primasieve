@@ -80,9 +80,16 @@ class Log:
         sents = [x.strip() for x in T.SENT.split(text) if x.strip()]
         for si, sent in enumerate(sents):
             quote = None
-            mq = re.match(r'^["“](.+?)[,.!?]?["”]\s*(?:(said|asked|cried|replied|shouted|whispered|answered)\s+(\w+)|(\w+)\s+(said|asked|cried|replied|shouted|whispered|answered))', sent)
+            mq = re.match(r'^["“](.+?)[,.!?]?["”]\s*(?:(said|asked|cried|replied|shouted|whispered|answered)\s+((?:the |a )?\w+)|((?:the |a )?\w+)\s+(said|asked|cried|replied|shouted|whispered|answered))', sent)
             if mq:
                 speaker = mq.group(3) or mq.group(4); quote = mq.group(1)
+                if speaker.lower() in ("he", "she"): speaker = self.persons[0] if self.persons else speaker
+                if speaker.split()[0].lower() in T.DET: speaker = T.key_of("ENT", speaker.lower().split())
+                for sym_q, filler_q in T.slotify(T.TOK.findall(quote), self.names):                   # things named inside the quote are things of the story
+                    if sym_q == "ENT":
+                        kq = T.key_of(sym_q, filler_q)
+                        if kq in self.things: self.things.remove(kq)
+                        self.things.insert(0, kq)
                 self.events.append(dict(actors=[speaker], verb="said", obj=quote.lower(), rec=None, place=None, si=si, dir=None, because=None, order=None, words=set(sent.lower().split()), quote=quote.lower()))
                 if speaker[:1].isupper():
                     if speaker in self.persons: self.persons.remove(speaker)
@@ -218,7 +225,7 @@ def _ask(log, q):
             if obj and not (e["obj"] and (ent(obj) == e["obj"] or ent(obj).split()[-1] == e["obj"].split()[-1])): continue
             if actor and not any(a.lower() == actor.lower() or a.lower() == ent(actor).lower() for a in e["actors"]): continue
             out.append(e)
-        if not out and verb and not loose: return find(verb, obj, actor, loose=True)       # class-based verb similarity only when nothing matches by stem
+        if not out and verb and not loose and not any(same_verb(e["verb"], verb) for e in log.events): return find(verb, obj, actor, loose=True)   # class-based verb similarity only when NO event has the verb
         return sorted(out, key=lambda e: -len(qwords & e["words"]))                      # the event whose sentence shares most words with the question
     if ql.startswith("what did ") and len(w) >= 4:                                       # what did X VERB [Y]?
         actor, verb, tail = split(ql[9:])
