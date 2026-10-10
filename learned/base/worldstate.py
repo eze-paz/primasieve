@@ -12,7 +12,7 @@ from b6_rwkv import hit
 SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 MOVE = {"walk", "go", "row", "ride", "run", "come", "return", "reach", "arrive", "travel", "sail", "climb", "hurry", "race"}
 CARRY = {"take", "carry", "bring", "lead"}
-PLACE_P = r"(to|into|at|in|on|by|near|behind|under|across|toward|towards|from)"
+PLACE_P = r"(?:(?:down|up|back|away|over) )?(to|into|at|in|on|by|near|behind|under|across|toward|towards|from)"   # R19b: "set it down at the fork"
 STOPW = r"(?:and|together|then|while|because|there|without|first|second|last|to|at|in|on|by|near|the|a|an|his|her|their|morning|evening|afternoon|noon|night|dawn|spring|summer|autumn|winter)\b"
 NP = rf"((?:the |a |an |his |her |their |its )?(?!{STOPW})[a-z][\w'-]*(?: (?!{STOPW})[a-z][\w'-]*)?)"
 TIME_MARK = re.compile(r"\b(in the morning|at noon|in the evening|at night|at dawn|the next morning)\b", re.I)
@@ -48,9 +48,20 @@ class World:
             try: evs = [e for e in self.R.read(s) if e.get("agent") and e.get("verb")]
             except Exception: evs = []
             places = [(mm.group(1).lower(), mm.group(2)) for mm in re.finditer(rf"\b{PLACE_P} {NP}", sl)]
+            # R19b: a copular state "the key was on the hook" / "X is at Y" fixes X's location (no event from the reader)
+            mc = re.match(rf"(?:in the \w+ |at \w+ |later |then )?((?:the |a |his |her |their )?[a-z][\w'-]*(?: [a-z][\w'-]*)?) (?:was|were|is|are) {PLACE_P} {NP}", sl)
+            if mc and not evs: self._set_loc(self._ent(mc.group(1)), mc.group(3))
+            # R19b: a pronoun object is the last thing handled
+            self.last_thing = getattr(self, "last_thing", None)
             for e in evs:
                 a = self._ent(e["agent"]) if e["agent"].lower() not in PRON else (self.last_agent or self._ent(e["agent"]))
+                a = re.sub(r"^(?:noon|morning|evening|afternoon|night|dawn|later|then|summer|winter|spring|autumn|return) ", "", a)      # R19b: "noon rosa" -> rosa
+                known_places = {w for tl in self.loc.values() for _, w in tl} | {np for _, np in places} | {self._ent(np) for _, np in places}
+                if (a in known_places or a.endswith("ing") or a.startswith("end of") or a in ("fork", "island", "cave", "finding")) and self.last_agent:
+                    a = self.last_agent                                                                                              # R19b: a place is not an actor
                 v = e["verb"]; p = self._ent(e.get("patient") or "")
+                if p in ("it", "them") or p.startswith("it "): p = self.last_thing or p                      # R19b: "dropped it" -> the last thing handled
+                if p and p not in PRON and v not in MOVE and v not in ("be",): self.last_thing = p
                 self.last_agent = a; self.events.append((self.t, a, v, p, s))
                 dest = next((np for prep, np in places if prep in ("to", "into", "toward", "towards")), None)
                 at = next((np for prep, np in places if prep in ("at", "in", "on", "by", "near", "behind", "under")), None)
@@ -136,11 +147,13 @@ class World:
                     mm = re.search(r"\b(left|right|north|south|east|west|up|down)\b", s.lower())
                     if mm: return mm.group(1)
             return None
-        m = re.match(r"where did (.+?) (find|leave|drop|put|set|hang) (.+)$", ql)
+        m = re.match(r"where did (.+?) (find|leave|drop|put|set|hang|lose) (.+)$", ql)
         if m:
             who = ent(m.group(1)); thing = ent(m.group(3))
+            syn = {"leave": ("leave", "set", "put", "place", "lay", "drop", "hang"), "drop": ("drop", "leave", "lose"), "find": ("find", "discover", "see"),
+                   "put": ("put", "set", "place", "lay", "hang"), "set": ("set", "put", "place", "lay"), "hang": ("hang", "put", "set"), "lose": ("lose", "drop")}
             for t, a, v, p, s in self.events:
-                if a == who and v.startswith(m.group(2)[:4]):
+                if a == who and v in syn.get(m.group(2), (m.group(2),)) and (not p or thing in p or p in thing or thing.split()[-1] == p.split()[-1]):
                     at = [x for x in self.loc.get(thing, []) if x[0] == t]
                     if at: return at[0][1]
                     mm = re.search(rf"\b{PLACE_P} {NP}", s.lower())
