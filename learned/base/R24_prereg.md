@@ -85,3 +85,14 @@ Gates: R24-a2 bits per token <= bigram + 0.5 and template coverage >= 0.30; R24-
 ## Run 2b result (books, templates over 200 induced word classes, 100 most frequent words frozen as literals)
 
 Classes came out sensible with no labels (one holds said/made/found/left/heard/seen/done/felt; others hold objects, substances, abstract nouns). But whole-sentence class templates still cover **440 / 5,003 = 0.088** of held-out sentences and cost **15.57 bits** per token against the interpolated bigram's **9.41**: R24-a2 MISS again. The unit is wrong, not the classes: a 15-symbol sentence over 300 symbols is still unique. Prose is built from short reusable PHRASES, not reusable sentences. Run 2c (registered now): the template inventory becomes an inventory of CHUNKS, 2-6 symbols over classes / frozen words / slots, learned by count and pruned to at most 5,000 by description-length gain; a sentence is explained as a segmentation into chunks (best segmentation by dynamic programming, re-estimated for 3 rounds); a symbol no chunk covers costs the floor. Bits are computed from the best segmentation (a lower bound on the true mixture, so slightly pessimistic). Gates for 2c: bits <= bigram + 0.5 (9.91); coverage = sentences fully explained by chunks of length >= 2 >= 0.30. Disclosure: a chunk inventory with a size cap is close kin to a class n-gram; what keeps it on this side of the line is the cap (a few thousand constructions, inspectable) and the slots that connect chunks to the state.
+
+## Run 2c result (books, chunk inventory over classes, cap 5,000)
+
+| measure | result | bar |
+|---|---|---|
+| bits per token, chunk learner | **9.52** | <= interpolated bigram + 0.5 (9.91) |
+| bits per token, interpolated bigram | 9.41 | |
+| held-out sentences fully explained by chunks of length >= 2 | 750 / 5,003 = 0.150 | >= 0.30 |
+| chunks in use / singleton share after 3 rounds | 4,755 / 0.42 | reported |
+
+**R24-a2 PASS on bits, coverage MISS.** With a capped inventory of a few thousand constructions and no word-pair memory, the learner predicts real prose within 0.11 bits of the word-pair shortcut. But the inventory it chose is shallow: the most used chunks are two symbols long and punctuation-bound ('PERSON .', 'ENT .', ', and', 'PRON was'), 42% of symbols are explained singly at the floor, and only 15% of sentences are built entirely from constructions. Two causes are visible: (1) the capitalisation cue takes 'I' (and 'You', 'We' at sentence starts) as a PERSON, which floods the PERSON slot on first-person prose -- fixed for run 2d by treating I/you/we/me/my/your/us as pronoun forms (a closed-class cue, disclosed); (2) pruning by count x (length - 1) favours frequent short chunks. Run 2d: the pronoun fix, and chunks scored by description-length GAIN (count x length minus the chunk's own cost) so longer constructions survive; coverage also reported as the share of TOKENS inside multi-symbol chunks.

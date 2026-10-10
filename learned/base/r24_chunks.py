@@ -24,7 +24,7 @@ class ChunkLM(C.ClassTLM):
         for text in stories:
             for s in T.SENT.split(text):
                 toks = T.TOK.findall(s)
-                if toks: out.append(self.symbols(T.slotify(toks, names)))
+                if toks: out.append([sym for sym, _ in self.symbols(T.slotify(toks, names))])
         return out
 
     def segment(self, syms):
@@ -32,13 +32,13 @@ class ChunkLM(C.ClassTLM):
         n = len(syms); best = [0.0] + [-1e18] * n; back = [0] * (n + 1)
         for j in range(1, n + 1):
             for L in range(1, min(MAXLEN, j) + 1):
-                ch = syms[j - L:j]
+                ch = tuple(syms[j - L:j])
                 lp = self.lp_chunk(ch)
                 if lp is None: continue
                 v = best[j - L] + lp
                 if v > best[j]: best[j] = v; back[j] = L
         out = []; j = n
-        while j > 0: out.append(syms[j - back[j]:j]); j -= back[j]
+        while j > 0: out.append(tuple(syms[j - back[j]:j])); j -= back[j]
         return out[::-1], best[n]
 
     def lp_chunk(self, ch):
