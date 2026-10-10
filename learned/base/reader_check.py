@@ -16,15 +16,39 @@ D = battery.door(); R = D.events.reader
 SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 
 
+AUXQ = ("was", "were", "is", "are", "did", "had", "has", "do", "does")
+V2 = "--v2" in sys.argv                       # R10: matcher v2 (developed on the validation set)
+
+
 def parse_q(q):
     """-> (asked_role, verb_surface, other_text) for 'Who V X?' and 'What did A V?' shapes; None otherwise"""
     m = re.match(r"Who (\w+) (.+)\?$", q)
-    if m and m.group(1).lower() not in ("was", "were", "is", "are", "did", "had", "has"): return ("agent", m.group(1), m.group(2))
-    m = re.match(r"What did (.+?) (\w+)\?$", q)
+    if m and m.group(1).lower() not in AUXQ: return ("agent", m.group(1), m.group(2))
+    m = re.match(r"What did (.+?) (\w+)(?: (?:to )?\w+)?\?$", q)          # v2: "What did Tomasz leave Rafal?" / "What did A refuse to do?"
     if m: return ("patient", m.group(2), m.group(1))
     m = re.match(r"Who (was|were) (.+)\?$", q)
     if m: return ("agent", None, m.group(2))
+    if V2:
+        m = re.match(r"What (\w+) (.+)\?$", q)                             # v2: "What broke the fence?" asks for the agent
+        if m and m.group(1).lower() not in AUXQ and m.group(1) != "was": return ("agent", m.group(1), m.group(2))
+        m = re.match(r"Who (\w+) (\w+) (.+)\?$", q)                         # v2: "Who pulled him out?" -> verb + rest (pronoun object dropped)
+        if m and m.group(1).lower() not in AUXQ: return ("agent", m.group(1), m.group(3))
     return None
+
+
+def resolve_names(evs):
+    """v2: 'a boy named Erlend' / 'A fisherman called Sven' -> the reader gives a 'name'/'call' event; substitute the name
+    for that description in the other events' agents"""
+    alias = {}
+    for e in evs:
+        if e.get("verb") in ("name", "call") and e.get("patient") and e["patient"][:1].isupper(): alias[norm(e["agent"])] = e["patient"]
+    out = []
+    for e in evs:
+        e = dict(e)
+        if norm(e.get("agent", "")) in alias and e.get("verb") not in ("name", "call"): e["agent"] = alias[norm(e["agent"])]
+        if e.get("patient"): e["patient"] = re.sub(r"^(him|her|them|it|me|us) ", "", e["patient"])   # 'gave him a pot of honey'
+        out.append(e)
+    return out
 
 
 SEQUENTIAL = "--sequential" in sys.argv       # read each hit window's sentences in order so the reader resolves "He rowed it" from the sentence before
@@ -48,13 +72,16 @@ def match(a, b):
 
 def check(item):
     p = parse_q(item["q"]); hits = hits_of(item["prompt"]); evs = events_in(hits)
+    if V2: evs = resolve_names(evs)
     if p is None or not evs: return None, None
     role, verb, other = p; other_role = "patient" if role == "agent" else "agent"
-    cands = []
+    cands = []; verb_only = []
     for e in evs:
         v_ok = verb is None or e.get("verb", "") and (R.verbs.get(verb.lower()) == e["verb"] or verb.lower().startswith(e["verb"][:4]))
         o_ok = match(other, e[other_role]) or any(w in norm(e[other_role]).split() for w in norm(other).split() if len(w) > 3)
         if v_ok and o_ok: cands.append(e[role])
+        elif v_ok and verb is not None: verb_only.append(e[role])
+    if not cands and V2 and len(set(norm(c) for c in verb_only)) == 1: cands = verb_only[:1]   # v2: the verb occurs in exactly one event among the hits
     if not cands: return None, None
     committed = item["reply"] if any(match(item["reply"], c) for c in cands) else "unknown"
     return committed, cands[0]
