@@ -1,0 +1,69 @@
+"""R20 joint search: the state verbs that co-occur in one story shape are bound TOGETHER by an exhaustive search over
+their operator assignments (8^k, k <= 4), scored by that shape's own state questions -- the mechanism of
+core/search.exhaustive, which Stage 3b needed for the same reason (interacting dimensions strand coordinate descent).
+Shapes are the teaching stories grouped by their set of reader verbs that any operator could act on; each shape's best
+assignment (ties -> simplest) proposes bindings; a verb is bound when every shape that proposes it agrees.
+Run: python learned/base/r20_joint.py  -> learned/base/r20_joint_table.json, validation on val_timespace.json"""
+import os, sys, re, json, random, itertools, collections
+HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(ROOT); sys.path.insert(0, ROOT); sys.path.insert(0, HERE)
+import r20_induce as RI
+from b6_rwkv import hit
+
+OPS = RI.OPS; SIMPLE = {"none": 0, "actor_at": 1, "actor_to_dest": 1, "holder_actor": 1, "holder_recipient": 1, "thing_at_release": 2, "thing_to_dest_hold": 3, "thing_at_hold": 3}
+STATIC = {"have", "own", "keep", "be", "say", "look", "hear", "search", "make", "ask", "promise", "want", "learn", "wait", "laugh", "sing", "sit", "see", "think", "name", "call", "praise", "shake", "agree", "beg", "pay", "sell", "buy", "plant", "water", "fill", "write", "read", "eat", "share", "challenge", "race", "stop", "help", "trip", "lie", "sleep", "hang", "open"}
+
+
+def main():
+    import battery
+    R = battery.door().events.reader
+    stories = json.load(open(os.path.join(HERE, "stories_train_v2.json"), encoding="utf-8")); random.Random(5).shuffle(stories)
+    teach = [s for s in stories if any(RI.state_q(q) for q, g in s["qs"])][:1200]
+    cache_of = {}; verbs_of = {}
+    for s in teach:
+        R.last_agent = None; R.last_patient = None; c = []
+        for sent in [x.strip() for x in RI.SENT.split(s["text"]) if x.strip()]:
+            try: c.append((sent, [e for e in R.read(sent) if e.get("agent") and e.get("verb")]))
+            except Exception: c.append((sent, []))
+        cache_of[id(s)] = c; verbs_of[id(s)] = tuple(sorted({e["verb"] for _, evs in c for e in evs if e["verb"] not in STATIC}))
+    groups = collections.defaultdict(list)
+    for s in teach: groups[verbs_of[id(s)]].append(s)
+    groups = {k: v for k, v in groups.items() if 1 <= len(k) <= 4 and len(v) >= 5}
+    print(f"teaching {len(teach)} stories; {len(groups)} shapes with 1-4 state verbs and >= 5 stories", flush=True)
+
+    def score(table, group):
+        ok = 0
+        for s in group[:20]:
+            W = RI.InducedWorld(R, table); W.read(s["text"], cache_of[id(s)])
+            for q, g in s["qs"]:
+                if RI.state_q(q):
+                    a = W.ask(q); ok += (a is not None and hit(a, g))
+        return ok
+
+    proposals = collections.defaultdict(list)
+    for verbs, group in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        best = None; best_sc = -1; best_simple = 99
+        base = score({v: "none" for v in verbs}, group)
+        for assign in itertools.product(OPS, repeat=len(verbs)):
+            table = dict(zip(verbs, assign)); sc = score(table, group); simple = sum(SIMPLE[o] for o in assign)
+            if sc > best_sc or (sc == best_sc and simple < best_simple): best, best_sc, best_simple = table, sc, simple
+        total = sum(1 for s in group[:20] for q, g in s["qs"] if RI.state_q(q))
+        print(f"  shape {verbs} ({len(group)} stories): base {base} -> best {best_sc} of {total}: {best}", flush=True)
+        if best_sc > base:
+            for v, o in best.items():
+                if o != "none": proposals[v].append(o)
+    table = {v: ops[0] for v, ops in proposals.items() if len(set(ops)) == 1}
+    conflicts = {v: ops for v, ops in proposals.items() if len(set(ops)) > 1}
+    print("induced (joint) table:", table); print("conflicts left unbound:", conflicts)
+    json.dump(table, open(os.path.join(HERE, "r20_joint_table.json"), "w"), indent=1)
+    val = json.load(open(os.path.join(HERE, "val_timespace.json"), encoding="utf-8"))["stories"]; matched = right = n = 0
+    for s in val:
+        W = RI.InducedWorld(R, table); W.read(s["text"])
+        for q, gold in s["qs"]:
+            n += 1; a = W.ask(q)
+            if a is not None: matched += 1; right += hit(a, gold)
+    print(f"R20-b (joint): induced world alone on val_timespace: matched {matched}/{n}, right {right} (precision {right / max(1, matched):.2f}); bar >= 18 at >= 0.90 (hand rules 20 at 0.95)")
+    print(f"R20-a (joint): bound verbs {len(table)} (bar >= 15)")
+
+
+if __name__ == "__main__":
+    main()
