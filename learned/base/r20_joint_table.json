@@ -1,5 +1,3 @@
 {
- "find": "holder_recipient",
- "reach": "actor_to_dest",
  "take": "thing_to_dest_hold"
 }

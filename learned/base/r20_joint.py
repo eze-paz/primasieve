@@ -47,8 +47,8 @@ def main():
         before = len(teach); teach = [s for s in teach if clean(s)]; print(f"clean filter: {before} -> {len(teach)} stories", flush=True)
     groups = collections.defaultdict(list)
     for s in teach: groups[verbs_of[id(s)]].append(s)
-    groups = {k: v for k, v in groups.items() if 1 <= len(k) <= 4 and len(v) >= 5}
-    print(f"teaching {len(teach)} stories; {len(groups)} shapes with 1-4 state verbs and >= 5 stories", flush=True)
+    groups = {k: v for k, v in groups.items() if 1 <= len(k) <= 7 and len(v) >= 5}
+    print(f"teaching {len(teach)} stories; {len(groups)} shapes with 1-7 state verbs and >= 5 stories", flush=True)
 
     def score(table, group):
         ok = 0
@@ -63,7 +63,15 @@ def main():
     for verbs, group in sorted(groups.items(), key=lambda kv: -len(kv[1])):
         best = None; best_sc = -1; best_simple = 99
         base = score({v: "none" for v in verbs}, group)
-        for assign in itertools.product(OPS, repeat=len(verbs)):
+        # shapes with more than 4 state verbs: prune each verb to its 3 best operators by single-verb score (others at none),
+        # then search the product exhaustively (3^7 = 2,187 assignments at most)
+        cand = {v: list(OPS) for v in verbs}
+        if len(verbs) > 4:
+            for v in verbs:
+                single = {op: score({**{w: "none" for w in verbs}, v: op}, group) for op in OPS}
+                cand[v] = sorted(OPS, key=lambda op: (-single[op], SIMPLE[op]))[:3]
+                if "none" not in cand[v]: cand[v][-1] = "none"
+        for assign in itertools.product(*[cand[v] for v in verbs]):
             table = dict(zip(verbs, assign)); sc = score(table, group); simple = sum(SIMPLE[o] for o in assign)
             if sc > best_sc or (sc == best_sc and simple < best_simple): best, best_sc, best_simple = table, sc, simple
         total = sum(1 for s in group[:20] for q, g in s["qs"] if RI.state_q(q))

@@ -94,3 +94,5 @@ exactly the shapes with the movement verbs (walk, carry, run, arrive), so fewer 
 stays at 12 / 30. Conclusion, settled: the hand reader's events on the generated movement sentences are the
 bottleneck. R20c: the generator emits exact per-sentence events with the text; induction teaches on those; validation
 keeps the reader at read time.
+
+**R20c, first run (exact events for three skeletons; 1,500 of 8,000 stories carry them):** only one shape passed the k <= 4 filter -- 'borrow, come, take' -- and on exact events it bound 'take' to the right operator with **120 of 120** questions reproduced (the reader-taught runs had bound it to release). The two new skeletons carry 5-7 state verbs each and were excluded by the cap; the search now admits up to 7 verbs with per-verb pruning to the 3 best operators (3^7 assignments). Validation unchanged (10 / 30) with one verb bound.
