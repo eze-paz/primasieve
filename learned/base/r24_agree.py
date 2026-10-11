@@ -67,7 +67,8 @@ def main():
 
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
-        if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword", "exact-r", "noword-r"): b = None
+        dissent = None
+        if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword", "exact-r", "noword-r"): dissent = b; b = None   # R24-ao: a coarse reading is too weak to answer but still counts against a lone cue answer
         if "--type-check" in ARGV:
             if a is not None and not type_ok(q, a): a = None
             if b is not None and not type_ok(q, b): b = None
@@ -86,7 +87,9 @@ def main():
         if ROUTES2:                                                                     # R24-x: no hand routing flags; every single-reader case is a route, admission decides per kind
             if a is not None and b is not None and same(a, b): return a, "agree"
             if b is not None and a is None: return b, "learned-alone-" + ("shape" if R.LAST.get("shape") else (QR.LASTQ.get("level") if LEARNED_Q else "x"))
-            if a is not None and b is None: return a, "cue-alone-" + ("strict" if conf else "loose")
+            if a is not None and b is None:
+                if "--no-loose" in ARGV and (not conf or (dissent is not None and not same(a, dissent))): return None, "silent"   # R24-ao: the hand cue reader alone answers only when its confidence flag is set and no learned reading dissents
+                return a, "cue-alone-" + ("strict" if conf else "loose")
             if a is not None and b is not None: return (b, "disagree-shape") if R.LAST.get("shape") else (None, "disagree")
             return None, "silent"
         if q.lower().split()[0] == "when": return (b, "learned-when") if b is not None else (None, "silent")       # R24-p2: 'when' is the learned reader's span
