@@ -5,7 +5,7 @@ constructions sharing a verb. A question becomes a canonical construction with o
 from the story sentence with the same verb, by the learned alignment. No role names, no sentence shapes by hand.
 Run: python learned/base/r24_reader.py [--show]"""
 import os, sys, re, json, random, collections, math
-SHOW = "--show" in sys.argv
+SHOW = "--show" in sys.argv; ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E
 from b6_rwkv import hit
@@ -366,7 +366,9 @@ def main():
     names = T.mid_caps([s["text"] for s in data[:7000]])
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
-    train = [(s["text"], [a for a in (canonical(q, g) for q, g in s["qs"]) if a] + [event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
+    EVENTS_ONLY = "--events-only" in ARGV                                                 # R24-u: no regex-rendered statements, the story's own events teach
+    train = [(s["text"], ([] if EVENTS_ONLY else [a for a in (canonical(q, g) for q, g in s["qs"]) if a]) + [event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
+    if EVENTS_ONLY: train = [t for t in train if t[1]]
     seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
