@@ -117,3 +117,6 @@ R25-o reproduced R25-k exactly (holdout 22 / 3): with the dictionary on, 'was' i
 
 ## R25-o2 result (negative)
 With the state role firing: practice 55 / 14 (+13), holdout 23 / 6 (+5) against R25-k 22 / 3 (+13). A last-mention place is often not where the thing is ('Rosa took the key to the garden. She dropped it near the well.'): states need the learned world layers (moves, holders), not a shortcut. The state role stays off.
+
+## R25-c2 registration (do the learner's groups keep improving across runs?)
+r25_classes.py is run again; it starts from its own saved groups (r25_classes.json, 9.1301 bits) rather than the k-means start. Passes if held-out book bits fall further.
