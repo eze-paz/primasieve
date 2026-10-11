@@ -90,8 +90,28 @@ class Chunks:
         return None
 
 
+def abstract(sym):
+    return "V" if sym.startswith("V:") else ("REF" if sym in ("PERSON", "ENT", "PRON") else sym)
+
+
+def features(syms, k, verb, chunks):
+    """several views of one slot; the reader learns which views predict (run 10): exact shape, the local window, the
+    relation to the shared verb, the learned chunk"""
+    vi = next((i for i, x in enumerate(syms) if x == "V:" + verb), None)
+    rel = ("none", 0) if vi is None else (("before" if k < vi else "after"), min(3, sum(1 for t in range(min(k, vi) + 1, max(k, vi)) if syms[t] in ("PERSON", "ENT"))))
+    g = lambda t: abstract(syms[t]) if 0 <= t < len(syms) else "#"
+    out = {"shape": (syms, k), "win1": (g(k - 1), g(k + 1)), "win2": (g(k - 2), g(k - 1), g(k + 1), g(k + 2)), "rel": (abstract(syms[k]), rel[0], rel[1], g(k - 1))}
+    if chunks: out["chunk"] = chunks.feat(syms, k)
+    return out
+
+
+FEATS = ("shape", "win2", "win1", "rel", "chunk")
+
+
 class Reader:
-    def __init__(self, chunks=None): self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
+    def __init__(self, chunks=None):
+        self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
+        self.tab = {f: collections.Counter() for f in FEATS}; self.tot = {f: collections.Counter() for f in FEATS}; self.w = collections.Counter()
 
     def learn(self, stories, names):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
@@ -108,6 +128,18 @@ class Reader:
                             if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower()):
                                 self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1; self.feat[(feat(ss, i, v), feat(cs, j, v))] += 1
                                 if self.chunks: self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, j))] += 1
+                                fs = features(ss, i, v, self.chunks); fc = features(cs, j, v, self.chunks)
+                                for f in FEATS:
+                                    if f in fs: self.tab[f][(fs[f], fc[f])] += 1
+                    # the feature weights: which view would have picked the right story slot for each canonical slot (counted on the same pass, one story behind)
+                    for j in cj:
+                        gold_i = [i for i in si if sf[i] and cf[j] and sf[i].lower() == cf[j].lower()]
+                        if not gold_i: continue
+                        fc = features(cs, j, v, self.chunks)
+                        for f in FEATS:
+                            if f not in fc: continue
+                            best = max(si, key=lambda i: self.tab[f][(features(ss, i, v, self.chunks)[f], fc[f])])
+                            self.w[f] += (best in gold_i) and self.tab[f][(features(ss, best, v, self.chunks)[f], fc[f])] > 1
 
     def fill(self, story_sents, names, cs, missing):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
@@ -116,13 +148,13 @@ class Reader:
             if not cv & set(verbs_of(ss)): continue
             si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k]]
             if not si: continue
-            scored = []; v = (cv & set(verbs_of(ss))).pop()
+            scored = []; v = (cv & set(verbs_of(ss))).pop(); fc = features(cs, missing, v, self.chunks); z = sum(self.w.values()) + len(FEATS)
             for i in si:
-                c = self.align[(ss, cs, i, missing)]
-                if c == 0: c = 0.1 * self.align[(ss, None, i, missing)]
-                if c == 0 and self.chunks: c = 0.05 * self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, missing))]   # learned phrase chunks: the reader's own units generalise across shapes
-                if c == 0: c = 0.03 * self.feat[(feat(ss, i, v), feat(cs, missing, v))]          # surface features generalise across sentence shapes
-                if c == 0 and ss[i] == cs[missing]: c = 0.01 * self.prior[(i, missing)]        # the index prior only within the same slot kind
+                fs = features(ss, i, v, self.chunks); c = 0.0
+                for f in FEATS:                                                        # a learned mixture over the views, each view's vote normalised
+                    if f not in fs: continue
+                    n = self.tab[f][(fs[f], fc[f])]
+                    if n: c += (self.w[f] + 1.0) / z * n / (n + 2.0)
                 scored.append((c, i))
             c, i = max(scored)
             if best is None or c > best[0]: best = (c, sf[i])
@@ -164,7 +196,7 @@ def main():
     seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
-    R = Reader(CH); R.learn(train, names); print(f"alignment table: {len(R.align)} entries; chunk-feature table {len(R.cfeat)}", flush=True)
+    R = Reader(CH); R.learn(train, names); print(f"alignment table: {len(R.align)} entries; learned view weights {dict(R.w)}", flush=True)
     ok = tot = 0
     for s in data[7000:]:
         for q, g in s["qs"]:
