@@ -274,3 +274,8 @@ One more cycle on all text from the 525 saved groups (2 exchange passes, 150 spl
 
 ## R25-ab registration (trust chosen on 1,110 practice questions)
 Practice sets C and D (200 each; separate writers barred from the tests folder and b6_ files; verified: every gold form in its story; C and D share only ordinary capitalised words). Practice becomes 1,110 (old 110, val_more, A, B, C, D); val_fresh2 stays the untouched judge (total only). The model runs once on all 1,310. The R25-x configuration runs once; trust is chosen on the 1,110 (r25_trust.py --big). Passes if untouched fitness beats +28. B6 once.
+
+## R25-ab result (negative)
+Model on 1,310: 877 (C+D 267/400). Trust chosen on 1,110 practice: kept more routes (only those under 0.75 practice precision drop under the -3 weight); practice 338 / 36 (+230); untouched 53 / 13, +14 < +28. More practice did not keep helping past 710.
+
+**Selection caution (stated):** val_fresh2's total has now been the gate in about 14 registrations (R25-p to R25-ab). Picking the best of many results on the same 200 questions makes the best (+28, R25-x) optimistic. A fourth hand-written set, val_fresh3 (200), is commissioned; the best configuration (R25-x: vectors from 13M tokens, role thresholds 0.8 / 0.5, trust chosen on the 710) will be scored on it exactly once, with B6 once. That number is the day's reportable result.
