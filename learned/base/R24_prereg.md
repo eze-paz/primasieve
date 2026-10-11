@@ -257,3 +257,5 @@ R24-k2 result: validation **34 / 80 matched, 33 right (0.97)**; B6 once: the rea
 R24-l runs 1-3 (span slots WHEN / WHY in the learned reader): the first two runs formed no spans ('morning' read as a verb; day names read as names); run 3: held-out by kind who 1,151 / 1,765, what 265 / 429, where 471 / 553, **when 59 / 120, why 15 / 50** (from 0), all 0.67; validation 37 / 80 matched, 29 right (0.78).
 
 R24-l agreement check: validation 34 / 80 matched, 33 right (0.97) unchanged; B6 once 79 (readers spoke on 36, right 31). The frozen test keeps the two-reader policy at 79-80: its four or five test errors sit on question shapes the 80 validation questions do not contain, so they cannot be fixed without reading the test, which is not allowed.
+
+R24-l run 4 (trailing time phrases are WHEN spans; a when / why question takes only when / why spans): held-out by kind who 1,151 / 1,765, what 265 / 429, where 468 / 553, **when 85 / 120**, why 15 / 50; all 0.68; **validation 37 / 80 matched, 30 right (0.81)**.
