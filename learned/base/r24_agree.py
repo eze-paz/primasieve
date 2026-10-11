@@ -57,6 +57,8 @@ def main():
             except Exception: c = None
             if c is not None and a is not None and same(a, c): return a, "state-agree"
             if c is not None and b is not None and same(b, c): return b, "state-agree"
+            if "--state-alone" in ARGV and c is not None:                              # R24-aj: the learned world layer speaks on its own; admission decides whether it is trusted
+                return c, ("state-alone" if (a is None and b is None) else "state-vs-reader")
         if ROUTES2:                                                                     # R24-x: no hand routing flags; every single-reader case is a route, admission decides per kind
             if a is not None and b is not None and same(a, b): return a, "agree"
             if b is not None and a is None: return b, "learned-alone-" + ("shape" if R.LAST.get("shape") else (QR.LASTQ.get("level") if LEARNED_Q else "x"))
