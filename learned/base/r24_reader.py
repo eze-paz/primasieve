@@ -207,7 +207,8 @@ class Reader:
             for a in answers:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
                 c_order = next((f for x, f in zip(cs, cf) if x == "ORDER"), None)
-                def carries(ss, sf): return (set(verbs_of(ss)) & set(cv)) and (not c_order or any(x == "ORDER" and f == c_order for x, f in zip(ss, sf)))
+                def carries(ss, sf):                                                  # the shared verb's own clause must carry the order word
+                    return any(ss[i] == "V:" + v and (not c_order or any(ss[k] == "ORDER" and sf[k] == c_order for k in range(*clause_of(ss, i)))) for v in cv for i in range(len(ss)))
                 if cv and not any(carries(ss, sf) for ss, sf in sents):
                     known = {f.lower() for f in cf if f}
                     scored = [(len(known & {f.lower() for f in t[1] if f}), -i, t) for i, t in enumerate(sents) if verbs_of(t[0])]
@@ -244,9 +245,9 @@ class Reader:
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
         cv = set(verbs_of(cs)); best = None
         order0 = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
-        def carries(ss, sf): return (cv & set(verbs_of(ss))) and (not order0 or any(x == "ORDER" and f == order0 for x, f in zip(ss, sf)))
+        def carries(ss, sf): return any(ss[i] == "V:" + v and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for v in cv for i in range(len(ss)))
         if cv and not any(carries(ss, sf) for ss, sf in story_sents):                  # learned paraphrase: 'own' -> 'have', 'arrive last' -> 'come last'
-            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(sv in verbs_of(ss) and (not order0 or any(x == "ORDER" and f == order0 for x, f in zip(ss, sf))) for ss, sf in story_sents)]
+            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(ss[i] == "V:" + sv and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for ss, sf in story_sents for i in range(len(ss)))]
             if alts: cs = tuple(("V:" + alts[0]) if x == "V:" + v0 else x for x in cs); cv = set(verbs_of(cs))
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
         for ss, sf in story_sents:
