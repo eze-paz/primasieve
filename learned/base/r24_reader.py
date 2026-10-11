@@ -69,6 +69,17 @@ def construction(sent, names):
 def verbs_of(syms): return [s[2:] for s in syms if s.startswith("V:")]
 
 
+def clause_of(syms, vi):
+    """the clause holding the verb at vi: bounded by ', and' / ', but' / 'because' / 'while' / 'when' / 'and' between two verbs"""
+    cuts = set()
+    for t in range(len(syms)):
+        if syms[t] in ("because", "while", "when", "but", "so"): cuts.add(t)
+        if syms[t] == "," and t + 1 < len(syms) and syms[t + 1] in ("and", "but", "so", "while"): cuts.add(t)
+        if syms[t] == "and" and any(x.startswith("V:") for x in syms[:t]) and any(x.startswith("V:") for x in syms[t + 1:]) and not (t >= 1 and syms[t - 1] in ("PERSON", "ENT") and t + 1 < len(syms) and syms[t + 1] in ("PERSON", "ENT")): cuts.add(t)
+    lo = max([c for c in cuts if c < vi], default=-1) + 1; hi = min([c for c in cuts if c > vi], default=len(syms))
+    return lo, hi
+
+
 def feat(syms, k, verb):
     """a slot's surface features: its kind, whether it sits before or after the shared verb, and the symbol before it"""
     vi = next((i for i, s in enumerate(syms) if s == "V:" + verb), None)
@@ -161,9 +172,13 @@ class Reader:
         cv = set(verbs_of(cs)); best = None
         for ss, sf in story_sents:
             if not cv & set(verbs_of(ss)): continue
-            si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k]]
+            v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
+            si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and lo <= k < hi]
+            if not any(k < vi for k in si) and lo > 0:                                 # a clause without its own subject shares the previous clause's subject
+                pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
+                si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
             if not si: continue
-            scored = []; v = (cv & set(verbs_of(ss))).pop(); fc = features(cs, missing, v, self.chunks); z = sum(self.w.values()) + len(FEATS)
+            scored = []; fc = features(cs, missing, v, self.chunks); z = sum(self.w.values()) + len(FEATS)
             for i in si:
                 fs = features(ss, i, v, self.chunks); c = 0.0
                 for f in FEATS:                                                        # a learned mixture over the views, each view's vote normalised
