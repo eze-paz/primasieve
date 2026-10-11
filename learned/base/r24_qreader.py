@@ -59,6 +59,9 @@ class QReader:
             for k, x in enumerate(cs):
                 if k == miss: tmpl.append("MISSING:" + x)
                 elif x in ("PERSON", "ENT") and cf[k] in qslots: tmpl.append(f"Q{qslots.index(cf[k])}")
+                elif x in ("PERSON", "ENT", "PRON", "WHEN", "WHY", "COMP"):                  # a slot the question never mentions: dropped, with its preposition
+                    if tmpl and tmpl[-1] in R.PLACE_WORDS | {"to", "for", "with"}: tmpl.pop()
+                    continue
                 elif x.startswith("V:"): tmpl.append(f"V{[v for v in qs if v.startswith('V:')].index(x) if x in qs else 0}")
                 elif x in qwords: tmpl.append(f"W{qwords.index(x)}")
                 else: tmpl.append(x)

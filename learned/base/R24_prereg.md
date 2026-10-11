@@ -343,3 +343,5 @@ R24-t note: question paraphrases cannot be taught through the regex teacher (it 
 R24-t run 1 (13,195 of 59,120 questions paraphrased; regex teacher): the regexes render none of the new wordings, so the teacher shrinks to 12,887 pairs; validation 31 / 28 (0.90) vs regex path 58 / 49 (0.84). The event-statement teacher run follows.
 
 R24-t run 2 (event-statement teacher, regexes out): 171 question shapes from 14,991 pairs; held-out exact level 1,088 / 1,487 = 0.73 -- below admission, so validation 0 answered. Cause: an event statement carries slots the question never mentions (the place, the recipient), and those stay in the template as empty slots that the sentence reader then fills at random. Run 3: a template keeps only the question's slots and the missing one (an unmentioned slot and its preposition are dropped).
+
+R24-t run 3 (unmentioned slots dropped): exact level 1,081 / 1,488 = 0.73 unchanged, nothing admitted. Being traced: the templates the event teacher yields against the regex ask forms for the same questions.
