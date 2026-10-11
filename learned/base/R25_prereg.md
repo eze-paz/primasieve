@@ -157,3 +157,6 @@ Learner alone: val_fresh2 98 spoke / 69 right / 29 wrong (0.70); val_more 81 / 6
 
 ## R25-c7 registration
 Next cycle from the 299 saved groups (2 exchange passes, 120 split tries). Passes if held-out bits fall below 9.0931.
+
+## R25-p result (clean checkpoint)
+Learner alone on the untouched set val_fresh2 (200): this morning's configuration R24-ap2 64 spoke / **46 right / 18 wrong** (0.72); today's R25-l 98 / **69 right / 29 wrong** (0.70). On val_more: 53 / 45 / 8 -> 81 / 67 / 14. Today's gains hold on text nothing was tuned on: +23 right (+50%), +11 wrong, precision about equal. Errors on the untouched set by route (aggregate only): learned-alone-exact 6, cue-alone-loose+soft 5, agree 4, cue-alone-strict 3, soft-alone 3, learned-alone-exact-r 3, state-agree 1, role-alone 1 -- mostly the older routes and the similarity confirmation of unconfident cue answers, not the role reader. Model alone on val_fresh2: 125/200. R24-ap2 did not pass the validation precision gate on 510, so its B6 did not run; R25-l B6 78.
