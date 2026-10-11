@@ -23,7 +23,7 @@ def arg(name, default):
 
 COMMON = set()
 SPAN_STOP = set(); SPAN_KEEP = set()           # SPAN_KEEP: learned noun-like words that may end in -ed ('seed', 'bed')                                 # verb-like words (filled by the caller from the induced classes): 'a wolf saw' is not one thing
-NOT_NAME = {"then", "right", "after", "before", "when", "while", "one", "later", "meanwhile", "there", "here", "now", "so", "but", "and", "everyone", "someone", "no"}
+NOT_NAME = {"then", "right", "after", "before", "when", "while", "one", "later", "meanwhile", "there", "here", "now", "so", "soon", "but", "and", "everyone", "someone", "no", "without", "as", "that", "every", "once"}
 
 
 def mid_caps(stories):

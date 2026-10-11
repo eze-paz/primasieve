@@ -30,6 +30,18 @@ def canonical(q, gold):
     if m and m.group(2) != "start":
         gp = g.split(" ", 1)[1] if g.split()[0] in PLACE_WORDS else g
         return f"{m.group(1).capitalize()} {E.lemma(m.group(2))} {m.group(3)} at {thing(gp)}."      # one place form for every preposition: the shape matches the question's
+    m = re.match(r"when did (.+)$", ql)
+    if m:
+        ws = q[9:].rstrip("?").split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x.lower())), None)
+        if vi:
+            gw = g if g.split()[0] in ("on", "in", "at", "when", "after", "before", "the", "every", "one", "that") else "on " + g
+            return f"{gw[0].upper()}{gw[1:]}, {ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {' '.join(ws[vi + 1:])}.".replace("  ", " ").replace(" .", ".")
+    m = re.match(r"why did (.+)$", ql)
+    if m:
+        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        if vi:
+            ws = q[8:].rstrip("?").split(); why = g if g.split()[0] in ("to",) else "because " + g
+            return f"{ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {' '.join(ws[vi + 1:])} {why}.".replace("  ", " ")
     return None
 
 
@@ -38,6 +50,7 @@ LEMMAS = set()
 
 def is_verb(w):
     if not LEMMAS: LEMMAS.update(E.IRREG.values()); LEMMAS.update(E.lemma(x) for x in E.VERBISH)      # the stems of the learned verb lexicon
+    if w in E.TIMEISH or w in E.NOUNISH: return False                                  # 'morning', 'evening' are not verbs
     return E.verbish(w) or w in LEMMAS
 
 
@@ -55,7 +68,17 @@ def event_statement(ev):
 def construction(sent, names):
     """(symbols, fillers): slot symbols keep their filler; a verb word is kept as its lemma (verbs matched across forms)"""
     sent = sent.replace("Dr.", "Dr").replace("Mr.", "Mr").replace("Mrs.", "Mrs")
+    why = None
+    if " because " in sent.lower():
+        head, why = re.split(r" because ", sent, maxsplit=1, flags=re.I); sent = head + "."; why = why.rstrip(".!?").lower()
     items = T.slotify(T.TOK.findall(sent), names); syms = []; fillers = []
+    xs = [x for x, _ in items]
+    if "," in xs[:8]:
+        j = xs.index(","); opening = " ".join(f[0] if x not in ("PERSON", "ENT") else " ".join(f) for x, f in items[:j]).lower(); words = opening.split()
+        timeish = any(w in E.TIMEISH or w.endswith("day") or w in ("noon", "dawn", "dusk", "midnight", "summer", "winter", "spring", "autumn", "week", "year", "month", "later", "ago") for w in words)
+        starter = xs[0] in ("on", "in", "at", "when", "while", "after", "before", "one", "every", "that", "the", "soon", "later", "by", "during", "without", "as")
+        if j <= 7 and (starter or timeish) and not (xs[0] == "PERSON" and not timeish):
+            syms.append("WHEN"); fillers.append(opening); items = items[j + 1:]
     for k, (sym, filler) in enumerate(items):
         if sym == "ENT" and filler[-1] in E.TIMEISH: syms.append("TIME"); fillers.append(None)                 # 'every morning' is when, not what
         elif sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
@@ -63,6 +86,12 @@ def construction(sent, names):
         elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
+    if why is None:                                                                      # 'opened its mouth to answer': a purpose phrase is a why
+        for k in range(1, len(syms) - 1):
+            if syms[k] == "to" and syms[k + 1].startswith("V:") and syms[k - 1] in ("ENT", "PERSON", "PRON"):
+                end = next((t for t in range(k + 1, len(syms)) if syms[t] in ("and", ",", ".")), len(syms))
+                why = "to " + " ".join((syms[t][2:] if syms[t].startswith("V:") else (fillers[t] or syms[t])) for t in range(k + 1, end)); break
+    if why: syms.append("WHY"); fillers.append(why)
     return tuple(syms), fillers
 
 
@@ -151,10 +180,10 @@ class Reader:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
                 for ss, sf in sents:
                     if not set(verbs_of(ss)) & set(cv): continue
-                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT")]; v = (set(verbs_of(ss)) & set(cv)).pop()
+                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY")]; v = (set(verbs_of(ss)) & set(cv)).pop()
                     for i in si:
                         for j in cj:
-                            if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower()):
+                            if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower() or (ss[i] in ("WHEN", "WHY") and (cf[j].lower() in sf[i].lower() or sf[i].lower() in cf[j].lower()))):
                                 self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1; self.feat[(feat(ss, i, v), feat(cs, j, v))] += 1
                                 if self.chunks: self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, j))] += 1
                                 fs = features(ss, i, v, self.chunks); fc = features(cs, j, v, self.chunks)
@@ -177,10 +206,10 @@ class Reader:
         for ss, sf in story_sents:
             if not cv & set(verbs_of(ss)): continue
             v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
-            si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and lo <= k < hi]
+            si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and (lo <= k < hi or s in ("WHEN", "WHY"))]
             if not any(k < vi for k in si) and lo > 0:                                 # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
-                si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
+                si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and k < pv] + si
             if not si: continue
             fc = features(cs, missing, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
             score = {i: 0.0 for i in si}
@@ -216,6 +245,20 @@ def ask(R, text, names, q):
         else:
             cs, cf = construction(f"{head} {E.lemma(ws[vi])} {tail} the thing.".replace("  ", " "), names); j = [k for k, s in enumerate(cs) if s == "ENT"]
         return art(R.fill(sents, names, cs, j[-1])) if j else None
+    m = re.match(r"when did (.+)$", ql)
+    if m:
+        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        if not vi: return None
+        ws = q[9:].rstrip("?").split(); cs, cf = construction(f"At some time, {ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {' '.join(ws[vi + 1:])}.".replace("  ", " ").replace(" .", "."), names)
+        j = [k for k, s in enumerate(cs) if s == "WHEN"]
+        return R.fill(sents, names, cs, j[0]) if j else None
+    m = re.match(r"why did (.+)$", ql)
+    if m:
+        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        if not vi: return None
+        ws = q[8:].rstrip("?").split(); cs, cf = construction(f"{ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {' '.join(ws[vi + 1:])} because of something.".replace("  ", " "), names)
+        j = [k for k, s in enumerate(cs) if s == "WHY"]
+        return R.fill(sents, names, cs, j[0]) if j else None
     m = re.match(r"where did (.+)$", ql)
     if m:
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
@@ -238,12 +281,12 @@ def main():
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
     R = Reader(CH); R.learn(train[:6000], names, weigh=False); R.learn(train[6000:], names, weigh=True)      # reliabilities measured on stories the tables had not seen
     tabs = (R.w, R.wn); R = Reader(CH); R.w, R.wn = tabs; R.learn(train, names, weigh=False); print(f"alignment table: {len(R.align)} entries; learned view accuracy by evidence: {[(f, b, round((R.w[(f, b)] + 0.5) / (R.wn[(f, b)] + 1.0), 2)) for f in FEATS for b in range(4) if R.wn[(f, b)]]}", flush=True)
-    ok = tot = 0
+    ok = tot = 0; by = collections.defaultdict(lambda: [0, 0])
     for s in data[7000:]:
         for q, g in s["qs"]:
             if canonical(q, g) is None: continue
-            a = ask(R, s["text"], names, q); tot += 1; ok += (a is not None and hit(a, g))
-    print(f"R24-j1: held-out generator who / what / where questions by the learned alignment: {ok}/{tot} = {ok / max(1, tot):.2f} (bar >= 0.80)")
+            a = ask(R, s["text"], names, q); tot += 1; h = (a is not None and hit(a, g)); ok += h; by[q.split()[0].lower()][0] += h; by[q.split()[0].lower()][1] += 1
+    print(f"R24-j1: held-out generator who / what / where / when / why questions by the learned alignment: {ok}/{tot} = {ok / max(1, tot):.2f} (bar >= 0.80); by kind {dict((k, f'{v[0]}/{v[1]}') for k, v in by.items())}")
     matched = right = n = 0
     for f in ("val_stories.json", "val_fables.json"):
         for s in json.load(open(f, encoding="utf-8"))["stories"]:
