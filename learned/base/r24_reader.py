@@ -126,12 +126,12 @@ def features(syms, k, verb, chunks):
     vi = next((i for i, x in enumerate(syms) if x == "V:" + verb), None)
     rel = ("none", 0) if vi is None else (("before" if k < vi else "after"), min(3, sum(1 for t in range(min(k, vi) + 1, max(k, vi)) if syms[t] in ("PERSON", "ENT"))))
     g = lambda t: abstract(syms[t]) if 0 <= t < len(syms) else "#"
-    out = {"shape": (syms, k), "win1": (g(k - 1), g(k + 1)), "win2": (g(k - 2), g(k - 1), g(k + 1), g(k + 2)), "rel": (abstract(syms[k]), rel[0], rel[1], g(k - 1))}
+    out = {"shape": (syms, k), "win1": (g(k - 1), g(k + 1)), "win2": (g(k - 2), g(k - 1), g(k + 1), g(k + 2)), "rel": (abstract(syms[k]), rel[0], rel[1], g(k - 1)), "rel0": rel}   # rel0: the coarsest view, position relative to the verb only
     if chunks: out["chunk"] = chunks.feat(syms, k)
     return out
 
 
-FEATS = ("shape", "win2", "win1", "rel", "chunk")
+FEATS = ("shape", "win2", "win1", "rel", "rel0", "chunk")
 
 
 class Reader:
