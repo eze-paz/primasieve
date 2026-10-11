@@ -23,6 +23,7 @@ def main():
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
     DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV; SHAPE = "--shape-keys" in ARGV
+    kind = lambda q: q.lower().split()[0]
     import r24_qreader as QR0; QR0.ARGV = list(ARGV)                                   # R24-ag2: the flags, captured before a downstream import resets sys.argv
     PRONS = ("it", "them", "him", "her", "he", "she", "they")
     def qslots(q): qs, qf = QR0.qshape(q, names); return [f if isinstance(f, str) else " ".join(f) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f and (f if isinstance(f, str) else " ".join(f)).lower() not in PRONS]   # R24-ah2: a pronoun slot names nothing ('he' is inside 'the')
@@ -33,6 +34,26 @@ def main():
     for s in data[:7000]:
         for q, g in s["qs"]: k = qshape_nw(q); SELF_BY[k][0] += any(same(g[0], f) for f in qslots(q)); SELF_BY[k][1] += 1
     SELF_SHAPES = {k for k, (r, t) in SELF_BY.items() if t >= 20 and r / t < 0.02}
+    lnames = {n.lower() for n in names}
+    def atype(ans):                                                                      # R24-am: an answer's type: a name, or the induced word class of its head word
+        w = [x for x in T.TOK.findall(ans.lower()) if x.isalpha()]
+        if not w: return "EMPTY"
+        if w[-1] in lnames or ans.split()[-1][:1].isupper(): return "NAME"
+        return f"C{E.CLASS[w[-1]]}" if w[-1] in E.CLASS else "UNK"
+    TYPES = collections.defaultdict(collections.Counter)                                 # (question shape) -> answer types seen in the generator's gold answers
+    for s_ in data[:7000]:
+        for q, g in s_["qs"]:
+            t_ = atype(g[0]); TYPES[qshape_nw(q)][t_] += 1; TYPES[("kind", kind(q))][t_] += 1
+    ALLT = collections.Counter()
+    for k_, c_ in TYPES.items():
+        if k_[0] == "kind": ALLT.update(c_)
+    def type_ok(q, ans):
+        for key in (qshape_nw(q), ("kind", kind(q))):
+            c = TYPES.get(key)
+            if c and sum(c.values()) >= 50:
+                t_ = atype(ans); return c[t_] > 0 or ALLT[t_] < 50                       # refused only if this question never takes a type that is common elsewhere
+        return True
+    print(f"R24-am answer types learned for {sum(1 for k, c in TYPES.items() if sum(c.values()) >= 50)} question shapes / kinds", flush=True)
     print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
@@ -47,6 +68,9 @@ def main():
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
         if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword"): b = None
+        if "--type-check" in ARGV:
+            if a is not None and not type_ok(q, a): a = None
+            if b is not None and not type_ok(q, b): b = None
         if SELF_RATE < 0.02 or ("--self-shapes" in ARGV and qshape_nw(q) in SELF_SHAPES):   # R24-aa/ab: a learned fact about questions: the answer is not something the question already names
             sl = qslots(q)
             if a is not None and any(same(a, f) for f in sl): a = None
