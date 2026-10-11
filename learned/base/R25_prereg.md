@@ -235,3 +235,9 @@ Vectors from 13.0M tokens (all training paragraphs the reader keeps; 25,000 word
 
 ## R25-y registration (directional contexts)
 The learner's word profiles count left and right neighbours separately (--directional; 2,500 context words per side, 25,000 words, same 13M tokens); previous vectors kept as r25_vectors_13m.npz. Same chain as R25-x: role thresholds re-chosen on 710, policy, trust on 710. Passes if untouched fitness beats +28.
+
+## R25-c11 result (PASS)
+From 457 saved groups on 400k sentences: exchange 8.9355 -> 8.9312 -> 8.9296; 42 of 150 splits kept -> 499 groups; held-out 8.9261.
+
+## R25-c12 registration (groups on all the training text)
+From the 499 saved groups, counting all training paragraphs the reader keeps (--sents 1000000, about 13M tokens). Passes if held-out bits fall below the start-of-run value with the larger counts (reported) and below 8.9261.
