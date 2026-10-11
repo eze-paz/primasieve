@@ -217,3 +217,9 @@ Role fixes with trust chosen on 710: practice (trusted) 186 / 10 (+156) -> 209 /
 
 ## R25-w registration (the role reader's thresholds re-chosen on 710 practice questions)
 The loose role reader's verb-similarity and argument-match thresholds were chosen on 210 practice questions. The learner re-chooses them on the 710 (r25_soft.py --k --big; argument grid 0 / 0.3 / 0.5 / 0.65 / 0.8 / 1.0), the policy reads them (--role-json), and route trust is chosen on the 710 again. Base: R25-u. Passes if untouched fitness beats +24.
+
+## R25-c10 result (PASS)
+Same saved groups counted on 400,000 sentences (6.97M tokens, 31,717 words): held-out 9.0653 -> 8.9619 from the data alone; exchange 8.9429 -> 8.9370; 24 of 100 splits kept -> 456 groups; held-out 8.9355. Distinctions: england / france / europe / america vs paris / london / rome; strange / terrible / sad / dreadful vs beautiful / charming / wonderful / lovely; thoughts / ideas / feelings / hopes vs movements / songs / smiles; fat / solid / stiff / slender vs dark / cold / bright / pale / soft; always / often / usually vs really / simply / actually.
+
+## R25-c11 registration
+Next cycle on the same larger text from the 456 saved groups (2 exchange passes, 150 split tries). Passes if held-out bits fall below 8.9355.
