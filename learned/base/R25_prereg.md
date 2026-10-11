@@ -71,3 +71,11 @@ Always answering, the similarity reader's top candidate is right on 84 of 192 pr
 
 ## R25-i registration (the similarity reader as a third vote)
 In the policy (R24-ap2 configuration), routes gain a '+soft' mark when the similarity reader's top candidate matches the answer; a lone unconfident cue answer (withdrawn in R24-ao) returns as 'cue-alone-loose+soft' when the similarity reader independently picks it and no learned reading dissents; 'soft-alone' when only it speaks with MARGIN >= 0.3. Admission by the disagreement rule against the model (R24-ak/al). Gate: validation precision after admission >= 0.90; B6 once.
+
+## R25-i result (learner improves on fresh text; B6 merge falls)
+Fresh 200, learner alone: 70 spoke / 58 right (R24-ap2: 53 / 45); old 110 61 / 57. Three-way agreement 'agree+soft' 35/35; 'cue-alone-loose+soft' 14/17. Validation after admission 104/100 (0.96). **B6 once 78** (spoke 36, right 31). Same pattern as R24-ad..an: every added reader answer at ~0.85 precision replaces a B6 model answer that is usually right (model 0.80 on B6, mostly on the easy questions the readers can read).
+
+**Measure change (stated):** the owner's goal is the non-LLM learner's understanding; the battery is the instrument. From here the primary measure is the learner alone on the fresh questions (right / wrong out of 200, fitness +1 / -3 / 0 on the holdout half); B6 merged stays a secondary check run once per registration that changes the policy.
+
+## R25-j registration (the similarity reader learns what to weigh)
+The match score gains two book-learned signals: word informativeness (inverse document frequency over training-book paragraphs; a question word's weight) and proximity (cosine contributions decay with the distance between the matching sentence word and the candidate). Weights chosen by the learner on practice: IDF on/off, decay in {none, 0.8, 0.6}, LAM in {0, 0.5, 1}. Measured: top-1 right when always answering on practice and holdout, holdout fitness at the learner's chosen margin. Passes if holdout top-1 right rises above R25-h's.
