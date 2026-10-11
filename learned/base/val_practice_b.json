@@ -1,0 +1,1683 @@
+{
+ "note": "R25: practice set B, written without access to the frozen test",
+ "stories": [
+  {
+   "id": "pb1",
+   "text": "The pharmacist, Oksana, closed her shop early on Friday because her daughter Yara had a school concert. Before leaving, she asked her neighbour Tadeusz to water the plants in the window. Yara played the violin at the concert, and Oksana sat in the front row. Afterwards they bought noodles from a stall near the station.",
+   "qs": [
+    [
+     "Who was the pharmacist?",
+     [
+      "oksana"
+     ]
+    ],
+    [
+     "Why did Oksana close her shop early?",
+     [
+      "a school concert",
+      "school concert",
+      "concert"
+     ]
+    ],
+    [
+     "Who did Oksana ask to water the plants?",
+     [
+      "tadeusz",
+      "her neighbour",
+      "neighbour"
+     ]
+    ],
+    [
+     "What did Yara play at the concert?",
+     [
+      "the violin",
+      "violin"
+     ]
+    ],
+    [
+     "What did they buy from a stall?",
+     [
+      "noodles"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb2",
+   "text": "A goat and a hedgehog shared a field beside a river. One windy afternoon the goat's bell was blown into the reeds, and she could not reach it with her long legs. The hedgehog, who was small enough to crawl between the stems, fetched the bell and rolled it back to her. 'You may sleep in my shed whenever you like,' said the goat, and from that day the hedgehog slept there every night.",
+   "qs": [
+    [
+     "What was blown into the reeds?",
+     [
+      "the goat's bell",
+      "bell"
+     ]
+    ],
+    [
+     "Where was the bell blown?",
+     [
+      "into the reeds",
+      "the reeds",
+      "reeds"
+     ]
+    ],
+    [
+     "Who could not reach the bell?",
+     [
+      "the goat",
+      "goat"
+     ]
+    ],
+    [
+     "Who fetched the bell?",
+     [
+      "the hedgehog",
+      "hedgehog"
+     ]
+    ],
+    [
+     "What did the goat let the hedgehog do?",
+     [
+      "sleep in my shed",
+      "sleep"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb3",
+   "text": "At seven in the morning Rashid loaded a crate of oranges onto his van at the market. He drove the crate to a cafe on Pine Street, where the owner, Sidonie, signed for it. At ten he collected empty bottles from the same cafe and took them to the recycling depot. By lunch the van was parked again outside his flat.",
+   "qs": [
+    [
+     "What did Rashid load onto his van?",
+     [
+      "a crate of oranges",
+      "crate of oranges",
+      "oranges"
+     ]
+    ],
+    [
+     "Who signed for the crate?",
+     [
+      "sidonie",
+      "the owner"
+     ]
+    ],
+    [
+     "What did Rashid collect at ten?",
+     [
+      "empty bottles",
+      "bottles"
+     ]
+    ],
+    [
+     "Where did Rashid take the bottles?",
+     [
+      "to the recycling depot",
+      "the recycling depot",
+      "recycling depot",
+      "depot"
+     ]
+    ],
+    [
+     "Where was the van by lunch?",
+     [
+      "outside his flat",
+      "his flat",
+      "flat"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb4",
+   "text": "Nnamdi repairs bicycles in a garage behind his uncle's bakery. On Monday a girl named Yetunde brought him a bike with a bent wheel. He straightened the wheel, but the brakes were worn too, so he replaced them as well. Yetunde paid him with a loaf from the bakery and a handful of coins.",
+   "qs": [
+    [
+     "Who repairs bicycles?",
+     [
+      "nnamdi"
+     ]
+    ],
+    [
+     "Where is Nnamdi's garage?",
+     [
+      "behind his uncle's bakery",
+      "his uncle's bakery",
+      "bakery"
+     ]
+    ],
+    [
+     "Who brought Nnamdi a bike with a bent wheel?",
+     [
+      "yetunde",
+      "a girl"
+     ]
+    ],
+    [
+     "What did Nnamdi replace?",
+     [
+      "the brakes",
+      "brakes"
+     ]
+    ],
+    [
+     "When did Yetunde bring the bike?",
+     [
+      "on monday",
+      "monday"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb5",
+   "text": "A mole who could not see well opened a small shop that sold spectacles to the other animals. The owl came first and bought a pair, though she did not need them. When the badger asked her why, the owl said that the mole's shop would close if nobody bought anything. Soon the badger and the rabbits bought spectacles too, and the mole's shop stayed open all winter.",
+   "qs": [
+    [
+     "What did the mole's shop sell?",
+     [
+      "spectacles"
+     ]
+    ],
+    [
+     "Who came to the shop first?",
+     [
+      "the owl",
+      "owl"
+     ]
+    ],
+    [
+     "Who asked the owl why she bought spectacles?",
+     [
+      "the badger",
+      "badger"
+     ]
+    ],
+    [
+     "What did the owl buy?",
+     [
+      "a pair",
+      "spectacles"
+     ]
+    ],
+    [
+     "How long did the mole's shop stay open?",
+     [
+      "all winter",
+      "winter"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb6",
+   "text": "On Saturday Shirin took the early train from Leeds to visit her grandmother in York. She left her umbrella on the train, but a guard named Wilfred handed it in at the lost-property desk at York station. In the afternoon Shirin and her grandmother walked along the city walls. Before going home she picked up the umbrella from the desk.",
+   "qs": [
+    [
+     "Who did Shirin visit?",
+     [
+      "her grandmother",
+      "grandmother"
+     ]
+    ],
+    [
+     "What did Shirin and her grandmother walk along?",
+     [
+      "the city walls",
+      "city walls"
+     ]
+    ],
+    [
+     "Where did Shirin leave her umbrella?",
+     [
+      "on the train",
+      "the train",
+      "train"
+     ]
+    ],
+    [
+     "Who handed the umbrella in?",
+     [
+      "wilfred",
+      "a guard",
+      "guard"
+     ]
+    ],
+    [
+     "Where was the umbrella in the afternoon?",
+     [
+      "the lost-property desk",
+      "lost-property desk",
+      "the desk"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb7",
+   "text": "Firefighters were called to a flat on Mercer Road on Tuesday night after a pan of oil caught fire. The tenant, Tevita Fonua, had gone to answer the door while his supper was cooking. Nobody was hurt, but the kitchen was badly damaged. The fire chief, Ms Szabo, reminded residents never to leave a hot pan alone.",
+   "qs": [
+    [
+     "What caught fire?",
+     [
+      "a pan of oil",
+      "pan of oil",
+      "pan"
+     ]
+    ],
+    [
+     "Where was the flat?",
+     [
+      "on mercer road",
+      "mercer road"
+     ]
+    ],
+    [
+     "Who was the tenant?",
+     [
+      "tevita fonua",
+      "tevita",
+      "fonua"
+     ]
+    ],
+    [
+     "What was badly damaged?",
+     [
+      "the kitchen",
+      "kitchen"
+     ]
+    ],
+    [
+     "Who was the fire chief?",
+     [
+      "ms szabo",
+      "szabo"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb8",
+   "text": "A hungry crane stood on one leg at the edge of a lake and pretended to sleep. A family of frogs swam closer to look at her, but the oldest frog noticed that one of her eyes was open. 'Down, all of you!' he croaked, and the frogs dived under the lily pads. The crane went home with an empty stomach.",
+   "qs": [
+    [
+     "Who pretended to sleep?",
+     [
+      "the crane",
+      "crane"
+     ]
+    ],
+    [
+     "Who noticed the open eye?",
+     [
+      "the oldest frog",
+      "oldest frog"
+     ]
+    ],
+    [
+     "Where did the frogs dive?",
+     [
+      "under the lily pads",
+      "the lily pads",
+      "lily pads"
+     ]
+    ],
+    [
+     "What did the oldest frog do?",
+     [
+      "croaked"
+     ]
+    ],
+    [
+     "Who swam closer to look at the crane?",
+     [
+      "a family of frogs",
+      "family of frogs",
+      "frogs"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb9",
+   "text": "The school bus left the depot at half past seven with the driver, Mr Ozturk, and no passengers. It stopped first at the farm gate, where the twins Mateo and Nell climbed aboard. At the bridge it picked up four more children. By eight the bus was outside the school, and Mr Ozturk drove it back to the depot after the bell rang.",
+   "qs": [
+    [
+     "Who drove the bus?",
+     [
+      "mr ozturk",
+      "ozturk",
+      "the driver"
+     ]
+    ],
+    [
+     "Who climbed aboard at the farm gate?",
+     [
+      "mateo and nell",
+      "the twins",
+      "mateo",
+      "nell"
+     ]
+    ],
+    [
+     "How many children got on at the bridge?",
+     [
+      "four"
+     ]
+    ],
+    [
+     "Where was the bus at eight?",
+     [
+      "outside the school",
+      "the school"
+     ]
+    ],
+    [
+     "When did the bus leave the depot?",
+     [
+      "at half past seven",
+      "half past seven"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb10",
+   "text": "Zainab teaches swimming at the public pool on weekday evenings. Her youngest pupil, Ruben, was afraid of the deep end for months. One evening, while Zainab held a float for him, he let go and swam the whole length by himself. His father, who was watching from the benches, clapped so loudly that everyone turned to look.",
+   "qs": [
+    [
+     "What does Zainab teach?",
+     [
+      "swimming"
+     ]
+    ],
+    [
+     "Who was afraid of the deep end?",
+     [
+      "ruben",
+      "her youngest pupil"
+     ]
+    ],
+    [
+     "What did Zainab hold for Ruben?",
+     [
+      "a float",
+      "float"
+     ]
+    ],
+    [
+     "Who clapped loudly?",
+     [
+      "his father",
+      "father"
+     ]
+    ],
+    [
+     "Where was Ruben's father watching from?",
+     [
+      "from the benches",
+      "the benches",
+      "benches"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb11",
+   "text": "A spider spun her web across the doorway of an old barn. Every morning the farmer's broom tore it down, and every night she built it again. One morning a swallow said to her, 'Move up to the rafters, where no broom can reach.' The spider took the advice, and her new web lasted the whole summer.",
+   "qs": [
+    [
+     "Where did the spider first spin her web?",
+     [
+      "across the doorway",
+      "the doorway",
+      "doorway"
+     ]
+    ],
+    [
+     "What tore the web down?",
+     [
+      "the farmer's broom",
+      "broom"
+     ]
+    ],
+    [
+     "Who told the spider to move?",
+     [
+      "a swallow",
+      "swallow"
+     ]
+    ],
+    [
+     "Where did the spider move?",
+     [
+      "to the rafters",
+      "the rafters",
+      "rafters"
+     ]
+    ],
+    [
+     "What did the spider do every night?",
+     [
+      "built it again",
+      "built it"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb12",
+   "text": "Mina's red kite started the day in the cupboard under the stairs. After breakfast she carried it to the hill behind the church and flew it for an hour. The string snapped, and the kite landed in Mr Quintero's apple tree. He climbed a ladder at noon and brought it down, and by evening it was back in the cupboard.",
+   "qs": [
+    [
+     "Where was the kite before breakfast?",
+     [
+      "the cupboard",
+      "cupboard"
+     ]
+    ],
+    [
+     "What snapped?",
+     [
+      "the string",
+      "string"
+     ]
+    ],
+    [
+     "Where did the kite land?",
+     [
+      "mr quintero's apple tree",
+      "apple tree"
+     ]
+    ],
+    [
+     "Who brought the kite down?",
+     [
+      "mr quintero",
+      "quintero"
+     ]
+    ],
+    [
+     "When did Mr Quintero bring the kite down?",
+     [
+      "at noon",
+      "noon"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb13",
+   "text": "The village library had only one computer, and the librarian, Tamati, kept a list of who could use it each day. On Wednesday a student named Svetla needed it for an essay, but a retired sailor called Teunis had already booked the morning. Teunis offered to swap his slot, so Svetla wrote her essay before lunch and Teunis read the newspapers instead.",
+   "qs": [
+    [
+     "Who was the librarian?",
+     [
+      "tamati"
+     ]
+    ],
+    [
+     "What did Svetla need the computer for?",
+     [
+      "for an essay",
+      "an essay",
+      "essay"
+     ]
+    ],
+    [
+     "Who had booked the morning?",
+     [
+      "teunis",
+      "a retired sailor"
+     ]
+    ],
+    [
+     "What did Teunis read instead?",
+     [
+      "the newspapers",
+      "newspapers"
+     ]
+    ],
+    [
+     "When did Svetla write her essay?",
+     [
+      "before lunch"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb14",
+   "text": "A young camel complained that her hump was ugly and asked a lizard to help her hide it. The lizard found a blanket, but under it the camel grew hot and thirsty on the long walk to the oasis. When her mother explained that the hump stored food for long journeys, the camel threw away the blanket. She never complained about her hump again.",
+   "qs": [
+    [
+     "What did the young camel complain about?",
+     [
+      "her hump",
+      "hump"
+     ]
+    ],
+    [
+     "Who found a blanket?",
+     [
+      "the lizard",
+      "lizard"
+     ]
+    ],
+    [
+     "Where was the camel walking?",
+     [
+      "to the oasis",
+      "the oasis",
+      "oasis"
+     ]
+    ],
+    [
+     "Who explained what the hump was for?",
+     [
+      "her mother",
+      "mother"
+     ]
+    ],
+    [
+     "What did the camel throw away?",
+     [
+      "the blanket",
+      "blanket"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb15",
+   "text": "Early on Sunday, Murat rowed his small boat from the harbour to Gull Island to collect driftwood. The fog came in while he was on the beach, so he waited in a fisherman's hut until it cleared. He rowed back in the late afternoon with the boat full of wood. His sister Selin met him at the harbour wall with a flask of tea.",
+   "qs": [
+    [
+     "Where did Murat row to?",
+     [
+      "gull island",
+      "island"
+     ]
+    ],
+    [
+     "What did Murat go to collect?",
+     [
+      "driftwood"
+     ]
+    ],
+    [
+     "Where did Murat wait for the fog to clear?",
+     [
+      "in a fisherman's hut",
+      "a fisherman's hut",
+      "fisherman's hut",
+      "hut"
+     ]
+    ],
+    [
+     "When did Murat row back?",
+     [
+      "in the late afternoon",
+      "late afternoon",
+      "afternoon"
+     ]
+    ],
+    [
+     "Who met Murat at the harbour wall?",
+     [
+      "selin",
+      "his sister"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb16",
+   "text": "Siddharth works the night shift as a security guard at the museum. At two in the morning he heard a noise in the stone gallery and went to look with his torch. A pigeon had flown in through a broken window and knocked a small vase off its stand. Siddharth caught the bird in his cap and let it out of the front door.",
+   "qs": [
+    [
+     "Who works as a security guard?",
+     [
+      "siddharth"
+     ]
+    ],
+    [
+     "Where did Siddharth hear the noise?",
+     [
+      "in the stone gallery",
+      "the stone gallery",
+      "stone gallery"
+     ]
+    ],
+    [
+     "What knocked the vase off its stand?",
+     [
+      "a pigeon",
+      "pigeon"
+     ]
+    ],
+    [
+     "What had the pigeon knocked off its stand?",
+     [
+      "a small vase",
+      "small vase",
+      "vase"
+     ]
+    ],
+    [
+     "What did Siddharth catch the pigeon in?",
+     [
+      "his cap",
+      "cap"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb17",
+   "text": "A beaver built a dam that made a quiet pool in the stream. The ducks loved the pool, but a heron complained that the fish no longer came to her shallow corner. So the beaver opened a small gap in the dam, and some water ran past the heron's corner again. After that the ducks kept their pool, and the heron caught her fish as before.",
+   "qs": [
+    [
+     "Who built the dam?",
+     [
+      "the beaver",
+      "beaver"
+     ]
+    ],
+    [
+     "What did the ducks love?",
+     [
+      "the pool",
+      "pool"
+     ]
+    ],
+    [
+     "Who complained about the fish?",
+     [
+      "a heron",
+      "the heron",
+      "heron"
+     ]
+    ],
+    [
+     "What did the beaver open in the dam?",
+     [
+      "a small gap",
+      "small gap",
+      "gap"
+     ]
+    ],
+    [
+     "What did the heron catch again?",
+     [
+      "her fish",
+      "fish"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb18",
+   "text": "The parcel from Ulrike's aunt left Vienna on Monday and reached the sorting office in Graz on Tuesday. On Wednesday morning the postman, Sandro, put it in his van, but Ulrike was out, so he left it with her neighbour Mrs Pohl. Ulrike collected it from Mrs Pohl that evening and found a woollen scarf inside.",
+   "qs": [
+    [
+     "Where did the parcel leave from?",
+     [
+      "vienna"
+     ]
+    ],
+    [
+     "Where was the parcel on Tuesday?",
+     [
+      "the sorting office",
+      "sorting office",
+      "graz"
+     ]
+    ],
+    [
+     "Who was the postman?",
+     [
+      "sandro"
+     ]
+    ],
+    [
+     "Who had the parcel on Wednesday afternoon?",
+     [
+      "mrs pohl",
+      "pohl",
+      "her neighbour"
+     ]
+    ],
+    [
+     "What was inside the parcel?",
+     [
+      "a woollen scarf",
+      "woollen scarf",
+      "scarf"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb19",
+   "text": "When the rain flooded the road to the clinic, the nurse, Thandiwe, borrowed her brother's tractor to reach her patients. She drove it through the water with her medical bag on the seat beside her. At the first farm she checked on an old man named Opoku, whose leg was healing well. Later she delivered medicine to a mother with a sick baby.",
+   "qs": [
+    [
+     "What flooded the road?",
+     [
+      "the rain",
+      "rain"
+     ]
+    ],
+    [
+     "Who was the nurse?",
+     [
+      "thandiwe"
+     ]
+    ],
+    [
+     "Whose tractor did Thandiwe borrow?",
+     [
+      "her brother's",
+      "brother's"
+     ]
+    ],
+    [
+     "Whose leg was healing well?",
+     [
+      "opoku",
+      "an old man"
+     ]
+    ],
+    [
+     "What did Thandiwe deliver to the mother?",
+     [
+      "medicine"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb20",
+   "text": "A magpie collected shiny things and kept them in her nest at the top of a pine. One day she found a spoon and a button on the same path, but she could carry only one. While she was deciding, a jackdaw flew down and took the spoon. 'The button was prettier anyway,' the magpie told herself, and she flew home with it.",
+   "qs": [
+    [
+     "Where did the magpie keep shiny things?",
+     [
+      "in her nest",
+      "her nest",
+      "nest"
+     ]
+    ],
+    [
+     "Who took the spoon?",
+     [
+      "a jackdaw",
+      "jackdaw"
+     ]
+    ],
+    [
+     "What did the magpie take home?",
+     [
+      "the button",
+      "button"
+     ]
+    ],
+    [
+     "Why could the magpie not take both things?",
+     [
+      "carry only one",
+      "only one"
+     ]
+    ],
+    [
+     "What did the jackdaw take?",
+     [
+      "the spoon",
+      "spoon"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb21",
+   "text": "At dawn the shepherd, Zoltan, led his sheep from the barn up to the high meadow. At midday he moved them down to the stream so they could drink. Because a storm was coming, he drove them back into the barn at four and bolted the door. Only one lamb was missing, and his dog found it sheltering under a hedge.",
+   "qs": [
+    [
+     "Who was the shepherd?",
+     [
+      "zoltan"
+     ]
+    ],
+    [
+     "Where did Zoltan lead the sheep at dawn?",
+     [
+      "the high meadow",
+      "high meadow",
+      "meadow"
+     ]
+    ],
+    [
+     "Where were the sheep at midday?",
+     [
+      "the stream",
+      "stream"
+     ]
+    ],
+    [
+     "Who found the missing lamb?",
+     [
+      "his dog",
+      "dog"
+     ]
+    ],
+    [
+     "What did Zoltan do to the barn door?",
+     [
+      "bolted the door",
+      "bolted"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb22",
+   "text": "Rafael and his grandfather spent Saturday painting the garden fence green. Rafael painted the low boards, while his grandfather did the tall posts. A neighbour's cat walked along the top of the fence and left green paw prints on the shed roof. Grandfather laughed and said the cat had signed their work.",
+   "qs": [
+    [
+     "What colour did they paint the fence?",
+     [
+      "green"
+     ]
+    ],
+    [
+     "Who painted the low boards?",
+     [
+      "rafael"
+     ]
+    ],
+    [
+     "Who did the tall posts?",
+     [
+      "his grandfather",
+      "grandfather"
+     ]
+    ],
+    [
+     "What left paw prints on the shed roof?",
+     [
+      "a neighbour's cat",
+      "the cat",
+      "cat"
+     ]
+    ],
+    [
+     "Where did the cat leave paw prints?",
+     [
+      "on the shed roof",
+      "the shed roof",
+      "shed roof"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb23",
+   "text": "Two ants found a grain of rice too heavy for either of them. The red ant pulled it from the front and the black ant pushed from behind, but they kept going in different directions. 'Walk on the same side,' said a beetle who was watching from a leaf. They lifted the grain together and carried it to their hill before dark.",
+   "qs": [
+    [
+     "What did the ants find?",
+     [
+      "a grain of rice",
+      "grain of rice",
+      "rice"
+     ]
+    ],
+    [
+     "Who pulled from the front?",
+     [
+      "the red ant",
+      "red ant"
+     ]
+    ],
+    [
+     "Who pushed from behind?",
+     [
+      "the black ant",
+      "black ant"
+     ]
+    ],
+    [
+     "Who was watching from a leaf?",
+     [
+      "a beetle",
+      "beetle"
+     ]
+    ],
+    [
+     "Where did the ants carry the rice?",
+     [
+      "to their hill",
+      "their hill",
+      "hill"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb24",
+   "text": "Nyokabi packed her tent and left the city on Thursday to cycle to the lake. She spent the first night at a campsite beside a tea farm. On Friday the road climbed through a forest, and she reached the lake at sunset. She stayed there two nights before riding home by bus with her bicycle on the roof.",
+   "qs": [
+    [
+     "What did Nyokabi pack?",
+     [
+      "her tent",
+      "tent"
+     ]
+    ],
+    [
+     "Where did Nyokabi spend the first night?",
+     [
+      "at a campsite",
+      "a campsite",
+      "campsite"
+     ]
+    ],
+    [
+     "When did Nyokabi reach the lake?",
+     [
+      "at sunset",
+      "sunset"
+     ]
+    ],
+    [
+     "How many nights did she stay at the lake?",
+     [
+      "two nights",
+      "two"
+     ]
+    ],
+    [
+     "When did Nyokabi leave the city?",
+     [
+      "on thursday",
+      "thursday"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb25",
+   "text": "The cook at the hospital, Prakash, had made soup for a hundred people when he learned that the delivery of bread would not arrive. He telephoned a baker named Odile, who sent her son across town with three sacks of rolls. The rolls came just before lunch, and the patients never knew anything had gone wrong.",
+   "qs": [
+    [
+     "Who was the cook?",
+     [
+      "prakash"
+     ]
+    ],
+    [
+     "What would not arrive?",
+     [
+      "the delivery of bread",
+      "delivery of bread",
+      "bread"
+     ]
+    ],
+    [
+     "Who did Prakash telephone?",
+     [
+      "odile",
+      "a baker"
+     ]
+    ],
+    [
+     "Who brought the rolls across town?",
+     [
+      "her son",
+      "son"
+     ]
+    ],
+    [
+     "How many sacks of rolls were sent?",
+     [
+      "three"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb26",
+   "text": "A rooster believed that the sun rose because he crowed. One morning he had a sore throat and could not make a sound. He hid in the henhouse, sure that the day would stay dark, but the hens woke him and showed him the bright sky. 'I suppose I will crow just for fun now,' he said.",
+   "qs": [
+    [
+     "Who believed the sun rose because he crowed?",
+     [
+      "a rooster",
+      "rooster"
+     ]
+    ],
+    [
+     "Why could the rooster not crow?",
+     [
+      "a sore throat",
+      "sore throat"
+     ]
+    ],
+    [
+     "Where did the rooster hide?",
+     [
+      "in the henhouse",
+      "the henhouse",
+      "henhouse"
+     ]
+    ],
+    [
+     "Who woke the rooster?",
+     [
+      "the hens",
+      "hens"
+     ]
+    ],
+    [
+     "What did the hens show him?",
+     [
+      "the bright sky",
+      "bright sky",
+      "sky"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb27",
+   "text": "The museum's oldest painting, a portrait of a sea captain, hung in the main hall until March. Then it was taken down and driven to a workshop in Braga, where a restorer named Marisol cleaned it for six weeks. In May it travelled back by lorry, and now it hangs in a small room near the library.",
+   "qs": [
+    [
+     "What is the museum's oldest painting?",
+     [
+      "a portrait",
+      "portrait"
+     ]
+    ],
+    [
+     "Where did the painting hang until March?",
+     [
+      "in the main hall",
+      "the main hall",
+      "main hall"
+     ]
+    ],
+    [
+     "Who cleaned the painting?",
+     [
+      "marisol",
+      "a restorer"
+     ]
+    ],
+    [
+     "Where was the painting in April?",
+     [
+      "a workshop in braga",
+      "workshop",
+      "braga"
+     ]
+    ],
+    [
+     "How long did Marisol clean the painting?",
+     [
+      "for six weeks",
+      "six weeks"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb28",
+   "text": "Every Friday, Saoirse sells honey from her bees at the market square. This week a tourist bought six jars early, so she had only two left by ten o'clock. Her friend Rui, who sells cheese at the next stall, lent her his cool box so she could fetch more honey from her farm. She was back before the church bell rang eleven.",
+   "qs": [
+    [
+     "What does Saoirse sell?",
+     [
+      "honey"
+     ]
+    ],
+    [
+     "Where does Saoirse sell her honey?",
+     [
+      "at the market square",
+      "the market square",
+      "market square"
+     ]
+    ],
+    [
+     "How many jars did the tourist buy?",
+     [
+      "six"
+     ]
+    ],
+    [
+     "Who lent Saoirse a cool box?",
+     [
+      "rui",
+      "her friend"
+     ]
+    ],
+    [
+     "What does Rui sell?",
+     [
+      "cheese"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb29",
+   "text": "A little fish lived in a bucket that a boy had left on the shore. Each day the boy fed her crumbs, and each day she grew a little bigger. One morning a wave came high up the beach and tipped the bucket over. 'Thank you for the crumbs!' the fish called as she swam out into the sea, and the boy waved goodbye from the rocks.",
+   "qs": [
+    [
+     "Where did the little fish live?",
+     [
+      "in a bucket",
+      "a bucket",
+      "bucket"
+     ]
+    ],
+    [
+     "Who fed the fish crumbs?",
+     [
+      "the boy",
+      "a boy",
+      "boy"
+     ]
+    ],
+    [
+     "What tipped the bucket over?",
+     [
+      "a wave",
+      "wave"
+     ]
+    ],
+    [
+     "Where did the fish swim?",
+     [
+      "into the sea",
+      "the sea",
+      "sea"
+     ]
+    ],
+    [
+     "What did the boy do from the rocks?",
+     [
+      "waved goodbye",
+      "waved"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb30",
+   "text": "Valeria lost her keys on Tuesday. She still had them after breakfast, because she locked the front door with them before walking to the bakery. At the bakery she put them on the counter while she paid for a cake. The baker, Mr Saliba, found them after she left and kept them in the till drawer until she came back at five.",
+   "qs": [
+    [
+     "When did Valeria lose her keys?",
+     [
+      "on tuesday",
+      "tuesday"
+     ]
+    ],
+    [
+     "What did Valeria pay for?",
+     [
+      "a cake",
+      "cake"
+     ]
+    ],
+    [
+     "Where did Valeria put her keys at the bakery?",
+     [
+      "on the counter",
+      "the counter",
+      "counter"
+     ]
+    ],
+    [
+     "Who found the keys?",
+     [
+      "mr saliba",
+      "saliba",
+      "the baker"
+     ]
+    ],
+    [
+     "Where were the keys until five?",
+     [
+      "in the till drawer",
+      "the till drawer",
+      "till drawer"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb31",
+   "text": "Yoshiro had been a bus driver for thirty years, and on his last day the passengers surprised him. A schoolgirl named Pia handed him a card that everyone had signed, and an old woman gave him a tin of biscuits. At the final stop he thanked them all through the loudspeaker. His wife, Nobuko, was waiting at the depot with flowers.",
+   "qs": [
+    [
+     "What did Yoshiro do at the final stop?",
+     [
+      "thanked them all",
+      "thanked them"
+     ]
+    ],
+    [
+     "Who handed Yoshiro a card?",
+     [
+      "pia",
+      "a schoolgirl"
+     ]
+    ],
+    [
+     "What did the old woman give him?",
+     [
+      "a tin of biscuits",
+      "tin of biscuits",
+      "biscuits"
+     ]
+    ],
+    [
+     "Who was waiting at the depot?",
+     [
+      "nobuko",
+      "his wife"
+     ]
+    ],
+    [
+     "What did Nobuko have with her at the depot?",
+     [
+      "flowers"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb32",
+   "text": "Every morning a lazy bear knocked on the bees' hive and asked for honey instead of looking for berries. The bees grew tired of him and moved their hive to a hollow too narrow for his paw. When the bear came the next day, he found only an empty branch. That summer he learned which bushes had the sweetest berries.",
+   "qs": [
+    [
+     "What did the bear ask the bees for?",
+     [
+      "honey"
+     ]
+    ],
+    [
+     "Who moved their hive?",
+     [
+      "the bees",
+      "bees"
+     ]
+    ],
+    [
+     "Where did the bees move their hive?",
+     [
+      "to a hollow",
+      "a hollow",
+      "hollow"
+     ]
+    ],
+    [
+     "What did the bear find the next day?",
+     [
+      "an empty branch",
+      "empty branch"
+     ]
+    ],
+    [
+     "Why did the bees move their hive?",
+     [
+      "grew tired of him",
+      "tired of him"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb33",
+   "text": "On the first day of the school trip, the class took a ferry from the mainland to the island of Vass. They spent the morning at the lighthouse and ate lunch in the ruined chapel. In the afternoon their teacher, Mrs Quist, led them along the cliffs to a seal colony. They slept that night in a youth hostel near the pier.",
+   "qs": [
+    [
+     "What did the class take to the island?",
+     [
+      "a ferry",
+      "ferry"
+     ]
+    ],
+    [
+     "Where did the class spend the morning?",
+     [
+      "at the lighthouse",
+      "the lighthouse",
+      "lighthouse"
+     ]
+    ],
+    [
+     "Where did they eat lunch?",
+     [
+      "in the ruined chapel",
+      "the ruined chapel",
+      "ruined chapel",
+      "chapel"
+     ]
+    ],
+    [
+     "Who led the class along the cliffs?",
+     [
+      "mrs quist",
+      "quist",
+      "their teacher"
+     ]
+    ],
+    [
+     "When did the teacher lead the class along the cliffs?",
+     [
+      "in the afternoon",
+      "afternoon"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb34",
+   "text": "Paloma mends shoes in a narrow shop next to the town hall. On Thursday the mayor, Mr Rautio, brought in a pair of boots with a broken heel. Paloma fixed the heel the same afternoon, and her brother Santiago delivered the boots to the town hall before the evening meeting.",
+   "qs": [
+    [
+     "Where is the shoe shop?",
+     [
+      "the town hall",
+      "town hall"
+     ]
+    ],
+    [
+     "Who was the mayor?",
+     [
+      "mr rautio",
+      "rautio"
+     ]
+    ],
+    [
+     "What was wrong with the mayor's boots?",
+     [
+      "a broken heel",
+      "broken heel"
+     ]
+    ],
+    [
+     "Who delivered the boots?",
+     [
+      "santiago",
+      "her brother"
+     ]
+    ],
+    [
+     "When did Paloma fix the heel?",
+     [
+      "the same afternoon",
+      "same afternoon"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb35",
+   "text": "A peacock and a sparrow argued about who was more useful to the garden. The peacock spread his tail and said that visitors came only to admire him. The sparrow said nothing but ate the caterpillars from the gardener's cabbages all afternoon. In the evening the gardener scattered seed for the sparrow and shooed the peacock off the lettuces.",
+   "qs": [
+    [
+     "What did the peacock and the sparrow argue about?",
+     [
+      "who was more useful",
+      "more useful"
+     ]
+    ],
+    [
+     "Who spread his tail?",
+     [
+      "the peacock",
+      "peacock"
+     ]
+    ],
+    [
+     "What did the sparrow eat?",
+     [
+      "the caterpillars",
+      "caterpillars"
+     ]
+    ],
+    [
+     "Where were the caterpillars?",
+     [
+      "the gardener's cabbages",
+      "gardener's cabbages",
+      "cabbages"
+     ]
+    ],
+    [
+     "Who did the gardener scatter seed for?",
+     [
+      "the sparrow",
+      "sparrow"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb36",
+   "text": "The ice-cream van belongs to Umberto, and on summer days it follows the same route. It parks by the swimming pool from eleven until one, then moves to the park gates for the afternoon. At five it goes to the beach car park, and at eight Umberto drives it home to his garage on Elm Street.",
+   "qs": [
+    [
+     "Who owns the ice-cream van?",
+     [
+      "umberto"
+     ]
+    ],
+    [
+     "Where is the van at noon?",
+     [
+      "by the swimming pool",
+      "the swimming pool",
+      "swimming pool"
+     ]
+    ],
+    [
+     "Where is the van in the afternoon?",
+     [
+      "the park gates",
+      "park gates"
+     ]
+    ],
+    [
+     "When does the van go to the beach car park?",
+     [
+      "at five",
+      "five"
+     ]
+    ],
+    [
+     "When does Umberto drive the van home?",
+     [
+      "at eight",
+      "eight"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb37",
+   "text": "Milena was elected captain of the school chess team in September. The team lost its first match, so she organised extra practice every Tuesday in the science room. Their coach, Mr Petrov, brought old puzzles from his own collection. By spring the team had won the county cup, and Milena's photo was printed in the local paper.",
+   "qs": [
+    [
+     "Who was captain of the chess team?",
+     [
+      "milena"
+     ]
+    ],
+    [
+     "Where did the team practise?",
+     [
+      "in the science room",
+      "the science room",
+      "science room"
+     ]
+    ],
+    [
+     "Who brought old puzzles?",
+     [
+      "mr petrov",
+      "petrov",
+      "their coach"
+     ]
+    ],
+    [
+     "What did the team win?",
+     [
+      "the county cup",
+      "county cup"
+     ]
+    ],
+    [
+     "When did the extra practice take place?",
+     [
+      "every tuesday",
+      "tuesday"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb38",
+   "text": "A young hare boasted that nobody could jump the brook. A frog said nothing, sat on a stone in the middle, and hopped across in two jumps. The hare tried in one leap, landed in the water, and was carried down to the mill pond. 'Grab this,' called the frog, and he pushed a stick toward her so she could climb onto the bank.",
+   "qs": [
+    [
+     "Who boasted that nobody could jump the brook?",
+     [
+      "a young hare",
+      "the hare",
+      "hare"
+     ]
+    ],
+    [
+     "What did the hare land in?",
+     [
+      "the water",
+      "water"
+     ]
+    ],
+    [
+     "How many jumps did the frog need?",
+     [
+      "two jumps",
+      "two"
+     ]
+    ],
+    [
+     "Where was the hare carried?",
+     [
+      "to the mill pond",
+      "the mill pond",
+      "mill pond"
+     ]
+    ],
+    [
+     "What did the frog push toward the hare?",
+     [
+      "a stick",
+      "stick"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb39",
+   "text": "The church bell was cracked, so on Monday workers lowered it from the tower onto a cart. The cart took it to a foundry in the next valley, where it was melted and cast again. Three weeks later the new bell came back on the same cart, and the priest, Father Mihai, rang it at the wedding of Sabine and Rolf.",
+   "qs": [
+    [
+     "Why was the bell lowered from the tower?",
+     [
+      "was cracked",
+      "cracked"
+     ]
+    ],
+    [
+     "Where did the cart take the bell?",
+     [
+      "to a foundry",
+      "a foundry",
+      "foundry"
+     ]
+    ],
+    [
+     "When did the new bell come back?",
+     [
+      "three weeks later",
+      "three weeks"
+     ]
+    ],
+    [
+     "Who rang the new bell?",
+     [
+      "father mihai",
+      "mihai",
+      "the priest"
+     ]
+    ],
+    [
+     "Whose wedding was the bell rung at?",
+     [
+      "sabine and rolf",
+      "sabine",
+      "rolf"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "pb40",
+   "text": "Roswitha and her neighbour Wim share a vegetable plot behind their block of flats. Roswitha grows tomatoes and beans, while Wim prefers potatoes. In August a storm flattened the beans, but Wim's potatoes were safe under the soil. He gave Roswitha a basket of potatoes, and she cooked a stew for them both.",
+   "qs": [
+    [
+     "Where is the vegetable plot?",
+     [
+      "their block of flats",
+      "block of flats"
+     ]
+    ],
+    [
+     "Who grows potatoes?",
+     [
+      "wim"
+     ]
+    ],
+    [
+     "What flattened the beans?",
+     [
+      "a storm",
+      "storm"
+     ]
+    ],
+    [
+     "When did the storm flatten the beans?",
+     [
+      "in august",
+      "august"
+     ]
+    ],
+    [
+     "Who cooked a stew?",
+     [
+      "roswitha"
+     ]
+    ]
+   ]
+  }
+ ]
+}

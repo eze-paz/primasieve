@@ -9,12 +9,14 @@ route = lambda l: l.split("| route ")[1].split(" |")[0]
 spoke = lambda l: "| ans None |" not in l
 right = lambda l: "hit True" in l
 fit = collections.defaultdict(lambda: [0, 0])
-for l in L[:310]:
+PRACTICE = L[:310] + L[510:] if "--big" in sys.argv else L[:310]                          # R25-u: old 110 + val_more + practice A / B; the untouched val_fresh2 is L[310:510]
+UNTOUCHED = L[310:510]
+for l in PRACTICE:
     if spoke(l): fit[route(l)][0 if right(l) else 1] += 1
 keep = {r for r, (a, w) in fit.items() if a - 3 * w > 0}
 print("practice fitness by route (right, wrong):", {r: tuple(v) for r, v in sorted(fit.items(), key=lambda kv: -sum(kv[1]))})
 print("routes the learner keeps:", sorted(keep)); print("routes it drops:", sorted(set(fit) - keep))
-for nm, part in (("practice 310", L[:310]), ("untouched val_fresh2 200", L[310:])):
+for nm, part in ((f"practice {len(PRACTICE)}", PRACTICE), ("untouched val_fresh2 200", UNTOUCHED)):
     a_all = sum(1 for l in part if spoke(l) and right(l)); w_all = sum(1 for l in part if spoke(l) and not right(l))
     a_k = sum(1 for l in part if spoke(l) and right(l) and route(l) in keep); w_k = sum(1 for l in part if spoke(l) and not right(l) and route(l) in keep)
     print(f"{nm}: all routes {a_all} right / {w_all} wrong (fitness {a_all - 3 * w_all}) -> kept routes {a_k} right / {w_k} wrong (fitness {a_k - 3 * w_k})")
@@ -32,7 +34,7 @@ if "--lift" in sys.argv:                                                        
             if right(l): a += 1
             else: w += 1
         return a - 3 * w, a, w
-    res = {tau: score(L[:310], tau) for tau in (None, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8)}
+    res = {tau: score(PRACTICE, tau) for tau in (None, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8)}
     for tau, r in res.items(): print(f"  role-score cut-off {tau}: practice fitness {r[0]} ({r[1]} right, {r[2]} wrong)")
     best = max(res, key=lambda t: res[t][0])
-    print(f"the learner chose cut-off {best}: practice {res[best]} | untouched val_fresh2 {score(L[310:], best)} (no cut-off: {score(L[310:], None)})")
+    print(f"the learner chose cut-off {best}: practice {res[best]} | untouched val_fresh2 {score(UNTOUCHED, best)} (no cut-off: {score(UNTOUCHED, None)})")

@@ -180,7 +180,8 @@ def main():
     print("R24-p held-out precision by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]} = {v[0] / max(1, v[1]):.2f}" for k, v in held.items()}, flush=True)
     stories = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]
     if "--val-more" in ARGV: stories = stories + json.load(open("val_more.json", encoding="utf-8"))["stories"]
-    if "--val-fresh2" in ARGV: stories = stories + json.load(open("val_fresh2.json", encoding="utf-8"))["stories"]     # R25-p: the third, untouched set     # R24-al: the second hand-written validation set
+    if "--val-fresh2" in ARGV: stories = stories + json.load(open("val_fresh2.json", encoding="utf-8"))["stories"]     # R25-p: the third, untouched set
+    if "--val-practice" in ARGV: stories = stories + json.load(open("val_practice_a.json", encoding="utf-8"))["stories"] + json.load(open("val_practice_b.json", encoding="utf-8"))["stories"]   # R25-u: 400 more practice questions     # R24-al: the second hand-written validation set
     n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0]); valkk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
         for q, g in s["qs"]:
