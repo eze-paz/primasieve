@@ -99,7 +99,15 @@ def main():
                 matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
                 for k in akeys(q, how, a): valkk[k][0] += h; valkk[k][1] += 1
     print(f"R24-k validation ({n}): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
-    admitted = {k for k in set(held) | set(valk) if (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) >= 0.95}      # R24-q3: pooled precision, held-out and validation together
+    BAR = collections.defaultdict(lambda: 0.95)
+    if "--vs-model" in ARGV:                                                             # R24-ai: the bar is the model's own accuracy on that kind of question (validation), not a hand number
+        vm = json.load(open("b6_rwkv_val_ckpt_read1b.json", encoding="utf-8"))["items"]; mk = collections.defaultdict(lambda: [0, 0])
+        for x in vm: mk[kind(x["q"])][0] += x["hit"]; mk[kind(x["q"])][1] += 1
+        tot_r = sum(v[0] for v in mk.values()); tot_n = sum(v[1] for v in mk.values())
+        for k, (r, n) in mk.items(): BAR[k] = (r + 2 * tot_r / tot_n) / (n + 2)        # kinds with few questions shrink toward the model's overall accuracy
+        BAR.default_factory = lambda: tot_r / tot_n
+        print("R24-ai model accuracy on validation by kind (the admission bar):", {k: f"{mk[k][0]}/{mk[k][1]} -> {BAR[k]:.2f}" for k in mk}, f"| overall {tot_r}/{tot_n}", flush=True)
+    admitted = {k for k in set(held) | set(valk) if (held[k][1] + valk[k][1]) >= 8 and (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) > BAR[k[0]]} if "--vs-model" in ARGV else                {k for k in set(held) | set(valk) if (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) >= 0.95}      # R24-q3: pooled precision, held-out and validation together
     pooled = {k: (heldk[k][0] + valkk[k][0], heldk[k][1] + valkk[k][1]) for k in set(heldk) | set(valkk)}
     def admit(q, how, a):
         """R24-y: the finest key with enough evidence (>= 8) decides; precision >= 0.95 admits"""
@@ -107,7 +115,7 @@ def main():
         for k in akeys(q, how, a):
             r, t = pooled.get(k, (0, 0))
             if len(k) == 2: return k in admitted
-            if t >= (20 if SHAPE else 8): return r / t >= 0.95
+            if t >= (20 if SHAPE else 8): return r / t > BAR[k[0]] if "--vs-model" in ARGV else r / t >= 0.95
         return False
     if FINE: print("R24-y admission keys with >= 8 evidence and precision >= 0.95:", sorted(str(k) for k, (r, t) in pooled.items() if t >= 8 and r / t >= 0.95), flush=True)
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
