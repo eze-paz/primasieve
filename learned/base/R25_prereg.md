@@ -114,3 +114,6 @@ About 19 practice questions ask for a state ('Where was Beth at the end?', 'Wher
 
 ## R25-o result (the state role never fired) and R25-o2
 R25-o reproduced R25-k exactly (holdout 22 / 3): with the dictionary on, 'was' is read as the verb 'be', so 'Where was X ...?' never reached the state role. Checked on a practice story: once reached, 'Where was the key at noon?' picks the noon clause ('Rosa took the key to the garden') -> the garden (right). R25-o2: the state role accepts a question whose only verb is 'be'. Same registration; the holdout total is reported, and the role is also measured on the new untouched set (val_fresh2) when it arrives.
+
+## R25-o2 result (negative)
+With the state role firing: practice 55 / 14 (+13), holdout 23 / 6 (+5) against R25-k 22 / 3 (+13). A last-mention place is often not where the thing is ('Rosa took the key to the garden. She dropped it near the well.'): states need the learned world layers (moves, holders), not a shortcut. The state role stays off.
