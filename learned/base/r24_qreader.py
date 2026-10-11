@@ -22,6 +22,7 @@ def qshape(q, names):
     for k, (sym, filler) in enumerate(items):
         w = filler[0].lower() if sym not in ("PERSON", "ENT") else None
         if sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(T.key_of(sym, filler) if sym == "ENT" else filler[0])
+        elif w in ("it", "them", "him", "her") and "--pron-ref" in ARGV: syms.append("ENT"); fillers.append(w)        # R24-ag: a pronoun in a question is a reference slot ('leave it' ~ 'leave the key')
         elif w in QW or w in ("the", "a", "an", "to", "at", "in", "on", "for", "with", "from", "it", "them", "him", "her"): syms.append(w); fillers.append(None)
         elif R.is_verb(w) and w not in E.NOUNISH: syms.append("V:" + E.lemma(w)); fillers.append(None)
         elif w in ("first", "second", "last"): syms.append("ORDER"); fillers.append(w)

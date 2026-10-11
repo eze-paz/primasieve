@@ -282,7 +282,7 @@ class Reader:
             if alts: via = {v0: alts[0]}
         cv_story = set(cv) | set(via.values())
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
-        given = [cf_k.lower() for k, (cs_k, cf_k) in enumerate(zip(cs, cs_fillers)) if cs_k in ("PERSON", "ENT") and cf_k and k != missing and cf_k.lower() not in ("thing", "someone")] if cs_fillers else []
+        given = [cf_k.lower() for k, (cs_k, cf_k) in enumerate(zip(cs, cs_fillers)) if cs_k in ("PERSON", "ENT") and cf_k and k != missing and cf_k.lower() not in ("thing", "someone", "it", "them", "him", "her")] if cs_fillers else []
         def pick(ss, sf, i, j):
             raw = raws_list[j][i] if raws_list and j < len(raws_list) and i < len(raws_list[j]) else None
             txt = raw if (raw and ss[i] == "ENT" and raw.split()[0].lower() in T.DET) else sf[i]           # R24-aa: 'a small boat' as written, not 'the small boat'
