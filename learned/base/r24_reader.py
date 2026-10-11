@@ -86,6 +86,13 @@ def construction(sent, names):
         elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
+    TIMEW = lambda w: w in E.TIMEISH or w.endswith("day") or w in ("noon", "dawn", "dusk", "dark", "midnight", "lunch", "supper", "breakfast", "dinner", "nightfall", "sunset", "sunrise", "summer", "winter", "spring", "autumn", "week", "year", "month")
+    for k in range(len(syms) - 2, 0, -1):                                                 # trailing 'at dawn' / 'before dark' / 'on Sunday'
+        if syms[k] in ("at", "before", "after", "on", "in", "by", "until") and k + 1 < len(syms):
+            nxt = syms[k + 1]; word = (fillers[k + 1] or "").split()[-1] if fillers[k + 1] else nxt
+            if (nxt in ("ENT", "PERSON") and TIMEW(word.lower())) or (nxt not in ("ENT", "PERSON") and TIMEW(nxt)):
+                phrase = f"{syms[k]} {fillers[k + 1] if fillers[k + 1] else nxt}".lower(); end = k + 2
+                syms = syms[:k] + ["WHEN"] + syms[end:]; fillers = fillers[:k] + [phrase] + fillers[end:]; break
     if why is None:                                                                      # 'opened its mouth to answer': a purpose phrase is a why
         for k in range(1, len(syms) - 1):
             if syms[k] == "to" and syms[k + 1].startswith("V:") and syms[k - 1] in ("ENT", "PERSON", "PRON"):
@@ -207,6 +214,7 @@ class Reader:
             if not cv & set(verbs_of(ss)): continue
             v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
             si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and (lo <= k < hi or s in ("WHEN", "WHY"))]
+            if cs[missing] in ("WHEN", "WHY"): si = [k for k in si if ss[k] == cs[missing]]                 # a when / why question takes only when / why spans
             if not any(k < vi for k in si) and lo > 0:                                 # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
                 si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and k < pv] + si
