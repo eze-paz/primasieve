@@ -22,7 +22,7 @@ def main():
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
-    DIAG = "--diag" in ARGV
+    DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
         import r24_qreader as QR
@@ -42,6 +42,12 @@ def main():
             except Exception: c = None
             if c is not None and a is not None and same(a, c): return a, "state-agree"
             if c is not None and b is not None and same(b, c): return b, "state-agree"
+        if ROUTES2:                                                                     # R24-x: no hand routing flags; every single-reader case is a route, admission decides per kind
+            if a is not None and b is not None and same(a, b): return a, "agree"
+            if b is not None and a is None: return b, "learned-alone-" + ("shape" if R.LAST.get("shape") else (QR.LASTQ.get("level") if LEARNED_Q else "x"))
+            if a is not None and b is None: return a, "cue-alone-" + ("strict" if conf else "loose")
+            if a is not None and b is not None: return (b, "disagree-shape") if R.LAST.get("shape") else (None, "disagree")
+            return None, "silent"
         if q.lower().split()[0] == "when": return (b, "learned-when") if b is not None else (None, "silent")       # R24-p2: 'when' is the learned reader's span
         if a is not None and b is not None and same(a, b): return a, "agree"
         if b is not None and R.LAST.get("shape") and q.lower().split()[0] in ("who", "what", "where"): return b, "learned-confident"   # R24-p5: the exact shape decided
@@ -68,7 +74,9 @@ def main():
     print(f"R24-k validation ({n}): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
     admitted = {k for k in set(held) | set(valk) if (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) >= 0.95}      # R24-q3: pooled precision, held-out and validation together
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
-    if matched and right / matched >= 0.90:
+    adm_right = sum(v[0] for k, v in valk.items() if k in admitted); adm_n = sum(v[1] for k, v in valk.items() if k in admitted)
+    print(f"R24-x validation after admission: matched {adm_n}, right {adm_right} (precision {adm_right / max(1, adm_n):.2f})", flush=True)
+    if adm_n and adm_right / adm_n >= 0.90:
         tests = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; rep = json.load(open("b6_rwkv_ckpt_read1b.json", encoding="utf-8"))["items"]; i = 0
         model = merged = spoke = spoke_right = 0
         for s in tests:
