@@ -100,3 +100,8 @@ Practice-only error analysis (old 110 + fresh m1-m20; the holdout half not inspe
 
 ## R25-m result (gate failed)
 Reader harness with action / complement roles: practice 54 / 11 (+21) -> 57 / 10 (+27); holdout 22 / 3 (+13) -> 22 / 4 (+10). Negative by the registered gate.
+
+Practice-only look at the action role: 4 of 6 right ('ate half', 'to climb the hill', 'to be lame', 'moved every jar behind glass'); the 2 wrong picked the subject's first clause because the question's time phrase ('every noon', 'one evening') never takes part in matching.
+
+## R25-n registration (time phrases are arguments)
+A clause's time phrase joins its arguments for loose matching (--time-args), with the R25-m roles on. Same harness, thresholds re-chosen by the learner; gate: holdout fitness > R25-k's +13.

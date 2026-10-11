@@ -227,6 +227,7 @@ def roles_of(sents):
             obj = next((filled(k_) for k_ in range(i + 1, hi) if cs[k_] in ("PERSON", "ENT") and cf[k_] and not (k_ >= 1 and cs[k_ - 1] in R.PLACE_WORDS)), None)
             place = next((f"{cs[k_ - 1]} {filled(k_)}" for k_ in range(i + 1, hi) if cs[k_] == "ENT" and cf[k_] and k_ >= 1 and cs[k_ - 1] in (R.PLACE_WORDS - {"from", "with", "by", "through", "to"})), None)                     or next((filled(k_) for k_ in range(i + 1, hi) if cs[k_] == "ENT" and cf[k_] and k_ >= 1 and cs[k_ - 1] == "to"), None)
             heads = [str(cf[k_]).split()[-1] for k_ in range(lo, hi) if cs[k_] in ("PERSON", "ENT") and cf[k_]]
+            if "--time-args" in ARGV_SOFT and when: heads += [w for w in T.TOK.findall(when) if w.isalpha() and w.lower() not in T.STOP]   # R25-n: a clause's time phrase is one of its arguments
             pred = " ".join(str(raws[k_]) for k_ in range(i, min(hi, len(raws))) if raws[k_] and cs[k_] not in (".", ",", "and", "but", "WHEN", "WHY", "COMP")).strip() or None     # R25-m: the action, verb to clause end
             comp = next((cf[k_] for k_, y in enumerate(cs) if y == "COMP" and cf[k_]), None)
             out.append(dict(si=si, verb=x[2:], subj=subj, obj=obj, place=place, when=when, heads=heads, do=pred, comp=comp))
