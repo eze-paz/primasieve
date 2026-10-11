@@ -1,0 +1,55 @@
+"""R24-k: two readers, one answer. The cue-built event log (r24_events) and the learned alignment reader (r24_reader)
+read every story; a question is answered when both agree (case-blind, head-word match), else by whichever speaks if the
+other is silent and that reader's confident flag is set, else not at all. Measured on the 80 validation story
+questions; B6 is run once, in front of the 0.4B model, only if validation precision >= 0.90.
+Run: python learned/base/r24_agree.py"""
+import os, sys, json, random
+HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
+import r24_tlm as T, r24_events as E, r24_reader as R
+from b6_rwkv import hit
+
+
+def same(a, b):
+    if a is None or b is None: return False
+    a, b = a.lower().strip(), b.lower().strip()
+    return a == b or a.split()[-1] == b.split()[-1] or a in b or b in a
+
+
+def main():
+    data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
+    import r24_books as B, data as D
+    train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
+    E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
+    train = [(s["text"], [a for a in (R.canonical(q, g) for q, g in s["qs"]) if a] + [R.event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
+    seqs = [list(R.construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
+    CH = R.Chunks(seqs); rd = R.Reader(CH); rd.learn(train[:6000], names, weigh=False); rd.learn(train[6000:], names, weigh=True)
+    tabs = (rd.w, rd.wn); rd = R.Reader(CH); rd.w, rd.wn = tabs; rd.learn(train, names, weigh=False)
+
+    def answer(text, q):
+        log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = R.ask(rd, text, names, q)
+        if a is not None and b is not None and same(a, b): return a, "agree"
+        if a is not None and conf and b is None: return a, "cue-confident"
+        if a is not None and b is not None: return None, "disagree"
+        return (a, "cue-only") if (a is not None and conf) else (None, "silent")
+
+    stories = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"]
+    n = matched = right = 0; by = {}
+    for s in stories:
+        for q, g in s["qs"]:
+            n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
+            if a is not None: matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1
+    print(f"R24-k validation (80): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
+    if matched and right / matched >= 0.90:
+        tests = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; rep = json.load(open("b6_rwkv_ckpt_read1b.json", encoding="utf-8"))["items"]; i = 0
+        model = merged = spoke = spoke_right = 0
+        for s in tests:
+            for q, g in s["qs"]:
+                x = rep[i]; i += 1; model += x["hit"]; a, how = answer(s["text"], q)
+                if a is not None: spoke += 1; spoke_right += hit(a, g); merged += hit(a, g)
+                else: merged += x["hit"]
+        print(f"B6 once (R24-k): model {model} | two readers spoke on {spoke}, right {spoke_right} | merged {merged}/100 (model 80, hand world 82, bar 85)")
+    json.dump(dict(matched=matched, right=right, by=by), open("r24_agree_results.json", "w"))
+
+
+if __name__ == "__main__":
+    main()

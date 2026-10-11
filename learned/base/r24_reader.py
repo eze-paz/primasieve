@@ -187,8 +187,8 @@ class Reader:
             for f in FEATS:                                                            # a learned mixture over the views; each view is a distribution over the candidates,
                 n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())   # weighted by how often that view was right with this much evidence
                 if tot:
-                    b = bucket(tot); acc = (self.w[(f, b)] + 0.5) / (self.wn[(f, b)] + 1.0)
-                    for i, ni in n.items(): score[i] += acc * ni / tot
+                    b = bucket(tot); acc = (self.w[(f, b)] + 0.5) / (self.wn[(f, b)] + 1.0); conf = tot / (tot + 20.0)   # reliability (learned) x evidence
+                    for i, ni in n.items(): score[i] += acc * conf * ni / tot
             scored = [(score[i], i) for i in si]
             c, i = max(scored)
             if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
