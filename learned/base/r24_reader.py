@@ -134,7 +134,7 @@ def clause_of(syms, vi):
     for t in range(len(syms)):
         if syms[t] in ("because", "while", "when", "but", "so"): cuts.add(t)
         if syms[t] == "," and t + 1 < len(syms) and syms[t + 1] in ("and", "but", "so", "while"): cuts.add(t)
-        if syms[t] == "and" and any(x.startswith("V:") for x in syms[:t]) and any(x.startswith("V:") for x in syms[t + 1:]) and not (t >= 1 and syms[t - 1] in ("PERSON", "ENT") and t + 1 < len(syms) and syms[t + 1] in ("PERSON", "ENT")): cuts.add(t)
+        if syms[t] == "and" and any(x.startswith("V:") for x in syms[:t]) and any(x.startswith("V:") for x in syms[t + 1:]) and not (t >= 1 and syms[t - 1] in ("PERSON", "ENT") and t + 1 < len(syms) and syms[t + 1] in ("PERSON", "ENT") and not (t + 2 < len(syms) and syms[t + 2].startswith("V:"))): cuts.add(t)   # R24-ac2: 'cabbages and Greta grew' is a new clause; 'to Ben and Ann.' is a list
     lo = max([c for c in cuts if c < vi], default=-1) + 1; hi = min([c for c in cuts if c > vi], default=len(syms))
     return lo, hi
 

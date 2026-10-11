@@ -133,6 +133,7 @@ def fables(R, P):
                  (f"Where did {b} find the {obj}?", [spot2, spot2.split()[-1]]), (f"Who had the {obj} after {a} left it?", [b.lower()]),
                  (f"Who was holding the {obj} right after {a} left it?", ["no one", "nobody"]), (f"Where was the {obj} at the end?", [spot1, spot1.split()[-1]]),
                  (f"Who found the {obj}?", [b.lower()]), (f"Who was holding the {obj} right after {b} found it?", [b.lower()]),
+                 (f"When did {a} take the {obj}?", ["at noon", "noon"]), (f"When did {b} find the {obj}?", ["in the evening", "evening"]),
                  (f"Who was holding the {obj} right after {b} put it back?", ["no one", "nobody"]), (f"Where was {a} at noon?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Who was holding the {obj} right after {a} took it?", [a.lower()])], g3_events))
     # G4: a race -- arrival order, then one rides on and one waits
@@ -143,6 +144,14 @@ def fables(R, P):
                 [(f"Who reached {p1} first?", [a.lower()]), (f"Who arrived last?", [c.lower()]), (f"Who arrived second?", [b.lower()]),
                  (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where was {a} at the end?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Where was {c} at the end?", [p1.lower(), p1.lower().replace("the ", "")])], g4_events))
+    # I (R24-ad): a thing as the actor -- 'What broke the fence?'
+    a, ga, g1 = actor(R, P, "name"); animal = R.choice(ANIMALS); thing = R.choice(["fence", "gate", "roof", "cart", "basket", "jar", "wall", "nest"])
+    vpast, vlem = R.choice([("broke", "break"), ("ate", "eat"), ("knocked over", "knock"), ("took", "take"), ("trampled", "trample"), ("carried off", "carry"), ("smashed", "smash"), ("flattened", "flatten")])
+    place = R.choice(PLACES)
+    i_events = [(0, f"A {animal}", vlem, f"the {thing}", None, None), (1, a, "chase", f"the {animal}", f"to {place}", None)]
+    out.append((f"A {animal} {vpast} the {thing}. {a} chased the {animal} to {place}.",
+                [(f"What {vpast} the {thing}?", [f"a {animal}", f"the {animal}", animal]), (f"Who chased the {animal}?", [a.lower()]), (f"Where did {a} chase the {animal}?", [place.lower(), place.lower().replace("the ", "")]),
+                 (f"What did the {animal} {vlem if vlem not in ('knock', 'carry') else vlem + (' over' if vlem == 'knock' else ' off')}?", [f"the {thing}", thing])], i_events))
     # H (R24-w): attribute facts -- made of, full of, belonged to, how many; copula events ('be') for the learned readers
     a, ga, g1 = actor(R, P, "name"); thing = R.choice(["bridge", "fence", "boat", "cart", "roof"]); material = R.choice(["logs", "stone", "oak planks", "reeds", "iron"])
     holder = R.choice(["sack", "basket", "jar", "chest", "barrel"]); content = R.choice(["flour", "apples", "honey", "salt", "coins"])
