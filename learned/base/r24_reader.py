@@ -4,7 +4,7 @@ stories plus their restated questions, says which story slot fills which canonic
 constructions sharing a verb. A question becomes a canonical construction with one missing slot; the reader fills it
 from the story sentence with the same verb, by the learned alignment. No role names, no sentence shapes by hand.
 Run: python learned/base/r24_reader.py [--show]"""
-import os, sys, re, json, random, collections
+import os, sys, re, json, random, collections, math
 SHOW = "--show" in sys.argv
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E
@@ -44,7 +44,7 @@ def construction(sent, names):
     items = T.slotify(T.TOK.findall(sent), names); syms = []; fillers = []
     for k, (sym, filler) in enumerate(items):
         if sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
-        elif sym.isalpha() and sym in E.NOUNISH and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym): syms.append("ENT"); fillers.append(sym)
+        elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
@@ -58,11 +58,40 @@ def feat(syms, k, verb):
     """a slot's surface features: its kind, whether it sits before or after the shared verb, and the symbol before it"""
     vi = next((i for i, s in enumerate(syms) if s == "V:" + verb), None)
     rel = "none" if vi is None else ("before" if k < vi else "after")
-    return (syms[k], rel, syms[k - 1] if k else "<s>")
+    prev = syms[k - 1] if k else "<s>"
+    return ("REF", rel, "V" if prev.startswith("V:") else prev)                         # kind-blind: a thing can act like a person; the verb before it counts as 'V'
+
+
+class Chunks:
+    """phrase chunks over construction symbols, learned by counting (as in run 2c): the reader's own units of form"""
+    def __init__(self, seqs, max_chunks=5000, maxlen=5):
+        cnt = collections.Counter()
+        for sq in seqs:
+            for i in range(len(sq)):
+                for L in range(2, maxlen + 1):
+                    if i + L <= len(sq): cnt[tuple(sq[i:i + L])] += 1
+        cand = {ch: c for ch, c in cnt.items() if c >= 3}
+        self.chunks = {ch: cand[ch] for ch in sorted(cand, key=lambda ch: -(cand[ch] * (len(ch) - 1) - 3 * len(ch)))[:max_chunks]}; self.maxlen = maxlen
+
+    def segment(self, sq):
+        n = len(sq); best = [0.0] + [-1e18] * n; back = [1] * (n + 1)
+        for j in range(1, n + 1):
+            for L in range(1, min(self.maxlen, j) + 1):
+                ch = tuple(sq[j - L:j]); sc = (math.log(self.chunks[ch]) + 2.0 * (L - 1)) if L > 1 and ch in self.chunks else (-1.0 if L == 1 else None)
+                if sc is None: continue
+                if best[j - L] + sc > best[j]: best[j] = best[j - L] + sc; back[j] = L
+        out = []; j = n
+        while j > 0: out.append((j - back[j], tuple(sq[j - back[j]:j]))); j -= back[j]
+        return out[::-1]
+
+    def feat(self, sq, k):
+        for start, ch in self.segment(list(sq)):
+            if start <= k < start + len(ch): return (ch, k - start)
+        return None
 
 
 class Reader:
-    def __init__(self): self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter()
+    def __init__(self, chunks=None): self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
 
     def learn(self, stories, names):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
@@ -78,6 +107,7 @@ class Reader:
                         for j in cj:
                             if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower()):
                                 self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1; self.feat[(feat(ss, i, v), feat(cs, j, v))] += 1
+                                if self.chunks: self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, j))] += 1
 
     def fill(self, story_sents, names, cs, missing):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
@@ -90,6 +120,7 @@ class Reader:
             for i in si:
                 c = self.align[(ss, cs, i, missing)]
                 if c == 0: c = 0.1 * self.align[(ss, None, i, missing)]
+                if c == 0 and self.chunks: c = 0.05 * self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, missing))]   # learned phrase chunks: the reader's own units generalise across shapes
                 if c == 0: c = 0.03 * self.feat[(feat(ss, i, v), feat(cs, missing, v))]          # surface features generalise across sentence shapes
                 if c == 0 and ss[i] == cs[missing]: c = 0.01 * self.prior[(i, missing)]        # the index prior only within the same slot kind
                 scored.append((c, i))
@@ -127,7 +158,10 @@ def main():
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     train = [(s["text"], [a for a in (canonical(q, g) for q, g in s["qs"]) if a]) for s in data[:7000]]
-    R = Reader(); R.learn(train, names); print(f"alignment table: {len(R.align)} entries", flush=True)
+    seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
+    seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
+    CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
+    R = Reader(CH); R.learn(train, names); print(f"alignment table: {len(R.align)} entries; chunk-feature table {len(R.cfeat)}", flush=True)
     ok = tot = 0
     for s in data[7000:]:
         for q, g in s["qs"]:
