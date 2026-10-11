@@ -131,8 +131,10 @@ def main():
             stmts = [R.event_statement(e) for e in s["events"]]
             for q, g in s["qs"]:
                 qs, qf = qshape(q, names); qslots = {f.lower() for x, f in zip(qs, qf) if x in ("PERSON", "ENT")}
+                qv = next((x for x in qs if x.startswith("V:")), None)
                 for st in stmts:
                     cs, cf = R.construction(st, names); fl = {f.lower() for f in cf if f}
+                    if qv is None or qv not in cs: continue                                  # the statement must carry the question's own verb
                     gold = next((f for f in cf if f and (f.lower() == g[0].lower() or f.lower() == T.key_of("ENT", g[0].lower().split()) or g[0].lower() in f.lower())), None)
                     if gold and (qslots & fl or not qslots): pairs.append((q, st, gold)); break
     Q = QReader(); Q.learn(pairs, names); print(f"question reader: {len(Q.map)} question shapes learned from {len(pairs)} pairs", flush=True)
