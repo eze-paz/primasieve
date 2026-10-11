@@ -181,3 +181,6 @@ Each answer gets a role score: how much more or less often the books pair the qu
 
 ## R25-s result (neutral)
 Only 88 of 248 answers get a role score (who / what questions built on a verb). Practice fitness by cut-off: none 91, 0.05-0.1 91, 0.2-0.3 90, 0.5 86, 0.8 91 (103 / 4); the learner kept no cut-off; untouched unchanged (+8). The remaining trusted errors are not mostly role-type errors. The verb-role line is closed.
+
+## R25-t registration (the role reader's three practice errors, fixed together, judged with learner-chosen trust)
+Practice-only look at the role reader alone: 15 right / 6 wrong. Causes: the question's time words are ignored when choosing a clause (R25-n), no action / complement answers (R25-m), modal verbs swallowed into name spans ('the beaver must', new: --modal-stop). R25-m and R25-n each missed the old 100-question holdout by one point; here the three are combined (--do --time-args --modal-stop) on the R25-l configuration, the learner re-chooses its trusted routes on practice, and the untouched set is reported once as a total. Passes if untouched fitness beats +8.

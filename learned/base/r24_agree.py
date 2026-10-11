@@ -24,6 +24,7 @@ def main():
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
     if "--dict" in ARGV:                                                                 # R24-ap: the dictionary as a reading-time source
         import r24_dict as D; D.ON = True; vf = D.verb_forms() - E.NOUNISH; T.SPAN_STOP.update(vf)
+        if "--modal-stop" in ARGV: T.SPAN_STOP.update(E.MODALS)                          # R25-t: 'the beaver must' -- a modal ends a name / thing span
         print(f"R24-ap dictionary on: {len(vf)} verb forms end name / thing spans; irregular forms {len(D.EXC)}", flush=True)
     DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV; SHAPE = "--shape-keys" in ARGV
     kind = lambda q: q.lower().split()[0]
