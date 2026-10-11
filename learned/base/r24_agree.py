@@ -92,6 +92,7 @@ def main():
                 for k in akeys(q, how, a): heldk[k][0] += hit(a, g); heldk[k][1] += 1
     print("R24-p held-out precision by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]} = {v[0] / max(1, v[1]):.2f}" for k, v in held.items()}, flush=True)
     stories = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]
+    if "--val-more" in ARGV: stories = stories + json.load(open("val_more.json", encoding="utf-8"))["stories"]     # R24-al: the second hand-written validation set
     n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0]); valkk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
         for q, g in s["qs"]:
@@ -100,7 +101,7 @@ def main():
             if a is not None:
                 matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
                 for k in akeys(q, how, a): valkk[k][0] += h; valkk[k][1] += 1
-    print(f"R24-k validation ({n}): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
+    print(f"R24-k validation ({n} questions): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
     BAR = collections.defaultdict(lambda: 0.95)
     if "--vs-model" in ARGV:                                                             # R24-ai: the bar is the model's own accuracy on that kind of question (validation), not a hand number
         vm = json.load(open("b6_rwkv_val_ckpt_read1b.json", encoding="utf-8"))["items"]; mk = collections.defaultdict(lambda: [0, 0])
