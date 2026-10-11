@@ -272,6 +272,7 @@ class Reader:
             if alts: via = {v0: alts[0]}
         cv_story = set(cv) | set(via.values())
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
+        given = [cf_k.lower() for k, (cs_k, cf_k) in enumerate(zip(cs, cs_fillers)) if cs_k in ("PERSON", "ENT") and cf_k and k != missing and cf_k.lower() not in ("thing", "someone")] if cs_fillers else []
         def pick(ss, sf, i, j):
             raw = raws_list[j][i] if raws_list and j < len(raws_list) and i < len(raws_list[j]) else None
             txt = raw if (raw and ss[i] == "ENT" and raw.split()[0].lower() in T.DET) else sf[i]           # R24-aa: 'a small boat' as written, not 'the small boat'
@@ -279,6 +280,10 @@ class Reader:
         for j, (ss, sf) in enumerate(story_sents):
             if not cv_story & set(verbs_of(ss)): continue
             v = (cv_story & set(verbs_of(ss))).pop(); cvv = next((c for c in cv if c == v or via.get(c) == v), v); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
+            if given:                                                                  # R24-ac: among several clauses with the verb, the one holding the question's own names / things
+                vis = [i for i, x in enumerate(ss) if x == "V:" + v]
+                anchored = [i for i in vis if any(ss[k] in ("PERSON", "ENT") and sf[k] and any(sf[k].lower() == g or sf[k].lower().split()[-1] == g.split()[-1] for g in given) for k in range(*clause_of(ss, i)))]
+                if anchored and anchored[0] != vi: vi = anchored[0]; lo, hi = clause_of(ss, vi)
             if order and not any(ss[k] == "ORDER" and sf[k] == order and lo <= k < hi for k in range(len(ss))):
                 vis = [i for i, x in enumerate(ss) if x == "V:" + v and any(ss[k] == "ORDER" and sf[k] == order for k in range(*clause_of(ss, i)))]
                 if not vis: continue
