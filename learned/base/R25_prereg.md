@@ -205,3 +205,9 @@ From 381 saved groups: exchange 9.0735 -> 9.0724 -> 9.0704; 50 of 180 splits kep
 
 ## R25-c10 registration (more text, same saved groups)
 The group refinement continues from the 431 saved groups but counts 400,000 training sentences instead of 150,000 (about 7M tokens, the same text the vectors use). Held-out books unchanged. Passes if held-out bits fall below the start-of-run value measured with the larger counts (reported), and below 9.0653.
+
+## R25-u result (PASS)
+Model on 910: 610 (practice A+B 274/400). Learner's route trust chosen on 710 practice questions: kept 14 routes, all with at least two readers agreeing (plus learned-alone-exact+soft, role-alone+soft, state-agree); dropped the lone routes, including the hand cue reader alone even when confident (12 / 6 on practice), the template reader alone (14 / 11), the role reader alone (16 / 8). Practice 277 / 63 (+88) -> 186 / 10 (+156). **Untouched val_fresh2: 42 right / 6 wrong, precision 0.875, fitness +24** (R25-q, trust on 310: 47 / 13, +8). B6 once 79 (spoke 41, right 35).
+
+## R25-v registration (the role fixes re-judged with trust chosen on 710)
+R25-t's fixes (--do --time-args --modal-stop) hurt when trust was chosen on 310 practice questions. With 710, they are run again: R25-l configuration plus the fixes, all 910 questions, trust chosen on the 710 (--big). Passes if untouched fitness beats +24.
