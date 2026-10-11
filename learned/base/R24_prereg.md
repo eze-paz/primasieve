@@ -347,3 +347,5 @@ R24-t run 2 (event-statement teacher, regexes out): 171 question shapes from 14,
 R24-t run 3 (unmentioned slots dropped): exact level 1,081 / 1,488 = 0.73 unchanged, nothing admitted. Being traced: the templates the event teacher yields against the regex ask forms for the same questions.
 
 R24-t run 4 ('at' convention, order words carried): shape agreement 0.46, exact level 1,089 / 1,446 = 0.75; still below admission. Tracing the exact-level misses end to end.
+
+Trace of the exact-level misses under the event teacher: the wrong answers are on STATE questions the regexes never handled ('Who had X after Y dropped it?', 'Where was X when Y stole Z?', 'Who was holding X right after ...?') -- the teacher pairs them with whatever event statement contains the gold (the drop event), yielding a confident template that names the dropper. Run 5: a question is paired only with a statement whose verb is the question's own verb; questions with no such statement get no template and abstain.
