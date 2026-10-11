@@ -23,7 +23,7 @@ def main():
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
     DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV; SHAPE = "--shape-keys" in ARGV
-    import r24_qreader as QR0
+    import r24_qreader as QR0; QR0.ARGV = list(ARGV)                                   # R24-ag2: the flags, captured before a downstream import resets sys.argv
     def qslots(q): qs, qf = QR0.qshape(q, names); return [f if isinstance(f, str) else " ".join(f) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
     n_self = sum(1 for s in data[:7000] for q, g in s["qs"] if any(same(g[0], f) for f in qslots(q))); n_all = sum(len(s["qs"]) for s in data[:7000])
     SELF_RATE = n_self / max(1, n_all); print(f"R24-aa: answers that repeat a question slot in the generator: {n_self}/{n_all} = {SELF_RATE:.3f}", flush=True)
