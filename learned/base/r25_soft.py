@@ -284,6 +284,10 @@ def main_k():
     more = json.load(open("val_more.json", encoding="utf-8"))["stories"]
     practice = [(s["text"], q, g) for s in old + more[:20] for q, g in s["qs"]]
     holdout = [(s["text"], q, g) for s in more[20:] for q, g in s["qs"]]
+    if "--big" in ARGV:                                                                   # R25-w: thresholds chosen on all 710 practice questions; the untouched val_fresh2 judges
+        pa = json.load(open("val_practice_a.json", encoding="utf-8"))["stories"] + json.load(open("val_practice_b.json", encoding="utf-8"))["stories"]
+        practice = [(s["text"], q, g) for s in old + more + pa for q, g in s["qs"]]
+        holdout = [(s["text"], q, g) for s in json.load(open("val_fresh2.json", encoding="utf-8"))["stories"] for q, g in s["qs"]]
     fp = [(soft_role(t, q, names), g) for t, q, g in practice]; fh = [(soft_role(t, q, names), g) for t, q, g in holdout]
     def fit(F, tv, ta):
         r = w = 0
@@ -291,7 +295,7 @@ def main_k():
             if a is None or vs < tv or am < ta: continue
             r, w = (r + 1, w) if hit(a, g) else (r, w + 1)
         return r - 3 * w, r, w
-    grid = [(tv, ta) for tv in (1.0, 0.9, 0.8, 0.7, 0.6, 0.5) for ta in (0.0, 0.5, 0.8, 1.0)]
+    grid = [(tv, ta) for tv in (1.0, 0.9, 0.8, 0.7, 0.6, 0.5) for ta in (0.0, 0.3, 0.5, 0.65, 0.8, 1.0)]
     res = {k: fit(fp, *k) for k in grid}
     for k in grid: print(f"  verb similarity >= {k[0]}, argument match >= {k[1]}: practice {res[k]}", flush=True)
     best = max(grid, key=lambda k: res[k][0])

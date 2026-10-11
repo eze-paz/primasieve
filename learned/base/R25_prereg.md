@@ -211,3 +211,9 @@ Model on 910: 610 (practice A+B 274/400). Learner's route trust chosen on 710 pr
 
 ## R25-v registration (the role fixes re-judged with trust chosen on 710)
 R25-t's fixes (--do --time-args --modal-stop) hurt when trust was chosen on 310 practice questions. With 710, they are run again: R25-l configuration plus the fixes, all 910 questions, trust chosen on the 710 (--big). Passes if untouched fitness beats +24.
+
+## R25-v result (negative)
+Role fixes with trust chosen on 710: practice (trusted) 186 / 10 (+156) -> 209 / 16 (+161); untouched 42 / 6 (+24) -> 44 / 12 (+8). The fixes are closed.
+
+## R25-w registration (the role reader's thresholds re-chosen on 710 practice questions)
+The loose role reader's verb-similarity and argument-match thresholds were chosen on 210 practice questions. The learner re-chooses them on the 710 (r25_soft.py --k --big; argument grid 0 / 0.3 / 0.5 / 0.65 / 0.8 / 1.0), the policy reads them (--role-json), and route trust is chosen on the 710 again. Base: R25-u. Passes if untouched fitness beats +24.

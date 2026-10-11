@@ -101,7 +101,8 @@ def main():
         return tab[vg][ng] > 0 or expected < 5                                           # refused only where the books confidently never put this group in this role
     print(f"R24-am answer types learned for {sum(1 for k, c in TYPES.items() if sum(c.values()) >= 50)} question shapes / kinds", flush=True)
     print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
-    SOFT = "--soft" in ARGV; ROLE = "--role" in ARGV
+    SOFT = "--soft" in ARGV; ROLE = "--role" in ARGV; RTV, RTA = 0.8, 0.5
+    if "--role-json" in ARGV: _rk = json.load(open("r25_soft_k.json", encoding="utf-8")); RTV, RTA = _rk["tv"], _rk["ta"]; print(f"R25-w role reader thresholds from the learner's choice: verb >= {RTV}, args >= {RTA}", flush=True)
     if SOFT or ROLE:
         import r25_soft as S; S.ARGV_SOFT = list(ARGV); PROTOS = S.protos_from(data[:7000]); print(f"R25-i similarity reader on: prototypes for {sorted(PROTOS)}", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
@@ -140,7 +141,7 @@ def main():
             st, sm = (S.top(text, q, names, PROTOS) if (SOFT and ql.split()[0] in ("who", "what", "where", "when", "whom")) else (None, 0.0))   # R25-i: the similarity reader as a third vote
             rr = None
             if ROLE:                                                                     # R25-l: the loose role reader (R25-k thresholds chosen by the learner: verb >= 0.8, args >= 0.5)
-                ra, rv, ram = S.soft_role(text, q, names); rr = ra if (ra is not None and rv >= 0.8 and ram >= 0.5) else None
+                ra, rv, ram = S.soft_role(text, q, names); rr = ra if (ra is not None and rv >= RTV and ram >= RTA) else None
             plus = lambda x: ("+soft" if (st is not None and x is not None and same(x, st)) else "") + ("+role" if (rr is not None and x is not None and same(x, rr)) else "")
             if a is not None and b is not None and same(a, b): return a, "agree" + plus(a)
             if b is not None and a is None: return b, "learned-alone-" + ("shape" if R.LAST.get("shape") else (QR.LASTQ.get("level") if LEARNED_Q else "x")) + plus(b)
