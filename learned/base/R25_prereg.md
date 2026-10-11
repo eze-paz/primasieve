@@ -85,3 +85,9 @@ Informativeness (book IDF over 45,997 words) and proximity decay barely move the
 
 ## R25-k registration (a role reader that matches loosely)
 Roles come from the learned constructions (subject, object, place, time of each verb occurrence, clause-bounded); matching comes from the learner's vectors: the story verb most similar to the question verb, with the question's other arguments matched to the clause's names / things by cosine. The answer is the filler of the asked role (who V -> subject; what / who did X V -> object; where -> place; when -> time span). The learner chooses the verb-similarity and argument-match thresholds on practice (+1 / -3 / 0). Gate: holdout fitness > 0 with more right answers than R25-h (5); the exact-verb-only setting is reported as the reference for what loose verb matching adds.
+
+## R25-k result (PASS)
+Holdout (fresh m21-m40, 100 questions): **22 right / 3 wrong, fitness +13** (template readers alone 21 / 10, -9; similarity reader 5 / 1, +2). The learner chose verb similarity >= 0.8 and argument match >= 0.5 (practice 54 / 11, +21). The exact-verb setting scores the same on the holdout (22 / 3): the gain comes from learned roles plus loose argument matching rather than from similar verbs.
+
+## R25-l registration (the role reader joins the policy)
+Policy = R25-i configuration plus the loose role reader at the learner's thresholds: routes gain '+role' when it agrees; 'role-alone' when only it speaks; a lone unconfident cue answer returns when the role or similarity reader independently picks it. Admission by disagreements against the model. Primary measure: learner alone on the fresh 200 (right / wrong); secondary: validation precision after admission >= 0.90 gate, then B6 once.
