@@ -94,3 +94,40 @@ if "--quad" in ARGV:
     print(f"R25-ae three groups of context (backoff {best4}): {bits4(te, lambda q3_, p_, a, b: p_c(q3_, p_, a, b, best3, best4)):.4f} bits/token", flush=True)
     bm = min((0.2, 0.3, 0.4), key=lambda m: bits4(tune, lambda q3_, p_, a, b: m * p_big(a, b, best_lam) + (1 - m) * p_c(q3_, p_, a, b, best3, best4)))
     print(f"R25-ae three groups mixed with the word-pair model ({bm} word-pair): {bits4(te, lambda q3_, p_, a, b: bm * p_big(a, b, best_lam) + (1 - bm) * p_c(q3_, p_, a, b, best3, best4)):.4f} bits/token", flush=True)
+
+# ---------------- R25-af: a stronger standard baseline (word triples) ----------------
+if "--wtri" in ARGV:
+    tri = collections.Counter(); tric = collections.Counter()
+    for w in fit:
+        for i in range(2, len(w)): tri[(w[i - 2], w[i - 1], w[i])] += 1; tric[(w[i - 2], w[i - 1])] += 1
+    def p_wtri(pp, prev, x, mu):
+        n = tric[(pp, prev)]; p3 = tri[(pp, prev, x)] / n if n else 0.0; l = n / (n + mu)
+        return l * p3 + (1 - l) * p_big(prev, x, best_lam)
+    def bits3w(data, f):
+        t = n = 0
+        for w in data:
+            for i in range(1, len(w)):
+                pp = w[i - 2] if i >= 2 else "<s>"; t -= math.log2(max(f(pp, w[i - 1], w[i]), 1e-12)); n += 1
+        return t / n
+    mu_w = min((10, 30, 100, 300, 1000, 3000), key=lambda m: bits3w(tune, lambda pp, a, b: p_wtri(pp, a, b, m)))
+    print(f"R25-af word-triple model (backoff {mu_w}): {bits3w(te, lambda pp, a, b: p_wtri(pp, a, b, mu_w)):.4f} bits/token", flush=True)
+    ct2 = collections.Counter(); cbr2 = collections.Counter(); cq = collections.Counter(); cqr = collections.Counter()
+    for w in fit:
+        for i in range(2, len(w)): ct2[(cof(w[i - 2]), cof(w[i - 1]), cof(w[i]))] += 1; cbr2[(cof(w[i - 2]), cof(w[i - 1]))] += 1
+        for i in range(3, len(w)): cq[(cof(w[i - 3]), cof(w[i - 2]), cof(w[i - 1]), cof(w[i]))] += 1; cqr[(cof(w[i - 3]), cof(w[i - 2]), cof(w[i - 1]))] += 1
+    def p_g(ppp, pp, prev, x):
+        a3, a2, a, b = cof(ppp), cof(pp), cof(prev), cof(x)
+        p2 = (cb[(a, b)] + 0.1) / (rows[a] + 0.1 * C)
+        n3 = cbr2[(a2, a)]; q3 = (n3 / (n3 + 500)) * (ct2[(a2, a, b)] / n3 if n3 else 0.0) + (1 - n3 / (n3 + 500)) * p2
+        n4 = cqr[(a3, a2, a)]; q4 = (n4 / (n4 + 200)) * (cq[(a3, a2, a, b)] / n4 if n4 else 0.0) + (1 - n4 / (n4 + 200)) * q3
+        return q4 * (uni[x] / cn[b] if (x in V and cn[b]) else p_uni(x))
+    def bits4(data, f):
+        t = n = 0
+        for w in data:
+            for i in range(1, len(w)):
+                pp = w[i - 2] if i >= 2 else "<s>"; ppp = w[i - 3] if i >= 3 else "<s>"
+                t -= math.log2(max(f(ppp, pp, w[i - 1], w[i]), 1e-12)); n += 1
+        return t / n
+    mm = min((0.2, 0.3, 0.4, 0.5, 0.6), key=lambda m: bits4(tune, lambda q3_, p_, a, b: m * p_wtri(p_, a, b, mu_w) + (1 - m) * p_g(q3_, p_, a, b)))
+    print(f"R25-af learner's three-group model alone (R25-ae settings): {bits4(te, p_g):.4f} bits/token", flush=True)
+    print(f"R25-af word-triple model mixed with the learner's groups ({mm} word-triple): {bits4(te, lambda q3_, p_, a, b: mm * p_wtri(p_, a, b, mu_w) + (1 - mm) * p_g(q3_, p_, a, b)):.4f} bits/token", flush=True)

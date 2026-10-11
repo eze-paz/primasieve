@@ -310,3 +310,9 @@ Model on val_fresh3: 127 / 200. R25-x reproduced exactly on the earlier sets (pr
 
 ## R25-af registration (a stronger baseline for the next-word claim)
 An interpolated word-triple model (previous two words, backing off to the word-pair and single-word models; weights chosen on the training slice), same tokens, training text and held-out books. Compared with the learner's three-group model (R25-ae, 8.5344 alone) and mixed with it (weight on the training slice). Reported as is; the claim 'the learner's groups beat a standard word model' stands only if the groups (alone or as the larger share of a mix) beat the word-triple model.
+
+## R25-af result (baseline under-tuned)
+Word-triple model 9.0016 bits/token -- worse than the word-pair model (8.8078), with its backoff strength at the top of the grid (10): under-smoothed, not yet a fair strong baseline. Learner's three-group model 8.5344; word-triple mixed with the groups 8.2902 (best next-word score so far). No head-to-head claim until the baseline is tuned.
+
+## R25-af2 (same registration, wider backoff grid for the baseline)
+Word-triple backoff strength chosen from {10, 30, 100, 300, 1000, 3000} on the training slice; everything else unchanged.
