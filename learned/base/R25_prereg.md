@@ -136,3 +136,9 @@ Exchange then splits again, starting from the 213 saved groups: up to 2 exchange
 ## R25-p registration (clean checkpoint on an untouched set)
 val_fresh2.json: 40 stories, 200 questions (who 70, what 60, where 40, when 16, why 6, whose 5, how 3), written by a separate agent barred from the tests folder and b6_ files; verified here: every gold form occurs in its story. No choice has been made on it. Caveat from its author: five fables retell well-known Aesop plots (the learner has no knowledge of them; the model may).
 The model (ckpt_read1b) is run once on all 510 validation questions. Then the R25-l configuration (role and similarity readers, dictionary, no-loose, disagreement admission) runs once. Primary measure: the learner alone on val_fresh2 (right / wrong out of 200), compared with the earlier configuration R24-ap2 run on the same 200 in the same pass. Secondary: B6 once.
+
+## R25-c4 result (PASS)
+From the saved 214 groups: exchange 9.1273 -> 9.1259 -> 9.1233; then 26 of 60 splits kept -> 240 groups, held-out 9.1196. New distinctions: man / woman / girl / child / boy split from rare nouns; white / black / red / blue vs cold / hot / warm / dry; wine / music / fish / bread vs water / light / gold / paper / stone; seen / done / taken / given vs filled / covered / surrounded; up / down / away / off / forth as a group.
+
+## R25-c5 registration
+The next cycle from the 240 saved groups (2 exchange passes, 80 split tries). Passes if held-out bits fall below 9.1196.
