@@ -4,21 +4,22 @@ compressed to 100 dimensions (truncated SVD). Two words are similar when their p
 Saved to r25_vectors.npz (vocab + unit vectors); a later run can refine or rebuild from more text.
 Run: python learned/base/r25_vectors.py"""
 import os, sys, json, collections, time
+ARGV = list(sys.argv)
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_books as B, data as D0
 
 
 def main():
-    t0 = time.time(); train_b, _ = D0.books(); paras = B.paragraphs(train_b, 400000)
+    t0 = time.time(); train_b, _ = D0.books(); paras = B.paragraphs(train_b, int(ARGV[ARGV.index("--sents") + 1]) if "--sents" in ARGV else 400000)
     sents = []
     for p in paras:
         for s in T.SENT.split(p["text"]):
             w = [x.lower() for x in T.TOK.findall(s) if x.isalpha()]
             if len(w) >= 2: sents.append(w)
     uni = collections.Counter(x for w in sents for x in w)
-    vocab = [w for w, c in uni.most_common(15000) if c >= 5]; vi = {w: i for i, w in enumerate(vocab)}
-    ctx = [w for w, _ in uni.most_common(3000)]; ci = {w: i for i, w in enumerate(ctx)}
+    vocab = [w for w, c in uni.most_common(int(ARGV[ARGV.index("--vocab") + 1]) if "--vocab" in ARGV else 15000) if c >= 5]; vi = {w: i for i, w in enumerate(vocab)}
+    ctx = [w for w, _ in uni.most_common(int(ARGV[ARGV.index("--ctx") + 1]) if "--ctx" in ARGV else 3000)]; ci = {w: i for i, w in enumerate(ctx)}
     M = np.zeros((len(vocab), len(ctx)), dtype=np.float32)
     for w in sents:
         for i, x in enumerate(w):
