@@ -285,3 +285,9 @@ From 526 saved groups on all text: exchange 8.8421 -> 8.8400 -> 8.8389; 45 of 15
 
 ## R25-ac registration (the learner's groups in the next-word game, against a fair baseline)
 Same tokens (lowercase words), same training text (all training paragraphs) and same held-out books as R25-c: (a) the learner's class-bigram model (its 571 groups) and (b) an interpolated word-bigram model with its mixing weight chosen on a slice of the training text; bits per token on the held-out books. Also (c) the two mixed, weight chosen on the training slice. Reported as is.
+
+## R25-ac result
+Held-out books, 270,358 predictions, same tokens and text: word-pair model 8.8078 bits/token; the learner's 572 groups (class-pair) **8.7897**; both mixed **8.6294**. The learner's groups beat the word-pair model with far fewer parameters (about 330k group-pair counts against millions of word-pair counts), and they carry information the word pairs lack (-0.18 bits mixed).
+
+## R25-ad registration (two words of context through the learner's groups)
+Predict the next group from the previous two groups, backing off to the previous one when evidence is thin (interpolation weight chosen on the training slice), times the word-given-group probability; mixed with the word-pair model (weight on the training slice). Held-out books scored once. Passes if bits fall below 8.6294.
