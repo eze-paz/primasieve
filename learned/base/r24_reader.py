@@ -207,9 +207,13 @@ class Reader:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
                 if cv and not any(set(verbs_of(ss)) & set(cv) for ss, sf in sents):
                     known = {f.lower() for f in cf if f}
-                    best = max(sents, key=lambda t: len(known & {f.lower() for f in t[1] if f}) if verbs_of(t[0]) else -1, default=None)
-                    if best is not None and len(known & {f.lower() for f in best[1] if f}) >= 1 and verbs_of(best[0]):
-                        sv = verbs_of(best[0])[0]; self.equiv[cv[0]][sv] += 1
+                    scored = [(len(known & {f.lower() for f in t[1] if f}), -i, t) for i, t in enumerate(sents) if verbs_of(t[0])]
+                    best = max(scored, default=None)
+                    if best is not None and best[0] >= 2:
+                        ss0, sf0 = best[2]; vis = [i for i, x in enumerate(ss0) if x.startswith("V:")]
+                        def held(vi):                                                      # overlapping fillers inside the verb's clause
+                            lo, hi = clause_of(ss0, vi); return sum(1 for k in range(lo, hi) if sf0[k] and sf0[k].lower() in known)
+                        sv = ss0[max(vis, key=held)][2:]; self.equiv[cv[0]][sv] += 1
                         cs = tuple(("V:" + sv) if x == "V:" + cv[0] else x for x in cs); cv = verbs_of(cs)       # align through the equivalent verb
                 for ss, sf in sents:
                     if not set(verbs_of(ss)) & set(cv): continue
