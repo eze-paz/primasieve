@@ -199,6 +199,10 @@ def qparse(q, names):
     """(asked role, question verb, question argument heads) or None"""
     qs, qf = QR.qshape(q, names); k = q.lower().split()[0]
     verbs = [x[2:] for x in qs if x.startswith("V:")]; v = verbs[0] if verbs else None
+    if "--state" in ARGV_SOFT and k == "where" and not verbs and len(qs) > 1 and qs[1] in ("was", "were", "w"):   # R25-o: 'where was X (at the end / at noon)' asks for a state
+        a0 = [(f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
+        tw = [w for w in T.TOK.findall(q) if w.isalpha() and w.lower() not in T.STOP and w.lower() not in ("where", "was", "were", "end")]
+        if a0: return ("state", None, [a0[0].split()[-1]] + [w for w in tw if w.lower() != a0[0].split()[-1].lower()])
     if v is None: return None
     args = [(f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
     args = [a.split()[-1] for a in args if a.lower() not in ("it", "him", "her", "them", "he", "she", "they")]
@@ -239,6 +243,19 @@ def soft_role(text, q, names, story_cache=None):
     p = qparse(q, names)
     if p is None: return None, 0.0, 0.0
     role, v, args = p; vv = vec(v) if v else None
+    if role == "state":                                                                   # R25-o: the place of the clauses about X; the time words choose among them, else the latest
+        if story_cache is None:
+            sents = []
+            for x in T.SENT.split(text):
+                if x.strip(): cs, cf = R.construction(x, names); sents.append((cs, cf, list(R.LAST_RAWS)))
+            story_cache = roles_of(sents)
+        x0 = args[0].lower(); rest = args[1:]
+        about = [c for c in story_cache if c["place"] and any(r_ and r_.split()[-1].lower() == x0 for r_ in (c["subj"], c["obj"]))]
+        if not about: return None, 0.0, 0.0
+        if rest:
+            def tm(c): ws = [w for w in T.TOK.findall(c["when"] or "") if w.isalpha()]; return max([1.0 if w.lower() == r.lower() else (max(0.0, float(np.dot(vec(w), vec(r)))) if vec(w) is not None and vec(r) is not None else 0.0) for w in ws for r in rest] or [0.0])
+            best = max(about, key=lambda c: (tm(c), c["si"])); return best["place"], 1.0, tm(best)
+        return about[-1]["place"], 1.0, 1.0
     if role != "do" and vv is None: return None, 0.0, 0.0
     if story_cache is None:
         sents = []

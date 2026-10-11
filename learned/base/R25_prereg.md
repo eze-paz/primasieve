@@ -105,3 +105,9 @@ Practice-only look at the action role: 4 of 6 right ('ate half', 'to climb the h
 
 ## R25-n registration (time phrases are arguments)
 A clause's time phrase joins its arguments for loose matching (--time-args), with the R25-m roles on. Same harness, thresholds re-chosen by the learner; gate: holdout fitness > R25-k's +13.
+
+## R25-n result (gate failed by one point)
+Holdout 24 right / 4 wrong (+12) vs R25-k 22 / 3 (+13); practice 60 / 12 (+24). Negative by the registered gate. The 100-question holdout can no longer separate differences of one or two answers, and its totals have now been read four times; finer tuning on it stops here.
+
+## R25-o registration (states: 'where was X')
+About 19 practice questions ask for a state ('Where was Beth at the end?', 'Where was the key at noon?'). The loose role reader gains a state role (--state): the clauses in which X is the subject or the object and a place is named; the question's time words choose among them by loose matching to each clause's time phrase, otherwise the latest clause wins; the answer is that clause's place. Base: the R25-k configuration (no --do). Gate: holdout fitness > +13.
