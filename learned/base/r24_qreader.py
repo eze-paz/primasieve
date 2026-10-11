@@ -6,7 +6,7 @@ At read time a question is matched to the nearest learned question shape (exact 
 the question word and the verb) and rendered as a canonical construction with its missing slot; r24_reader fills it.
 Run: python learned/base/r24_qreader.py"""
 import os, sys, re, json, random, collections
-SHOW = "--show" in sys.argv
+SHOW = "--show" in sys.argv; ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E, r24_reader as R
 from b6_rwkv import hit
@@ -114,6 +114,17 @@ def main():
         a = R.canonical(q, [ph if k != "what" or not (q.lower().endswith(" to do") or q.lower().endswith(" to learn")) else "to do something"])
         return (q, a, ph if a and ph in a else ("to do something" if a and "to do something" in a else None)) if a else None
     pairs = [t for s in data[:7000] for q, g in s["qs"] for t in [ask_form(q)] if t and t[2]]
+    if "--event-teacher" in ARGV:                                                         # R24-t: learn from the story's event statements instead of the regexes
+        pairs = []
+        for s in data[:7000]:
+            if not s.get("events"): continue
+            stmts = [R.event_statement(e) for e in s["events"]]
+            for q, g in s["qs"]:
+                qs, qf = qshape(q, names); qslots = {f.lower() for x, f in zip(qs, qf) if x in ("PERSON", "ENT")}
+                for st in stmts:
+                    cs, cf = R.construction(st, names); fl = {f.lower() for f in cf if f}
+                    gold = next((f for f in cf if f and (f.lower() == g[0].lower() or f.lower() == T.key_of("ENT", g[0].lower().split()) or g[0].lower() in f.lower())), None)
+                    if gold and (qslots & fl or not qslots): pairs.append((q, st, gold)); break
     Q = QReader(); Q.learn(pairs, names); print(f"question reader: {len(Q.map)} question shapes learned from {len(pairs)} pairs", flush=True)
     # R24-s1: agreement with the hand regexes on held-out questions, and extra coverage
     same = handled = extra = total = 0; ab = lambda t: tuple("REF" if x in ("PERSON", "ENT") else x for x in t)

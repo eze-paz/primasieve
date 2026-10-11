@@ -252,6 +252,21 @@ def paraphrase(R, text):
     return " ".join(out)
 
 
+def paraphrase_q(R, q):
+    """R24-t: another wording of the same question, gold unchanged"""
+    r = R.random(); m = re.match(r"^What did (.+?) (\w+)\?$", q)
+    if m and r < 0.35: return R.choice([f"Which thing did {m.group(1)} {m.group(2)}?", f"{m.group(1)} {m.group(2).replace('buy', 'bought').replace('take', 'took').replace('give', 'gave')} what?" if False else f"Which thing did {m.group(1)} {m.group(2)}?"])
+    m = re.match(r"^Who (\w+) (.+?)\?$", q)
+    if m and r < 0.35: return R.choice([f"Which person {m.group(1)} {m.group(2)}?", f"Which one of them {m.group(1)} {m.group(2)}?"])
+    m = re.match(r"^Where did (.+?) (\w+) (.+?)\?$", q)
+    if m and r < 0.35: return R.choice([f"In which place did {m.group(1)} {m.group(2)} {m.group(3)}?", f"At what place did {m.group(1)} {m.group(2)} {m.group(3)}?"])
+    m = re.match(r"^When did (.+?)\?$", q)
+    if m and r < 0.35: return f"At what time did {m.group(1)}?"
+    m = re.match(r"^Why did (.+?)\?$", q)
+    if m and r < 0.35: return f"For what reason did {m.group(1)}?"
+    return q
+
+
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else 6000
     names = json.load(open(os.path.join(ROOT, "learned", "cache", "names.json"), encoding="utf-8"))["pool"]
@@ -268,7 +283,7 @@ def main():
                 if x not in used and x not in test_names: used.add(x); return x, g
         for item in skeletons(R, P) + (fables(R, P) if "--v2" in sys.argv else []):
             text, qs = item[0], item[1]
-            if "--paraphrase" in sys.argv: text = paraphrase(R, text)
+            if "--paraphrase" in sys.argv: text = paraphrase(R, text); qs = [(paraphrase_q(R, q), g) for q, g in qs]
             data.append(dict(text=text, qs=qs, events=item[2] if len(item) > 2 else None))      # R20c: exact events where the skeleton emits them
     R.shuffle(data); data = data[:n]
     assert not any(d["text"] == s["text"] for d in data for s in test)
