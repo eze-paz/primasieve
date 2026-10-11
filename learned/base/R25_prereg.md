@@ -259,3 +259,9 @@ Teaching on val_more + A (268 pairs, 315 statements), trust chosen on old 110 + 
 
 ## R25-aa registration (trust per route and question kind)
 On R25-x's logged answers, no rerun: the learner trusts a (route, question kind) when it has >= 10 practice answers with fitness > 0, otherwise decides at the route level as in R25-u. Chosen on the 710 practice questions; untouched scored once. Passes if untouched fitness beats +28.
+
+## R25-aa result (negative)
+Trust per (route, question kind) chosen on 710 practice: practice 198 / 10 (+168); untouched 46 / 10, +16 < +28. More decisions on the same evidence overfit; route-level trust stays.
+
+## R25-ab plan (more practice evidence)
+Trust chosen on 310 -> 710 practice questions moved untouched fitness +8 -> +24. Two more practice sets (C, D; 200 each) are commissioned from separate writers barred from the tests folder and b6_ files, avoiding every name already used; trust will then be chosen on 1,110. Registered when the sets arrive.
