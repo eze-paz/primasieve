@@ -58,7 +58,7 @@ def main():
             n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
             if a is not None: matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
     print(f"R24-k validation ({n}): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
-    admitted = {k for k in set(held) | set(valk) if (held[k][1] == 0 or held[k][0] / held[k][1] >= 0.95) and (valk[k][1] == 0 or valk[k][0] / valk[k][1] >= 0.95)}
+    admitted = {k for k in set(held) | set(valk) if (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) >= 0.95}      # R24-q3: pooled precision, held-out and validation together
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
     if matched and right / matched >= 0.90:
         tests = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; rep = json.load(open("b6_rwkv_ckpt_read1b.json", encoding="utf-8"))["items"]; i = 0

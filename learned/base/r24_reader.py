@@ -259,7 +259,7 @@ class Reader:
 
     def fill(self, story_sents, names, cs, missing, keep_prep=False, cs_fillers=None):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
-        cv = set(verbs_of(cs)); best = None; LAST["shape"] = False
+        cv = set(verbs_of(cs)[:1]); best = None; LAST["shape"] = False                   # the question's own verb is the anchor, never a verb in its tail ('for fixing it')
         order0 = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
         def carries(ss, sf): return any(ss[i] == "V:" + v and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for v in cv for i in range(len(ss)))
         via = {}
