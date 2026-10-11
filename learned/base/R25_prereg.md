@@ -97,3 +97,6 @@ Learner alone, fresh 200: **67 right / 14 wrong** (R25-i 58 / 12; R24-ap2 45 / 8
 
 ## R25-m registration (actions and complements as roles)
 Practice-only error analysis (old 110 + fresh m1-m20; the holdout half not inspected): 22 silent 'what did' questions and several wrong answers ask for an action ('What did the magpie do one evening?' -> 'dropped a shiny button'), which no reader can return. The loose role reader gains two roles: 'do' (the verb and what follows it to the clause end, in the clause whose subject matches the one the question names) and 'comp' ('What did the donkey refuse to do?' -> the complement of 'refuse'). Flag --do. Measured first in the reader harness (thresholds re-chosen by the learner; gate: holdout fitness > R25-k's +13), then in the policy (learner alone on fresh 200; B6 once).
+
+## R25-m result (gate failed)
+Reader harness with action / complement roles: practice 54 / 11 (+21) -> 57 / 10 (+27); holdout 22 / 3 (+13) -> 22 / 4 (+10). Negative by the registered gate.
