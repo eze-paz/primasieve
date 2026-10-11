@@ -113,12 +113,27 @@ def main():
     pooled = {k: (heldk[k][0] + valkk[k][0], heldk[k][1] + valkk[k][1]) for k in set(heldk) | set(valkk)}
     def admit(q, how, a):
         """R24-y: the finest key with enough evidence (>= 8) decides; precision >= 0.95 admits"""
+        if "--disagree" in ARGV:
+            w, l = WL[(kind(q), how)]
+            if w > l: return True                                                        # this route wins its disagreements with the model
+            if l > w: return False                                                       # this route loses them
         if not FINE: return (kind(q), how) in admitted
         for k in akeys(q, how, a):
             r, t = pooled.get(k, (0, 0))
             if len(k) == 2: return k in admitted
             if t >= (20 if SHAPE else 8): return r / t > BAR[k[0]] if "--vs-model" in ARGV else r / t >= 0.95
         return False
+    WL = collections.defaultdict(lambda: [0, 0])                                         # R24-ak: per (kind, route), on validation, disagreements with the model won / lost by the reader
+    if "--disagree" in ARGV:
+        vm2 = json.load(open("b6_rwkv_val_ckpt_read1b.json", encoding="utf-8"))["items"]; i2 = 0
+        for s2 in stories:
+            for q, g in s2["qs"]:
+                a2, how2 = answer(s2["text"], q); mh = vm2[i2]["hit"]; i2 += 1
+                if a2 is None: continue
+                rh = hit(a2, g)
+                if rh and not mh: WL[(kind(q), how2)][0] += 1
+                if mh and not rh: WL[(kind(q), how2)][1] += 1
+        print("R24-ak disagreements with the model on validation (won, lost) by kind and route:", {f"{k[0]}/{k[1]}": tuple(v) for k, v in WL.items() if sum(v)}, flush=True)
     if FINE: print("R24-y admission keys with >= 8 evidence and precision >= 0.95:", sorted(str(k) for k, (r, t) in pooled.items() if t >= 8 and r / t >= 0.95), flush=True)
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
     adm_right = adm_n = 0; vmi = json.load(open("b6_rwkv_val_ckpt_read1b.json", encoding="utf-8"))["items"] if "--vs-model" in ARGV else None; vi = 0; v_model = v_merged = 0
