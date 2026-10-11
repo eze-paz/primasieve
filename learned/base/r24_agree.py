@@ -6,6 +6,7 @@ Run: python learned/base/r24_agree.py"""
 import os, sys, json, random
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E, r24_reader as R
+import r24_probe as P
 from b6_rwkv import hit
 
 
@@ -24,9 +25,16 @@ def main():
     seqs = [list(R.construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     CH = R.Chunks(seqs); rd = R.Reader(CH); rd.learn(train[:6000], names, weigh=False); rd.learn(train[6000:], names, weigh=True)
     tabs = (rd.w, rd.wn); rd = R.Reader(CH); rd.w, rd.wn = tabs; rd.learn(train, names, weigh=False)
+    PM, pnames, HM, hnames = P.fit_all()                                                 # R24-q: the learned world layers (place / time / holder)
 
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = R.ask(rd, text, names, q)
+        ql = q.lower()
+        if ql.startswith(("where was ", "who had ", "who was holding ")):
+            try: c = P.answer(PM, pnames, HM, hnames, text, q)
+            except Exception: c = None
+            if c is not None and a is not None and same(a, c): return a, "state-agree"
+            if c is not None and b is not None and same(b, c): return b, "state-agree"
         if q.lower().split()[0] == "when": return (b, "learned-when") if b is not None else (None, "silent")       # R24-p2: 'when' is the learned reader's span
         if a is not None and b is not None and same(a, b): return a, "agree"
         if b is not None and R.LAST.get("shape") and q.lower().split()[0] in ("who", "what", "where"): return b, "learned-confident"   # R24-p5: the exact shape decided
