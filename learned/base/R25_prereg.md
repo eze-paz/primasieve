@@ -193,3 +193,9 @@ Next group cycle from the 337 saved groups (2 exchange passes, 150 split tries).
 
 ## R25-u registration (route trust chosen on 710 practice questions)
 Two more practice sets (val_practice_a / _b, 200 questions each, separate writers barred from the tests folder and b6_ files; verified: every gold form in its story; no digit forms in B). Practice becomes 710 (old 110 + val_more 200 + A 200 + B 200); val_fresh2 stays the untouched judge (total only). The model is run once on all 910. The R25-l configuration runs once; the learner chooses its trusted routes on the 710 (r25_trust.py --big). Passes if untouched fitness beats +8 (R25-q). Note: story ids f1-f6 repeat between val_fables and val_fresh2; alignment is by question text and order, asserted per question.
+
+## R25-c8 result (PASS)
+From 338 saved groups: exchange 9.0830 -> 9.0784 -> 9.0777; 42 of 150 splits kept -> 380 groups; held-out 9.0735.
+
+## R25-c9 registration
+Next cycle from the 380 saved groups (2 exchange passes, 180 split tries). Passes if held-out bits fall below 9.0735.
