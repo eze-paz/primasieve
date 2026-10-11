@@ -12,7 +12,7 @@ TOK = re.compile(r"[A-Za-z][A-Za-z'-]*|[.,;!?]")
 SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
 PRON = {"he", "she", "him", "her", "his", "they", "them", "it", "i", "you", "we", "me", "my", "your", "us", "our"}   # run 2d: first/second person are pronoun forms too
 DET = {"the", "a", "an", "his", "her", "their", "its"}
-STOP = {"and", "to", "of", "at", "in", "on", "by", "near", "with", "for", "from", "into", "back", "down", "up", "home", "there", "then", "when", "while", "under", "behind", "over", "across", "through", "toward", "towards", "inside", "outside", "onto",
+STOP = {"and", "to", "of", "at", "in", "on", "by", "near", "with", "for", "from", "into", "back", "down", "up", "home", "there", "then", "when", "while", "under", "behind", "over", "across", "through", "toward", "towards", "inside", "outside", "onto", "beside", "along", "past",
         "was", "were", "is", "had", "who", "that", "which", "but", "so", "because", "without", "until", "after", "before", "first", "second", "last", "away", "together"}
 FLOOR = 0.01; RANKS = ("recency", "subject"); K = 20
 
