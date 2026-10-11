@@ -271,3 +271,5 @@ R24-l run 9 (verb stems end thing spans): held-out who 1,256 / 1,765, what 332 /
 **R24-l2 result:** validation **36 / 80 matched, 35 right (0.97)**, agreement route 33 / 34; **B6 once: the two readers spoke on 33, right 30 (0.91); merged 81 / 100** -- the first time the non-LLM readers in front of the model beat the model alone (80); hand world merged 82, bar 85.
 
 R24-l run 10 (time-headed things are TIME, 'a boy named Erlend' yields the name, bare-preposition questions rendered in the story's order): held-out 0.75 unchanged; **validation 50 / 80 matched, 41 right (0.82)** -- the learned reader now beats the cue-built event log on both coverage (50 vs 45) and right answers (41 vs 40). **R24-l3 registration:** agreement with this reader, validation then B6 once.
+
+**R24-l3 result:** validation **41 / 80 matched, 40 right (0.98)**, agreement route 38 / 39; B6 once: readers spoke on 33, right 30, **merged 81 / 100** (model 80, hand world 82, bar 85). The frozen-test ceiling holds at 81: the readers' three test errors are on question shapes the validation set does not contain.
