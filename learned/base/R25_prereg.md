@@ -142,3 +142,9 @@ From the saved 214 groups: exchange 9.1273 -> 9.1259 -> 9.1233; then 26 of 60 sp
 
 ## R25-c5 registration
 The next cycle from the 240 saved groups (2 exchange passes, 80 split tries). Passes if held-out bits fall below 9.1196.
+
+## R25-c5 result (PASS)
+From 241 saved groups: exchange 9.1196 -> 9.1142 -> 9.1086; 28 of 80 splits kept -> 269 groups; held-out 9.1037. Distinctions: mind / heart / tongue / conscience vs mother / wife / friend / husband; state / story / scene / situation vs town / city / point / book; natural / simple / sweet / proper vs strange / beautiful / terrible / wonderful; men / people / women / children as a group; door / window / river / road / wall as a group.
+
+## R25-c6 registration
+Next cycle from the 269 saved groups (2 exchange passes, 100 split tries). Passes if held-out bits fall below 9.1037.
