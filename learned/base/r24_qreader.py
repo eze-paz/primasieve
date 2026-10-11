@@ -62,7 +62,9 @@ class QReader:
                 elif x.startswith("V:"): tmpl.append(f"V{[v for v in qs if v.startswith('V:')].index(x) if x in qs else 0}")
                 elif x in qwords: tmpl.append(f"W{qwords.index(x)}")
                 else: tmpl.append(x)
-            for key in keys_of(qs): self.map[key][tuple(tmpl)] += 1
+            for key in keys_of(qs):                                                       # coarser keys store templates without the references they cannot resolve
+                t2 = tuple(x for x in tmpl if not (key[0] in ("noword", "coarse") and x.startswith("W") and x[1:].isdigit()))
+                self.map[key][t2] += 1
 
     def render(self, q, names):
         """a canonical construction (syms, fillers) with its missing slot index, or None"""
