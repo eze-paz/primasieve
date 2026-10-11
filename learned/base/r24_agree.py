@@ -39,11 +39,12 @@ def main():
         for q, g in s["qs"]: k = qshape_nw(q); SELF_BY[k][0] += any(same(g[0], f) for f in qslots(q)); SELF_BY[k][1] += 1
     SELF_SHAPES = {k for k, (r, t) in SELF_BY.items() if t >= 20 and r / t < 0.02}
     lnames = {n.lower() for n in names}
+    CLS = json.load(open("r25_classes.json", encoding="utf-8")) if "--classes" in ARGV else E.CLASS     # R25-d: the learner's own refined word groups
     def atype(ans):                                                                      # R24-am: an answer's type: a name, or the induced word class of its head word
         w = [x for x in T.TOK.findall(ans.lower()) if x.isalpha()]
         if not w: return "EMPTY"
         if w[-1] in lnames or ans.split()[-1][:1].isupper(): return "NAME"
-        return f"C{E.CLASS[w[-1]]}" if w[-1] in E.CLASS else "UNK"
+        return f"C{CLS[w[-1]]}" if w[-1] in CLS else "UNK"
     TYPES = collections.defaultdict(collections.Counter)                                 # (question shape) -> answer types seen in the generator's gold answers
     for s_ in data[:7000]:
         for q, g in s_["qs"]:

@@ -33,3 +33,9 @@ Pruning removed 11 of 13 stored revisions by the learner's own transfer rule (al
 - Operator: exchange -- each of the 8,000 most frequent words moves to the group with the highest training likelihood; a pass is kept only if held-out bits fall.
 - Downstream gate (next registration, R25-d): the answer-type check that failed in R24-am because the groups were too crude ('doctor', 'nephew', 'dusk') is rerun with the learner's refined groups; it passes if it removes wrong answers on validation without losing right ones; then B6 once.
 - Gate for R25-c itself: held-out bits/token fall below the starting groups'.
+
+## R25-c result (PASS)
+Held-out book bits/token 9.8298 -> 9.1414 -> 9.1301 (pass 3 9.1336 rejected by the learner's own score); 4,925 then 1,748 words moved; groups saved to r25_classes.json. Groups now gather by meaning without labels: 'doctor' with king, maid, colonel, dentist, baron, countess (also sun, moon); 'nephew' with mother, wife, son, daughter, sister, cousin; 'dusk' with dawn, midnight, noon, breakfast, lunch; 'lend' with give, tell, teach, allow; 'eleven' with the numbers. 'mole' still sits with time / counting nouns.
+
+## R25-d registration (downstream use of the learner's own groups)
+The answer-type check of R24-am is rerun with --classes (the learner's refined groups) on the R24-ap2 configuration. Passes if, on validation, it removes wrong answers while losing at most as many right answers as it removes (R24-am with the old groups lost 16 right on all 310), and validation precision after admission >= 0.90; then B6 once.
