@@ -232,3 +232,6 @@ Training books hold 22.1M words / 944k sentences; the vectors used 7M. Rebuild f
 
 ## R25-x result (PASS)
 Vectors from 13.0M tokens (all training paragraphs the reader keeps; 25,000 words x 4,000 contexts): nearest to 'lend' give / repay / send / grant / pay; 'parcel' package / packet / bundle / envelope; 'nephew' cousin / son / brother / heir. Role reader alone (thresholds unchanged, 0.8 / 0.5): practice 177 / 41, untouched 48 / 8. Policy with trust chosen on 710: practice 195 / 11 (+162); **untouched 46 right / 6 wrong, precision 0.885, fitness +28** (R25-u +24). B6 once 80 (spoke 38, right 33).
+
+## R25-y registration (directional contexts)
+The learner's word profiles count left and right neighbours separately (--directional; 2,500 context words per side, 25,000 words, same 13M tokens); previous vectors kept as r25_vectors_13m.npz. Same chain as R25-x: role thresholds re-chosen on 710, policy, trust on 710. Passes if untouched fitness beats +28.

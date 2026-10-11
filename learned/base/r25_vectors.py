@@ -20,13 +20,14 @@ def main():
     uni = collections.Counter(x for w in sents for x in w)
     vocab = [w for w, c in uni.most_common(int(ARGV[ARGV.index("--vocab") + 1]) if "--vocab" in ARGV else 15000) if c >= 5]; vi = {w: i for i, w in enumerate(vocab)}
     ctx = [w for w, _ in uni.most_common(int(ARGV[ARGV.index("--ctx") + 1]) if "--ctx" in ARGV else 3000)]; ci = {w: i for i, w in enumerate(ctx)}
-    M = np.zeros((len(vocab), len(ctx)), dtype=np.float32)
+    DIR = "--directional" in ARGV                                                         # R25-y: left and right neighbours counted separately
+    M = np.zeros((len(vocab), len(ctx) * (2 if DIR else 1)), dtype=np.float32)
     for w in sents:
         for i, x in enumerate(w):
             r = vi.get(x)
             if r is None: continue
             for j in range(max(0, i - 2), min(len(w), i + 3)):
-                if j != i and w[j] in ci: M[r, ci[w[j]]] += 1
+                if j != i and w[j] in ci: M[r, ci[w[j]] + (len(ctx) if (DIR and j > i) else 0)] += 1
     print(f"R25-g co-occurrence: {len(vocab)} words x {len(ctx)} contexts from {sum(uni.values())} tokens ({time.time() - t0:.0f} s)", flush=True)
     tot = M.sum(); pr = M.sum(1, keepdims=True) / tot; pc = M.sum(0, keepdims=True) / tot
     with np.errstate(divide="ignore", invalid="ignore"):
