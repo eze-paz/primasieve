@@ -229,3 +229,6 @@ Re-choosing on 710 practice questions, the learner picked the same role threshol
 
 ## R25-x registration (the learner's word vectors from all the training text)
 Training books hold 22.1M words / 944k sentences; the vectors used 7M. Rebuild from all of it (--sents 1000000), vocabulary 25,000 words, 4,000 context words; previous vectors kept as r25_vectors_7m.npz. Then the role reader re-chooses its thresholds on the 710 practice questions (r25_soft.py --k --big), the R25-u policy runs with them (--role-json), and route trust is chosen on the 710. Passes if untouched fitness beats +24; the role reader alone on the untouched 200 (R25-w: 46 / 7) is also reported.
+
+## R25-x result (PASS)
+Vectors from 13.0M tokens (all training paragraphs the reader keeps; 25,000 words x 4,000 contexts): nearest to 'lend' give / repay / send / grant / pay; 'parcel' package / packet / bundle / envelope; 'nephew' cousin / son / brother / heir. Role reader alone (thresholds unchanged, 0.8 / 0.5): practice 177 / 41, untouched 48 / 8. Policy with trust chosen on 710: practice 195 / 11 (+162); **untouched 46 right / 6 wrong, precision 0.885, fitness +28** (R25-u +24). B6 once 80 (spoke 38, right 33).
