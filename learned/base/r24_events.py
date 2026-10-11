@@ -106,6 +106,7 @@ class Log:
             actors = []; pending_verb = None; cur = None; sent_places = []; because = None
             low = sent.lower()
             if " because " in low: because = low.split(" because ", 1)[1].rstrip(".!?")
+            opening = low.split(",")[0] if "," in low[:40] else None                                 # 'The next morning, ...' / 'When winter came, ...'
             direction = None
             for k, (sym, filler) in enumerate(items):
                 word = filler[0].lower() if sym not in ("PERSON", "ENT") else None
@@ -128,6 +129,7 @@ class Log:
                     elif word in ("it", "them") and r and cur and cur["verb"]: cur["obj"] = cur["obj"] or r[0]
                 elif sym == "ENT":
                     key = T.key_of(sym, filler); after_place = k >= 1 and items[k - 1][0] in PLACE_WORDS
+                    if k >= 1 and items[k - 1][0] in ("with", "by", "through") and cur: cur.setdefault("phrases", []).append((items[k - 1][0], key))
                     if after_place:
                         sent_places.append((items[k - 1][0], key))
                         if cur: cur["place"] = cur.get("place") or (items[k - 1][0], key); cur.setdefault("phrases", []).append((items[k - 1][0], key))
@@ -143,7 +145,7 @@ class Log:
                     cur = dict(actors=[cur["obj"]], verb=word, obj=None, rec=None, place=None, si=si, dir=None, because=because, order=None, words=set(low.split())); self.events.append(cur)
                 elif sym.isalpha() and verbish(word, items[k - 1][0] if k else None) and word not in SKIP_VERB and (cur := None) is None and (passive := (k >= 1 and items[k - 1][0] in ("was", "were"))) is not None and (actors or passive) and word not in T.DET and word not in PLACE_WORDS and actors and not (cur and cur["verb"] and cur["obj"] is None and k >= 1 and items[k - 1][0] == cur["verb"]):
                     if passive and not actors: actors = [self.things[0]] if self.things else []        # the thing just mentioned is what the passive is about
-                    cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split()), passive=passive); self.events.append(cur)
+                    cur = dict(actors=list(actors), verb=word, obj=None, rec=None, place=None, si=si, dir=direction, because=because, order=None, words=set(low.split()), passive=passive, opening=opening); self.events.append(cur)
             for e in [x for x in self.events if x["si"] == si]:
                 if e.get("passive") and e.get("phrases"):
                     by = next((key for pp, key in e["phrases"] if pp == "by"), None)
@@ -305,11 +307,29 @@ def _ask(log, q):
         if actor:
             ev = [e for e in find(verb=verb, actor=actor) if e.get("dir")]
             return ev[0]["dir"] if ev else None
+    if ql.startswith("when did "):
+        actor, verb, tail = split(ql[9:])
+        if actor:
+            ev = find(verb=verb, actor=actor) or find(verb=verb)
+            for e in ev:
+                if e.get("opening") and not any(e["opening"].startswith(w) for w in ("the " + a.lower() for a in e["actors"])): LAST["strict"] = e.get("strict", False); return e["opening"]
+                tm = next((w for w in e["words"] if w in TIMEISH), None)
+                if tm: LAST["strict"] = e.get("strict", False); return tm
+            return None
+    if ql.startswith("how did "):
+        actor, verb, tail = split(ql[8:])
+        if actor:
+            ev = find(verb=verb, actor=actor) or find(verb=verb)
+            for e in ev:
+                ph = next((f"{pp} {key}" for pp, key in e.get("phrases", []) if pp in ("by", "with", "through", "across")), None)
+                if ph: LAST["strict"] = e.get("strict", False); return ph
+            return None
     if ql.startswith("why did "):
         actor, verb, tail = split(ql[8:])
         if actor:
             ev = [e for e in find(verb=verb, actor=actor) if e.get("because")]
             if not ev: ev = [e for e in find(verb=verb) if e.get("because")]
+            if ev: LAST["strict"] = ev[0].get("strict", False)
             return ev[0]["because"] if ev else None
     if ql.startswith("where was ") and ql.endswith(" at the end"):
         who = q[10:-12].strip(); return log.places.get(who) or log.places.get(ent(who))

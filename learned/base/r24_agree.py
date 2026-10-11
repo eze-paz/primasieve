@@ -29,6 +29,7 @@ def main():
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = R.ask(rd, text, names, q)
         if a is not None and b is not None and same(a, b): return a, "agree"
         if a is not None and conf and b is None: return a, "cue-confident"
+        if a is not None and q.lower().split()[0] in ("why", "when", "how") and conf: return a, "cue-why-when-how"       # R24-k2: slots the learned reader does not have
         if a is not None and b is not None: return None, "disagree"
         return (a, "cue-only") if (a is not None and conf) else (None, "silent")
 
