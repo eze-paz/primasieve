@@ -49,7 +49,9 @@ LEMMAS = set()
 
 
 def is_verb(w):
-    if not LEMMAS: LEMMAS.update(E.IRREG.values()); LEMMAS.update(E.lemma(x) for x in E.VERBISH)      # the stems of the learned verb lexicon
+    if not LEMMAS:
+        LEMMAS.update(E.IRREG.values()); LEMMAS.update(E.lemma(x) for x in E.VERBISH)      # the stems of the learned verb lexicon
+        T.SPAN_STOP.update(x for x in LEMMAS if x not in E.NOUNISH)                        # 'the fox drop': a verb stem ends a thing span too
     if w in E.TIMEISH or w in E.NOUNISH: return False                                  # 'morning', 'evening' are not verbs
     return E.verbish(w) or w in LEMMAS
 
@@ -95,7 +97,7 @@ def construction(sent, names):
                 syms = syms[:k] + ["WHEN"] + syms[end:]; fillers = fillers[:k] + [phrase] + fillers[end:]; break
     if why is None:                                                                      # 'opened its mouth to answer': a purpose phrase is a why
         for k in range(1, len(syms) - 1):
-            if syms[k] == "to" and syms[k + 1].startswith("V:") and syms[k - 1] in ("ENT", "PERSON", "PRON"):
+            if syms[k] == "to" and (syms[k + 1].startswith("V:") or (syms[k + 1].isalpha() and syms[k + 1] not in T.DET and syms[k + 1] not in PLACE_WORDS and syms[k + 1] not in T.STOP)) and syms[k - 1] in ("ENT", "PERSON", "PRON"):
                 end = next((t for t in range(k + 1, len(syms)) if syms[t] in ("and", ",", ".")), len(syms))
                 why = "to " + " ".join((syms[t][2:] if syms[t].startswith("V:") else (fillers[t] or syms[t])) for t in range(k + 1, end)); break
     if why: syms.append("WHY"); fillers.append(why)
@@ -263,9 +265,9 @@ def ask(R, text, names, q):
         return R.fill(sents, names, cs, j[0]) if j else None
     m = re.match(r"why did (.+)$", ql)
     if m:
-        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        ws = q[8:].rstrip("?").split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x.lower()) and x.lower() not in E.NOUNISH), None)
         if not vi: return None
-        ws = q[8:].rstrip("?").split(); cs, cf = construction(f"{ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {' '.join(ws[vi + 1:])} because of something.".replace("  ", " "), names)
+        cs, cf = construction(f"{ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {' '.join(ws[vi + 1:])} because of something.".replace("  ", " "), names)
         j = [k for k, s in enumerate(cs) if s == "WHY"]
         return R.fill(sents, names, cs, j[0]) if j else None
     m = re.match(r"where did (.+)$", ql)
