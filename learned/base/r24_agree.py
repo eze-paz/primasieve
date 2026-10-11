@@ -22,6 +22,7 @@ def main():
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
+    DIAG = "--diag" in ARGV
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
         import r24_qreader as QR
@@ -62,6 +63,7 @@ def main():
     for s in stories:
         for q, g in s["qs"]:
             n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
+            if DIAG: print(f"VAL | {q} | gold {g} | cue {E.ask_conf(E.Log(names).read(s['text']), q)} | learned {QR.ask_learned(QRD, rd, s['text'], names, q) if LEARNED_Q else R.ask(rd, s['text'], names, q)} lvl {QR.LASTQ.get('level') if LEARNED_Q else '-'} | route {how} | ans {a} | hit {hit(a, g) if a is not None else '-'}", flush=True)
             if a is not None: matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
     print(f"R24-k validation ({n}): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
     admitted = {k for k in set(held) | set(valk) if (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) >= 0.95}      # R24-q3: pooled precision, held-out and validation together
@@ -72,6 +74,7 @@ def main():
         for s in tests:
             for q, g in s["qs"]:
                 x = rep[i]; i += 1; model += x["hit"]; a, how = answer(s["text"], q)
+                if DIAG: print(f"B6 | {q} | gold {g} | model {x['hit']} | route {how} | ans {a} | admitted {(kind(q), how) in admitted} | hit {hit(a, g) if a is not None else '-'}", flush=True)
                 if a is not None and (kind(q), how) not in admitted: a = None
                 if a is not None: spoke += 1; spoke_right += hit(a, g); merged += hit(a, g)
                 else: merged += x["hit"]

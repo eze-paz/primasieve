@@ -66,6 +66,7 @@ def event_statement(ev):
     """an exact generator event as a plain statement: 'Rosa took the key to the garden.'"""
     i, a, v, p, place, rec = ev; past = {"take": "took", "give": "gave", "come": "came", "go": "went", "run": "ran", "steal": "stole", "find": "found", "leave": "left", "put": "put", "set": "set", "drop": "dropped",
                                         "carry": "carried", "walk": "walked", "return": "returned", "borrow": "borrowed", "follow": "followed", "row": "rowed", "reach": "reached", "arrive": "arrived", "ride": "rode", "wait": "waited", "have": "had"}
+    past["be"] = "was"; past["belong"] = "belonged"
     s = f"{a} {past.get(v, v + 'ed')}"
     if p: s += f" {p}"
     if rec: s += f" to {rec}"

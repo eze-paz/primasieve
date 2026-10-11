@@ -142,6 +142,14 @@ def fables(R, P):
                 [(f"Who reached {p1} first?", [a.lower()]), (f"Who arrived last?", [c.lower()]), (f"Who arrived second?", [b.lower()]),
                  (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where was {a} at the end?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Where was {c} at the end?", [p1.lower(), p1.lower().replace("the ", "")])], g4_events))
+    # H (R24-w): attribute facts -- made of, full of, belonged to, how many; copula events ('be') for the learned readers
+    a, ga, g1 = actor(R, P, "name"); thing = R.choice(["bridge", "fence", "boat", "cart", "roof"]); material = R.choice(["logs", "stone", "oak planks", "reeds", "iron"])
+    holder = R.choice(["sack", "basket", "jar", "chest", "barrel"]); content = R.choice(["flour", "apples", "honey", "salt", "coins"])
+    rel = R.choice(["his late wife", "her grandmother", "the old miller", "a sailor"]); count = R.choice(["two", "three", "four", "five"]); unit = R.choice(["sacks", "baskets", "jars", "bundles"])
+    h_events = [(0, f"The {thing}", "be", f"made of {material}", None, None), (1, f"The {holder}", "be", f"full of {content}", None, None), (2, f"The ring", "belong", None, None, rel), (3, a, "carry", f"{count} {unit}", "to the mill", None)]
+    out.append((f"The {thing} was made of {material}. The {holder} was full of {content}. The ring belonged to {rel}. {a} carried {count} {unit} to the mill.",
+                [(f"What was the {thing} made of?", [material]), (f"What was in the {holder}?", [content]), (f"Whose ring was it?", [rel, rel.split()[-1]]),
+                 (f"How many {unit} did {a} carry?", [count]), (f"Who carried the {unit}?", [a.lower()]), (f"What was the {holder} full of?", [content])], h_events))
     # F: buying with a count
     a, ga, _ = actor(R, P); n = R.choice(["two", "three", "four", "five"]); item = R.choice(["loaves of bread", "candles", "eggs", "pears", "ribbons"]); seller, gs, _ = actor(R, P, "role"); place = R.choice(PLACES); coin = R.choice(["a silver coin", "two pennies", "a copper", "a shilling"]); needy = R.choice(NEEDY)
     out.append((f"{cap(a)} went to {place} and bought {n} {item} from {seller}. {cap(a)} paid with {coin}. On the way home {a} gave one to {needy} who was crying.",
