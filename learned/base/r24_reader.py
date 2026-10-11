@@ -369,6 +369,38 @@ def main():
     EVENTS_ONLY = "--events-only" in ARGV                                                 # R24-u: no regex-rendered statements, the story's own events teach
     train = [(s["text"], ([] if EVENTS_ONLY else [a for a in (canonical(q, g) for q, g in s["qs"]) if a]) + [event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
     if EVENTS_ONLY: train = [t for t in train if t[1]]
+    if "--closed-loop" in ARGV:                                                          # R24-v: the event-taught question reader renders the generator's questions into training statements
+        import r24_qreader as QR
+        pairs = []
+        for s in data[:7000]:
+            if not s.get("events"): continue
+            stmts = [event_statement(e) for e in s["events"]]
+            for q, g in s["qs"]:
+                qs, qf = QR.qshape(q, names); qslots = {f.lower() for x, f in zip(qs, qf) if x in ("PERSON", "ENT")}; qv = next((x for x in qs if x.startswith("V:")), None)
+                for st in stmts:
+                    cs, cf = construction(st, names); fl = {f.lower() for f in cf if f}
+                    if qv is None or qv not in cs: continue
+                    gold = next((f for f in cf if f and (f.lower() == g[0].lower() or f.lower() == T.key_of("ENT", g[0].lower().split()) or g[0].lower() in f.lower())), None)
+                    if gold and (qslots & fl or not qslots): pairs.append((q, st, gold)); break
+        Q = QR.QReader(); Q.learn(pairs, names); added = 0
+        def as_text(cs, cf, missing, gold):
+            out = []
+            for k, (x, f) in enumerate(zip(cs, cf)):
+                if k == missing: out.append(gold)
+                elif x in ("PERSON", "ENT"): out.append(f if x == "PERSON" else ("the " + f if not f.startswith(("the ", "a ", "an ")) else f))
+                elif x.startswith("V:"): out.append(x[2:])
+                elif x in ("WHEN", "WHY", "COMP", "ORDER"): out.append(f or "")
+                elif x == ".": continue
+                else: out.append(x)
+            return " ".join(w for w in out if w).strip() + "."
+        extra_by = collections.defaultdict(list)
+        for s in data[:7000]:
+            for q, g in s["qs"]:
+                got = Q.render(q, names)
+                if got and QR.LASTQ.get("level") == "exact": extra_by[s["text"]].append(as_text(got[0], got[1], got[2], g[0])); added += 1
+        train = [(t[0], t[1] + extra_by.get(t[0], [])) for t in train] + [(s["text"], extra_by[s["text"]]) for s in data[:7000] if s["text"] in extra_by and not any(t[0] == s["text"] for t in train[:0])]
+        seen = set(); train = [t for t in train if not (t[0] in seen or seen.add(t[0]))]
+        print(f"closed loop: {added} statements rendered by the learned question reader for the sentence reader", flush=True)
     seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
