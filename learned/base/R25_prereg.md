@@ -39,3 +39,9 @@ Held-out book bits/token 9.8298 -> 9.1414 -> 9.1301 (pass 3 9.1336 rejected by t
 
 ## R25-d registration (downstream use of the learner's own groups)
 The answer-type check of R24-am is rerun with --classes (the learner's refined groups) on the R24-ap2 configuration. Passes if, on validation, it removes wrong answers while losing at most as many right answers as it removes (R24-am with the old groups lost 16 right on all 310), and validation precision after admission >= 0.90; then B6 once.
+
+## R25-d result (negative)
+Type check with the learner's refined groups: removed 18 right and 4 wrong answers on validation; precision after admission 73/76; **B6 once 79** (spoke 26, right 24). Cause: the groups are fine, the answer-type table is not -- it is learned from the generator's gold answers, which use a few dozen objects and places, so 'the seedlings', 'the feast', 'a gale', 'the picnic' are refused for never having been a generator answer; 'why' answers are typed by their last word ('the salt was dry' -> 'dry').
+
+## R25-e registration (roles learned from the books)
+From the training books, the learner counts which of its own word groups fill the object slot and the subject slot of each verb group (a verb followed within three words by a determiner phrase; a name or noun right before a verb). An answer to 'what did X V' is refused when its group never fills V's object slot in the books although at least 5 such fillers were expected from the group's frequency; an answer to 'who V' likewise for the subject slot (names always allowed). 'Why' and 'how' answers are not typed. Gate as R25-d: removes more wrong than right answers on validation, precision after admission >= 0.90; then B6 once.
