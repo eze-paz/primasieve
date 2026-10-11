@@ -134,10 +134,13 @@ def features(syms, k, verb, chunks):
 FEATS = ("shape", "win2", "win1", "rel", "rel0", "chunk")
 
 
+def bucket(tot): return 0 if tot <= 5 else 1 if tot <= 50 else 2 if tot <= 500 else 3      # how much evidence a view has for this decision
+
+
 class Reader:
     def __init__(self, chunks=None):
         self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
-        self.tab = {f: collections.Counter() for f in FEATS}; self.tot = {f: collections.Counter() for f in FEATS}; self.w = collections.Counter()
+        self.tab = {f: collections.Counter() for f in FEATS}; self.tot = {f: collections.Counter() for f in FEATS}; self.w = collections.Counter(); self.wn = collections.Counter()
 
     def learn(self, stories, names):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
@@ -161,11 +164,12 @@ class Reader:
                     for j in cj:
                         gold_i = [i for i in si if sf[i] and cf[j] and sf[i].lower() == cf[j].lower()]
                         if not gold_i: continue
-                        fc = features(cs, j, v, self.chunks)
+                        fc = features(cs, j, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
                         for f in FEATS:
                             if f not in fc: continue
-                            best = max(si, key=lambda i: self.tab[f][(features(ss, i, v, self.chunks)[f], fc[f])])
-                            self.w[f] += (best in gold_i) and self.tab[f][(features(ss, best, v, self.chunks)[f], fc[f])] > 1
+                            n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())
+                            if not tot: continue
+                            best = max(n, key=n.get); self.w[(f, bucket(tot))] += (best in gold_i); self.wn[(f, bucket(tot))] += 1
 
     def fill(self, story_sents, names, cs, missing, keep_prep=False):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
@@ -178,14 +182,14 @@ class Reader:
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
                 si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
             if not si: continue
-            scored = []; fc = features(cs, missing, v, self.chunks); z = sum(self.w.values()) + len(FEATS)
-            for i in si:
-                fs = features(ss, i, v, self.chunks); c = 0.0
-                for f in FEATS:                                                        # a learned mixture over the views, each view's vote normalised
-                    if f not in fs: continue
-                    n = self.tab[f][(fs[f], fc[f])]
-                    if n: c += (self.w[f] + 1.0) / z * n / (n + 2.0)
-                scored.append((c, i))
+            fc = features(cs, missing, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
+            score = {i: 0.0 for i in si}
+            for f in FEATS:                                                            # a learned mixture over the views; each view is a distribution over the candidates,
+                n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())   # weighted by how often that view was right with this much evidence
+                if tot:
+                    b = bucket(tot); acc = (self.w[(f, b)] + 0.5) / (self.wn[(f, b)] + 1.0)
+                    for i, ni in n.items(): score[i] += acc * ni / tot
+            scored = [(score[i], i) for i in si]
             c, i = max(scored)
             if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
         if best and best[1] and best[1].lower().split()[-1] in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler: the learned latest-person rule
@@ -232,7 +236,7 @@ def main():
     seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
-    R = Reader(CH); R.learn(train, names); print(f"alignment table: {len(R.align)} entries; learned view weights {dict(R.w)}", flush=True)
+    R = Reader(CH); R.learn(train, names); print(f"alignment table: {len(R.align)} entries; learned view accuracy by evidence: {[(f, b, round((R.w[(f, b)] + 0.5) / (R.wn[(f, b)] + 1.0), 2)) for f in FEATS for b in range(4) if R.wn[(f, b)]]}", flush=True)
     ok = tot = 0
     for s in data[7000:]:
         for q, g in s["qs"]:
