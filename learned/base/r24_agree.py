@@ -27,7 +27,8 @@ def main():
         print(f"R24-ap dictionary on: {len(vf)} verb forms end name / thing spans; irregular forms {len(D.EXC)}", flush=True)
     DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV; SHAPE = "--shape-keys" in ARGV
     kind = lambda q: q.lower().split()[0]
-    import r24_qreader as QR0; QR0.ARGV = list(ARGV)                                   # R24-ag2: the flags, captured before a downstream import resets sys.argv
+    import r24_qreader as QR0; QR0.ARGV = list(ARGV)
+    if "--store" in ARGV: QR0.STORE.update(json.load(open("r25_store.json", encoding="utf-8"))); print("R25 store loaded:", {k: len(v) for k, v in QR0.STORE.items() if isinstance(v, dict)}, flush=True)                                   # R24-ag2: the flags, captured before a downstream import resets sys.argv
     PRONS = ("it", "them", "him", "her", "he", "she", "they")
     def qslots(q): qs, qf = QR0.qshape(q, names); return [f if isinstance(f, str) else " ".join(f) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f and (f if isinstance(f, str) else " ".join(f)).lower() not in PRONS]   # R24-ah2: a pronoun slot names nothing ('he' is inside 'the')
     n_self = sum(1 for s in data[:7000] for q, g in s["qs"] if any(same(g[0], f) for f in qslots(q))); n_all = sum(len(s["qs"]) for s in data[:7000])
@@ -71,7 +72,7 @@ def main():
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
         dissent = None
-        if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword", "exact-r", "noword-r"): dissent = b; b = None   # R24-ao: a coarse reading is too weak to answer but still counts against a lone cue answer
+        if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword", "exact-r", "noword-r", "alias"): dissent = b; b = None   # R24-ao: a coarse reading is too weak to answer but still counts against a lone cue answer
         if "--type-check" in ARGV:
             if a is not None and not type_ok(q, a): a = None
             if b is not None and not type_ok(q, b): b = None

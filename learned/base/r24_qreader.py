@@ -42,6 +42,7 @@ def keys_of(shape):
 
 
 LASTQ = {"level": None}
+STORE = {}                                                                               # R25: the persistent self-revised store (shape_alias, verb_alias), loaded by the caller
 
 
 class QReader:
@@ -90,6 +91,9 @@ class QReader:
                 if k2: best = (v, k2); break
             if best: (qs, qf), key = best; qs = tuple(qs); LASTQ["level"] = key[0] + "-r"
             else: qs = tuple(qs)
+        if (key is None or key[0] == "coarse") and STORE.get("shape_alias"):            # R25: a shape alias the system learned from its own failures
+            src = repr(tuple(x for x in abstract_q(qs) if x != "w")); dst = STORE["shape_alias"].get(src)
+            if dst is not None and ("noword", eval(dst)) in self.map: key = ("noword", eval(dst)); LASTQ["level"] = "alias"
         if key is None: return None
         tmpl = self.map[key].most_common(1)[0][0]
         qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]; qverb = next((x for x in qs if x.startswith("V:")), None)
@@ -123,6 +127,9 @@ def ask_learned(Q, rd, text, names, q):
     cs, cf, missing = got; sents = []; raws = []
     for x in T.SENT.split(text):
         if x.strip(): sents.append(R.construction(x, names)); raws.append(list(R.LAST_RAWS))
+    if STORE.get("verb_alias"):                                                          # R25: a verb alias the system learned ('lend' read as 'give' when the story lacks 'lend')
+        sv = {y for ss, _ in sents for y in ss if y.startswith("V:")}
+        cs = tuple(("V:" + STORE["verb_alias"][y[2:]]) if (y.startswith("V:") and y not in sv and y[2:] in STORE["verb_alias"] and "V:" + STORE["verb_alias"][y[2:]] in sv) else y for y in cs)
     keep = cs[missing] == "ENT" and missing >= 1 and cs[missing - 1] in R.PLACE_WORDS
     a = rd.fill(sents, names, cs, missing, keep_prep=keep, cs_fillers=cf, raws_list=raws)
     if a is None: return None
