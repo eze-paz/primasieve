@@ -28,13 +28,22 @@ def canonical(q, gold):
     return None
 
 
+LEMMAS = set()
+
+
+def is_verb(w):
+    if not LEMMAS: LEMMAS.update(E.IRREG.values()); LEMMAS.update(E.lemma(x) for x in E.VERBISH)      # the stems of the learned verb lexicon
+    return E.verbish(w) or w in LEMMAS
+
+
 def construction(sent, names):
     """(symbols, fillers): slot symbols keep their filler; a verb word is kept as its lemma (verbs matched across forms)"""
     items = T.slotify(T.TOK.findall(sent), names); syms = []; fillers = []
-    for sym, filler in items:
+    for k, (sym, filler) in enumerate(items):
         if sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
+        elif sym.isalpha() and sym in E.NOUNISH and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym): syms.append("ENT"); fillers.append(sym)
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
-        elif sym.isalpha() and E.verbish(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
+        elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
     return tuple(syms), fillers
 
@@ -42,8 +51,15 @@ def construction(sent, names):
 def verbs_of(syms): return [s[2:] for s in syms if s.startswith("V:")]
 
 
+def feat(syms, k, verb):
+    """a slot's surface features: its kind, whether it sits before or after the shared verb, and the symbol before it"""
+    vi = next((i for i, s in enumerate(syms) if s == "V:" + verb), None)
+    rel = "none" if vi is None else ("before" if k < vi else "after")
+    return (syms[k], rel, syms[k - 1] if k else "<s>")
+
+
 class Reader:
-    def __init__(self): self.align = collections.Counter(); self.prior = collections.Counter()
+    def __init__(self): self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter()
 
     def learn(self, stories, names):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
@@ -54,11 +70,11 @@ class Reader:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
                 for ss, sf in sents:
                     if not set(verbs_of(ss)) & set(cv): continue
-                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT")]
+                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT")]; v = (set(verbs_of(ss)) & set(cv)).pop()
                     for i in si:
                         for j in cj:
                             if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower()):
-                                self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1
+                                self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1; self.feat[(feat(ss, i, v), feat(cs, j, v))] += 1
 
     def fill(self, story_sents, names, cs, missing):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
@@ -67,11 +83,12 @@ class Reader:
             if not cv & set(verbs_of(ss)): continue
             si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k]]
             if not si: continue
-            scored = []
+            scored = []; v = (cv & set(verbs_of(ss))).pop()
             for i in si:
                 c = self.align[(ss, cs, i, missing)]
                 if c == 0: c = 0.1 * self.align[(ss, None, i, missing)]
-                if c == 0: c = 0.01 * self.prior[(i, missing)]
+                if c == 0: c = 0.03 * self.feat[(feat(ss, i, v), feat(cs, missing, v))]          # surface features generalise across sentence shapes
+                if c == 0 and ss[i] == cs[missing]: c = 0.01 * self.prior[(i, missing)]        # the index prior only within the same slot kind
                 scored.append((c, i))
             c, i = max(scored)
             if best is None or c > best[0]: best = (c, sf[i])
