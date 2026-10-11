@@ -11,6 +11,7 @@ import r24_tlm as T, r24_events as E
 from b6_rwkv import hit
 
 PLACE_WORDS = E.PLACE_WORDS
+LAST_RAWS = []
 
 
 def canonical(q, gold):
@@ -120,6 +121,7 @@ def construction(sent, names):
                 why = "to " + " ".join(raws[t] for t in range(k + 1, end)); break
     if why: syms.append("WHY"); fillers.append(why)
     if comp: syms.append("COMP"); fillers.append(comp)
+    LAST_RAWS[:] = raws                                                                  # R24-aa: the words behind each slot, for answers in the story's own words
     return tuple(syms), fillers
 
 
@@ -258,7 +260,7 @@ class Reader:
                             if not tot: continue
                             best = max(n, key=n.get); self.w[(f, bucket(tot))] += (best in gold_i); self.wn[(f, bucket(tot))] += 1
 
-    def fill(self, story_sents, names, cs, missing, keep_prep=False, cs_fillers=None):
+    def fill(self, story_sents, names, cs, missing, keep_prep=False, cs_fillers=None, raws_list=None):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
         cv = set(verbs_of(cs)[:1]); best = None; LAST["shape"] = False                   # the question's own verb is the anchor, never a verb in its tail ('for fixing it')
         order0 = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
@@ -270,7 +272,11 @@ class Reader:
             if alts: via = {v0: alts[0]}
         cv_story = set(cv) | set(via.values())
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
-        for ss, sf in story_sents:
+        def pick(ss, sf, i, j):
+            raw = raws_list[j][i] if raws_list and j < len(raws_list) and i < len(raws_list[j]) else None
+            txt = raw if (raw and ss[i] == "ENT" and raw.split()[0].lower() in T.DET) else sf[i]           # R24-aa: 'a small boat' as written, not 'the small boat'
+            return f"{ss[i - 1]} {txt}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else txt
+        for j, (ss, sf) in enumerate(story_sents):
             if not cv_story & set(verbs_of(ss)): continue
             v = (cv_story & set(verbs_of(ss))).pop(); cvv = next((c for c in cv if c == v or via.get(c) == v), v); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
             if order and not any(ss[k] == "ORDER" and sf[k] == order and lo <= k < hi for k in range(len(ss))):
@@ -292,7 +298,7 @@ class Reader:
             n_shape = {i: self.tab["shape"][(fsd[i]["shape"], fc["shape"])] for i in si}
             if sum(n_shape.values()) >= 5:                                             # this exact shape has been seen: its own evidence decides
                 scored = [(n_shape[i], i) for i in si]; c, i = max(scored)
-                if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i])); LAST["shape"] = True
+                if best is None or c > best[0]: best = (c, pick(ss, sf, i, j)); LAST["shape"] = True
                 continue
             for f in FEATS:                                                            # a learned mixture over the views; each view is a distribution over the candidates,
                 n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())   # weighted by how often that view was right with this much evidence
@@ -301,7 +307,7 @@ class Reader:
                     for i, ni in n.items(): score[i] += acc * conf * ni / tot
             scored = [(score[i], i) for i in si]
             c, i = max(scored)
-            if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
+            if best is None or c > best[0]: best = (c, pick(ss, sf, i, j))
         if best and best[1] and best[1].lower() in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler (a whole slot, never a span): the learned latest-person rule
             persons = [f for ss, sf in story_sents for ss_k, f in zip(ss, sf) if ss_k == "PERSON" and f]
             return persons[-1] if persons else None

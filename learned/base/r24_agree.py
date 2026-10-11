@@ -22,7 +22,11 @@ def main():
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
-    DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV
+    DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV; SHAPE = "--shape-keys" in ARGV
+    import r24_qreader as QR0
+    def qslots(q): qs, qf = QR0.qshape(q, names); return [f if isinstance(f, str) else " ".join(f) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
+    n_self = sum(1 for s in data[:7000] for q, g in s["qs"] if any(same(g[0], f) for f in qslots(q))); n_all = sum(len(s["qs"]) for s in data[:7000])
+    SELF_RATE = n_self / max(1, n_all); print(f"R24-aa: answers that repeat a question slot in the generator: {n_self}/{n_all} = {SELF_RATE:.3f}", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
         import r24_qreader as QR
@@ -36,6 +40,10 @@ def main():
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
         if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword"): b = None
+        if SELF_RATE < 0.02:                                                             # R24-aa: a learned fact about questions: the answer is not something the question already names
+            sl = qslots(q)
+            if a is not None and any(same(a, f) for f in sl): a = None
+            if b is not None and any(same(b, f) for f in sl): b = None
         ql = q.lower()
         if ql.startswith(("where was ", "who had ", "who was holding ")):
             try: c = P.answer(PM, pnames, HM, hnames, text, q)
@@ -58,13 +66,14 @@ def main():
 
     import collections
     kind = lambda q: q.lower().split()[0]
-    FINE = "--fine" in ARGV                                                              # R24-y: admission keys with back-off, scored on pooled evidence
+    FINE = "--fine" in ARGV or SHAPE                                                     # R24-y: admission keys with back-off, scored on pooled evidence
     def akeys(q, how, a):
         """finest to coarsest admission keys for an answer: question shape, whether the answer repeats a question slot, whether it is a name"""
         if not FINE: return [(kind(q), how)]
         import r24_qreader as Q2
         qs, qf = Q2.qshape(q, names); shape = tuple(x for x in Q2.abstract_q(qs) if x != "w")
         in_q = any(f and same(a, f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT")); is_name = a.split()[-1][:1].isupper()
+        if SHAPE: return [(kind(q), how, shape), (kind(q), how)]                        # R24-aa: the question shape only, with >= 20 evidence
         return [(kind(q), how, shape, in_q, is_name), (kind(q), how, in_q, is_name), (kind(q), how)]
     held = collections.defaultdict(lambda: [0, 0]); heldk = collections.defaultdict(lambda: [0, 0])
     for s in data[7000:7600]:
@@ -91,7 +100,8 @@ def main():
         if not FINE: return (kind(q), how) in admitted
         for k in akeys(q, how, a):
             r, t = pooled.get(k, (0, 0))
-            if t >= 8: return r / t >= 0.95
+            if len(k) == 2: return k in admitted
+            if t >= (20 if SHAPE else 8): return r / t >= 0.95
         return False
     if FINE: print("R24-y admission keys with >= 8 evidence and precision >= 0.95:", sorted(str(k) for k, (r, t) in pooled.items() if t >= 8 and r / t >= 0.95), flush=True)
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)

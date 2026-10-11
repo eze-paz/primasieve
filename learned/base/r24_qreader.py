@@ -106,9 +106,11 @@ def ask_learned(Q, rd, text, names, q):
     """the learned question reader renders the question; the learned sentence reader fills it"""
     got = Q.render(q, names)
     if not got: return None
-    cs, cf, missing = got; sents = [R.construction(x, names) for x in T.SENT.split(text) if x.strip()]
+    cs, cf, missing = got; sents = []; raws = []
+    for x in T.SENT.split(text):
+        if x.strip(): sents.append(R.construction(x, names)); raws.append(list(R.LAST_RAWS))
     keep = cs[missing] == "ENT" and missing >= 1 and cs[missing - 1] in R.PLACE_WORDS
-    a = rd.fill(sents, names, cs, missing, keep_prep=keep, cs_fillers=cf)
+    a = rd.fill(sents, names, cs, missing, keep_prep=keep, cs_fillers=cf, raws_list=raws)
     if a is None: return None
     return a if (a[:1].isupper() or a.split()[0] in T.DET or a.split()[0] in R.PLACE_WORDS or cs[missing] in ("WHEN", "WHY", "COMP")) else "the " + a
 
