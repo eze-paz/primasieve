@@ -291,3 +291,4 @@ Held-out books, 270,358 predictions, same tokens and text: word-pair model 8.807
 
 ## R25-ad registration (two words of context through the learner's groups)
 Predict the next group from the previous two groups, backing off to the previous one when evidence is thin (interpolation weight chosen on the training slice), times the word-given-group probability; mixed with the word-pair model (weight on the training slice). Held-out books scored once. Passes if bits fall below 8.6294.
+R25-ad first run: the two-group block never ran (an import reset sys.argv); arguments now captured at the top; rerun, same registration.
