@@ -9,7 +9,7 @@ LAM and MARGIN are chosen by the learner itself on its practice questions (+1 ri
 the holdout (fresh m21-m40) is reported only. Run: python learned/base/r25_soft.py"""
 import os, sys, json, random, collections, time
 import numpy as np
-ARGV = list(sys.argv)
+ARGV = list(sys.argv); ARGV_SOFT = ARGV
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E, r24_reader as R
 import r24_books as B, data as D0, r24_dict as D
@@ -198,10 +198,12 @@ def main_j():
 def qparse(q, names):
     """(asked role, question verb, question argument heads) or None"""
     qs, qf = QR.qshape(q, names); k = q.lower().split()[0]
-    v = next((x[2:] for x in qs if x.startswith("V:")), None)
+    verbs = [x[2:] for x in qs if x.startswith("V:")]; v = verbs[0] if verbs else None
     if v is None: return None
     args = [(f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
     args = [a.split()[-1] for a in args if a.lower() not in ("it", "him", "her", "them", "he", "she", "they")]
+    if k == "what" and verbs[-1] == "do" and "--do" in ARGV_SOFT:                         # R25-m: 'what did X do' asks for an action; 'what did X refuse to do' for a complement
+        return ("comp", verbs[0], args) if len(verbs) >= 2 else ("do", None, args)
     if k == "who" and "did" not in qs: role = "subj"
     elif k in ("what", "who", "whom") and "did" in qs: role = "obj"
     elif k == "what": role = "subj"
@@ -225,7 +227,9 @@ def roles_of(sents):
             obj = next((filled(k_) for k_ in range(i + 1, hi) if cs[k_] in ("PERSON", "ENT") and cf[k_] and not (k_ >= 1 and cs[k_ - 1] in R.PLACE_WORDS)), None)
             place = next((f"{cs[k_ - 1]} {filled(k_)}" for k_ in range(i + 1, hi) if cs[k_] == "ENT" and cf[k_] and k_ >= 1 and cs[k_ - 1] in (R.PLACE_WORDS - {"from", "with", "by", "through", "to"})), None)                     or next((filled(k_) for k_ in range(i + 1, hi) if cs[k_] == "ENT" and cf[k_] and k_ >= 1 and cs[k_ - 1] == "to"), None)
             heads = [str(cf[k_]).split()[-1] for k_ in range(lo, hi) if cs[k_] in ("PERSON", "ENT") and cf[k_]]
-            out.append(dict(si=si, verb=x[2:], subj=subj, obj=obj, place=place, when=when, heads=heads))
+            pred = " ".join(str(raws[k_]) for k_ in range(i, min(hi, len(raws))) if raws[k_] and cs[k_] not in (".", ",", "and", "but", "WHEN", "WHY", "COMP")).strip() or None     # R25-m: the action, verb to clause end
+            comp = next((cf[k_] for k_, y in enumerate(cs) if y == "COMP" and cf[k_]), None)
+            out.append(dict(si=si, verb=x[2:], subj=subj, obj=obj, place=place, when=when, heads=heads, do=pred, comp=comp))
     return out
 
 
@@ -233,8 +237,8 @@ def soft_role(text, q, names, story_cache=None):
     """(answer, verb similarity, argument match) for the best-matching clause, or (None, 0, 0)"""
     p = qparse(q, names)
     if p is None: return None, 0.0, 0.0
-    role, v, args = p; vv = vec(v)
-    if vv is None: return None, 0.0, 0.0
+    role, v, args = p; vv = vec(v) if v else None
+    if role != "do" and vv is None: return None, 0.0, 0.0
     if story_cache is None:
         sents = []
         for x in T.SENT.split(text):
@@ -243,9 +247,10 @@ def soft_role(text, q, names, story_cache=None):
     best = (None, -1.0, 0.0)
     for c in story_cache:
         cu = vec(c["verb"]); ans = c[role]
-        if cu is None or not ans: continue
-        if any(ans.split()[-1].lower() == a.lower() for a in args): continue                 # the question already names it
-        vs = 1.0 if c["verb"] == v else float(np.dot(vv, cu))
+        if not ans or (role != "do" and cu is None): continue
+        if role not in ("do", "comp") and any(ans.split()[-1].lower() == a.lower() for a in args): continue   # the question already names it
+        if role == "do" and (not c["subj"] or not args or not any(c["subj"].split()[-1].lower() == a.lower() or (vec(a) is not None and vec(c["subj"].split()[-1]) is not None and float(np.dot(vec(a), vec(c["subj"].split()[-1]))) >= 0.8) for a in args[:1])): continue   # the action of the one the question names
+        vs = 1.0 if (role == "do" or c["verb"] == v) else float(np.dot(vv, cu))
         am = float(np.mean([max([1.0 if h.lower() == a.lower() else max(0.0, float(np.dot(vec(a), vec(h)))) for h in c["heads"] if vec(h) is not None] or [0.0]) for a in args if vec(a) is not None])) if args else 0.5
         sc = vs + am
         if sc > best[1] + best[2]: best = (ans, vs, am)

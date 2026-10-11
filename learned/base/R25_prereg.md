@@ -94,3 +94,6 @@ Policy = R25-i configuration plus the loose role reader at the learner's thresho
 
 ## R25-l result (primary measure up again)
 Learner alone, fresh 200: **67 right / 14 wrong** (R25-i 58 / 12; R24-ap2 45 / 8); holdout half m21-40 35 / 6 (R25-i 29 / 5). Old 110: 63 / 6. Four-signal agreement 'agree+soft+role' 20/20. Validation after admission 117/113 (0.97). B6 once 80 (spoke 38, right 34; R25-i 78).
+
+## R25-m registration (actions and complements as roles)
+Practice-only error analysis (old 110 + fresh m1-m20; the holdout half not inspected): 22 silent 'what did' questions and several wrong answers ask for an action ('What did the magpie do one evening?' -> 'dropped a shiny button'), which no reader can return. The loose role reader gains two roles: 'do' (the verb and what follows it to the clause end, in the clause whose subject matches the one the question names) and 'comp' ('What did the donkey refuse to do?' -> the complement of 'refuse'). Flag --do. Measured first in the reader harness (thresholds re-chosen by the learner; gate: holdout fitness > R25-k's +13), then in the policy (learner alone on fresh 200; B6 once).

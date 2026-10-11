@@ -98,7 +98,7 @@ def main():
     print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
     SOFT = "--soft" in ARGV; ROLE = "--role" in ARGV
     if SOFT or ROLE:
-        import r25_soft as S; PROTOS = S.protos_from(data[:7000]); print(f"R25-i similarity reader on: prototypes for {sorted(PROTOS)}", flush=True)
+        import r25_soft as S; S.ARGV_SOFT = list(ARGV); PROTOS = S.protos_from(data[:7000]); print(f"R25-i similarity reader on: prototypes for {sorted(PROTOS)}", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
         import r24_qreader as QR
