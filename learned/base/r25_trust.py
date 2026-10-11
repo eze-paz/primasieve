@@ -1,0 +1,20 @@
+"""R25-q: the learner decides which of its own answer routes to trust, by its own score on practice only.
+Reads the per-question lines of a policy run (route and hit for every question). A route is kept when its practice
+fitness (+1 right, -3 wrong) over the old 110 and val_more 200 is above zero; the kept set is then applied once to the
+untouched val_fresh2 200, reported as a total only. Run: python learned/base/r25_trust.py r24_diag_r25p_l.txt"""
+import sys, collections
+f = sys.argv[1]
+L = [l for l in open(f, encoding="utf-8") if l.startswith("VAL |")]
+route = lambda l: l.split("| route ")[1].split(" |")[0]
+spoke = lambda l: "| ans None |" not in l
+right = lambda l: "hit True" in l
+fit = collections.defaultdict(lambda: [0, 0])
+for l in L[:310]:
+    if spoke(l): fit[route(l)][0 if right(l) else 1] += 1
+keep = {r for r, (a, w) in fit.items() if a - 3 * w > 0}
+print("practice fitness by route (right, wrong):", {r: tuple(v) for r, v in sorted(fit.items(), key=lambda kv: -sum(kv[1]))})
+print("routes the learner keeps:", sorted(keep)); print("routes it drops:", sorted(set(fit) - keep))
+for nm, part in (("practice 310", L[:310]), ("untouched val_fresh2 200", L[310:])):
+    a_all = sum(1 for l in part if spoke(l) and right(l)); w_all = sum(1 for l in part if spoke(l) and not right(l))
+    a_k = sum(1 for l in part if spoke(l) and right(l) and route(l) in keep); w_k = sum(1 for l in part if spoke(l) and not right(l) and route(l) in keep)
+    print(f"{nm}: all routes {a_all} right / {w_all} wrong (fitness {a_all - 3 * w_all}) -> kept routes {a_k} right / {w_k} wrong (fitness {a_k - 3 * w_k})")
