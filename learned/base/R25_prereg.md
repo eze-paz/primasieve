@@ -51,3 +51,11 @@ Roles counted from the books: 127,896 verb-object and 261,555 subject-verb pairs
 
 ## R25-f registration (the learner's own groups used for understanding, not filtering)
 When a question's verb is absent from the story, the question reader reads it as the single story verb in the same learned group (R25-c groups; e.g. 'lend' with 'give'); if no or several story verbs share the group, nothing changes. One general rule, measured as a whole: readers-alone fitness (+1 / -3 / 0) on practice and on the holdout (fresh m21-m40), with and without the rule, same store. Passes if holdout fitness rises; then the policy runs once with it and B6 once.
+
+## R25-f result (negative)
+Practice 63/15 (fitness 18) -> 64/19 (7); holdout -12 -> -15. Group-level verb swaps are too coarse: the group of 'lend' also holds 'tell', 'let', 'kill', 'thank'.
+
+## R25-g registration (graded similarity, threshold chosen by the learner)
+- The learner builds its own word vectors from the training books with no labels: each of 15,000 words gets a profile of the words within two places of it (positive pointwise mutual information over 3,000 context words), compressed to 100 dimensions; similarity is the cosine (r25_vectors.npz).
+- A missing question verb is read as the most similar story verb when the similarity reaches a threshold. The learner chooses the threshold itself from {none, 0.8, 0.7, 0.6, 0.5, 0.4} by its practice fitness (+1 / -3 / 0).
+- Passes if holdout fitness at the chosen threshold beats no swap; then the policy runs once with it and B6 once.

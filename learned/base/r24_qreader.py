@@ -42,6 +42,7 @@ def keys_of(shape):
 
 
 LASTQ = {"level": None}
+VEC = {}; TAU = [None]                                                                   # R25-g: the learner's own word vectors and its chosen similarity threshold
 GROUPS = {}                                                                              # R25-f: the learner's own word groups (r25_classes.json), set by the caller
 STORE = {}                                                                               # R25: the persistent self-revised store (shape_alias, verb_alias), loaded by the caller
 
@@ -128,6 +129,14 @@ def ask_learned(Q, rd, text, names, q):
     cs, cf, missing = got; sents = []; raws = []
     for x in T.SENT.split(text):
         if x.strip(): sents.append(R.construction(x, names)); raws.append(list(R.LAST_RAWS))
+    if VEC and TAU[0] is not None:                                                       # R25-g: a missing question verb read as the most similar story verb, if similar enough
+        import numpy as _np
+        sv = {y[2:] for ss, _ in sents for y in ss if y.startswith("V:")}
+        def swap_v(y):
+            if not y.startswith("V:") or y[2:] in sv or y[2:] not in VEC: return y
+            best = max(((float(_np.dot(VEC[y[2:]], VEC[u])), u) for u in sv if u in VEC), default=(0.0, None))
+            return "V:" + best[1] if best[1] is not None and best[0] >= TAU[0] else y
+        cs = tuple(swap_v(y) for y in cs)
     if GROUPS:                                                                           # R25-f: a missing question verb read as the one story verb from its own learned group ('lend' ~ 'give')
         sv = {y[2:] for ss, _ in sents for y in ss if y.startswith("V:")}
         def swap(y):

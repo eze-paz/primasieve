@@ -58,6 +58,16 @@ def main():
     def score(items): return [one(*x) for x in items]
     def summary(sc): return dict(right=sum(1 for x in sc if x == 1), wrong=sum(1 for x in sc if x == -3), fitness=sum(sc))
 
+    if "--vectors" in ARGV:                                                              # R25-g: the learner picks its own similarity threshold by its practice score
+        import numpy as np
+        z = np.load("r25_vectors.npz"); QR.VEC.update({w: v for w, v in zip(z["vocab"].tolist(), z["vecs"])})
+        res = {}
+        for tau in (None, 0.8, 0.7, 0.6, 0.5, 0.4):
+            QR.TAU[0] = tau; res[tau] = summary(score(practice)); print(f"R25-g threshold {tau}: practice {res[tau]}", flush=True)
+        best = max(res, key=lambda t: res[t]["fitness"]); QR.TAU[0] = best
+        print(f"R25-g the learner chose threshold {best}", flush=True)
+        QR.TAU[0] = None; hn = summary(score(holdout)); QR.TAU[0] = best; hb = summary(score(holdout))
+        print(f"R25-g holdout: no swap {hn} | chosen threshold {hb}", flush=True)
     QR.STORE.clear(); hold_empty = summary(score(holdout)); QR.STORE.update(store)        # the learner with no store at all: the reference for the gate
     base = score(practice)
     if "--prune" in ARGV:                                                                # R25-b: the learner re-judges its own earlier revisions by the transfer rule
