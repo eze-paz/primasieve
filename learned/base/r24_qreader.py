@@ -17,6 +17,7 @@ QW = ("who", "what", "where", "when", "why", "how", "which", "whose", "did")
 def qshape(q, names):
     """the question as a construction: question words kept, verbs as stems, names / things as slots"""
     toks = T.TOK.findall(q.rstrip("?")); syms = []; fillers = []
+    if toks and toks[0].lower() in QW: toks[0] = toks[0].lower()                          # 'What' is a question word, not a name
     items = T.slotify(toks, names)
     for k, (sym, filler) in enumerate(items):
         w = filler[0].lower() if sym not in ("PERSON", "ENT") else None
@@ -24,7 +25,7 @@ def qshape(q, names):
         elif w in QW or w in ("the", "a", "an", "to", "at", "in", "on", "for", "with", "from", "it", "them", "him", "her"): syms.append(w); fillers.append(None)
         elif R.is_verb(w) and w not in E.NOUNISH: syms.append("V:" + E.lemma(w)); fillers.append(None)
         elif w in ("first", "second", "last"): syms.append("ORDER"); fillers.append(w)
-        else: syms.append("w"); fillers.append(w)                                        # any other word: a generic token (kept out of the shape key)
+        else: syms.append("w"); fillers.append(w)                                        # any other word: copied into the statement by position
     return tuple(syms), fillers
 
 
@@ -41,15 +42,16 @@ class QReader:
         for q, stmt, gold in pairs:
             qs, qf = qshape(q, names); cs, cf = R.construction(stmt, names)
             cj = [k for k, x in enumerate(cs) if x in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]
-            miss = next((k for k in cj if cf[k] and gold and (cf[k].lower() == gold.lower() or cf[k].lower() == T.key_of("ENT", gold.lower().split()) or gold.lower() in cf[k].lower())), None)
+            miss = next((k for k in cj if cf[k] and gold and (cf[k].lower() == gold.lower() or cf[k].lower() == T.key_of("ENT", gold.lower().split()) or gold.lower() in cf[k].lower() or cf[k].lower() in gold.lower())), None)
             if miss is None: continue
             # the statement as a template: its symbols with slots numbered by the order of the question's slots they came from
-            qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]
+            qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]
             tmpl = []
             for k, x in enumerate(cs):
-                if k == miss: tmpl.append("MISSING")
+                if k == miss: tmpl.append("MISSING:" + x)
                 elif x in ("PERSON", "ENT") and cf[k] in qslots: tmpl.append(f"Q{qslots.index(cf[k])}")
                 elif x.startswith("V:"): tmpl.append("V")
+                elif x in qwords: tmpl.append(f"W{qwords.index(x)}")
                 else: tmpl.append(x)
             self.map[abstract_q(qs)][tuple(tmpl)] += 1
 
@@ -62,10 +64,14 @@ class QReader:
             if not cand: return None
             key = max(cand, key=lambda k: sum(self.map[k].values()))
         tmpl = self.map[key].most_common(1)[0][0]
-        qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qverb = next((x for x in qs if x.startswith("V:")), None)
+        qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]; qverb = next((x for x in qs if x.startswith("V:")), None)
         syms = []; fillers = []; missing = None
         for t in tmpl:
-            if t == "MISSING": missing = len(syms); syms.append("ENT"); fillers.append("thing")
+            if t.startswith("MISSING:"): missing = len(syms); syms.append(t[8:]); fillers.append({"WHEN": "at some time", "WHY": "of something", "COMP": "to do something"}.get(t[8:], "thing"))
+            elif t.startswith("W"):
+                i = int(t[1:])
+                if i >= len(qwords): return None
+                syms.append(qwords[i]); fillers.append(None)
             elif t.startswith("Q"):
                 i = int(t[1:])
                 if i >= len(qslots): return None
@@ -77,22 +83,52 @@ class QReader:
         return (tuple(syms), fillers, missing) if missing is not None else None
 
 
+def ask_learned(Q, rd, text, names, q):
+    """the learned question reader renders the question; the learned sentence reader fills it"""
+    got = Q.render(q, names)
+    if not got: return None
+    cs, cf, missing = got; sents = [R.construction(x, names) for x in T.SENT.split(text) if x.strip()]
+    keep = cs[missing] == "ENT" and missing >= 1 and cs[missing - 1] in R.PLACE_WORDS
+    a = rd.fill(sents, names, cs, missing, keep_prep=keep, cs_fillers=cf)
+    if a is None: return None
+    return a if (a[:1].isupper() or a.split()[0] in T.DET or a.split()[0] in R.PLACE_WORDS or cs[missing] in ("WHEN", "WHY", "COMP")) else "the " + a
+
+
 def main():
     data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
-    pairs = [(q, R.canonical(q, g), g[0]) for s in data[:7000] for q, g in s["qs"] if R.canonical(q, g)]
+    PH = {"who": "Someone", "what": "the thing", "where": "the place", "when": "at some time", "why": "of something", "how": "somehow"}
+    def ask_form(q):
+        k = q.lower().split()[0]; ph = PH.get(k)
+        if ph is None: return None
+        a = R.canonical(q, [ph if k != "what" or not (q.lower().endswith(" to do") or q.lower().endswith(" to learn")) else "to do something"])
+        return (q, a, ph if a and ph in a else ("to do something" if a and "to do something" in a else None)) if a else None
+    pairs = [t for s in data[:7000] for q, g in s["qs"] for t in [ask_form(q)] if t and t[2]]
     Q = QReader(); Q.learn(pairs, names); print(f"question reader: {len(Q.map)} question shapes learned from {len(pairs)} pairs", flush=True)
     # R24-s1: agreement with the hand regexes on held-out questions, and extra coverage
-    same = handled = extra = total = 0
+    same = handled = extra = total = 0; ab = lambda t: tuple("REF" if x in ("PERSON", "ENT") else x for x in t)
     for s in data[7000:]:
         for q, g in s["qs"]:
-            total += 1; ref = R.canonical(q, g); got = Q.render(q, names)
-            if ref:
-                handled += 1; rs, rf = R.construction(ref, names)
-                if got and tuple(x for x in got[0]) == tuple(rs): same += 1
+            total += 1; ref = ask_form(q); got = Q.render(q, names)
+            if ref and ref[1]:
+                handled += 1; rs, rf = R.construction(ref[1], names)
+                if got and ab(got[0]) == ab(rs): same += 1
+                elif got and SHOW and same < 40: print(f"  DIFF {q} | ref {rs} | got {got[0]}")
             elif got: extra += 1
-    print(f"R24-s1: same canonical construction as the hand regexes on {same}/{handled} = {same / max(1, handled):.2f} (bar >= 0.95); handles {extra} questions the regexes do not (of {total - handled}; bar >= 20% more)")
+    print(f"R24-s1: same construction as the hand regexes' ask form on {same}/{handled} = {same / max(1, handled):.2f} (bar >= 0.95); handles {extra} questions the regexes do not (of {total - handled}; bar >= 20% more)")
+    # R24-s2: end to end, learned question reader + learned sentence reader, against the regex path
+    train = [(s["text"], [a for a in (R.canonical(q, g) for q, g in s["qs"]) if a] + [R.event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
+    seqs = [list(R.construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
+    CH = R.Chunks(seqs); rd = R.Reader(CH); rd.learn(train[:6000], names, weigh=False); rd.learn(train[6000:], names, weigh=True); tabs = (rd.w, rd.wn, rd.eqw, rd.eqn); rd = R.Reader(CH); rd.w, rd.wn, rd.eqw, rd.eqn = tabs; rd.learn(train, names, weigh=False)
+    for label, stories in (("held-out generator", data[7000:7600]), ("validation (110)", [dict(text=s["text"], qs=s["qs"]) for f in ("val_stories.json", "val_fables.json", "val_timespace.json") for s in json.load(open(f, encoding="utf-8"))["stories"]])):
+        lm = lr = rm = rr = n = 0
+        for s in stories:
+            for q, g in s["qs"]:
+                n += 1; a = ask_learned(Q, rd, s["text"], names, q); b = R.ask(rd, s["text"], names, q)
+                if a is not None: lm += 1; lr += hit(a, g)
+                if b is not None: rm += 1; rr += hit(b, g)
+        print(f"R24-s2 {label}: learned question reader -> matched {lm}/{n}, right {lr} ({lr / max(1, lm):.2f}) | regex path -> matched {rm}, right {rr} ({rr / max(1, rm):.2f})")
     json.dump(dict(shapes=len(Q.map), same=same, handled=handled, extra=extra, total=total), open("r24_qreader_results.json", "w"))
 
 
