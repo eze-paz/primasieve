@@ -196,6 +196,7 @@ class Reader:
     def __init__(self, chunks=None):
         self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
         self.tab = {f: collections.Counter() for f in FEATS}; self.tot = {f: collections.Counter() for f in FEATS}; self.w = collections.Counter(); self.wn = collections.Counter()
+        self.equiv = collections.defaultdict(collections.Counter)                       # learned paraphrase: statement verb -> story verbs that carried its fillers
 
     def learn(self, stories, names, weigh=True):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
@@ -204,6 +205,12 @@ class Reader:
             sents = [construction(x, names) for x in T.SENT.split(text) if x.strip()]
             for a in answers:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
+                if cv and not any(set(verbs_of(ss)) & set(cv) for ss, sf in sents):
+                    known = {f.lower() for f in cf if f}
+                    best = max(sents, key=lambda t: len(known & {f.lower() for f in t[1] if f}) if verbs_of(t[0]) else -1, default=None)
+                    if best is not None and len(known & {f.lower() for f in best[1] if f}) >= 1 and verbs_of(best[0]):
+                        sv = verbs_of(best[0])[0]; self.equiv[cv[0]][sv] += 1
+                        cs = tuple(("V:" + sv) if x == "V:" + cv[0] else x for x in cs); cv = verbs_of(cs)       # align through the equivalent verb
                 for ss, sf in sents:
                     if not set(verbs_of(ss)) & set(cv): continue
                     si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]; v = (set(verbs_of(ss)) & set(cv)).pop()
@@ -229,6 +236,9 @@ class Reader:
     def fill(self, story_sents, names, cs, missing, keep_prep=False):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
         cv = set(verbs_of(cs)); best = None
+        if cv and not any(cv & set(verbs_of(ss)) for ss, sf in story_sents):           # learned paraphrase: 'own' -> 'have', 'win' -> 'reach'
+            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(sv in verbs_of(ss) for ss, sf in story_sents)]
+            if alts: cs = tuple(("V:" + alts[0]) if x == "V:" + v0 else x for x in cs); cv = set(verbs_of(cs))
         for ss, sf in story_sents:
             if not cv & set(verbs_of(ss)): continue
             v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
@@ -319,7 +329,8 @@ def main():
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
     R = Reader(CH); R.learn(train[:6000], names, weigh=False); R.learn(train[6000:], names, weigh=True)      # reliabilities measured on stories the tables had not seen
-    tabs = (R.w, R.wn); R = Reader(CH); R.w, R.wn = tabs; R.learn(train, names, weigh=False); print(f"alignment table: {len(R.align)} entries; learned view accuracy by evidence: {[(f, b, round((R.w[(f, b)] + 0.5) / (R.wn[(f, b)] + 1.0), 2)) for f in FEATS for b in range(4) if R.wn[(f, b)]]}", flush=True)
+    tabs = (R.w, R.wn); R = Reader(CH); R.w, R.wn = tabs; R.learn(train, names, weigh=False)
+    print("learned verb equivalents:", {v: dict(c.most_common(2)) for v, c in R.equiv.items() if sum(c.values()) >= 10}, flush=True); print(f"alignment table: {len(R.align)} entries; learned view accuracy by evidence: {[(f, b, round((R.w[(f, b)] + 0.5) / (R.wn[(f, b)] + 1.0), 2)) for f in FEATS for b in range(4) if R.wn[(f, b)]]}", flush=True)
     ok = tot = 0; by = collections.defaultdict(lambda: [0, 0])
     for s in data[7000:]:
         for q, g in s["qs"]:
