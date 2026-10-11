@@ -26,3 +26,10 @@ Practice fitness 14 -> 30 (59/15 -> 75/15) with 13 revisions kept, but holdout -
 
 ## R25-b result (gate failed; self-pruning works)
 Pruning removed 11 of 13 stored revisions by the learner's own transfer rule (all 8 memorised verb aliases, 3 single-story shape aliases); 2 shape aliases with support in >= 2 stories remain. No new revision met the rule (204 candidates). Holdout -12 with the store vs -9 empty. Finding: with 210 practice questions nearly every failure is unique to one story; the learner cannot discover transferable relations from that little signal. Next: a large self-supervised signal -- prediction of real book text.
+
+## R25-c registration (the learner refines its own word groups by predicting real text)
+- Signal: prediction of real book text. Groups are scored by a class-bigram model's bits per token on held-out books (Gutenberg books the counts never saw); millions of training tokens instead of 210 questions.
+- Persistence: groups live in r25_classes.json and are refined further at every run; first run starts from the induced k-means classes (200).
+- Operator: exchange -- each of the 8,000 most frequent words moves to the group with the highest training likelihood; a pass is kept only if held-out bits fall.
+- Downstream gate (next registration, R25-d): the answer-type check that failed in R24-am because the groups were too crude ('doctor', 'nephew', 'dusk') is rerun with the learner's refined groups; it passes if it removes wrong answers on validation without losing right ones; then B6 once.
+- Gate for R25-c itself: held-out bits/token fall below the starting groups'.
