@@ -241,3 +241,9 @@ From 457 saved groups on 400k sentences: exchange 8.9355 -> 8.9312 -> 8.9296; 42
 
 ## R25-c12 registration (groups on all the training text)
 From the 499 saved groups, counting all training paragraphs the reader keeps (--sents 1000000, about 13M tokens). Passes if held-out bits fall below the start-of-run value with the larger counts (reported) and below 8.9261.
+
+## R25-y result (neutral)
+Directional contexts: the learner chose exact verbs (verb >= 1.0) on practice; role reader alone untouched 48 / 7; policy with trust on 710: untouched 46 / 6, +28 -- equal to R25-x, not above it. R25-x's vectors and thresholds are restored (r25_vectors_13m.npz, verb >= 0.8).
+
+## R25-z registration (the practice questions teach the readers)
+The 710 practice questions (old 110, val_more, practice A / B; never val_fresh2) have only judged and chosen so far. Now they teach: for each, the story sentence holding a gold form and the question's verb gives a (question, sentence, answer) pair for the question reader; then the question reader renders each practice question as a statement with the gold answer, added to the sentence reader's training for that story. Built on R25-x. Caveat: practice scores become partly in-sample, so the trust choice made on practice may over-trust; only the untouched set can show it. Passes if untouched fitness beats +28.

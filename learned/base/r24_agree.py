@@ -109,6 +109,31 @@ def main():
     if LEARNED_Q:
         import r24_qreader as QR
         train, QRD = R.closed_loop_train(data, names)
+        if "--teach-practice" in ARGV:                                                   # R25-z: the hand-written practice questions teach the readers (never the untouched val_fresh2)
+            import re as _re
+            nrm = lambda x: _re.sub(r"[^a-z0-9 ]", " ", x.lower())
+            pst = []
+            for f_ in ("val_stories.json", "val_fables.json", "val_timespace.json", "val_more.json", "val_practice_a.json", "val_practice_b.json"):
+                pst += json.load(open(f_, encoding="utf-8"))["stories"]
+            pairs = []
+            for s_ in pst:
+                sents_ = [x for x in T.SENT.split(s_["text"]) if x.strip()]
+                for q, g in s_["qs"]:
+                    qs_, qf_ = QR.qshape(q, names); qv = [x[2:] for x in qs_ if x.startswith("V:")]
+                    for x in sents_:
+                        gf = next((gg for gg in g if nrm(gg).strip() and f" {nrm(gg).strip()} " in f" {nrm(x)} "), None)
+                        if gf is None: continue
+                        if qv and qv[0] not in [y[2:] for y in R.construction(x, names)[0] if y.startswith("V:")]: continue
+                        surface = next((m.group(0) for m in [_re.search(_re.escape(gf), x, _re.I)] if m), gf)
+                        pairs.append((q, x.strip(), surface)); break
+            n0 = sum(sum(c.values()) for c in QRD.map.values()); QRD.learn(pairs, names); n1 = sum(sum(c.values()) for c in QRD.map.values())
+            added = collections.defaultdict(list)
+            for s_ in pst:
+                for q, g in s_["qs"]:
+                    got = QRD.render(q, names)
+                    if got and QR.LASTQ.get("level") in ("exact", "noword"): added[s_["text"]].append(R.as_text(got[0], got[1], got[2], g[0]))
+            train = train + [(t_, st_) for t_, st_ in added.items()]
+            print(f"R25-z practice teaching: {len(pairs)} question-sentence pairs from {len(pst)} practice stories; question-reader evidence {n0} -> {n1}; {sum(len(v) for v in added.values())} statements for the sentence reader", flush=True)
     else: train = [(s["text"], [a for a in (R.canonical(q, g) for q, g in s["qs"]) if a] + [R.event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
     seqs = [list(R.construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     CH = R.Chunks(seqs); n6 = int(len(train) * 6 / 7); rd = R.Reader(CH); rd.learn(train[:n6], names, weigh=False); rd.learn(train[n6:], names, weigh=True)

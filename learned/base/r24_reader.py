@@ -385,6 +385,19 @@ def ask(R, text, names, q):
     return None
 
 
+def as_text(cs, cf, missing, gold):
+    """a rendered canonical construction as a plain statement, the gold in the missing slot (module-level copy, R25-z)"""
+    out = []
+    for k, (x, f) in enumerate(zip(cs, cf)):
+        if k == missing: out.append(gold)
+        elif x in ("PERSON", "ENT"): out.append(f if x == "PERSON" else ("the " + f if not f.startswith(("the ", "a ", "an ")) else f))
+        elif x.startswith("V:"): out.append(x[2:])
+        elif x in ("WHEN", "WHY", "COMP", "ORDER"): out.append(f or "")
+        elif x == ".": continue
+        else: out.append(x)
+    return " ".join(w for w in out if w).strip() + "."
+
+
 def closed_loop_train(data, names):
     """R24-v: event statements plus the statements the event-taught question reader renders; returns (train, Q)"""
     import r24_qreader as QR
