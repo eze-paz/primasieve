@@ -82,7 +82,9 @@ def main():
         for c_ in SUBJ.values(): colS.update(c_)
         totO = sum(colO.values()); totS = sum(colS.values())
         print(f"R25-e roles counted from the books: {totO} verb-object and {totS} subject-verb pairs over {len(OBJ)} verb groups", flush=True)
+    LIFT = [None]
     def role_ok(q, ans):
+        LIFT[0] = None
         qs, qf = QR0.qshape(q, names); k = kind(q); v = next((x[2:] for x in qs if x.startswith("V:")), None)
         if v is None or k not in ("what", "who"): return True
         role = "obj" if (k == "what" and "did" in qs) or (k == "who" and "did" in qs) else ("subj" if k == "who" else None)
@@ -93,6 +95,8 @@ def main():
         if ng is None or ng == "NAME": return True
         tab, col, tot = (OBJ, colO, totO) if role == "obj" else (SUBJ, colS, totS)
         row = sum(tab[vg].values()); expected = row * col[ng] / max(1, tot)
+        LIFT[0] = (tab[vg][ng] + 0.5) / (expected + 0.5)                                 # R25-s: how much more (or less) often the books pair these groups than chance
+        if "--lift-only" in ARGV: return True
         return tab[vg][ng] > 0 or expected < 5                                           # refused only where the books confidently never put this group in this role
     print(f"R24-am answer types learned for {sum(1 for k, c in TYPES.items() if sum(c.values()) >= 50)} question shapes / kinds", flush=True)
     print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
@@ -180,7 +184,8 @@ def main():
     for s in stories:
         for q, g in s["qs"]:
             n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
-            if DIAG: print(f"VAL | {q} | gold {g} | cue {E.ask_conf(E.Log(names).read(s['text']), q)} | learned {QR.ask_learned(QRD, rd, s['text'], names, q) if LEARNED_Q else R.ask(rd, s['text'], names, q)} lvl {QR.LASTQ.get('level') if LEARNED_Q else '-'} | route {how} | ans {a} | hit {hit(a, g) if a is not None else '-'}", flush=True)
+            if DIAG and "--selpref" in ARGV and a is not None: role_ok(q, a)
+            if DIAG: print(f"VAL | lift {LIFT[0] if (a is not None and '--selpref' in ARGV) else None} | {q} | gold {g} | cue {E.ask_conf(E.Log(names).read(s['text']), q)} | learned {QR.ask_learned(QRD, rd, s['text'], names, q) if LEARNED_Q else R.ask(rd, s['text'], names, q)} lvl {QR.LASTQ.get('level') if LEARNED_Q else '-'} | route {how} | ans {a} | hit {hit(a, g) if a is not None else '-'}", flush=True)
             if a is not None:
                 matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
                 for k in akeys(q, how, a): valkk[k][0] += h; valkk[k][1] += 1

@@ -172,3 +172,9 @@ From 300 saved groups: exchange 9.0931 -> 9.0912 -> 9.0875; 37 of 120 splits kep
 
 ## R25-r registration (the verb-role check with the learner's finer groups)
 R25-e's book-learned verb roles refused nothing at ~200 groups. With 337 learner-refined groups the same check (--selpref) is added to the R25-l configuration; route trust is then chosen by the learner on practice (r25_trust.py) and applied once to the untouched set. Passes if untouched fitness with trusted routes beats R25-q's +8.
+
+## R25-r result (neutral)
+At 337 groups / 226 verb groups the zero-count role check still refused nothing; trusted-route results identical to R25-q (untouched 47 / 13, +8).
+
+## R25-s registration (graded role score, cut-off chosen by the learner)
+Each answer gets a role score: how much more or less often the books pair the question verb's group with the answer's group in that slot than chance ((observed + 0.5) / (expected + 0.5)). Nothing is refused in the run (--lift-only); afterwards, on top of the routes the learner trusts, it picks a cut-off from {none, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8} by practice fitness and applies it once to the untouched set. Passes if untouched fitness beats +8.
