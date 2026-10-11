@@ -34,8 +34,14 @@ def abstract_q(shape):
     return tuple("REF" if x in ("PERSON", "ENT") else ("V" if x.startswith("V:") else x) for x in shape)
 
 
+def keys_of(shape):
+    """three views of a question shape, from exact to coarse"""
+    a = abstract_q(shape)
+    return [("exact", a), ("noword", tuple(x for x in a if x != "w")), ("coarse", (a[0] if a else "", sum(1 for x in a if x == "REF"), "V" in a, tuple(x for x in a if x in ("to", "at", "in", "with", "for", "from", "ORDER"))))]
+
+
 class QReader:
-    def __init__(self): self.map = collections.defaultdict(collections.Counter)         # abstract question shape -> (abstract statement shape, missing index, slot order) counts
+    def __init__(self): self.map = collections.defaultdict(collections.Counter)         # (level, question-shape view) -> statement template counts
 
     def learn(self, pairs, names):
         """pairs: (question, canonical statement, gold) -- the statement's slots are the question's slots plus the gold"""
@@ -53,16 +59,12 @@ class QReader:
                 elif x.startswith("V:"): tmpl.append("V")
                 elif x in qwords: tmpl.append(f"W{qwords.index(x)}")
                 else: tmpl.append(x)
-            self.map[abstract_q(qs)][tuple(tmpl)] += 1
+            for key in keys_of(qs): self.map[key][tuple(tmpl)] += 1
 
     def render(self, q, names):
         """a canonical construction (syms, fillers) with its missing slot index, or None"""
-        qs, qf = qshape(q, names); key = abstract_q(qs)
-        if key not in self.map:                                                           # nearest shape: drop generic tokens, then drop tail words
-            cand = [k for k in self.map if tuple(x for x in k if x != "w") == tuple(x for x in key if x != "w")]
-            if not cand: cand = [k for k in self.map if k[:4] == key[:4] and len(k) == len(key)]
-            if not cand: return None
-            key = max(cand, key=lambda k: sum(self.map[k].values()))
+        qs, qf = qshape(q, names); key = next((k for k in keys_of(qs) if k in self.map), None)     # exact shape, else without generic words, else coarse
+        if key is None: return None
         tmpl = self.map[key].most_common(1)[0][0]
         qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]; qverb = next((x for x in qs if x.startswith("V:")), None)
         syms = []; fillers = []; missing = None
