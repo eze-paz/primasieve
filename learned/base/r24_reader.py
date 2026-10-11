@@ -95,6 +95,7 @@ def construction(sent, names):
         elif sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
         elif sym in ("were", "are"): syms.append("was" if sym == "were" else "is"); fillers.append(None)
+        elif sym in ("first", "second", "third", "last"): syms.append("ORDER"); fillers.append(sym)
         elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
@@ -205,7 +206,9 @@ class Reader:
             sents = [construction(x, names) for x in T.SENT.split(text) if x.strip()]
             for a in answers:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
-                if cv and not any(set(verbs_of(ss)) & set(cv) for ss, sf in sents):
+                c_order = next((f for x, f in zip(cs, cf) if x == "ORDER"), None)
+                def carries(ss, sf): return (set(verbs_of(ss)) & set(cv)) and (not c_order or any(x == "ORDER" and f == c_order for x, f in zip(ss, sf)))
+                if cv and not any(carries(ss, sf) for ss, sf in sents):
                     known = {f.lower() for f in cf if f}
                     scored = [(len(known & {f.lower() for f in t[1] if f}), -i, t) for i, t in enumerate(sents) if verbs_of(t[0])]
                     best = max(scored, default=None)
@@ -217,7 +220,7 @@ class Reader:
                         cs = tuple(("V:" + sv) if x == "V:" + cv[0] else x for x in cs); cv = verbs_of(cs)       # align through the equivalent verb
                 for ss, sf in sents:
                     if not set(verbs_of(ss)) & set(cv): continue
-                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]; v = (set(verbs_of(ss)) & set(cv)).pop()
+                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP", "ORDER")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP", "ORDER")]; v = (set(verbs_of(ss)) & set(cv)).pop()
                     for i in si:
                         for j in cj:
                             if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower() or (ss[i] in ("WHEN", "WHY", "COMP") and (cf[j].lower() in sf[i].lower() or sf[i].lower() in cf[j].lower()))):
@@ -237,15 +240,22 @@ class Reader:
                             if not tot: continue
                             best = max(n, key=n.get); self.w[(f, bucket(tot))] += (best in gold_i); self.wn[(f, bucket(tot))] += 1
 
-    def fill(self, story_sents, names, cs, missing, keep_prep=False):
+    def fill(self, story_sents, names, cs, missing, keep_prep=False, cs_fillers=None):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
         cv = set(verbs_of(cs)); best = None
-        if cv and not any(cv & set(verbs_of(ss)) for ss, sf in story_sents):           # learned paraphrase: 'own' -> 'have', 'win' -> 'reach'
-            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(sv in verbs_of(ss) for ss, sf in story_sents)]
+        order0 = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
+        def carries(ss, sf): return (cv & set(verbs_of(ss))) and (not order0 or any(x == "ORDER" and f == order0 for x, f in zip(ss, sf)))
+        if cv and not any(carries(ss, sf) for ss, sf in story_sents):                  # learned paraphrase: 'own' -> 'have', 'arrive last' -> 'come last'
+            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(sv in verbs_of(ss) and (not order0 or any(x == "ORDER" and f == order0 for x, f in zip(ss, sf))) for ss, sf in story_sents)]
             if alts: cs = tuple(("V:" + alts[0]) if x == "V:" + v0 else x for x in cs); cv = set(verbs_of(cs))
+        order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
         for ss, sf in story_sents:
             if not cv & set(verbs_of(ss)): continue
             v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
+            if order and not any(ss[k] == "ORDER" and sf[k] == order and lo <= k < hi for k in range(len(ss))):
+                vis = [i for i, x in enumerate(ss) if x == "V:" + v and any(ss[k] == "ORDER" and sf[k] == order for k in range(*clause_of(ss, i)))]
+                if not vis: continue
+                vi = vis[0]; lo, hi = clause_of(ss, vi)
             si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP") and sf[k] and (lo <= k < hi or s in ("WHEN", "WHY", "COMP"))]
             if not any(k < vi for k in si if ss[k] in ("PERSON", "ENT")) and lo > 0:   # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
@@ -276,7 +286,7 @@ def ask(R, text, names, q):
     m = re.match(r"who (\w+) (.+)$", ql)
     if m and m.group(1) not in ("was", "were", "had", "is"):
         cs, cf = construction(f"{who} {m.group(1)} {m.group(2)}.", names)
-        return art(R.fill(sents, names, cs, 0)) if cs and cs[0] == "PERSON" else None
+        return art(R.fill(sents, names, cs, 0, cs_fillers=cf)) if cs and cs[0] == "PERSON" else None
     m = re.match(r"what did (.+)$", ql)
     if m:
         ws = q[9:].rstrip("?").split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x.lower()) and x.lower() not in E.NOUNISH), None)
