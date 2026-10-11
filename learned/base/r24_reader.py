@@ -182,8 +182,9 @@ def features(syms, k, verb, chunks):
     vi = next((i for i, x in enumerate(syms) if x == "V:" + verb), None)
     rel = ("none", 0) if vi is None else (("before" if k < vi else "after"), min(3, sum(1 for t in range(min(k, vi) + 1, max(k, vi)) if syms[t] in ("PERSON", "ENT"))))
     g = lambda t: abstract(syms[t]) if 0 <= t < len(syms) else "#"
-    out = {"shape": (syms, k), "win1": (g(k - 1), g(k + 1)), "win2": (g(k - 2), g(k - 1), g(k + 1), g(k + 2)), "rel": (abstract(syms[k]), rel[0], rel[1], g(k - 1)), "rel0": rel}   # rel0: the coarsest view, position relative to the verb only
-    if chunks: out["chunk"] = chunks.feat(syms, k)
+    ab = tuple(abstract(x) if x in ("PERSON", "ENT") else x for x in syms)                 # the shape view is blind to name-versus-thing
+    out = {"shape": (ab, k), "win1": (g(k - 1), g(k + 1)), "win2": (g(k - 2), g(k - 1), g(k + 1), g(k + 2)), "rel": (abstract(syms[k]), rel[0], rel[1], g(k - 1)), "rel0": rel}   # rel0: the coarsest view, position relative to the verb only
+    if chunks: out["chunk"] = chunks.feat(ab, k)
     return out
 
 
@@ -198,6 +199,7 @@ class Reader:
         self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
         self.tab = {f: collections.Counter() for f in FEATS}; self.tot = {f: collections.Counter() for f in FEATS}; self.w = collections.Counter(); self.wn = collections.Counter()
         self.equiv = collections.defaultdict(collections.Counter)                       # learned paraphrase: statement verb -> story verbs that carried its fillers
+        self.eqw = collections.Counter(); self.eqn = collections.Counter()               # how often alignment through a verb pair found the right filler (weighing stories)
 
     def learn(self, stories, names, weigh=True):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
@@ -235,6 +237,13 @@ class Reader:
                                 for f in FEATS:
                                     if f in fs: self.tab[f][(fs[f], fc[f])] += 1
                     if not weigh: continue
+                    if cvv != v:
+                        for j in cj:
+                            gold_i = [i for i in si if sf[i] and cf[j] and sf[i].lower() == cf[j].lower()]
+                            if not gold_i: continue
+                            fc0 = features(cs, j, cvv, self.chunks); fsd0 = {i: features(ss, i, v, self.chunks) for i in si}
+                            score0 = {i: sum(self.tab[f][(fsd0[i][f], fc0[f])] for f in FEATS if f in fsd0[i]) for i in si}
+                            self.eqw[(cvv, v)] += (max(score0, key=score0.get) in gold_i); self.eqn[(cvv, v)] += 1
                     for j in cj:
                         gold_i = [i for i in si if sf[i] and cf[j] and sf[i].lower() == cf[j].lower()]
                         if not gold_i: continue
@@ -252,7 +261,8 @@ class Reader:
         def carries(ss, sf): return any(ss[i] == "V:" + v and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for v in cv for i in range(len(ss)))
         via = {}
         if cv and not any(carries(ss, sf) for ss, sf in story_sents):                  # learned paraphrase: 'own' -> 'have', 'arrive last' -> 'come last'
-            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(ss[i] == "V:" + sv and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for ss, sf in story_sents for i in range(len(ss)))]
+            v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(5) if c >= 3 and any(ss[i] == "V:" + sv and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for ss, sf in story_sents for i in range(len(ss)))]
+            alts.sort(key=lambda sv: -((self.eqw[(v0, sv)] + 0.5) / (self.eqn[(v0, sv)] + 1.0)))        # the equivalent that answered best, not the most frequent
             if alts: via = {v0: alts[0]}
         cv_story = set(cv) | set(via.values())
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
@@ -267,6 +277,8 @@ class Reader:
             if not any(k < vi for k in si if ss[k] in ("PERSON", "ENT")) and lo > 0:   # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
                 si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
+            if cs[missing] == "ENT" and missing >= 1 and cs[missing - 1] in PLACE_WORDS and lo > 0 and not any(ss[k] == "ENT" and k >= 1 and ss[k - 1] in PLACE_WORDS and lo <= k < hi for k in range(len(ss))):
+                si = [k for k in range(lo) if ss[k] == "ENT" and sf[k] and k >= 1 and ss[k - 1] in PLACE_WORDS] + si      # 'went to the gate and bought': the place is in the previous clause
             if cs[missing] in ("WHEN", "WHY", "COMP"): si = [k for k, s in enumerate(ss) if s == cs[missing] and sf[k]]   # a span question takes only spans of its kind
             else: si = [k for k in si if ss[k] not in ("WHEN", "WHY", "COMP")]                               # and a who / what / where question never takes a span
             if not si: continue
