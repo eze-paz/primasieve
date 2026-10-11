@@ -89,6 +89,15 @@ def construction(sent, names):
         starter = xs[0] in ("on", "in", "at", "when", "while", "after", "before", "one", "every", "that", "the", "soon", "later", "by", "during", "without", "as")
         if j <= 7 and (starter or timeish) and not (xs[0] == "PERSON" and not timeish):
             syms.append("WHEN"); fillers.append(opening); items = items[j + 1:]
+    if not syms and len(items) >= 3 and items[0][0] == "TIME" and items[1][0] in ("PERSON", "ENT", "PRON", "a", "an", "the"):   # R24-ae: 'The next morning Rosa left ...': a leading time item is a when-span
+        syms.append("WHEN"); fillers.append(" ".join(items[0][1]).lower()); items = items[1:]
+    head0 = (items[0][1][0] if items[0][0] in ("PERSON", "ENT") else items[0][0]).lower() if items else ""
+    if not syms and len(items) >= 3 and head0 in ("at", "in", "on", "by", "during", "before", "after", "every", "one", "that", "the", "next", "last"):   # R24-ae: 'At noon Rosa took ...' (no comma)
+        TW = lambda w: w in E.TIMEISH or w.endswith("day") or w in ("noon", "dawn", "dusk", "dark", "midnight", "lunch", "supper", "breakfast", "dinner", "nightfall", "sunset", "sunrise", "summer", "winter", "spring", "autumn", "morning", "evening", "afternoon", "night", "week", "year", "month", "hour", "moment", "day")
+        timeish = lambda it: any(TW(w.lower()) for w in it[1])
+        j = next((k for k in range(1, min(6, len(items))) if items[k][0] in ("PERSON", "PRON", "ENT") and not timeish(items[k])), None)
+        if j and j >= 2 and any(timeish(items[k]) for k in range(1, j)) and not (items[0][0] == "PERSON" and not timeish(items[0]) and head0 not in ("the", "one", "that")):
+            syms.append("WHEN"); fillers.append(" ".join(w for k in range(j) for w in items[k][1]).lower()); items = items[j:]
     raws = [fillers[0]] if syms else []                                                 # the words behind each symbol, for spans (kept parallel to syms)
     for k, (sym, filler) in enumerate(items):
         n0 = len(syms)
