@@ -60,7 +60,8 @@ def is_verb(w):
         LEMMAS.update(E.IRREG.values()); LEMMAS.update(E.lemma(x) for x in E.VERBISH)      # the stems of the learned verb lexicon
         T.SPAN_STOP.update(x for x in LEMMAS if x not in E.NOUNISH)                        # 'the fox drop': a verb stem ends a thing span too
     if w in E.TIMEISH or w in E.NOUNISH: return False                                  # 'morning', 'evening' are not verbs
-    return E.verbish(w) or w in LEMMAS
+    import r24_dict as D
+    return E.verbish(w) or w in LEMMAS or (D.ON and D.mainly_verb(w))                  # R24-ap: the dictionary, consulted when the learned lexicon is silent
 
 
 def event_statement(ev):

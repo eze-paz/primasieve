@@ -23,6 +23,8 @@ SKIP_VERB = {"was", "were", "is", "are", "had", "has", "have", "be", "been", "di
 def lemma(w):
     w = w.lower()
     if w in IRREG: return IRREG[w]
+    import r24_dict as D
+    if D.ON and w in D.EXC: return D.EXC[w]                                              # R24-ap: an irregular form the learned lexicon lacks, looked up
     for suf in ("ied", "ed", "ing", "es", "s"):
         if w.endswith(suf) and len(w) - len(suf) >= 2 and suf in ("ed", "ing") and (w[:-len(suf)] + "e") in BASEV: return w[:-len(suf)] + "e"     # R24-z: 'used' -> 'use' (a learned base form), not 'us'
         if w.endswith(suf) and len(w) - len(suf) >= 3:

@@ -22,6 +22,9 @@ def main():
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
     E.HOLD_RULES.update(json.load(open("r24_hold_results.json"))["rules"])
+    if "--dict" in ARGV:                                                                 # R24-ap: the dictionary as a reading-time source
+        import r24_dict as D; D.ON = True; vf = D.verb_forms() - E.NOUNISH; T.SPAN_STOP.update(vf)
+        print(f"R24-ap dictionary on: {len(vf)} verb forms end name / thing spans; irregular forms {len(D.EXC)}", flush=True)
     DIAG = "--diag" in ARGV; ROUTES2 = "--routes2" in ARGV; SHAPE = "--shape-keys" in ARGV
     kind = lambda q: q.lower().split()[0]
     import r24_qreader as QR0; QR0.ARGV = list(ARGV)                                   # R24-ag2: the flags, captured before a downstream import resets sys.argv
