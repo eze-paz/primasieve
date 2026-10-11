@@ -18,11 +18,14 @@ def canonical(q, gold):
     ql = q.lower().rstrip("?"); g = gold[0]
     def thing(x): return x if x.split()[0] in T.DET else "the " + x
     m = re.match(r"who (\w+) (.+)$", ql)
-    if m and m.group(1) not in ("was", "were", "had", "is"): return f"{g.capitalize()} {m.group(1)} {m.group(2)}."
+    if m and m.group(1) not in ("was", "were", "had", "is"): return f"{g[0].upper()}{g[1:]} {m.group(1)} {m.group(2)}."
     m = re.match(r"what did (.+)$", ql)
     if m:
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
-        if vi: return f"{' '.join(ws[:vi]).capitalize()} {E.lemma(ws[vi])} {' '.join(ws[vi + 1:])} {thing(g)}.".replace("  ", " ")   # 'What did Domett give Grudden?' -> 'Domett give Grudden the pot of jam.'
+        if vi:
+            head = ' '.join(ws[:vi]); head = head[0].upper() + head[1:]; tail = ' '.join(ws[vi + 1:])
+            if tail and (tail.split()[0] in PLACE_WORDS or tail.split()[0] in ("as", "for", "with")): return f"{head} {E.lemma(ws[vi])} {thing(g)} {tail}."      # 'What did Sara bring as a gift?' -> 'Sara bring the kite as a gift.'
+            return f"{head} {E.lemma(ws[vi])} {tail} {thing(g)}.".replace("  ", " ")                                                                      # 'What did Domett give Grudden?' -> 'Domett give Grudden the pot of jam.'
     m = re.match(r"where did (.+?) (\w+) (.+)$", ql)
     if m and m.group(2) != "start":
         gp = g.split(" ", 1)[1] if g.split()[0] in PLACE_WORDS else g
@@ -153,7 +156,7 @@ class Reader:
                             best = max(si, key=lambda i: self.tab[f][(features(ss, i, v, self.chunks)[f], fc[f])])
                             self.w[f] += (best in gold_i) and self.tab[f][(features(ss, best, v, self.chunks)[f], fc[f])] > 1
 
-    def fill(self, story_sents, names, cs, missing):
+    def fill(self, story_sents, names, cs, missing, keep_prep=False):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
         cv = set(verbs_of(cs)); best = None
         for ss, sf in story_sents:
@@ -169,8 +172,8 @@ class Reader:
                     if n: c += (self.w[f] + 1.0) / z * n / (n + 2.0)
                 scored.append((c, i))
             c, i = max(scored)
-            if best is None or c > best[0]: best = (c, sf[i])
-        if best and best[1] and best[1].lower() in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler: the learned latest-person rule
+            if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
+        if best and best[1] and best[1].lower().split()[-1] in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler: the learned latest-person rule
             persons = [f for ss, sf in story_sents for ss_k, f in zip(ss, sf) if ss_k == "PERSON" and f]
             return persons[-1] if persons else None
         return best[1] if best else None
@@ -179,7 +182,7 @@ class Reader:
 def ask(R, text, names, q):
     ql = q.lower().rstrip("?"); sents = [construction(x, names) for x in T.SENT.split(text) if x.strip()]
     who = sorted(names)[0] if names else "Someone"                                      # a known name stands in for the missing PERSON slot
-    def art(a): return a if (a is None or a[:1].isupper() or a.split()[0] in T.DET) else "the " + a
+    def art(a): return a if (a is None or a[:1].isupper() or a.split()[0] in T.DET or a.split()[0] in PLACE_WORDS) else "the " + a
     m = re.match(r"who (\w+) (.+)$", ql)
     if m and m.group(1) not in ("was", "were", "had", "is"):
         cs, cf = construction(f"{who} {m.group(1)} {m.group(2)}.", names)
@@ -188,14 +191,20 @@ def ask(R, text, names, q):
     if m:
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
         if not vi: return None
-        cs, cf = construction(f"{' '.join(ws[:vi]).capitalize()} {E.lemma(ws[vi])} {' '.join(ws[vi + 1:])} the thing.".replace("  ", " "), names)
-        j = [k for k, s in enumerate(cs) if s == "ENT"]
+        head = ' '.join(ws[:vi]); head = head[0].upper() + head[1:]; tail = ' '.join(ws[vi + 1:])
+        if tail and (tail.split()[0] in PLACE_WORDS or tail.split()[0] in ("as", "for", "with")):
+            cs, cf = construction(f"{head} {E.lemma(ws[vi])} the thing {tail}.", names); j = [k for k, s in enumerate(cs) if s == "ENT" and cf[k] == "thing"]
+        else:
+            cs, cf = construction(f"{head} {E.lemma(ws[vi])} {tail} the thing.".replace("  ", " "), names); j = [k for k, s in enumerate(cs) if s == "ENT"]
         return art(R.fill(sents, names, cs, j[-1])) if j else None
-    m = re.match(r"where did (.+?) (\w+) (.+)$", ql)
-    if m and m.group(2) != "start":
-        cs, cf = construction(f"{m.group(1).capitalize()} {E.lemma(m.group(2))} {m.group(3)} at the place.", names)
+    m = re.match(r"where did (.+)$", ql)
+    if m:
+        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        if not vi or ws[vi] == "start": return None
+        head = ' '.join(ws[:vi]); head = head[0].upper() + head[1:]
+        cs, cf = construction(f"{head} {E.lemma(ws[vi])} {' '.join(ws[vi + 1:])} at the place.".replace("  ", " "), names)
         j = [k for k, s in enumerate(cs) if s == "ENT"]
-        return art(R.fill(sents, names, cs, j[-1])) if j else None
+        return art(R.fill(sents, names, cs, j[-1], keep_prep=True)) if j else None
     return None
 
 

@@ -18,6 +18,9 @@ RELS = [("brother", "m"), ("sister", "f"), ("cousin", "o"), ("uncle", "m"), ("au
 TITLES = {"f": ["Mrs", "Miss"], "m": ["Mr", "Dr"]}
 
 
+def cap(x): return x[:1].upper() + x[1:]            # 'Mrs. Barbara' keeps its capital (str.capitalize lowercases the rest)
+
+
 def pron(g): return ("she", "her", "her") if g == "f" else ("he", "him", "his")
 
 
@@ -52,23 +55,23 @@ def fables(R, P):
     a, ga, g1 = actor(R, P); b, gb, g2 = actor(R, P)
     while b == a: b, gb, g2 = actor(R, P)
     place = R.choice(PLACES)
-    out.append((f"{a.capitalize()} challenged {b} to a race to {place}. {b.capitalize()} ran ahead and then lay down to sleep under a tree. "
-                f"{a.capitalize()} never stopped and reached {place} first. When {b} woke, the race was over.",
+    out.append((f"{cap(a)} challenged {b} to a race to {place}. {cap(b)} ran ahead and then lay down to sleep under a tree. "
+                f"{cap(a)} never stopped and reached {place} first. When {b} woke, the race was over.",
                 [("Who challenged whom to a race?", ga), ("Who slept during the race?", gb), ("Who never stopped?", ga), ("Who won the race?", ga),
                  ("Where was the race to?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"Where was {a} at the end?", [place.lower(), place.lower().replace("the ", "")]), ("Who reached the end first?", ga)]))   # R20
     # B: flattery and food (fox and crow shape)
     a, ga, _ = actor(R, P); b, gb, _ = actor(R, P); food = R.choice(FOODS); reason = R.choice(REASONS)
     while b == a: b, gb, _ = actor(R, P)
-    out.append((f"{b.capitalize()} sat on a branch holding {food}. {a.capitalize()} came by and flattered {b}, praising {b}'s fine voice. "
-                f"{b.capitalize()} opened its mouth {reason} and dropped {food}. {a.capitalize()} ate {food} and walked away.",
+    out.append((f"{cap(b)} sat on a branch holding {food}. {cap(a)} came by and flattered {b}, praising {b}'s fine voice. "
+                f"{cap(b)} opened its mouth {reason} and dropped {food}. {cap(a)} ate {food} and walked away.",
                 [("Who flattered whom?", ga), (f"Who was holding {food}?", gb), (f"Who ate {food}?", ga), (f"What did {a} eat?", [food.replace("a ", "").replace("an ", "")]),
                  (f"Why did {b} drop {food}?", [reason, reason.replace("to ", "")])]))
     # C: keys / lost thing with a time
     a, ga, g1 = actor(R, P); b, gb, g2 = actor(R, P); obj = R.choice(["the keys", "a purse", "a letter", "the ring", "a glove"]); place = R.choice(PLACES)
     where = R.choice(["under a bench", "behind the door", "in a drawer", "under the stairs", "beside the well", "on the roof"]); when = R.choice(["at lunch", "at dawn", "after supper", "at noon", "on Sunday", "before dark"])
     while b == a: b, gb, g2 = actor(R, P)
-    out.append((f"{a.capitalize()} could not find {obj}. {b.capitalize()} had seen {obj} {where} near {place}. {b.capitalize()} fetched {obj} and returned {obj} to {a} {when}.",
+    out.append((f"{cap(a)} could not find {obj}. {cap(b)} had seen {obj} {where} near {place}. {cap(b)} fetched {obj} and returned {obj} to {a} {when}.",
                 [(f"Where were {obj}?" if obj.endswith("s") else f"Where was {obj}?", [where]), (f"Who returned {obj}?", gb), (f"When did {b} return {obj}?", [when]),
                  (f"Who lost {obj}?", ga), (f"Near which place?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"Who had {obj} at the end?", ga), (f"Where {'were' if obj.endswith('s') else 'was'} {obj} before {b} returned {obj}?", [where])]))   # R20
@@ -76,13 +79,13 @@ def fables(R, P):
     a, ga, _ = actor(R, P); crop = R.choice(["tomatoes", "beans", "potatoes", "pumpkins", "onions", "roses"]); season = R.choice(["in the spring", "in autumn", "in early summer", "in March"])
     helper, gh, _ = actor(R, P); nb = R.choice(["two", "three", "four", "five", "six"])
     while helper == a: helper, gh, _ = actor(R, P)
-    out.append((f"{a.capitalize()} planted {crop} {season}. {helper.capitalize()} watered them every evening. By the end of the season the {crop} filled {nb} baskets, "
+    out.append((f"{cap(a)} planted {crop} {season}. {cap(helper)} watered them every evening. By the end of the season the {crop} filled {nb} baskets, "
                 f"and {a} gave one basket to {helper}.",
                 [(f"What did {a} plant?", [crop]), (f"When were the {crop} planted?", [season, season.replace("in ", "")]), ("Who watered them?", gh),
                  ("How many baskets did they fill?", [nb]), (f"Who received a basket?", gh)]))
     # E: ship / storm
     a, ga, _ = actor(R, P, "title"); b, gb, _ = actor(R, P); thing = R.choice(["a hat", "a lantern", "the map", "a barrel", "a coat"]); place = R.choice(PLACES)
-    out.append((f"{a} steered the ship through a storm toward {place}. A wave knocked {thing} belonging to {b} into the sea. {b.capitalize()} was angry, but {a} laughed "
+    out.append((f"{a} steered the ship through a storm toward {place}. A wave knocked {thing} belonging to {b} into the sea. {cap(b)} was angry, but {a} laughed "
                 f"and gave {b} {thing.replace('the ', 'a ')} of {('his' if _ == 'm' else 'her')} own.",
                 [("Who steered the ship?", ga), ("What fell into the sea?", [thing.replace("the ", ""), f"{gb[0]}'s {thing.replace('the ', '').replace('a ', '')}"]),
                  (f"Whose {thing.replace('the ', '').replace('a ', '')} fell into the sea?", gb), ("Where was the ship going?", [place.lower(), place.lower().replace("the ", "")]), ("Who was angry?", gb)]))
@@ -96,9 +99,9 @@ def fables(R, P):
     if R.random() < 0.5:                                                      # split variant: 'came' and 'took' in separate sentences
         s2, _, _ = pron(g2)
         g1_events = g1_events[:3] + [(2, b, "come", None, f"to {p2}", None), (3, b, "take", f"the {obj}", None, None), (4, b, "give", f"the {obj}", None, a), (4, a, "return", None, p2, None)]
-        mid = f"While {a} was away, {b} came to {p2}. {s2.capitalize()} took the {obj}. "
+        mid = f"While {a} was away, {b} came to {p2}. {cap(s2)} took the {obj}. "
     else: mid = f"While {a} was away, {b} came to {p2} and took the {obj}. "
-    out.append((f"{a} walked from {p1} to {p2} with a {obj}. {s.capitalize()} set the {obj} down {spot} and went to the well. "
+    out.append((f"{a} walked from {p1} to {p2} with a {obj}. {cap(s)} set the {obj} down {spot} and went to the well. "
                 + mid + f"{b} gave the {obj} to {a} when {s} returned.",
                 [(f"Where was {a} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where did {a} start?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Where did {a} set the {obj} down?", [spot, spot.split()[-1]]), (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} set it down?", [b.lower()]),
@@ -141,7 +144,7 @@ def fables(R, P):
                  (f"Where was {c} at the end?", [p1.lower(), p1.lower().replace("the ", "")])], g4_events))
     # F: buying with a count
     a, ga, _ = actor(R, P); n = R.choice(["two", "three", "four", "five"]); item = R.choice(["loaves of bread", "candles", "eggs", "pears", "ribbons"]); seller, gs, _ = actor(R, P, "role"); place = R.choice(PLACES); coin = R.choice(["a silver coin", "two pennies", "a copper", "a shilling"]); needy = R.choice(NEEDY)
-    out.append((f"{a.capitalize()} went to {place} and bought {n} {item} from {seller}. {a.capitalize()} paid with {coin}. On the way home {a} gave one to {needy} who was crying.",
+    out.append((f"{cap(a)} went to {place} and bought {n} {item} from {seller}. {cap(a)} paid with {coin}. On the way home {a} gave one to {needy} who was crying.",
                 [(f"What did {a} buy?", [f"{n} {item}", item]), (f"Who sold the {item}?", gs), (f"How did {a} pay?", [coin.replace("a ", "").replace("two ", "")]),
                  (f"Where did {a} buy the {item}?", [place.lower(), place.lower().replace("the ", "")]), ("Who was crying?", [needy, needy.split()[-1]])]))
     return out
@@ -155,8 +158,8 @@ def skeletons(R, P):
     s, o, p = pron(ga); s2, o2, p2 = pron(gb)
     s1_events = [(0, a, "have", f"a {obj}", None, None), (1, b, "borrow", f"the {obj}", None, None), (2, b, "take", f"the {obj}", place, None),
                  (3, b, "come", None, None, None), (3, a, "wait", None, "the door", None), (4, a, "make", b, None, None)]
-    out.append((f"{a} had a {obj}. One afternoon {p} {rel} {b} borrowed the {obj} without asking. {s2.capitalize()} took it to {place}. "
-                f"When {s2} came back, {a} was waiting at the door. {s.capitalize()} made {o2} promise {promise} next time.",
+    out.append((f"{a} had a {obj}. One afternoon {p} {rel} {b} borrowed the {obj} without asking. {cap(s2)} took it to {place}. "
+                f"When {s2} came back, {a} was waiting at the door. {cap(s)} made {o2} promise {promise} next time.",
                 [(f"Who owned the {obj}?", [a.lower()]), (f"Who borrowed the {obj}?", [b.lower(), f"{p} {rel}"]),
                  (f"Where did {b} take the {obj}?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"Where was the {obj} at the end?", [place.lower(), place.lower().replace("the ", "")]),           # R20: state questions the generator knows
@@ -166,8 +169,8 @@ def skeletons(R, P):
     # 2 learning / teacher
     a, ga = P(None); tg = R.choice("fm"); t, _ = P(tg); title = R.choice(TITLES[tg]); skill = R.choice(SKILLS); day = R.choice(WEEKDAYS); place = R.choice(PLACES)
     s, o, p = pron(ga); rel, gr = R.choice(RELS)
-    out.append((f"{a} wanted to learn {skill}. {p.capitalize()} teacher, {title}. {t}, gave {o} a lesson every {day}. After a year, {a} performed at {place}. "
-                f"{p.capitalize()} {rel} came to watch.",
+    out.append((f"{a} wanted to learn {skill}. {cap(p)} teacher, {title}. {t}, gave {o} a lesson every {day}. After a year, {a} performed at {place}. "
+                f"{cap(p)} {rel} came to watch.",
                 [(f"What did {a} want to learn?", [skill.lower().replace("to ", ""), skill.lower()]), (f"Who was {p} teacher?", [f"{title.lower()} {t.lower()}", t.lower()]),
                  (f"On which day was the lesson?", [day.lower()]), (f"Where did {a} perform?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"Who came to watch?", [f"{p} {rel}", rel])]))
@@ -176,7 +179,7 @@ def skeletons(R, P):
     while p2 == p1: p2 = R.choice(PLACES)
     thanks = R.choice(THANKS)
     s, o, p = pron(ga); s2, o2, pp2 = pron(gb)
-    out.append((f"{a} lost {p} {obj} near {p1}. {s.capitalize()} searched all morning. In the evening {b} found the {obj} at {p2} and brought it to {a}. "
+    out.append((f"{a} lost {p} {obj} near {p1}. {cap(s)} searched all morning. In the evening {b} found the {obj} at {p2} and brought it to {a}. "
                 f"{a} gave {b} {thanks} to say thank you.",
                 [(f"What did {a} lose?", [obj.lower()]), (f"Where did {a} lose the {obj}?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Who found the {obj}?", [b.lower()]), (f"Where was the {obj} found?", [p2.lower(), p2.lower().replace("the ", "")]),
@@ -186,7 +189,7 @@ def skeletons(R, P):
     # 4 gift / trip
     a, ga = P(None); rel, gr = R.choice(RELS); b, gb = P(gr); obj = R.choice(OBJECTS); place = R.choice(PLACES); day = R.choice(WEEKDAYS)
     s, o, p = pron(ga)
-    out.append((f"On {day}, {a} travelled to {place} to visit {p} {rel} {b}. {s.capitalize()} brought a {obj} as a gift. {b} was delighted and hung it by the window. "
+    out.append((f"On {day}, {a} travelled to {place} to visit {p} {rel} {b}. {cap(s)} brought a {obj} as a gift. {b} was delighted and hung it by the window. "
                 f"They ate supper together and {a} went home after dark.",
                 [(f"Who did {a} visit?", [b.lower(), f"{p} {rel}", rel]), (f"Where did {a} travel?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"What did {a} bring as a gift?", [obj.lower()]), (f"When did {a} travel?", [day.lower()]), (f"Who hung the {obj} by the window?", [b.lower()]),
@@ -225,7 +228,7 @@ def skeletons(R, P):
 FRONTS = ["That day, ", "Later that day, ", "Without a word, ", "As it happened, ", "Soon after, ", "Before long, "]
 PARA_ROLES = ["the farmer", "a tall farmer", "the baker", "a young sailor", "the old teacher", "a quiet neighbour", "the miller", "a travelling tinker"]
 NOT_NAMES = {"The", "A", "An", "In", "At", "On", "One", "When", "While", "After", "Before", "Then", "He", "She", "They", "It", "Her", "His", "Their", "Right", "Every", "Each", "Mr", "Mrs", "Dr", "Miss", "That", "This", "Soon", "Later", "Without", "As", "By", "From", "To", "Her", "Some", "Many", "All", "No", "Not", "But", "And", "So", "Once", "Twice"}
-PASSIVE = re.compile(r"^([A-Z][a-z]+) (\w+ed) (the [a-z]+(?: [a-z]+)?|a [a-z]+(?: [a-z]+)?)( .*)?\.$")
+PASSIVE = re.compile(r"^([A-Z][a-z]+) (\w+ed) (the [a-z]+|a [a-z]+|the [a-z]+ [a-z]+(?= to | at | near | by | from | in |\.)|a [a-z]+ [a-z]+(?= to | at | near | by | from | in |\.))( .*)?\.$")
 
 
 def paraphrase(R, text):
