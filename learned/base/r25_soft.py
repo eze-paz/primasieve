@@ -194,5 +194,87 @@ def main_j():
     json.dump(dict(use_idf=use_idf, decay=decay, lam=lam, margin=margin), open("r25_soft_j.json", "w"))
 
 
+# ---------------- R25-k: a role reader that matches loosely (structure from constructions, matching from vectors) ----------------
+def qparse(q, names):
+    """(asked role, question verb, question argument heads) or None"""
+    qs, qf = QR.qshape(q, names); k = q.lower().split()[0]
+    v = next((x[2:] for x in qs if x.startswith("V:")), None)
+    if v is None: return None
+    args = [(f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
+    args = [a.split()[-1] for a in args if a.lower() not in ("it", "him", "her", "them", "he", "she", "they")]
+    if k == "who" and "did" not in qs: role = "subj"
+    elif k in ("what", "who", "whom") and "did" in qs: role = "obj"
+    elif k == "what": role = "subj"
+    elif k == "where": role = "place"
+    elif k == "when": role = "when"
+    else: return None
+    return role, v, args
+
+
+def roles_of(sents):
+    """for every verb occurrence in the story: (sentence index, verb, subject, object, place, when, clause heads)"""
+    out = []
+    for si, (cs, cf, raws) in enumerate(sents):
+        when = next((cf[i] for i, x in enumerate(cs) if x == "WHEN" and cf[i]), None)
+        for i, x in enumerate(cs):
+            if not x.startswith("V:"): continue
+            lo, hi = R.clause_of(cs, i)
+            filled = lambda k_: (raws[k_] if k_ < len(raws) and raws[k_] else cf[k_])
+            subj = next((filled(k_) for k_ in range(i - 1, lo - 1, -1) if cs[k_] in ("PERSON", "ENT", "PRON") and cf[k_]), None)
+            if subj is None and lo > 0: subj = next((filled(k_) for k_ in range(lo - 1, -1, -1) if cs[k_] in ("PERSON", "ENT") and cf[k_]), None)
+            obj = next((filled(k_) for k_ in range(i + 1, hi) if cs[k_] in ("PERSON", "ENT") and cf[k_] and not (k_ >= 1 and cs[k_ - 1] in R.PLACE_WORDS)), None)
+            place = next((f"{cs[k_ - 1]} {filled(k_)}" for k_ in range(i + 1, hi) if cs[k_] == "ENT" and cf[k_] and k_ >= 1 and cs[k_ - 1] in (R.PLACE_WORDS - {"from", "with", "by", "through", "to"})), None)                     or next((filled(k_) for k_ in range(i + 1, hi) if cs[k_] == "ENT" and cf[k_] and k_ >= 1 and cs[k_ - 1] == "to"), None)
+            heads = [str(cf[k_]).split()[-1] for k_ in range(lo, hi) if cs[k_] in ("PERSON", "ENT") and cf[k_]]
+            out.append(dict(si=si, verb=x[2:], subj=subj, obj=obj, place=place, when=when, heads=heads))
+    return out
+
+
+def soft_role(text, q, names, story_cache=None):
+    """(answer, verb similarity, argument match) for the best-matching clause, or (None, 0, 0)"""
+    p = qparse(q, names)
+    if p is None: return None, 0.0, 0.0
+    role, v, args = p; vv = vec(v)
+    if vv is None: return None, 0.0, 0.0
+    if story_cache is None:
+        sents = []
+        for x in T.SENT.split(text):
+            if x.strip(): cs, cf = R.construction(x, names); sents.append((cs, cf, list(R.LAST_RAWS)))
+        story_cache = roles_of(sents)
+    best = (None, -1.0, 0.0)
+    for c in story_cache:
+        cu = vec(c["verb"]); ans = c[role]
+        if cu is None or not ans: continue
+        if any(ans.split()[-1].lower() == a.lower() for a in args): continue                 # the question already names it
+        vs = 1.0 if c["verb"] == v else float(np.dot(vv, cu))
+        am = float(np.mean([max([1.0 if h.lower() == a.lower() else max(0.0, float(np.dot(vec(a), vec(h)))) for h in c["heads"] if vec(h) is not None] or [0.0]) for a in args if vec(a) is not None])) if args else 0.5
+        sc = vs + am
+        if sc > best[1] + best[2]: best = (ans, vs, am)
+    return best
+
+
+def main_k():
+    t0 = time.time()
+    data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
+    train_b, _ = D0.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
+    D.ON = True; T.SPAN_STOP.update(D.verb_forms() - E.NOUNISH); QR.ARGV = ["x", "--pron-ref"]
+    old = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]
+    more = json.load(open("val_more.json", encoding="utf-8"))["stories"]
+    practice = [(s["text"], q, g) for s in old + more[:20] for q, g in s["qs"]]
+    holdout = [(s["text"], q, g) for s in more[20:] for q, g in s["qs"]]
+    fp = [(soft_role(t, q, names), g) for t, q, g in practice]; fh = [(soft_role(t, q, names), g) for t, q, g in holdout]
+    def fit(F, tv, ta):
+        r = w = 0
+        for (a, vs, am), g in F:
+            if a is None or vs < tv or am < ta: continue
+            r, w = (r + 1, w) if hit(a, g) else (r, w + 1)
+        return r - 3 * w, r, w
+    grid = [(tv, ta) for tv in (1.0, 0.9, 0.8, 0.7, 0.6, 0.5) for ta in (0.0, 0.5, 0.8, 1.0)]
+    res = {k: fit(fp, *k) for k in grid}
+    for k in grid: print(f"  verb similarity >= {k[0]}, argument match >= {k[1]}: practice {res[k]}", flush=True)
+    best = max(grid, key=lambda k: res[k][0])
+    print(f"R25-k the learner chose verb >= {best[0]}, args >= {best[1]}: practice {res[best]} | holdout {fit(fh, *best)} over {len(holdout)} | exact-verb-only reference (1.0, {best[1]}): holdout {fit(fh, 1.0, best[1])} ({time.time() - t0:.0f} s)", flush=True)
+    json.dump(dict(tv=best[0], ta=best[1], practice=res[best], holdout=fit(fh, *best)), open("r25_soft_k.json", "w"))
+
+
 if __name__ == "__main__":
-    main_j() if "--j" in ARGV else main()
+    main_k() if "--k" in ARGV else (main_j() if "--j" in ARGV else main())

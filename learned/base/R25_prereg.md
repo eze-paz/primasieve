@@ -79,3 +79,9 @@ Fresh 200, learner alone: 70 spoke / 58 right (R24-ap2: 53 / 45); old 110 61 / 5
 
 ## R25-j registration (the similarity reader learns what to weigh)
 The match score gains two book-learned signals: word informativeness (inverse document frequency over training-book paragraphs; a question word's weight) and proximity (cosine contributions decay with the distance between the matching sentence word and the candidate). Weights chosen by the learner on practice: IDF on/off, decay in {none, 0.8, 0.6}, LAM in {0, 0.5, 1}. Measured: top-1 right when always answering on practice and holdout, holdout fitness at the learner's chosen margin. Passes if holdout top-1 right rises above R25-h's.
+
+## R25-j result (neutral)
+Informativeness (book IDF over 45,997 words) and proximity decay barely move the similarity reader: practice top-1 right when always answering 82-90 of 192 across settings (R25-h settings 88); the learner kept the R25-h settings; holdout top-1 39/95 for both. A bag-of-similar-words ranker plateaus near 45%: it knows which words are near the answer, not who did what to whom.
+
+## R25-k registration (a role reader that matches loosely)
+Roles come from the learned constructions (subject, object, place, time of each verb occurrence, clause-bounded); matching comes from the learner's vectors: the story verb most similar to the question verb, with the question's other arguments matched to the clause's names / things by cosine. The answer is the filler of the asked role (who V -> subject; what / who did X V -> object; where -> place; when -> time span). The learner chooses the verb-similarity and argument-match thresholds on practice (+1 / -3 / 0). Gate: holdout fitness > 0 with more right answers than R25-h (5); the exact-verb-only setting is reported as the reference for what loose verb matching adds.
