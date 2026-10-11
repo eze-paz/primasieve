@@ -30,7 +30,8 @@ def verb_base(w):
     if w in EXC: return EXC[w]
     if ("v", w) in IDX: return w
     for suf, rep in VERB_SUFFIX:
-        if w.endswith(suf) and ("v", w[: -len(suf)] + rep) in IDX: return w[: -len(suf)] + rep
+        b = w[: -len(suf)] + rep
+        if w.endswith(suf) and len(b) >= 3 and ("v", b) in IDX: return b          # R24-ap2: no two-letter bases from suffix stripping ('bees' is not a form of 'be')
     return None
 
 
