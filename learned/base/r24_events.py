@@ -24,9 +24,9 @@ def lemma(w):
     w = w.lower()
     if w in IRREG: return IRREG[w]
     for suf in ("ied", "ed", "ing", "es", "s"):
+        if w.endswith(suf) and len(w) - len(suf) >= 2 and suf in ("ed", "ing") and (w[:-len(suf)] + "e") in BASEV: return w[:-len(suf)] + "e"     # R24-z: 'used' -> 'use' (a learned base form), not 'us'
         if w.endswith(suf) and len(w) - len(suf) >= 3:
-            stem = w[:-len(suf)] + ("y" if suf == "ied" else "")
-            if suf in ("ed", "ing") and (stem + "e") in BASEV: return stem + "e"                                                            # R24-z: 'used' -> 'use' (a learned base form), not 'us'
+            stem = w[:-len(suf)] + ("y" if suf == "ied" else "")                                                            # R24-z: 'used' -> 'use' (a learned base form), not 'us'
             if suf in ("ed", "ing") and (stem + "e") in (T.COMMON | VOCAB) and stem not in (T.COMMON | VOCAB): return stem + "e"          # 'raced' -> 'race', 'hired' -> 'hire' (the vocabulary of the books decides)
             return stem[:-1] if suf in ("ed", "ing") and len(stem) > 3 and stem[-1] == stem[-2] else stem
     return w
@@ -50,7 +50,7 @@ def induce_verbish(stories, k=100):
     for c, ws in by.items():
         n = sum(uni[w] for w in ws); v = sum(uni[w] for w in ws if w.endswith("ed") or w in IRREG)
         if n and v / n >= 0.5: VERBISH.update(ws)
-    after_det = collections.Counter(); total = collections.Counter(); after_every = collections.Counter(); after_modal = collections.Counter()
+    after_det = collections.Counter(); total = collections.Counter(); after_every = collections.Counter(); after_modal = collections.Counter(); after_to = collections.Counter()
     for text in stories:
         w = [x.lower() for x in T.TOK.findall(text)]
         for i, x in enumerate(w):
@@ -58,9 +58,11 @@ def induce_verbish(stories, k=100):
             if i and w[i - 1] in T.DET: after_det[x] += 1
             if i and w[i - 1] in ("every", "each"): after_every[x] += 1                                   # 'every morning', 'each day': habitual time words
             if i and w[i - 1] in MODALS: after_modal[x] += 1                                             # R24-z: 'will use', 'could teach': a base form
+            if i and w[i - 1] == "to": after_to[x] += 1
     NOUNISH.update(x for x, c in total.items() if c >= 5 and after_det[x] / c >= 0.3)        # 'seed', 'bed', 'shed' are things, not past verbs
     VOCAB.update(x for x, c in total.items() if c >= 3)
-    BASEV.update(x for x, c in after_modal.items() if c >= 3 and x not in NOUNISH and any(x + suf in VOCAB for suf in ("ed", "d", "s", "es")))   # R24-z: base forms with an inflected form in the books
+    def past_of(x): return x[:-1] + "ied" if x.endswith("y") else (x + "d" if x.endswith("e") else x + "ed")
+    BASEV.update(x for x, c in after_modal.items() if c >= 3 and c / total[x] >= 0.05 and after_to[x] / total[x] >= 0.02 and x not in NOUNISH and (past_of(x) in VOCAB or x + "s" in VOCAB or x + "es" in VOCAB))   # R24-z2: base forms: often after a modal and after 'to' (not 'not'), with an inflected form in the books
     VERBISH.update(BASEV)
     if "morning" in classes: TIMEISH.update(w for w, c in classes.items() if c == classes["morning"] and after_every[w] >= 3)   # the induced class of 'morning', kept to words used after 'every' / 'each'
     TIMEISH.add("morning")
