@@ -58,23 +58,48 @@ def main():
 
     import collections
     kind = lambda q: q.lower().split()[0]
-    held = collections.defaultdict(lambda: [0, 0])
+    FINE = "--fine" in ARGV                                                              # R24-y: admission keys with back-off, scored on pooled evidence
+    def akeys(q, how, a):
+        """finest to coarsest admission keys for an answer: question shape, whether the answer repeats a question slot, whether it is a name"""
+        if not FINE: return [(kind(q), how)]
+        import r24_qreader as Q2
+        qs, qf = Q2.qshape(q, names); shape = tuple(x for x in Q2.abstract_q(qs) if x != "w")
+        in_q = any(f and same(a, f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT")); is_name = a.split()[-1][:1].isupper()
+        return [(kind(q), how, shape, in_q, is_name), (kind(q), how, in_q, is_name), (kind(q), how)]
+    held = collections.defaultdict(lambda: [0, 0]); heldk = collections.defaultdict(lambda: [0, 0])
     for s in data[7000:7600]:
         for q, g in s["qs"]:
             a, how = answer(s["text"], q)
-            if a is not None: held[(kind(q), how)][0] += hit(a, g); held[(kind(q), how)][1] += 1
+            if a is not None:
+                held[(kind(q), how)][0] += hit(a, g); held[(kind(q), how)][1] += 1
+                for k in akeys(q, how, a): heldk[k][0] += hit(a, g); heldk[k][1] += 1
     print("R24-p held-out precision by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]} = {v[0] / max(1, v[1]):.2f}" for k, v in held.items()}, flush=True)
     stories = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]
-    n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0])
+    n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0]); valkk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
         for q, g in s["qs"]:
             n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
             if DIAG: print(f"VAL | {q} | gold {g} | cue {E.ask_conf(E.Log(names).read(s['text']), q)} | learned {QR.ask_learned(QRD, rd, s['text'], names, q) if LEARNED_Q else R.ask(rd, s['text'], names, q)} lvl {QR.LASTQ.get('level') if LEARNED_Q else '-'} | route {how} | ans {a} | hit {hit(a, g) if a is not None else '-'}", flush=True)
-            if a is not None: matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
+            if a is not None:
+                matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[(kind(q), how)][0] += h; valk[(kind(q), how)][1] += 1
+                for k in akeys(q, how, a): valkk[k][0] += h; valkk[k][1] += 1
     print(f"R24-k validation ({n}): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
     admitted = {k for k in set(held) | set(valk) if (held[k][0] + valk[k][0]) / max(1, held[k][1] + valk[k][1]) >= 0.95}      # R24-q3: pooled precision, held-out and validation together
+    pooled = {k: (heldk[k][0] + valkk[k][0], heldk[k][1] + valkk[k][1]) for k in set(heldk) | set(valkk)}
+    def admit(q, how, a):
+        """R24-y: the finest key with enough evidence (>= 8) decides; precision >= 0.95 admits"""
+        if not FINE: return (kind(q), how) in admitted
+        for k in akeys(q, how, a):
+            r, t = pooled.get(k, (0, 0))
+            if t >= 8: return r / t >= 0.95
+        return False
+    if FINE: print("R24-y admission keys with >= 8 evidence and precision >= 0.95:", sorted(str(k) for k, (r, t) in pooled.items() if t >= 8 and r / t >= 0.95), flush=True)
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
-    adm_right = sum(v[0] for k, v in valk.items() if k in admitted); adm_n = sum(v[1] for k, v in valk.items() if k in admitted)
+    adm_right = adm_n = 0
+    for s in stories:
+        for q, g in s["qs"]:
+            a, how = answer(s["text"], q)
+            if a is not None and admit(q, how, a): adm_n += 1; adm_right += hit(a, g)
     print(f"R24-x validation after admission: matched {adm_n}, right {adm_right} (precision {adm_right / max(1, adm_n):.2f})", flush=True)
     if adm_n and adm_right / adm_n >= 0.90:
         tests = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; rep = json.load(open("b6_rwkv_ckpt_read1b.json", encoding="utf-8"))["items"]; i = 0
@@ -82,8 +107,8 @@ def main():
         for s in tests:
             for q, g in s["qs"]:
                 x = rep[i]; i += 1; model += x["hit"]; a, how = answer(s["text"], q)
-                if DIAG: print(f"B6 | {q} | gold {g} | model {x['hit']} | route {how} | ans {a} | admitted {(kind(q), how) in admitted} | hit {hit(a, g) if a is not None else '-'}", flush=True)
-                if a is not None and (kind(q), how) not in admitted: a = None
+                if DIAG: print(f"B6 | {q} | gold {g} | model {x['hit']} | route {how} | ans {a} | admitted {admit(q, how, a) if a is not None else '-'} | hit {hit(a, g) if a is not None else '-'}", flush=True)
+                if a is not None and not admit(q, how, a): a = None
                 if a is not None: spoke += 1; spoke_right += hit(a, g); merged += hit(a, g)
                 else: merged += x["hit"]
         print(f"B6 once (R24-k): model {model} | two readers spoke on {spoke}, right {spoke_right} | merged {merged}/100 (model 80, hand world 82, bar 85)")
