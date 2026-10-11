@@ -122,7 +122,7 @@ def main():
         for s in tests:
             for q, g in s["qs"]:
                 x = rep[i]; i += 1; model += x["hit"]; a, how = answer(s["text"], q)
-                if DIAG: print(f"B6 | {q} | gold {g} | model {x['hit']} | route {how} | ans {a} | admitted {admit(q, how, a) if a is not None else '-'} | hit {hit(a, g) if a is not None else '-'}", flush=True)
+                if DIAG and "--b6-lines" in ARGV: print(f"B6 | {q} | gold {g} | model {x['hit']} | route {how} | ans {a} | admitted {admit(q, how, a) if a is not None else '-'} | hit {hit(a, g) if a is not None else '-'}", flush=True)
                 if a is not None and not admit(q, how, a): a = None
                 if a is not None: spoke += 1; spoke_right += hit(a, g); merged += hit(a, g)
                 else: merged += x["hit"]

@@ -3,6 +3,7 @@ import os, sys, json, random
 ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E, r24_reader as R, r24_qreader as QR
+QR.ARGV = ARGV
 data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
 import r24_books as B, data as D
 train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
@@ -17,6 +18,7 @@ for s in stories:
         if q not in PICK: continue
         print("=" * 100); print("Q:", q, "| gold", g); print("qshape:", QR.qshape(q, names)); print("keys:", [k for k in QR.keys_of(QR.qshape(q, names)[0]) if k in QRD.map])
         got = QRD.render(q, names); print("render:", got, "| level", QR.LASTQ.get("level"))
+        if got: print("template:", QRD.map[next(k for k in QR.keys_of(QR.qshape(q, names)[0]) if k in QRD.map)].most_common(3))
         for x in T.SENT.split(s["text"]):
             if x.strip(): print("  sent:", x.strip()[:120]); print("    cons:", R.construction(x, names))
         print("learned answer:", QR.ask_learned(QRD, rd, s["text"], names, q), "| LAST", dict(R.LAST))
