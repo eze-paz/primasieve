@@ -223,3 +223,6 @@ Same saved groups counted on 400,000 sentences (6.97M tokens, 31,717 words): hel
 
 ## R25-c11 registration
 Next cycle on the same larger text from the 456 saved groups (2 exchange passes, 150 split tries). Passes if held-out bits fall below 8.9355.
+
+## R25-w result (stable settings)
+Re-choosing on 710 practice questions, the learner picked the same role thresholds as on 210 (verb >= 0.8, args >= 0.5); downstream identical to R25-u (untouched +24; B6 79). Role reader alone on the untouched 200 at those settings: 46 right / 7 wrong (0.87).
