@@ -33,19 +33,30 @@ def main():
         if a is not None and b is not None: return None, "disagree"
         return (a, "cue-only") if (a is not None and conf) else (None, "silent")
 
+    import collections
+    kind = lambda q: q.lower().split()[0]
+    held = collections.defaultdict(lambda: [0, 0])
+    for s in data[7000:7600]:
+        for q, g in s["qs"]:
+            a, how = answer(s["text"], q)
+            if a is not None: held[kind(q)][0] += hit(a, g); held[kind(q)][1] += 1
+    print("R24-p held-out precision by kind:", {k: f"{v[0]}/{v[1]} = {v[0] / max(1, v[1]):.2f}" for k, v in held.items()}, flush=True)
     stories = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"]
-    n = matched = right = 0; by = {}
+    n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
         for q, g in s["qs"]:
             n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
-            if a is not None: matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1
+            if a is not None: matched += 1; h = hit(a, g); right += h; by[how][0] += h; by[how][1] += 1; valk[kind(q)][0] += h; valk[kind(q)][1] += 1
     print(f"R24-k validation (80): matched {matched}, right {right} (precision {right / max(1, matched):.2f}); by route {by}")
+    admitted = {k for k in set(held) | set(valk) if (held[k][1] == 0 or held[k][0] / held[k][1] >= 0.95) and (valk[k][1] == 0 or valk[k][0] / valk[k][1] >= 0.95)}
+    print("R24-p admitted kinds:", sorted(admitted), "| validation by kind:", {k: f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
     if matched and right / matched >= 0.90:
         tests = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; rep = json.load(open("b6_rwkv_ckpt_read1b.json", encoding="utf-8"))["items"]; i = 0
         model = merged = spoke = spoke_right = 0
         for s in tests:
             for q, g in s["qs"]:
                 x = rep[i]; i += 1; model += x["hit"]; a, how = answer(s["text"], q)
+                if a is not None and kind(q) not in admitted: a = None
                 if a is not None: spoke += 1; spoke_right += hit(a, g); merged += hit(a, g)
                 else: merged += x["hit"]
         print(f"B6 once (R24-k): model {model} | two readers spoke on {spoke}, right {spoke_right} | merged {merged}/100 (model 80, hand world 82, bar 85)")
