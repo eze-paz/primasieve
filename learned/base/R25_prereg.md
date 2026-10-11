@@ -316,3 +316,9 @@ Word-triple model 9.0016 bits/token -- worse than the word-pair model (8.8078), 
 
 ## R25-af2 (same registration, wider backoff grid for the baseline)
 Word-triple backoff strength chosen from {10, 30, 100, 300, 1000, 3000} on the training slice; everything else unchanged.
+
+## R25-af2 result (fair baseline)
+Word-triple model properly tuned (backoff 300, inside the grid): 8.5648 bits/token. The learner's three-group model: **8.5344** -- better than a tuned standard word-triple model by 0.03 bits on 270,358 predictions, with far fewer parameters. Mixed: 8.2943 (-0.27 bits against the word-triple model alone): the groups carry information the word sequences lack.
+
+## R25-ag registration (four groups of context)
+The group model gains a four-group context (previous four groups, backed off to the three-group estimate, strength chosen on the training slice from {50, 200, 1000, 5000}); alone and mixed with the tuned word-triple model. Held-out books once. Passes if the mix falls below 8.2943.
