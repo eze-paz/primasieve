@@ -322,3 +322,9 @@ Word-triple model properly tuned (backoff 300, inside the grid): 8.5648 bits/tok
 
 ## R25-ag registration (four groups of context)
 The group model gains a four-group context (previous four groups, backed off to the three-group estimate, strength chosen on the training slice from {50, 200, 1000, 5000}); alone and mixed with the tuned word-triple model. Held-out books once. Passes if the mix falls below 8.2943.
+
+## R25-ag result (PASS, diminishing)
+Four groups of context: 8.5130 alone; mixed with the tuned word-triple model **8.2826** (from 8.2943). Context depth is nearly exhausted (about 0.01 bits per extra group).
+
+## R25-c14 + R25-ah registration
+Group refinement resumes on all training text from the 571 saved groups (2 exchange passes, 200 split tries; gate: held-out class-pair bits below 8.8361); then the next-word model of R25-ag is re-scored with the refined groups (gate: mix below 8.2826).
