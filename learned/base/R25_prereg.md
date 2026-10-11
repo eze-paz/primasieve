@@ -253,3 +253,9 @@ Practice teaching: 485 question-sentence pairs from 142 practice stories; questi
 
 ## R25-z2 registration (teach on one half, choose trust on the other)
 The readers learn from val_more + practice A (400 questions); route trust is chosen on old 110 + practice B (310), which taught nothing (--teach-half, r25_trust.py --trust-half). Untouched val_fresh2 judges; B6 once. Passes if untouched fitness beats +28.
+
+## R25-z2 result (negative; practice teaching closed)
+Teaching on val_more + A (268 pairs, 315 statements), trust chosen on old 110 + B: untouched all routes 71 / 37 (R25-x 70 / 30), trusted 44 / 14, +2. Teaching the readers from the practice questions adds wrong answers on new text even with separate trust data; R25-z's B6 84 most likely came from in-sample admission. R25-x stays the best (+28).
+
+## R25-aa registration (trust per route and question kind)
+On R25-x's logged answers, no rerun: the learner trusts a (route, question kind) when it has >= 10 practice answers with fitness > 0, otherwise decides at the route level as in R25-u. Chosen on the 710 practice questions; untouched scored once. Passes if untouched fitness beats +28.

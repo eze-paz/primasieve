@@ -39,3 +39,20 @@ if "--lift" in sys.argv:                                                        
     for tau, r in res.items(): print(f"  role-score cut-off {tau}: practice fitness {r[0]} ({r[1]} right, {r[2]} wrong)")
     best = max(res, key=lambda t: res[t][0])
     print(f"the learner chose cut-off {best}: practice {res[best]} | untouched val_fresh2 {score(UNTOUCHED, best)} (no cut-off: {score(UNTOUCHED, None)})")
+
+
+if "--by-kind" in sys.argv:                                                              # R25-aa: trust per (route, question kind), falling back to the route
+    def qkind(l):
+        parts = l.split(" | "); q = parts[2] if parts[1].startswith("lift") else parts[1]
+        return q.strip().lower().split()[0] if q.strip() else ""
+    fk = collections.defaultdict(lambda: [0, 0])
+    for l in PRACTICE:
+        if spoke(l): fk[(route(l), qkind(l))][0 if right(l) else 1] += 1
+    def trusted(l):
+        a, w = fk[(route(l), qkind(l))]
+        if a + w >= 10: return a - 3 * w > 0
+        return route(l) in keep
+    for nm, part in ((f"practice {len(PRACTICE)}", PRACTICE), ("untouched val_fresh2 200", UNTOUCHED)):
+        a = sum(1 for l in part if spoke(l) and right(l) and trusted(l)); w = sum(1 for l in part if spoke(l) and not right(l) and trusted(l))
+        print(f"R25-aa {nm}: trust by route and kind -> {a} right / {w} wrong (fitness {a - 3 * w})")
+    print("R25-aa (route, kind) decisions with >= 10 practice answers:", {f"{k[0]}/{k[1]}": ("keep" if v[0] - 3 * v[1] > 0 else "drop", tuple(v)) for k, v in fk.items() if sum(v) >= 10})
