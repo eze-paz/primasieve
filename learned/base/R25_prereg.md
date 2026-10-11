@@ -148,3 +148,12 @@ From 241 saved groups: exchange 9.1196 -> 9.1142 -> 9.1086; 28 of 80 splits kept
 
 ## R25-c6 registration
 Next cycle from the 269 saved groups (2 exchange passes, 100 split tries). Passes if held-out bits fall below 9.1037.
+
+## R25-c6 result (PASS)
+From 270 saved groups: exchange 9.1037 -> 9.1004 -> 9.0975; 29 of 100 splits kept -> 299 groups; held-out 9.0931. Distinctions: between / behind / beside vs upon / against / toward(s); company / conversation / friendship vs interest / pleasure / service; said / quoth apart from motion verbs; learned / discovered / expected vs found / allowed / believed.
+
+## R25-p partial (today's best configuration, R25-l, on the untouched set)
+Learner alone: val_fresh2 98 spoke / 69 right / 29 wrong (0.70); val_more 81 / 67 / 14 (0.83); old 110 69 / 63 / 6. Right answers per 200 hold on untouched text (69 vs 67); precision falls (0.70 vs 0.83): the size of the remaining overfitting. Merged validation 387/510 vs model 336/510. B6 once 78 (spoke 37, right 31). The R24-ap2 comparison on the same questions is running.
+
+## R25-c7 registration
+Next cycle from the 299 saved groups (2 exchange passes, 120 split tries). Passes if held-out bits fall below 9.0931.
