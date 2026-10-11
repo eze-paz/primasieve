@@ -9,7 +9,8 @@ route = lambda l: l.split("| route ")[1].split(" |")[0]
 spoke = lambda l: "| ans None |" not in l
 right = lambda l: "hit True" in l
 fit = collections.defaultdict(lambda: [0, 0])
-PRACTICE = L[:310] + L[510:] if "--big" in sys.argv else L[:310]                          # R25-u: old 110 + val_more + practice A / B; the untouched val_fresh2 is L[310:510]
+PRACTICE = L[:310] + L[510:] if "--big" in sys.argv else L[:310]
+if "--trust-half" in sys.argv: PRACTICE = L[:110] + L[710:910]                             # R25-z2: choose trust on the half that did not teach (old 110 + practice B)                          # R25-u: old 110 + val_more + practice A / B; the untouched val_fresh2 is L[310:510]
 UNTOUCHED = L[310:510]
 for l in PRACTICE:
     if spoke(l): fit[route(l)][0 if right(l) else 1] += 1

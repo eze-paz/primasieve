@@ -113,7 +113,8 @@ def main():
             import re as _re
             nrm = lambda x: _re.sub(r"[^a-z0-9 ]", " ", x.lower())
             pst = []
-            for f_ in ("val_stories.json", "val_fables.json", "val_timespace.json", "val_more.json", "val_practice_a.json", "val_practice_b.json"):
+            TEACH = ("val_more.json", "val_practice_a.json") if "--teach-half" in ARGV else ("val_stories.json", "val_fables.json", "val_timespace.json", "val_more.json", "val_practice_a.json", "val_practice_b.json")   # R25-z2: teach on one half
+            for f_ in TEACH:
                 pst += json.load(open(f_, encoding="utf-8"))["stories"]
             pairs = []
             for s_ in pst:

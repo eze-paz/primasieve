@@ -247,3 +247,9 @@ Directional contexts: the learner chose exact verbs (verb >= 1.0) on practice; r
 
 ## R25-z registration (the practice questions teach the readers)
 The 710 practice questions (old 110, val_more, practice A / B; never val_fresh2) have only judged and chosen so far. Now they teach: for each, the story sentence holding a gold form and the question's verb gives a (question, sentence, answer) pair for the question reader; then the question reader renders each practice question as a statement with the gold answer, added to the sentence reader's training for that story. Built on R25-x. Caveat: practice scores become partly in-sample, so the trust choice made on practice may over-trust; only the untouched set can show it. Passes if untouched fitness beats +28.
+
+## R25-z result (gate failed; B6 best yet)
+Practice teaching: 485 question-sentence pairs from 142 practice stories; question-reader evidence 22,695 -> 23,976; 589 statements for the sentence reader. Untouched, all routes 70 / 30 -> 74 / 35; with trust chosen on the (now taught) practice: 45 / 8, +21 < +28 -- gate failed; the learner over-trusted, as the caveat predicted (practice became in-sample). **B6 once 84** (spoke 36, right 34; best yet, one below the bar) -- secondary, and its admission also used the taught practice.
+
+## R25-z2 registration (teach on one half, choose trust on the other)
+The readers learn from val_more + practice A (400 questions); route trust is chosen on old 110 + practice B (310), which taught nothing (--teach-half, r25_trust.py --trust-half). Untouched val_fresh2 judges; B6 once. Passes if untouched fitness beats +28.
