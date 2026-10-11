@@ -199,3 +199,9 @@ From 338 saved groups: exchange 9.0830 -> 9.0784 -> 9.0777; 42 of 150 splits kep
 
 ## R25-c9 registration
 Next cycle from the 380 saved groups (2 exchange passes, 180 split tries). Passes if held-out bits fall below 9.0735.
+
+## R25-c9 result (PASS)
+From 381 saved groups: exchange 9.0735 -> 9.0724 -> 9.0704; 50 of 180 splits kept -> 431 groups; held-out 9.0653. Gains per cycle are shrinking.
+
+## R25-c10 registration (more text, same saved groups)
+The group refinement continues from the 431 saved groups but counts 400,000 training sentences instead of 150,000 (about 7M tokens, the same text the vectors use). Held-out books unchanged. Passes if held-out bits fall below the start-of-run value measured with the larger counts (reported), and below 9.0653.

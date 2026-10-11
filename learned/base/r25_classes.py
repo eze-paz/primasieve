@@ -27,7 +27,8 @@ def main():
     t0 = time.time(); passes = int(ARGV[ARGV.index("--passes") + 1]) if "--passes" in ARGV else 4
     vmax = int(ARGV[ARGV.index("--vocab") + 1]) if "--vocab" in ARGV else 8000
     train_b, test_b = D0.books()
-    train_p = B.paragraphs(train_b, 150000); test_p = B.paragraphs(test_b, 20000)
+    n_sent = int(ARGV[ARGV.index("--sents") + 1]) if "--sents" in ARGV else 150000          # R25-c10: more training text
+    train_p = B.paragraphs(train_b, n_sent); test_p = B.paragraphs(test_b, 20000)
     E.induce_verbish([p["text"] for p in train_p], k=200)
     uni = collections.Counter(); L = collections.defaultdict(collections.Counter); Rn = collections.defaultdict(collections.Counter)
     for w in sents_of(train_p):
