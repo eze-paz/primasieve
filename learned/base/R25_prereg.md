@@ -301,3 +301,6 @@ Two groups of context: 8.5651 bits/token alone (better than every earlier mix); 
 
 ## R25-ae registration (wider backoff range; three groups of context)
 Backoff strength chosen from {200, 500, 1500, 5000} on the training slice; a three-group context (previous three groups) added with its own backoff to the two-group estimate; each mixed with the word-pair model. Held-out books once. Passes if bits fall below 8.4313.
+
+## R25-ae result (PASS)
+Wider backoff range: the two-group model still chose 500 (now inside the range), 8.5651. Three groups of context (backoff 200): 8.5344; mixed with the word-pair model **8.3886** (word-pair alone 8.8078: -0.42 bits). Further next-word work is paused while the final clean evaluation runs, to give it the processor.

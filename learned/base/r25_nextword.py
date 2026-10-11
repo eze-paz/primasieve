@@ -67,3 +67,30 @@ if "--tri" in ARGV:
     best_m3 = min((0.2, 0.3, 0.4, 0.5, 0.6), key=lambda m: bits3(tune, lambda pp, a, b: m * p_big(a, b, best_lam) + (1 - m) * p_cls3(pp, a, b, best_mu)))
     print(f"R25-ad two groups of context (backoff strength {best_mu}): {bits3(te, lambda pp, a, b: p_cls3(pp, a, b, best_mu)):.4f} bits/token")
     print(f"R25-ad mixed with the word-pair model ({best_m3} word-pair): {bits3(te, lambda pp, a, b: best_m3 * p_big(a, b, best_lam) + (1 - best_m3) * p_cls3(pp, a, b, best_mu)):.4f} bits/token")
+
+# ---------------- R25-ae: wider backoff range, three groups of context ----------------
+if "--quad" in ARGV:
+    cq = collections.Counter(); cqr = collections.Counter(); ct2 = collections.Counter(); cbr2 = collections.Counter()
+    for w in fit:
+        for i in range(2, len(w)): ct2[(cof(w[i - 2]), cof(w[i - 1]), cof(w[i]))] += 1; cbr2[(cof(w[i - 2]), cof(w[i - 1]))] += 1
+        for i in range(3, len(w)): cq[(cof(w[i - 3]), cof(w[i - 2]), cof(w[i - 1]), cof(w[i]))] += 1; cqr[(cof(w[i - 3]), cof(w[i - 2]), cof(w[i - 1]))] += 1
+    def p_c(ppp, pp, prev, x, mu3, mu4):
+        a3, a2, a, b = cof(ppp), cof(pp), cof(prev), cof(x)
+        p2 = (cb[(a, b)] + 0.1) / (rows[a] + 0.1 * C)
+        n3 = cbr2[(a2, a)]; p3 = ct2[(a2, a, b)] / n3 if n3 else 0.0; l3 = n3 / (n3 + mu3); q3 = l3 * p3 + (1 - l3) * p2
+        n4 = cqr[(a3, a2, a)]; p4 = cq[(a3, a2, a, b)] / n4 if n4 else 0.0; l4 = n4 / (n4 + mu4); q4 = l4 * p4 + (1 - l4) * q3
+        pw = uni[x] / cn[b] if (x in V and cn[b]) else p_uni(x)
+        return q4 * pw
+    def bits4(data, f):
+        t = n = 0
+        for w in data:
+            for i in range(1, len(w)):
+                pp = w[i - 2] if i >= 2 else "<s>"; ppp = w[i - 3] if i >= 3 else "<s>"
+                t -= math.log2(max(f(ppp, pp, w[i - 1], w[i]), 1e-12)); n += 1
+        return t / n
+    best3 = min((200, 500, 1500, 5000), key=lambda m: bits4(tune, lambda q3_, p_, a, b: p_c(q3_, p_, a, b, m, 1e12)))
+    print(f"R25-ae two groups, wider backoff range (chose {best3}): {bits4(te, lambda q3_, p_, a, b: p_c(q3_, p_, a, b, best3, 1e12)):.4f} bits/token", flush=True)
+    best4 = min((200, 500, 1500, 5000, 20000), key=lambda m: bits4(tune, lambda q3_, p_, a, b: p_c(q3_, p_, a, b, best3, m)))
+    print(f"R25-ae three groups of context (backoff {best4}): {bits4(te, lambda q3_, p_, a, b: p_c(q3_, p_, a, b, best3, best4)):.4f} bits/token", flush=True)
+    bm = min((0.2, 0.3, 0.4), key=lambda m: bits4(tune, lambda q3_, p_, a, b: m * p_big(a, b, best_lam) + (1 - m) * p_c(q3_, p_, a, b, best3, best4)))
+    print(f"R25-ae three groups mixed with the word-pair model ({bm} word-pair): {bits4(te, lambda q3_, p_, a, b: bm * p_big(a, b, best_lam) + (1 - bm) * p_c(q3_, p_, a, b, best3, best4)):.4f} bits/token", flush=True)
