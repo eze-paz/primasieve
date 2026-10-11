@@ -91,3 +91,6 @@ Holdout (fresh m21-m40, 100 questions): **22 right / 3 wrong, fitness +13** (tem
 
 ## R25-l registration (the role reader joins the policy)
 Policy = R25-i configuration plus the loose role reader at the learner's thresholds: routes gain '+role' when it agrees; 'role-alone' when only it speaks; a lone unconfident cue answer returns when the role or similarity reader independently picks it. Admission by disagreements against the model. Primary measure: learner alone on the fresh 200 (right / wrong); secondary: validation precision after admission >= 0.90 gate, then B6 once.
+
+## R25-l result (primary measure up again)
+Learner alone, fresh 200: **67 right / 14 wrong** (R25-i 58 / 12; R24-ap2 45 / 8); holdout half m21-40 35 / 6 (R25-i 29 / 5). Old 110: 63 / 6. Four-signal agreement 'agree+soft+role' 20/20. Validation after admission 117/113 (0.97). B6 once 80 (spoke 38, right 34; R25-i 78).
