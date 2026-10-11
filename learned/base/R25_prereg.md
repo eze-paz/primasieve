@@ -178,3 +178,6 @@ At 337 groups / 226 verb groups the zero-count role check still refused nothing;
 
 ## R25-s registration (graded role score, cut-off chosen by the learner)
 Each answer gets a role score: how much more or less often the books pair the question verb's group with the answer's group in that slot than chance ((observed + 0.5) / (expected + 0.5)). Nothing is refused in the run (--lift-only); afterwards, on top of the routes the learner trusts, it picks a cut-off from {none, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8} by practice fitness and applies it once to the untouched set. Passes if untouched fitness beats +8.
+
+## R25-s result (neutral)
+Only 88 of 248 answers get a role score (who / what questions built on a verb). Practice fitness by cut-off: none 91, 0.05-0.1 91, 0.2-0.3 90, 0.5 86, 0.8 91 (103 / 4); the learner kept no cut-off; untouched unchanged (+8). The remaining trusted errors are not mostly role-type errors. The verb-role line is closed.
