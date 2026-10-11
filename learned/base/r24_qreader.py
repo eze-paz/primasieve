@@ -40,6 +40,9 @@ def keys_of(shape):
     return [("exact", a), ("noword", tuple(x for x in a if x != "w")), ("coarse", (a[0] if a else "", sum(1 for x in a if x == "REF"), "V" in a, tuple(x for x in a if x in ("to", "at", "in", "with", "for", "from", "ORDER"))))]
 
 
+LASTQ = {"level": None}
+
+
 class QReader:
     def __init__(self): self.map = collections.defaultdict(collections.Counter)         # (level, question-shape view) -> statement template counts
 
@@ -64,6 +67,7 @@ class QReader:
     def render(self, q, names):
         """a canonical construction (syms, fillers) with its missing slot index, or None"""
         qs, qf = qshape(q, names); key = next((k for k in keys_of(qs) if k in self.map), None)     # exact shape, else without generic words, else coarse
+        LASTQ["level"] = key[0] if key else None
         if key is None: return None
         tmpl = self.map[key].most_common(1)[0][0]
         qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]; qverb = next((x for x in qs if x.startswith("V:")), None)
@@ -124,14 +128,17 @@ def main():
     train = [(s["text"], [a for a in (R.canonical(q, g) for q, g in s["qs"]) if a] + [R.event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
     seqs = [list(R.construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     CH = R.Chunks(seqs); rd = R.Reader(CH); rd.learn(train[:6000], names, weigh=False); rd.learn(train[6000:], names, weigh=True); tabs = (rd.w, rd.wn, rd.eqw, rd.eqn); rd = R.Reader(CH); rd.w, rd.wn, rd.eqw, rd.eqn = tabs; rd.learn(train, names, weigh=False)
+    admitted = None
     for label, stories in (("held-out generator", data[7000:7600]), ("validation (110)", [dict(text=s["text"], qs=s["qs"]) for f in ("val_stories.json", "val_fables.json", "val_timespace.json") for s in json.load(open(f, encoding="utf-8"))["stories"]])):
-        lm = lr = rm = rr = n = 0
+        lm = lr = rm = rr = n = 0; lvl = collections.defaultdict(lambda: [0, 0])
         for s in stories:
             for q, g in s["qs"]:
-                n += 1; a = ask_learned(Q, rd, s["text"], names, q); b = R.ask(rd, s["text"], names, q)
-                if a is not None: lm += 1; lr += hit(a, g)
+                n += 1; a = ask_learned(Q, rd, s["text"], names, q); level = LASTQ["level"]; b = R.ask(rd, s["text"], names, q)
+                if a is not None and admitted is not None and level not in admitted: a = None
+                if a is not None: lm += 1; lr += hit(a, g); lvl[level][0] += hit(a, g); lvl[level][1] += 1
                 if b is not None: rm += 1; rr += hit(b, g)
-        print(f"R24-s2 {label}: learned question reader -> matched {lm}/{n}, right {lr} ({lr / max(1, lm):.2f}) | regex path -> matched {rm}, right {rr} ({rr / max(1, rm):.2f})")
+        print(f"R24-s2 {label}: learned question reader -> matched {lm}/{n}, right {lr} ({lr / max(1, lm):.2f}) | regex path -> matched {rm}, right {rr} ({rr / max(1, rm):.2f}) | by level {dict((k, f'{v[0]}/{v[1]}') for k, v in lvl.items())}")
+        if admitted is None: admitted = {k for k, v in lvl.items() if v[1] and v[0] / v[1] >= 0.90}; print("   admitted levels (>= 0.90 on held-out):", sorted(admitted))
     json.dump(dict(shapes=len(Q.map), same=same, handled=handled, extra=extra, total=total), open("r24_qreader_results.json", "w"))
 
 
