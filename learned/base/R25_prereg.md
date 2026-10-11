@@ -166,3 +166,9 @@ From the R25-p run's per-question lines, a route is kept when its practice fitne
 
 ## R25-q result (PASS)
 The learner kept 16 of 21 routes by its practice fitness and dropped cue-alone-loose+soft, learned-alone-exact, learned-alone-noword, role-alone, soft-alone (each answers on one weak source). Practice 130 / 20 (fitness 70) -> 112 / 7 (91). **Untouched val_fresh2: 69 / 29 (fitness -18) -> 47 / 13 (+8), precision 0.70 -> 0.78**, decided on practice only and applied once. Trade-off set by the -3 weight for a wrong answer (a choice the owner may change).
+
+## R25-c7 result (PASS)
+From 300 saved groups: exchange 9.0931 -> 9.0912 -> 9.0875; 37 of 120 splits kept -> 337 groups; held-out 9.0830. Newer splits are increasingly among rare words.
+
+## R25-r registration (the verb-role check with the learner's finer groups)
+R25-e's book-learned verb roles refused nothing at ~200 groups. With 337 learner-refined groups the same check (--selpref) is added to the R25-l configuration; route trust is then chosen by the learner on practice (r25_trust.py) and applied once to the untouched set. Passes if untouched fitness with trusted routes beats R25-q's +8.
