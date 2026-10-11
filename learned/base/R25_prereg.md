@@ -126,3 +126,9 @@ Starting from its own saved groups (9.1301), one more exchange pass moved 809 wo
 
 ## R25-c3 registration (the learner may split groups)
 A new operator: for each of the 30 most frequent groups, split it in two by the learner's own word vectors (2-means) and keep the split only if held-out book bits fall. The number of groups is then the learner's choice. Fix: after a rejected exchange pass the saved groups are really restored. Passes if held-out bits fall below 9.1301.
+
+## R25-c3 result (PASS)
+12 of 30 splits kept by the learner's own held-out score; groups 202 -> 213; held-out book bits 9.1301 -> 9.1273. Splits found real distinctions with no labels: know / say / think / believe / feel vs want / wish / expect / beg; came / went / looked / turned / fell vs stood / lay / sat / arrived; will / can / must / should / may vs didst / wilt / shalt / mayst; little / new / small / large / big vs great / mere / sudden / single; paid / spent / obtained / counted vs made / got / put / brought. Some kept splits are small rare-word noise.
+
+## R25-c4 registration (the next cycle continues from the saved state)
+Exchange then splits again, starting from the 213 saved groups: up to 2 exchange passes, then splits over the 60 most frequent groups. Passes if held-out bits fall below 9.1273.
