@@ -194,6 +194,9 @@ FEATS = ("shape", "win2", "win1", "rel", "rel0", "chunk")
 def bucket(tot): return 0 if tot <= 5 else 1 if tot <= 50 else 2 if tot <= 500 else 3      # how much evidence a view has for this decision
 
 
+LAST = {"shape": False}                                                                # did the exact-shape evidence decide the last fill?
+
+
 class Reader:
     def __init__(self, chunks=None):
         self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
@@ -256,7 +259,7 @@ class Reader:
 
     def fill(self, story_sents, names, cs, missing, keep_prep=False, cs_fillers=None):
         """the filler for canonical slot `missing`, from the story sentence sharing the canonical verb, by the learned alignment"""
-        cv = set(verbs_of(cs)); best = None
+        cv = set(verbs_of(cs)); best = None; LAST["shape"] = False
         order0 = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
         def carries(ss, sf): return any(ss[i] == "V:" + v and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for v in cv for i in range(len(ss)))
         via = {}
@@ -288,7 +291,7 @@ class Reader:
             n_shape = {i: self.tab["shape"][(fsd[i]["shape"], fc["shape"])] for i in si}
             if sum(n_shape.values()) >= 5:                                             # this exact shape has been seen: its own evidence decides
                 scored = [(n_shape[i], i) for i in si]; c, i = max(scored)
-                if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
+                if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i])); LAST["shape"] = True
                 continue
             for f in FEATS:                                                            # a learned mixture over the views; each view is a distribution over the candidates,
                 n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())   # weighted by how often that view was right with this much evidence
