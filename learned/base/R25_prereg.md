@@ -45,3 +45,9 @@ Type check with the learner's refined groups: removed 18 right and 4 wrong answe
 
 ## R25-e registration (roles learned from the books)
 From the training books, the learner counts which of its own word groups fill the object slot and the subject slot of each verb group (a verb followed within three words by a determiner phrase; a name or noun right before a verb). An answer to 'what did X V' is refused when its group never fills V's object slot in the books although at least 5 such fillers were expected from the group's frequency; an answer to 'who V' likewise for the subject slot (names always allowed). 'Why' and 'how' answers are not typed. Gate as R25-d: removes more wrong than right answers on validation, precision after admission >= 0.90; then B6 once.
+
+## R25-e result (neutral)
+Roles counted from the books: 127,896 verb-object and 261,555 subject-verb pairs over 164 verb groups. The check removed no answers, right or wrong: at the level of about 200 groups nearly every verb group has met nearly every noun group once, so nothing is confidently never seen. B6 once 82 (spoke 28, right 27).
+
+## R25-f registration (the learner's own groups used for understanding, not filtering)
+When a question's verb is absent from the story, the question reader reads it as the single story verb in the same learned group (R25-c groups; e.g. 'lend' with 'give'); if no or several story verbs share the group, nothing changes. One general rule, measured as a whole: readers-alone fitness (+1 / -3 / 0) on practice and on the holdout (fresh m21-m40), with and without the rule, same store. Passes if holdout fitness rises; then the policy runs once with it and B6 once.

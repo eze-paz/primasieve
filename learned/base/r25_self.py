@@ -43,6 +43,7 @@ def main():
 
     store = json.load(open(STORE_F, encoding="utf-8")) if os.path.exists(STORE_F) else {"shape_alias": {}, "verb_alias": {}, "history": []}
     QR.STORE.clear(); QR.STORE.update(store)
+    if "--group-alias" in ARGV: QR.GROUPS.update(json.load(open("r25_classes.json", encoding="utf-8"))); print("R25-f: group alias on", flush=True)
     print("R25 store loaded:", {k: len(v) for k, v in store.items()}, flush=True)
 
     old = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]

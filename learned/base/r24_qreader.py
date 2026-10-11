@@ -42,6 +42,7 @@ def keys_of(shape):
 
 
 LASTQ = {"level": None}
+GROUPS = {}                                                                              # R25-f: the learner's own word groups (r25_classes.json), set by the caller
 STORE = {}                                                                               # R25: the persistent self-revised store (shape_alias, verb_alias), loaded by the caller
 
 
@@ -127,6 +128,13 @@ def ask_learned(Q, rd, text, names, q):
     cs, cf, missing = got; sents = []; raws = []
     for x in T.SENT.split(text):
         if x.strip(): sents.append(R.construction(x, names)); raws.append(list(R.LAST_RAWS))
+    if GROUPS:                                                                           # R25-f: a missing question verb read as the one story verb from its own learned group ('lend' ~ 'give')
+        sv = {y[2:] for ss, _ in sents for y in ss if y.startswith("V:")}
+        def swap(y):
+            if not y.startswith("V:") or y[2:] in sv or GROUPS.get(y[2:]) is None: return y
+            same_g = [u for u in sv if GROUPS.get(u) == GROUPS.get(y[2:])]
+            return "V:" + same_g[0] if len(same_g) == 1 else y
+        cs = tuple(swap(y) for y in cs)
     if STORE.get("verb_alias"):                                                          # R25: a verb alias the system learned ('lend' read as 'give' when the story lacks 'lend')
         sv = {y for ss, _ in sents for y in ss if y.startswith("V:")}
         cs = tuple(("V:" + STORE["verb_alias"][y[2:]]) if (y.startswith("V:") and y not in sv and y[2:] in STORE["verb_alias"] and "V:" + STORE["verb_alias"][y[2:]] in sv) else y for y in cs)
