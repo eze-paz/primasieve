@@ -307,3 +307,6 @@ Wider backoff range: the two-group model still chose 500 (now inside the range),
 
 ## R25-final result (the day's reportable number)
 Model on val_fresh3: 127 / 200. R25-x reproduced exactly on the earlier sets (practice 195 / 11; val_fresh2 46 / 6). **val_fresh3, scored once: all routes 73 right / 32 wrong; trusted routes 43 right / 13 wrong, precision 0.768, fitness +4.** The breadth gain holds on clean text (this morning's configuration got 46 right on a comparable untouched set; today's 73); the trusted-route precision does not (0.885 on the over-consulted val_fresh2 vs 0.768 here): about a third of it was selection among many results on the same 200 questions. The B6 gate (validation precision after admission) did not pass, so B6 did not run.
+
+## R25-af registration (a stronger baseline for the next-word claim)
+An interpolated word-triple model (previous two words, backing off to the word-pair and single-word models; weights chosen on the training slice), same tokens, training text and held-out books. Compared with the learner's three-group model (R25-ae, 8.5344 alone) and mixed with it (weight on the training slice). Reported as is; the claim 'the learner's groups beat a standard word model' stands only if the groups (alone or as the larger share of a mix) beat the word-triple model.
