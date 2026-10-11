@@ -148,10 +148,12 @@ def fables(R, P):
     a, ga, g1 = actor(R, P, "name"); animal = R.choice(ANIMALS); thing = R.choice(["fence", "gate", "roof", "cart", "basket", "jar", "wall", "nest"])
     vpast, vlem = R.choice([("broke", "break"), ("ate", "eat"), ("knocked over", "knock"), ("took", "take"), ("trampled", "trample"), ("carried off", "carry"), ("smashed", "smash"), ("flattened", "flatten")])
     place = R.choice(PLACES)
-    i_events = [(0, f"A {animal}", vlem, f"the {thing}", None, None), (1, a, "chase", f"the {animal}", f"to {place}", None)]
-    out.append((f"A {animal} {vpast} the {thing}. {a} chased the {animal} to {place}.",
+    tw = R.choice(["At dusk", "Before dawn", "That night", "In the morning", "At noon", "In the evening"])
+    i_events = [(0, f"A {animal}", vlem, f"the {thing}", None, None), (1, a, "chase", f"the {animal}", f"to {place}", None), (2, f"The {animal}", "run", None, None, None, tw.lower())]   # R24-ah: an intransitive event with its time
+    out.append((f"A {animal} {vpast} the {thing}. {a} chased the {animal} to {place}. {tw} the {animal} ran away.",
                 [(f"What {vpast} the {thing}?", [f"a {animal}", f"the {animal}", animal]), (f"Who chased the {animal}?", [a.lower()]), (f"Where did {a} chase the {animal}?", [place.lower(), place.lower().replace("the ", "")]),
-                 (f"What did the {animal} {vlem if vlem not in ('knock', 'carry') else vlem + (' over' if vlem == 'knock' else ' off')}?", [f"the {thing}", thing])], i_events))
+                 (f"What did the {animal} {vlem if vlem not in ('knock', 'carry') else vlem + (' over' if vlem == 'knock' else ' off')}?", [f"the {thing}", thing]),
+                 (f"When did the {animal} run away?", [tw.lower(), tw.lower().split()[-1]])], i_events))
     # H (R24-w): attribute facts -- made of, full of, belonged to, how many; copula events ('be') for the learned readers
     a, ga, g1 = actor(R, P, "name"); thing = R.choice(["bridge", "fence", "boat", "cart", "roof"]); material = R.choice(["logs", "stone", "oak planks", "reeds", "iron"])
     holder = R.choice(["sack", "basket", "jar", "chest", "barrel"]); content = R.choice(["flour", "apples", "honey", "salt", "coins"])

@@ -90,7 +90,8 @@ def construction(sent, names):
         starter = xs[0] in ("on", "in", "at", "when", "while", "after", "before", "one", "every", "that", "the", "soon", "later", "by", "during", "without", "as")
         if j <= 7 and (starter or timeish) and not (xs[0] == "PERSON" and not timeish):
             syms.append("WHEN"); fillers.append(opening); items = items[j + 1:]
-    if not syms and len(items) >= 3 and items[0][0] == "TIME" and items[1][0] in ("PERSON", "ENT", "PRON", "a", "an", "the"):   # R24-ae: 'The next morning Rosa left ...': a leading time item is a when-span
+    LEADW = ("year", "month", "week", "day", "night", "hour", "summer", "winter", "spring", "autumn", "morning", "evening", "afternoon", "noon", "dawn", "dusk")
+    if not syms and len(items) >= 3 and (items[0][0] == "TIME" or (items[0][0] == "ENT" and (items[0][1][-1].lower() in E.TIMEISH or items[0][1][-1].lower() in LEADW))) and items[1][0] in ("PERSON", "ENT", "PRON", "a", "an", "the"):   # R24-ah: the time span arrives as a thing span ending in a time word   # R24-ae: 'The next morning Rosa left ...': a leading time item is a when-span
         syms.append("WHEN"); fillers.append(" ".join(items[0][1]).lower()); items = items[1:]
     head0 = (items[0][1][0] if items[0][0] in ("PERSON", "ENT") else items[0][0]).lower() if items else ""
     if not syms and len(items) >= 3 and head0 in ("at", "in", "on", "by", "during", "before", "after", "every", "one", "that", "the", "next", "last"):   # R24-ae: 'At noon Rosa took ...' (no comma)
@@ -282,7 +283,7 @@ class Reader:
             if alts: via = {v0: alts[0]}
         cv_story = set(cv) | set(via.values())
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
-        given = [cf_k.lower() for k, (cs_k, cf_k) in enumerate(zip(cs, cs_fillers)) if cs_k in ("PERSON", "ENT") and cf_k and k != missing and cf_k.lower() not in ("thing", "someone", "it", "them", "him", "her")] if cs_fillers else []
+        given = [cf_k.lower() for k, (cs_k, cf_k) in enumerate(zip(cs, cs_fillers)) if cs_k in ("PERSON", "ENT") and cf_k and k != missing and cf_k.lower() not in ("thing", "someone", "it", "them", "him", "her", "he", "she", "they")] if cs_fillers else []
         def pick(ss, sf, i, j):
             raw = raws_list[j][i] if raws_list and j < len(raws_list) and i < len(raws_list[j]) else None
             txt = raw if (raw and ss[i] == "ENT" and raw.split()[0].lower() in T.DET) else sf[i]           # R24-aa: 'a small boat' as written, not 'the small boat'
