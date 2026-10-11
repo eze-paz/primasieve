@@ -106,7 +106,7 @@ def fables(R, P):
                 [(f"Where was {a} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where did {a} start?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Where did {a} set the {obj} down?", [spot, spot.split()[-1]]), (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} set it down?", [b.lower()]),
                  (f"Who took the {obj}?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
-                 (f"What did {a} set down?", [f"the {obj}", obj]), (f"What did {b} take?", [f"the {obj}", obj]),
+                 (f"What did {a} set down?", [f"the {obj}", obj]), (f"What did {b} take?", [f"the {obj}", obj]), (f"What did {b} give {a}?", [f"the {obj}", obj]), (f"Who did {b} give the {obj} to?", [a.lower()]),
                  (f"Where was the {obj} after {a} set it down?", [spot, spot.split()[-1]]), (f"Who was holding the {obj} right after {a} set it down?", ["no one", "nobody"]),
                  (f"Where was {a} when {b} took the {obj}?", ["the well", "well"]), (f"Who was holding the {obj} right after {b} took it?", [b.lower()]), (f"Who was holding the {obj} right after {b} gave it to {a}?", [a.lower()])], g1_events))
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)

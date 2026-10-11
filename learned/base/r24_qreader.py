@@ -77,6 +77,18 @@ class QReader:
         """a canonical construction (syms, fillers) with its missing slot index, or None"""
         qs, qf = qshape(q, names); key = next((k for k in keys_of(qs) if k in self.map), None)     # exact shape, else without generic words, else coarse
         LASTQ["level"] = key[0] if key else None
+        if "--reinterp" in ARGV and (key is None or key[0] == "coarse"):                  # R24-an: an unknown word read as a verb, or a span's last word split off as one,
+            qs = list(qs); qf = list(qf); best = None                                     # kept only when a learned template then fits (the inventory decides)
+            for i, (x, f) in enumerate(zip(qs, qf)):
+                if x == "w" and f and f.isalpha() and f not in E.NOUNISH and i >= 2:
+                    v = (tuple(qs[:i] + ["V:" + E.lemma(f)] + qs[i + 1:]), qf[:i] + [None] + qf[i + 1:])
+                elif x == "ENT" and isinstance(f, str) and len(f.split()) >= 2 and f.split()[-1] not in E.NOUNISH and f.split()[-1].isalpha():
+                    v = (tuple(qs[:i] + ["ENT", "V:" + E.lemma(f.split()[-1])] + qs[i + 1:]), qf[:i] + [" ".join(f.split()[:-1]), None] + qf[i + 1:])
+                else: continue
+                k2 = next((k for k in keys_of(v[0])[:2] if k in self.map), None)
+                if k2: best = (v, k2); break
+            if best: (qs, qf), key = best; qs = tuple(qs); LASTQ["level"] = key[0] + "-r"
+            else: qs = tuple(qs)
         if key is None: return None
         tmpl = self.map[key].most_common(1)[0][0]
         qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]; qverb = next((x for x in qs if x.startswith("V:")), None)

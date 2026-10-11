@@ -67,7 +67,7 @@ def main():
 
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
-        if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword"): b = None
+        if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword", "exact-r", "noword-r"): b = None
         if "--type-check" in ARGV:
             if a is not None and not type_ok(q, a): a = None
             if b is not None and not type_ok(q, b): b = None
