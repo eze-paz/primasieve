@@ -224,6 +224,7 @@ def skeletons(R, P):
 
 FRONTS = ["That day, ", "Later that day, ", "Without a word, ", "As it happened, ", "Soon after, ", "Before long, "]
 PARA_ROLES = ["the farmer", "a tall farmer", "the baker", "a young sailor", "the old teacher", "a quiet neighbour", "the miller", "a travelling tinker"]
+NOT_NAMES = {"The", "A", "An", "In", "At", "On", "One", "When", "While", "After", "Before", "Then", "He", "She", "They", "It", "Her", "His", "Their", "Right", "Every", "Each", "Mr", "Mrs", "Dr", "Miss", "That", "This", "Soon", "Later", "Without", "As", "By", "From", "To", "Her", "Some", "Many", "All", "No", "Not", "But", "And", "So", "Once", "Twice"}
 PASSIVE = re.compile(r"^([A-Z][a-z]+) (\w+ed) (the [a-z]+(?: [a-z]+)?|a [a-z]+(?: [a-z]+)?)( .*)?\.$")
 
 
@@ -231,14 +232,15 @@ def paraphrase(R, text):
     """R24-j run 9: surface variety with the events untouched -- fronted adjuncts, appositions, regular passives; one
     sentence stays one sentence so the exact events keep their indices"""
     out = []
-    for sent in re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", text):
+    for sent in re.split(r"(?<=[.!?])(?<!Dr\.)(?<!Mr\.)(?<!Mrs\.)(?<!Miss\.)\s+(?=[A-Z\"'])", text):
         r = R.random(); m = PASSIVE.match(sent)
         if r < 0.22 and m and " to " not in (m.group(4) or "") and m.group(2) not in ("wanted", "needed", "agreed", "waited", "promised"):
             sent = f"{m.group(3)[0].upper()}{m.group(3)[1:]} was {m.group(2)}{m.group(4) or ''} by {m.group(1)}."
-        elif r < 0.42 and sent[:1].isupper() and sent.split()[0].isalpha() and sent.split()[0] not in ("The", "A", "An", "In", "At", "On", "One", "When", "While", "After", "Then", "He", "She", "They", "It", "Her", "His", "Right"):
+        elif r < 0.42 and sent[:1].isupper() and sent.split()[0].isalpha() and len(sent.split()) > 2 and sent.split()[1][:1].islower() and sent.split()[0] not in NOT_NAMES and sent.split()[1] not in ("morning", "evening", "afternoon", "night", "day", "week", "summer", "winter", "year"):
             name = sent.split()[0]; sent = f"{name}, {R.choice(PARA_ROLES)}, {sent[len(name) + 1:]}"
-        elif r < 0.60 and not sent.startswith(("In the", "At noon", "At night", "At dawn", "One ", "When", "While", "After", "Right", "Then")):
-            sent = R.choice(FRONTS) + sent[0].lower() + sent[1:] if not sent.split()[0][0].isupper() or sent.split()[0] in ("The", "A", "An", "He", "She", "They", "It") else R.choice(FRONTS) + sent
+        elif r < 0.60 and not sent.startswith(("In the", "At noon", "At night", "At dawn", "One ", "When", "While", "After", "Right", "Then", "Every", "Mr", "Mrs", "Dr", "Miss", "His", "Her", "Their")):
+            first = sent.split()[0]
+            sent = R.choice(FRONTS) + (sent[0].lower() + sent[1:] if first in ("The", "A", "An", "He", "She", "They", "It") else sent)
         out.append(sent)
     return " ".join(out)
 
