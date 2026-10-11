@@ -58,6 +58,42 @@ def main():
             if c and sum(c.values()) >= 50:
                 t_ = atype(ans); return c[t_] > 0 or ALLT[t_] < 50                       # refused only if this question never takes a type that is common elsewhere
         return True
+    OBJ = collections.defaultdict(collections.Counter); SUBJ = collections.defaultdict(collections.Counter)
+    if "--selpref" in ARGV:                                                              # R25-e: which of the learner's own groups fill the object / subject slot of each verb group, counted in the books
+        RC = json.load(open("r25_classes.json", encoding="utf-8")); DETS = {"the", "a", "an", "his", "her", "their", "my", "our", "your", "its", "some", "this", "that"}
+        g = lambda w: RC.get(w.lower())
+        for p_ in B.paragraphs(train_b, 150000):
+            for sent in T.SENT.split(p_["text"]):
+                w = [x for x in T.TOK.findall(sent) if x.isalpha()]
+                for i, x in enumerate(w):
+                    lx = x.lower()
+                    if lx in DETS or lx in T.STOP or not R.is_verb(lx): continue
+                    vg = g(E.lemma(lx))
+                    if vg is None: continue
+                    j = next((j for j in range(i + 1, min(i + 3, len(w))) if w[j].lower() in DETS), None)
+                    if j is not None and j + 1 < len(w):
+                        h = w[j + 2] if (j + 2 < len(w) and w[j + 2].lower() not in T.STOP and not R.is_verb(w[j + 2].lower()) and g(w[j + 2]) is not None) else w[j + 1]
+                        if g(h) is not None: OBJ[vg][g(h)] += 1
+                    if i >= 1 and w[i - 1].lower() not in T.STOP and w[i - 1].lower() not in DETS:
+                        h = w[i - 1]; key = "NAME" if (h[:1].isupper() and i - 1 > 0) else g(h)
+                        if key is not None: SUBJ[vg][key] += 1
+        colO = collections.Counter(); colS = collections.Counter()
+        for c_ in OBJ.values(): colO.update(c_)
+        for c_ in SUBJ.values(): colS.update(c_)
+        totO = sum(colO.values()); totS = sum(colS.values())
+        print(f"R25-e roles counted from the books: {totO} verb-object and {totS} subject-verb pairs over {len(OBJ)} verb groups", flush=True)
+    def role_ok(q, ans):
+        qs, qf = QR0.qshape(q, names); k = kind(q); v = next((x[2:] for x in qs if x.startswith("V:")), None)
+        if v is None or k not in ("what", "who"): return True
+        role = "obj" if (k == "what" and "did" in qs) or (k == "who" and "did" in qs) else ("subj" if k == "who" else None)
+        if role is None: return True
+        vg = RC.get(v); hw = [x for x in T.TOK.findall(ans) if x.isalpha()]
+        if vg is None or not hw: return True
+        h = hw[-1]; ng = "NAME" if (h[:1].isupper() and role == "subj") else RC.get(h.lower())
+        if ng is None or ng == "NAME": return True
+        tab, col, tot = (OBJ, colO, totO) if role == "obj" else (SUBJ, colS, totS)
+        row = sum(tab[vg].values()); expected = row * col[ng] / max(1, tot)
+        return tab[vg][ng] > 0 or expected < 5                                           # refused only where the books confidently never put this group in this role
     print(f"R24-am answer types learned for {sum(1 for k, c in TYPES.items() if sum(c.values()) >= 50)} question shapes / kinds", flush=True)
     print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
@@ -74,6 +110,9 @@ def main():
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
         dissent = None
         if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword", "exact-r", "noword-r", "alias"): dissent = b; b = None   # R24-ao: a coarse reading is too weak to answer but still counts against a lone cue answer
+        if "--selpref" in ARGV:
+            if a is not None and not role_ok(q, a): a = None
+            if b is not None and not role_ok(q, b): b = None
         if "--type-check" in ARGV:
             if a is not None and not type_ok(q, a): a = None
             if b is not None and not type_ok(q, b): b = None
