@@ -54,7 +54,8 @@ def construction(sent, names):
     sent = sent.replace("Dr.", "Dr").replace("Mr.", "Mr").replace("Mrs.", "Mrs")
     items = T.slotify(T.TOK.findall(sent), names); syms = []; fillers = []
     for k, (sym, filler) in enumerate(items):
-        if sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
+        if sym == "ENT" and filler[-1] in E.TIMEISH: syms.append("TIME"); fillers.append(None)                 # 'every morning' is when, not what
+        elif sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
         elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)

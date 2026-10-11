@@ -37,7 +37,7 @@ def same_verb(a, b, loose=False):
     return loose and a.lower() in CLASS and b.lower() in CLASS and CLASS[a.lower()] == CLASS[b.lower()] and a.lower() in VERBISH   # 'came' ~ 'arrived': the same induced class, only as a fallback
 
 
-VERBISH = set(); NOUNISH = set(); CLASS = {}; VOCAB = set()
+VERBISH = set(); NOUNISH = set(); CLASS = {}; VOCAB = set(); TIMEISH = set()
 
 
 def induce_verbish(stories, k=100):
@@ -48,14 +48,17 @@ def induce_verbish(stories, k=100):
     for c, ws in by.items():
         n = sum(uni[w] for w in ws); v = sum(uni[w] for w in ws if w.endswith("ed") or w in IRREG)
         if n and v / n >= 0.5: VERBISH.update(ws)
-    after_det = collections.Counter(); total = collections.Counter()
+    after_det = collections.Counter(); total = collections.Counter(); after_every = collections.Counter()
     for text in stories:
         w = [x.lower() for x in T.TOK.findall(text)]
         for i, x in enumerate(w):
             total[x] += 1
             if i and w[i - 1] in T.DET: after_det[x] += 1
+            if i and w[i - 1] in ("every", "each"): after_every[x] += 1                                   # 'every morning', 'each day': habitual time words
     NOUNISH.update(x for x, c in total.items() if c >= 5 and after_det[x] / c >= 0.3)        # 'seed', 'bed', 'shed' are things, not past verbs
     VOCAB.update(x for x, c in total.items() if c >= 3)
+    if "morning" in classes: TIMEISH.update(w for w, c in classes.items() if c == classes["morning"] and after_every[w] >= 3)   # the induced class of 'morning', kept to words used after 'every' / 'each'
+    TIMEISH.add("morning")
     VERBISH.difference_update(NOUNISH); T.SPAN_KEEP.update(NOUNISH)
     T.SPAN_STOP.update(VERBISH); T.SPAN_STOP.update(IRREG)
     return VERBISH
