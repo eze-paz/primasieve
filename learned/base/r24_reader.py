@@ -361,6 +361,41 @@ def ask(R, text, names, q):
     return None
 
 
+def closed_loop_train(data, names):
+    """R24-v: event statements plus the statements the event-taught question reader renders; returns (train, Q)"""
+    import r24_qreader as QR
+    train = [(s["text"], [event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]; train = [t for t in train if t[1]]
+    pairs = []
+    for s in data[:7000]:
+        if not s.get("events"): continue
+        stmts = [event_statement(e) for e in s["events"]]
+        for q, g in s["qs"]:
+            qs, qf = QR.qshape(q, names); qslots = {f.lower() for x, f in zip(qs, qf) if x in ("PERSON", "ENT")}; qv = next((x for x in qs if x.startswith("V:")), None)
+            for st in stmts:
+                cs, cf = construction(st, names); fl = {f.lower() for f in cf if f}
+                if qv is None or qv not in cs: continue
+                gold = next((f for f in cf if f and (f.lower() == g[0].lower() or f.lower() == T.key_of("ENT", g[0].lower().split()) or g[0].lower() in f.lower())), None)
+                if gold and (qslots & fl or not qslots): pairs.append((q, st, gold)); break
+    Q = QR.QReader(); Q.learn(pairs, names)
+    def as_text(cs, cf, missing, gold):
+        out = []
+        for k, (x, f) in enumerate(zip(cs, cf)):
+            if k == missing: out.append(gold)
+            elif x in ("PERSON", "ENT"): out.append(f if x == "PERSON" else ("the " + f if not f.startswith(("the ", "a ", "an ")) else f))
+            elif x.startswith("V:"): out.append(x[2:])
+            elif x in ("WHEN", "WHY", "COMP", "ORDER"): out.append(f or "")
+            elif x == ".": continue
+            else: out.append(x)
+        return " ".join(w for w in out if w).strip() + "."
+    extra_by = collections.defaultdict(list)
+    for s in data[:7000]:
+        for q, g in s["qs"]:
+            got = Q.render(q, names)
+            if got and QR.LASTQ.get("level") == "exact": extra_by[s["text"]].append(as_text(got[0], got[1], got[2], g[0]))
+    train = [(t[0], t[1] + extra_by.get(t[0], [])) for t in train]
+    return train, Q
+
+
 def main():
     data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data)
     names = T.mid_caps([s["text"] for s in data[:7000]])
