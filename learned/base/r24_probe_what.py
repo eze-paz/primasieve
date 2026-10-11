@@ -1,5 +1,6 @@
 """R24 probe: why the learned readers are silent on plain 'What did X V?' validation questions (development on validation only)."""
 import os, sys, json, random
+ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E, r24_reader as R, r24_qreader as QR
 data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
@@ -10,7 +11,7 @@ seqs = [list(R.construction(x, names)[0]) for s in data[:7000] for x in T.SENT.s
 CH = R.Chunks(seqs); n6 = int(len(train) * 6 / 7); rd = R.Reader(CH); rd.learn(train[:n6], names, weigh=False); rd.learn(train[n6:], names, weigh=True)
 tabs = (rd.w, rd.wn, rd.eqw, rd.eqn); rd = R.Reader(CH); rd.w, rd.wn, rd.eqw, rd.eqn = tabs; rd.learn(train, names, weigh=False)
 stories = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]
-PICK = ("What did Ilse grow?", "What did Greta grow?", "What did Sven use?", "What did she teach?", "What did the ferryman charge?", "What did Pavel sew it with?", "What did the mayor have marked?", "What did the mouse gnaw through?", "Who sewed the sail?", "Where did the lamb stand?", "What was the bridge made of?", "Whose ring was it?")
+PICK = tuple(x.strip() for x in open(ARGV[1], encoding="utf-8")) if len(ARGV) > 1 else ("What did Ilse grow?", "What did Greta grow?", "What did Sven use?", "What did she teach?", "What did the ferryman charge?", "What did Pavel sew it with?", "What did the mayor have marked?", "What did the mouse gnaw through?", "Who sewed the sail?", "Where did the lamb stand?", "What was the bridge made of?", "Whose ring was it?")
 for s in stories:
     for q, g in s["qs"]:
         if q not in PICK: continue

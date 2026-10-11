@@ -3,7 +3,7 @@ read every story; a question is answered when both agree (case-blind, head-word 
 other is silent and that reader's confident flag is set, else not at all. Measured on the 80 validation story
 questions; B6 is run once, in front of the 0.4B model, only if validation precision >= 0.90.
 Run: python learned/base/r24_agree.py"""
-import os, sys, json, random
+import os, sys, json, random, collections
 ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, "learned"))
 import r24_tlm as T, r24_events as E, r24_reader as R
@@ -27,6 +27,12 @@ def main():
     def qslots(q): qs, qf = QR0.qshape(q, names); return [f if isinstance(f, str) else " ".join(f) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
     n_self = sum(1 for s in data[:7000] for q, g in s["qs"] if any(same(g[0], f) for f in qslots(q))); n_all = sum(len(s["qs"]) for s in data[:7000])
     SELF_RATE = n_self / max(1, n_all); print(f"R24-aa: answers that repeat a question slot in the generator: {n_self}/{n_all} = {SELF_RATE:.3f}", flush=True)
+    def qshape_nw(q): qs, qf = QR0.qshape(q, names); return tuple(x for x in QR0.abstract_q(qs) if x != "w")
+    SELF_BY = collections.defaultdict(lambda: [0, 0])                                   # R24-ab: the same rate per question shape
+    for s in data[:7000]:
+        for q, g in s["qs"]: k = qshape_nw(q); SELF_BY[k][0] += any(same(g[0], f) for f in qslots(q)); SELF_BY[k][1] += 1
+    SELF_SHAPES = {k for k, (r, t) in SELF_BY.items() if t >= 20 and r / t < 0.02}
+    print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
         import r24_qreader as QR
@@ -40,7 +46,7 @@ def main():
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = QR.ask_learned(QRD, rd, text, names, q) if LEARNED_Q else R.ask(rd, text, names, q)
         if LEARNED_Q and b is not None and QR.LASTQ.get("level") not in ("exact", "noword"): b = None
-        if SELF_RATE < 0.02:                                                             # R24-aa: a learned fact about questions: the answer is not something the question already names
+        if SELF_RATE < 0.02 or ("--self-shapes" in ARGV and qshape_nw(q) in SELF_SHAPES):   # R24-aa/ab: a learned fact about questions: the answer is not something the question already names
             sl = qslots(q)
             if a is not None and any(same(a, f) for f in sl): a = None
             if b is not None and any(same(b, f) for f in sl): b = None
@@ -64,7 +70,6 @@ def main():
         if a is not None and b is not None: return None, "disagree"
         return (a, "cue-only") if (a is not None and conf) else (None, "silent")
 
-    import collections
     kind = lambda q: q.lower().split()[0]
     FINE = "--fine" in ARGV or SHAPE                                                     # R24-y: admission keys with back-off, scored on pooled evidence
     def akeys(q, how, a):

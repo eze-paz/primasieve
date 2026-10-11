@@ -38,7 +38,7 @@ def same_verb(a, b, loose=False):
     return loose and a.lower() in CLASS and b.lower() in CLASS and CLASS[a.lower()] == CLASS[b.lower()] and a.lower() in VERBISH   # 'came' ~ 'arrived': the same induced class, only as a fallback
 
 
-VERBISH = set(); NOUNISH = set(); CLASS = {}; VOCAB = set(); TIMEISH = set(); BASEV = set()
+VERBISH = set(); NOUNISH = set(); CLASS = {}; VOCAB = set(); TIMEISH = set(); BASEV = set(); INDUCED = {}
 MODALS = ("will", "would", "could", "can", "must", "should", "might", "shall", "may")
 
 
@@ -66,9 +66,39 @@ def induce_verbish(stories, k=100):
     VERBISH.update(BASEV)
     if "morning" in classes: TIMEISH.update(w for w, c in classes.items() if c == classes["morning"] and after_every[w] >= 3)   # the induced class of 'morning', kept to words used after 'every' / 'each'
     TIMEISH.add("morning")
+    skel = lambda w: re.sub(r"[aeiouy]", "", w)                                          # R24-ab: induced irregular pasts: close contexts and the same consonant skeleton ('grew' ~ 'grow'), or very close contexts
+    INDUCED.update({p: b for p, (b, sim) in induce_irregulars(stories).items() if sim > 0.80 or skel(p) == skel(b)})
+    for p, b in INDUCED.items(): IRREG.setdefault(p, b)
     VERBISH.difference_update(NOUNISH); T.SPAN_KEEP.update(NOUNISH)
     T.SPAN_STOP.update(VERBISH); T.SPAN_STOP.update(IRREG)
     return VERBISH
+
+
+def induce_irregulars(stories, n_feat=300, min_count=10, theta=0.5):
+    """R24-ab: irregular past forms paired with their base by the words that follow them ('grew up' ~ 'grow up'); learned, no list"""
+    import numpy as np
+    uni = collections.Counter(); right = collections.defaultdict(collections.Counter)
+    for text in stories:
+        for sent in T.SENT.split(text):
+            w = [x.lower() for x in T.TOK.findall(sent)]
+            for i, x in enumerate(w):
+                uni[x] += 1
+                if i: right[w[i - 1]][x] += 1
+    feats = [w for w, _ in uni.most_common(n_feat)]; fi = {w: i for i, w in enumerate(feats)}
+    def vec(w):
+        v = np.zeros(n_feat, dtype=np.float32)
+        for c, n in right[w].items():
+            if c in fi: v[fi[c]] = n
+        v = np.log1p(v); return v / (np.linalg.norm(v) + 1e-6)
+    pasts = [w for w in VERBISH if uni[w] >= min_count and not w.endswith("ed") and w not in BASEV and w not in NOUNISH]
+    bases = {w: vec(w) for w in BASEV if uni[w] >= min_count}
+    out = {}
+    for p in pasts:
+        vp = vec(p); cands = [(float(vp @ bases[b]), b) for b in bases if b[0] == p[0] and b != p and not p.startswith(b)]
+        if cands:
+            sim, b = max(cands)
+            if sim >= theta: out[p] = (b, sim)
+    return out
 
 
 def verbish(w, prev=None):
