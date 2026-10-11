@@ -295,3 +295,9 @@ R25-ad first run: the two-group block never ran (an import reset sys.argv); argu
 
 ## R25-final registration (one clean score of the best configuration)
 val_fresh3.json: 40 stories, 200 questions (who 71, what 58, where 40, when 16, how 9, why 4, whose 2), written by a separate agent barred from the tests folder and b6_ files; verified here: every gold form occurs in its story. Nothing has been chosen on it and it will be scored exactly once. Configuration: R25-x unchanged (vectors from 13M tokens, role thresholds 0.8 / 0.5, similarity and role readers, dictionary, no-loose, disagreement admission), route trust chosen on the same 710 practice questions (old 110, val_more, A, B). The model answers all 1,110 (old, val_more, val_fresh2, A, B, val_fresh3). Reported: learner alone on val_fresh3, all routes and trusted routes; B6 once.
+
+## R25-ad result (PASS)
+Two groups of context: 8.5651 bits/token alone (better than every earlier mix); mixed with the word-pair model 8.4313 (word-pair alone 8.8078; -0.38 bits). The chosen backoff strength (500) was the top of the grid offered.
+
+## R25-ae registration (wider backoff range; three groups of context)
+Backoff strength chosen from {200, 500, 1500, 5000} on the training slice; a three-group context (previous three groups) added with its own backoff to the two-group estimate; each mixed with the word-pair model. Held-out books once. Passes if bits fall below 8.4313.
