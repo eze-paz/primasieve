@@ -218,23 +218,27 @@ class Reader:
                         def held(vi):                                                      # overlapping fillers inside the verb's clause
                             lo, hi = clause_of(ss0, vi); return sum(1 for k in range(lo, hi) if sf0[k] and sf0[k].lower() in known)
                         sv = ss0[max(vis, key=held)][2:]; self.equiv[cv[0]][sv] += 1
-                        cs = tuple(("V:" + sv) if x == "V:" + cv[0] else x for x in cs); cv = verbs_of(cs)       # align through the equivalent verb
+                        via = {cv[0]: sv}                                                   # align through the equivalent verb, the canonical shape keeps its own verb
+                    else: via = {}
+                else: via = {}
                 for ss, sf in sents:
-                    if not set(verbs_of(ss)) & set(cv): continue
-                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP", "ORDER")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP", "ORDER")]; v = (set(verbs_of(ss)) & set(cv)).pop()
+                    match = [(c, c) for c in cv if c in verbs_of(ss)] or [(c, via[c]) for c in cv if c in via and via[c] in verbs_of(ss)]
+                    if not match: continue
+                    cvv, v = match[0]
+                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP", "ORDER")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP", "ORDER")]
                     for i in si:
                         for j in cj:
                             if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower() or (ss[i] in ("WHEN", "WHY", "COMP") and (cf[j].lower() in sf[i].lower() or sf[i].lower() in cf[j].lower()))):
                                 self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1; self.feat[(feat(ss, i, v), feat(cs, j, v))] += 1
                                 if self.chunks: self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, j))] += 1
-                                fs = features(ss, i, v, self.chunks); fc = features(cs, j, v, self.chunks)
+                                fs = features(ss, i, v, self.chunks); fc = features(cs, j, cvv, self.chunks)
                                 for f in FEATS:
                                     if f in fs: self.tab[f][(fs[f], fc[f])] += 1
                     if not weigh: continue
                     for j in cj:
                         gold_i = [i for i in si if sf[i] and cf[j] and sf[i].lower() == cf[j].lower()]
                         if not gold_i: continue
-                        fc = features(cs, j, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
+                        fc = features(cs, j, cvv, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
                         for f in FEATS:
                             if f not in fc: continue
                             n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())
@@ -246,13 +250,15 @@ class Reader:
         cv = set(verbs_of(cs)); best = None
         order0 = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
         def carries(ss, sf): return any(ss[i] == "V:" + v and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for v in cv for i in range(len(ss)))
+        via = {}
         if cv and not any(carries(ss, sf) for ss, sf in story_sents):                  # learned paraphrase: 'own' -> 'have', 'arrive last' -> 'come last'
             v0 = next(iter(cv)); alts = [sv for sv, c in self.equiv[v0].most_common(3) if c >= 3 and any(ss[i] == "V:" + sv and (not order0 or any(ss[k] == "ORDER" and sf[k] == order0 for k in range(*clause_of(ss, i)))) for ss, sf in story_sents for i in range(len(ss)))]
-            if alts: cs = tuple(("V:" + alts[0]) if x == "V:" + v0 else x for x in cs); cv = set(verbs_of(cs))
+            if alts: via = {v0: alts[0]}
+        cv_story = set(cv) | set(via.values())
         order = next((cf_k for cs_k, cf_k in zip(cs, cs_fillers) if cs_k == "ORDER"), None) if cs_fillers else None
         for ss, sf in story_sents:
-            if not cv & set(verbs_of(ss)): continue
-            v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
+            if not cv_story & set(verbs_of(ss)): continue
+            v = (cv_story & set(verbs_of(ss))).pop(); cvv = next((c for c in cv if c == v or via.get(c) == v), v); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
             if order and not any(ss[k] == "ORDER" and sf[k] == order and lo <= k < hi for k in range(len(ss))):
                 vis = [i for i, x in enumerate(ss) if x == "V:" + v and any(ss[k] == "ORDER" and sf[k] == order for k in range(*clause_of(ss, i)))]
                 if not vis: continue
@@ -264,7 +270,7 @@ class Reader:
             if cs[missing] in ("WHEN", "WHY", "COMP"): si = [k for k, s in enumerate(ss) if s == cs[missing] and sf[k]]   # a span question takes only spans of its kind
             else: si = [k for k in si if ss[k] not in ("WHEN", "WHY", "COMP")]                               # and a who / what / where question never takes a span
             if not si: continue
-            fc = features(cs, missing, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
+            fc = features(cs, missing, cvv, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
             score = {i: 0.0 for i in si}
             for f in FEATS:                                                            # a learned mixture over the views; each view is a distribution over the candidates,
                 n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())   # weighted by how often that view was right with this much evidence

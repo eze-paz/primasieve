@@ -27,6 +27,7 @@ def main():
 
     def answer(text, q):
         log = E.Log(names).read(text); a, conf = E.ask_conf(log, q); b = R.ask(rd, text, names, q)
+        if q.lower().split()[0] == "when": return (b, "learned-when") if b is not None else (None, "silent")       # R24-p2: 'when' is the learned reader's span
         if a is not None and b is not None and same(a, b): return a, "agree"
         if a is not None and conf and b is None: return a, "cue-confident"
         if a is not None and q.lower().split()[0] in ("why", "when", "how") and conf: return a, "cue-why-when-how"       # R24-k2: slots the learned reader does not have
