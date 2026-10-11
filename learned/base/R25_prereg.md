@@ -271,3 +271,6 @@ From the 500 saved groups counted on all training paragraphs (13.0M tokens, 41,1
 
 ## R25-c13 registration
 One more cycle on all text from the 525 saved groups (2 exchange passes, 150 split tries). Passes if held-out bits fall below 8.8421.
+
+## R25-ab registration (trust chosen on 1,110 practice questions)
+Practice sets C and D (200 each; separate writers barred from the tests folder and b6_ files; verified: every gold form in its story; C and D share only ordinary capitalised words). Practice becomes 1,110 (old 110, val_more, A, B, C, D); val_fresh2 stays the untouched judge (total only). The model runs once on all 1,310. The R25-x configuration runs once; trust is chosen on the 1,110 (r25_trust.py --big). Passes if untouched fitness beats +28. B6 once.
