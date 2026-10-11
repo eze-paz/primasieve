@@ -65,3 +65,9 @@ Vectors from 6.97M book tokens: nearest to 'lend' give, show, allow, bring; 'nep
 
 ## R25-h registration (a similarity-native reader)
 Each name / thing span in the story is a candidate; score = match (mean over question content words of the best cosine to a word in the candidate's sentence, learner's own vectors) + LAM x type (cosine of the candidate's head word to the prototype of that question kind, averaged from the generator's gold answers). It answers only when the best beats the second by MARGIN. LAM and MARGIN are chosen by the learner on its practice questions (who / what / where / when / whom). Gate: holdout fitness (+1 / -3 / 0) > 0 on its own (the existing learned readers score -9 there); then it joins the policy as a third reader and B6 runs once.
+
+## R25-h result (gate met narrowly)
+Always answering, the similarity reader's top candidate is right on 84 of 192 practice questions (44%; wrong 108); the learner chose LAM 0.5, MARGIN 0.3 (practice 13 right / 3 wrong); holdout 5 right / 1 wrong (fitness +2 > 0). Alone it is precise only at tiny coverage; as a ranker it is right more often than the template readers answer at all.
+
+## R25-i registration (the similarity reader as a third vote)
+In the policy (R24-ap2 configuration), routes gain a '+soft' mark when the similarity reader's top candidate matches the answer; a lone unconfident cue answer (withdrawn in R24-ao) returns as 'cue-alone-loose+soft' when the similarity reader independently picks it and no learned reading dissents; 'soft-alone' when only it speaks with MARGIN >= 0.3. Admission by the disagreement rule against the model (R24-ak/al). Gate: validation precision after admission >= 0.90; B6 once.

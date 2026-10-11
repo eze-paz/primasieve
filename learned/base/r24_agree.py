@@ -96,6 +96,9 @@ def main():
         return tab[vg][ng] > 0 or expected < 5                                           # refused only where the books confidently never put this group in this role
     print(f"R24-am answer types learned for {sum(1 for k, c in TYPES.items() if sum(c.values()) >= 50)} question shapes / kinds", flush=True)
     print(f"R24-ab: question shapes whose answer never repeats a question slot: {len(SELF_SHAPES)} of {sum(1 for v in SELF_BY.values() if v[1] >= 20)} with >= 20 evidence", flush=True)
+    SOFT = "--soft" in ARGV
+    if SOFT:
+        import r25_soft as S; PROTOS = S.protos_from(data[:7000]); print(f"R25-i similarity reader on: prototypes for {sorted(PROTOS)}", flush=True)
     LEARNED_Q = "--learned-q" in ARGV                                                    # R24-v2: the closed-loop readers, no regex anywhere in the reading path
     if LEARNED_Q:
         import r24_qreader as QR
@@ -129,12 +132,16 @@ def main():
             if "--state-alone" in ARGV and c is not None:                              # R24-aj: the learned world layer speaks on its own; admission decides whether it is trusted
                 return c, ("state-alone" if (a is None and b is None) else "state-vs-reader")
         if ROUTES2:                                                                     # R24-x: no hand routing flags; every single-reader case is a route, admission decides per kind
-            if a is not None and b is not None and same(a, b): return a, "agree"
-            if b is not None and a is None: return b, "learned-alone-" + ("shape" if R.LAST.get("shape") else (QR.LASTQ.get("level") if LEARNED_Q else "x"))
+            st, sm = (S.top(text, q, names, PROTOS) if (SOFT and ql.split()[0] in ("who", "what", "where", "when", "whom")) else (None, 0.0))   # R25-i: the similarity reader as a third vote
+            plus = lambda x: "+soft" if (st is not None and x is not None and same(x, st)) else ""
+            if a is not None and b is not None and same(a, b): return a, "agree" + plus(a)
+            if b is not None and a is None: return b, "learned-alone-" + ("shape" if R.LAST.get("shape") else (QR.LASTQ.get("level") if LEARNED_Q else "x")) + plus(b)
             if a is not None and b is None:
+                if SOFT and not conf and same(a, st) and (dissent is None or same(a, dissent)): return a, "cue-alone-loose+soft"   # R25-i: a lone unconfident cue answer the similarity reader also picks
                 if "--no-loose" in ARGV and (not conf or (dissent is not None and not same(a, dissent))): return None, "silent"   # R24-ao: the hand cue reader alone answers only when its confidence flag is set and no learned reading dissents
-                return a, "cue-alone-" + ("strict" if conf else "loose")
+                return a, "cue-alone-" + ("strict" if conf else "loose") + plus(a)
             if a is not None and b is not None: return (b, "disagree-shape") if R.LAST.get("shape") else (None, "disagree")
+            if SOFT and st is not None and sm >= 0.3: return st, "soft-alone"            # R25-i: only the similarity reader speaks, clearly ahead
             return None, "silent"
         if q.lower().split()[0] == "when": return (b, "learned-when") if b is not None else (None, "silent")       # R24-p2: 'when' is the learned reader's span
         if a is not None and b is not None and same(a, b): return a, "agree"

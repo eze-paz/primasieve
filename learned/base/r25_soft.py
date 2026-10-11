@@ -56,6 +56,24 @@ def features(text, q, names, protos):
     return rows
 
 
+def protos_from(stories):
+    """the type prototypes: mean vector of the head words of gold answers, per question kind"""
+    acc = collections.defaultdict(list)
+    for s in stories:
+        for q, g in s["qs"]:
+            h = head(g[0]); v = vec(h) if h else None
+            if v is not None: acc[q.lower().split()[0]].append(v)
+    return {k: (np.mean(v, 0) / (np.linalg.norm(np.mean(v, 0)) + 1e-9)) for k, v in acc.items() if len(v) >= 50}
+
+
+def top(text, q, names, protos, lam=0.5):
+    """the best candidate and its lead over the second, or (None, 0)"""
+    rows = features(text, q, names, protos)
+    if not rows: return None, 0.0
+    sc = sorted(((m + lam * t, s) for s, m, t in rows), reverse=True)
+    return sc[0][1], (sc[0][0] - sc[1][0]) if len(sc) > 1 else 1.0
+
+
 def decide(rows, lam, margin):
     if not rows: return None
     sc = sorted(((m + lam * t, s) for s, m, t in rows), reverse=True)
