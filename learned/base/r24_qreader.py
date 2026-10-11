@@ -16,7 +16,7 @@ QW = ("who", "what", "where", "when", "why", "how", "which", "whose", "did")
 
 def qshape(q, names):
     """the question as a construction: question words kept, verbs as stems, names / things as slots"""
-    toks = T.TOK.findall(q.rstrip("?")); syms = []; fillers = []
+    toks = T.TOK.findall(q.rstrip("?").replace("Dr.", "Dr").replace("Mr.", "Mr").replace("Mrs.", "Mrs").replace("Miss.", "Miss")); syms = []; fillers = []
     if toks and toks[0].lower() in QW: toks[0] = toks[0].lower()                          # 'What' is a question word, not a name
     items = T.slotify(toks, names)
     for k, (sym, filler) in enumerate(items):
@@ -56,7 +56,7 @@ class QReader:
             for k, x in enumerate(cs):
                 if k == miss: tmpl.append("MISSING:" + x)
                 elif x in ("PERSON", "ENT") and cf[k] in qslots: tmpl.append(f"Q{qslots.index(cf[k])}")
-                elif x.startswith("V:"): tmpl.append("V")
+                elif x.startswith("V:"): tmpl.append(f"V{[v for v in qs if v.startswith('V:')].index(x) if x in qs else 0}")
                 elif x in qwords: tmpl.append(f"W{qwords.index(x)}")
                 else: tmpl.append(x)
             for key in keys_of(qs): self.map[key][tuple(tmpl)] += 1
@@ -69,8 +69,8 @@ class QReader:
         qslots = [f for x, f in zip(qs, qf) if x in ("PERSON", "ENT")]; qwords = [f for x, f in zip(qs, qf) if x == "w"]; qverb = next((x for x in qs if x.startswith("V:")), None)
         syms = []; fillers = []; missing = None
         for t in tmpl:
-            if t.startswith("MISSING:"): missing = len(syms); syms.append(t[8:]); fillers.append({"WHEN": "at some time", "WHY": "of something", "COMP": "to do something"}.get(t[8:], "thing"))
-            elif t.startswith("W"):
+            if t.startswith("MISSING:"): missing = len(syms); syms.append(t[8:]); fillers.append({"WHEN": "at some time", "WHY": "of something", "COMP": "to do something", "PERSON": sorted(names)[0] if names else "Someone"}.get(t[8:], "thing"))
+            elif t.startswith("W") and t[1:].isdigit():
                 i = int(t[1:])
                 if i >= len(qwords): return None
                 syms.append(qwords[i]); fillers.append(None)
@@ -78,9 +78,10 @@ class QReader:
                 i = int(t[1:])
                 if i >= len(qslots): return None
                 f = qslots[i]; syms.append("PERSON" if f[:1].isupper() else "ENT"); fillers.append(f)
-            elif t == "V":
-                if qverb is None: return None
-                syms.append(qverb); fillers.append(None)
+            elif t.startswith("V") and (t[1:].isdigit() or t == "V"):
+                qverbs = [x for x in qs if x.startswith("V:")]; i = int(t[1:] or 0)
+                if i >= len(qverbs): return None
+                syms.append(qverbs[i]); fillers.append(None)
             else: syms.append(t); fillers.append(None)
         return (tuple(syms), fillers, missing) if missing is not None else None
 
@@ -100,7 +101,7 @@ def main():
     data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
-    PH = {"who": "Someone", "what": "the thing", "where": "the place", "when": "at some time", "why": "of something", "how": "somehow"}
+    PH = {"who": sorted(names)[0] if names else "Someone", "what": "the thing", "where": "the place", "when": "at some time", "why": "of something", "how": "somehow"}
     def ask_form(q):
         k = q.lower().split()[0]; ph = PH.get(k)
         if ph is None: return None
