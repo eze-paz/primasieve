@@ -39,7 +39,7 @@ def mainly_verb(w):
     than its noun / adjective senses ('spin', 'lend' yes; 'doctor', 'dusk', 'open' no)"""
     load(); w = w.lower(); b = verb_base(w)
     if b is None: return False
-    if b != w: return True                                                   # an inflected form of a verb: 'spun', 'packed'
+    if b != w: return w in EXC or mainly_verb(b)                              # R24-ap2: an inflected form counts only if its base is mainly a verb ('spun', 'packed' yes; 'bees' no)
     v = IDX.get(("v", w), 0)
     return v > max(IDX.get(("n", w), 0), IDX.get(("a", w), 0), IDX.get(("r", w), 0))
 
