@@ -341,3 +341,5 @@ R24-s run 8: no-word level now 125 / 203 (0.62), coarse 129 / 426 (0.31), exact 
 R24-t note: question paraphrases cannot be taught through the regex teacher (it does not render them). The teacher becomes the story's own event statements (generator-exact events, as in R24-j): a question is paired with the event statement that holds its gold and shares its slots; the regexes leave the teaching role. Run with --event-teacher.
 
 R24-t run 1 (13,195 of 59,120 questions paraphrased; regex teacher): the regexes render none of the new wordings, so the teacher shrinks to 12,887 pairs; validation 31 / 28 (0.90) vs regex path 58 / 49 (0.84). The event-statement teacher run follows.
+
+R24-t run 2 (event-statement teacher, regexes out): 171 question shapes from 14,991 pairs; held-out exact level 1,088 / 1,487 = 0.73 -- below admission, so validation 0 answered. Cause: an event statement carries slots the question never mentions (the place, the recipient), and those stay in the template as empty slots that the sentence reader then fills at random. Run 3: a template keeps only the question's slots and the missing one (an unmentioned slot and its preposition are dropped).
