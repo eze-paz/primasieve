@@ -199,7 +199,7 @@ def qparse(q, names):
     """(asked role, question verb, question argument heads) or None"""
     qs, qf = QR.qshape(q, names); k = q.lower().split()[0]
     verbs = [x[2:] for x in qs if x.startswith("V:")]; v = verbs[0] if verbs else None
-    if "--state" in ARGV_SOFT and k == "where" and not verbs and len(qs) > 1 and qs[1] in ("was", "were", "w"):   # R25-o: 'where was X (at the end / at noon)' asks for a state
+    if "--state" in ARGV_SOFT and k == "where" and verbs in ([], ["be"]) and len(qs) > 1 and qs[1] in ("was", "were", "w", "V:be"):   # R25-o2: the dictionary reads 'was' as the verb 'be'   # R25-o: 'where was X (at the end / at noon)' asks for a state
         a0 = [(f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
         tw = [w for w in T.TOK.findall(q) if w.isalpha() and w.lower() not in T.STOP and w.lower() not in ("where", "was", "were", "end")]
         if a0: return ("state", None, [a0[0].split()[-1]] + [w for w in tw if w.lower() != a0[0].split()[-1].lower()])

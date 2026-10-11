@@ -111,3 +111,6 @@ Holdout 24 right / 4 wrong (+12) vs R25-k 22 / 3 (+13); practice 60 / 12 (+24). 
 
 ## R25-o registration (states: 'where was X')
 About 19 practice questions ask for a state ('Where was Beth at the end?', 'Where was the key at noon?'). The loose role reader gains a state role (--state): the clauses in which X is the subject or the object and a place is named; the question's time words choose among them by loose matching to each clause's time phrase, otherwise the latest clause wins; the answer is that clause's place. Base: the R25-k configuration (no --do). Gate: holdout fitness > +13.
+
+## R25-o result (the state role never fired) and R25-o2
+R25-o reproduced R25-k exactly (holdout 22 / 3): with the dictionary on, 'was' is read as the verb 'be', so 'Where was X ...?' never reached the state role. Checked on a practice story: once reached, 'Where was the key at noon?' picks the noon clause ('Rosa took the key to the garden') -> the garden (right). R25-o2: the state role accepts a question whose only verb is 'be'. Same registration; the holdout total is reported, and the role is also measured on the new untouched set (val_fresh2) when it arrives.
