@@ -120,3 +120,9 @@ With the state role firing: practice 55 / 14 (+13), holdout 23 / 6 (+5) against 
 
 ## R25-c2 registration (do the learner's groups keep improving across runs?)
 r25_classes.py is run again; it starts from its own saved groups (r25_classes.json, 9.1301 bits) rather than the k-means start. Passes if held-out book bits fall further.
+
+## R25-c2 result
+Starting from its own saved groups (9.1301), one more exchange pass moved 809 words but held-out bits rose to 9.1321; the learner rejected it. With a fixed number of groups, exchange is at a local optimum.
+
+## R25-c3 registration (the learner may split groups)
+A new operator: for each of the 30 most frequent groups, split it in two by the learner's own word vectors (2-means) and keep the split only if held-out book bits fall. The number of groups is then the learner's choice. Fix: after a rejected exchange pass the saved groups are really restored. Passes if held-out bits fall below 9.1301.

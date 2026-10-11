@@ -44,6 +44,7 @@ def main():
     print(f"R25-c start from {src}: {len(vocab)} words, {C} groups, training tokens {sum(uni.values())} ({time.time() - t0:.0f} s)", flush=True)
 
     def heldout_bits(cl):
+        C = max(cl.values()) + 2
         N = np.zeros((C + 1, C + 1)); n = np.zeros(C + 1); UNK = C
         cof = lambda x: cl.get(x, UNK)
         for w in sents_of(train_p):
@@ -84,7 +85,33 @@ def main():
         b1 = heldout_bits(cls)
         print(f"R25-c pass {ps + 1}: {moves} words moved; held-out bits/token {b1:.4f} ({time.time() - t0:.0f} s)", flush=True)
         if b1 < b0: json.dump(cls, open(STORE, "w", encoding="utf-8")); b0 = b1
-        else: print("R25-c held-out score did not improve; groups from the previous pass kept", flush=True); break
+        else:
+            print("R25-c held-out score did not improve; groups from the previous pass kept", flush=True)
+            if os.path.exists(STORE): cls = {w: c for w, c in json.load(open(STORE, encoding="utf-8")).items()}   # R25-c3: really go back to the saved groups
+            break
+    if "--split" in ARGV:                                                                 # R25-c3: the learner may split a group in two when that predicts held-out books better
+        z = np.load(os.path.join(HERE, "r25_vectors.npz")); VEC = {w: v for w, v in zip(z["vocab"].tolist(), z["vecs"])}
+        tries = int(ARGV[ARGV.index("--split") + 1]) if ARGV.index("--split") + 1 < len(ARGV) and ARGV[ARGV.index("--split") + 1].isdigit() else 30
+        size = collections.Counter()
+        for w, c in cls.items(): size[c] += uni[w]
+        kept = 0
+        for g, _ in size.most_common(tries):
+            ws = [w for w in cls if cls[w] == g and w in VEC]
+            if len(ws) < 8: continue
+            X = np.stack([VEC[w] for w in ws]); rng = np.random.default_rng(0); cent = X[rng.choice(len(ws), 2, replace=False)]
+            for _ in range(10):
+                lab = (X @ cent.T).argmax(1)
+                for j in range(2):
+                    if (lab == j).any(): cent[j] = X[lab == j].mean(0); cent[j] /= (np.linalg.norm(cent[j]) + 1e-9)
+            if lab.min() == lab.max(): continue
+            new_id = max(cls.values()) + 1; trial = dict(cls)
+            for w, l in zip(ws, lab):
+                if l == 1: trial[w] = new_id
+            b1 = heldout_bits(trial)
+            if b1 < b0:
+                cls = trial; b0 = b1; kept += 1; json.dump(cls, open(STORE, "w", encoding="utf-8"))
+                print(f"R25-c3 split kept: group {g} -> {new_id} ({sum(1 for l in lab if l == 1)} words moved) held-out {b1:.4f} | e.g. {[w for w, l in zip(ws, lab) if l == 0][:5]} / {[w for w, l in zip(ws, lab) if l == 1][:5]}", flush=True)
+        print(f"R25-c3 splits kept {kept} of {tries} tried; groups now {len(set(cls.values()))}; held-out bits/token {b0:.4f}", flush=True)
     groups = collections.defaultdict(list)
     for w in vocab[:3000]: groups[cls[w]].append(w)
     for probe in ("doctor", "mole", "dusk", "lend", "parcel", "nephew", "eleven", "spin"):
