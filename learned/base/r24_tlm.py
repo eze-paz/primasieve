@@ -9,9 +9,9 @@ Run: python learned/base/r24_tlm.py [--data stories_train_v2.json] [--min-count 
 import os, sys, re, json, math, random, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
 TOK = re.compile(r"[A-Za-z][A-Za-z'-]*|[.,;!?]")
-SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'])")
+SENT = re.compile(r"(?<=[.!?])(?<!Dr\.)(?<!Mr\.)(?<!Mrs\.)(?<!St\.)\s+(?=[A-Z\"'])")
 PRON = {"he", "she", "him", "her", "his", "they", "them", "it", "i", "you", "we", "me", "my", "your", "us", "our"}   # run 2d: first/second person are pronoun forms too
-DET = {"the", "a", "an", "his", "her", "their", "its"}
+DET = {"the", "a", "an", "his", "her", "their", "its", "my", "your", "our", "two", "three", "four", "five", "six", "seven", "ten", "several", "some", "many", "every", "each", "another", "one"}
 STOP = {"and", "to", "of", "at", "in", "on", "by", "near", "with", "for", "from", "into", "back", "down", "up", "home", "there", "then", "when", "while", "under", "behind", "over", "across", "through", "toward", "towards", "inside", "outside", "onto", "beside", "along", "past",
         "was", "were", "is", "had", "who", "that", "which", "but", "so", "because", "without", "until", "after", "before", "first", "second", "last", "away", "together"}
 FLOOR = 0.01; RANKS = ("recency", "subject"); K = 20
@@ -47,7 +47,7 @@ def slotify(tokens, names):
     while i < len(tokens):
         w = tokens[i]; wl = w.lower()
         if wl not in PRON and wl not in COMMON and wl not in NOT_NAME and (w in names or (w[0].isupper() and (i > 0 or len(w) > 2))): out.append(("PERSON", [w])); i += 1; continue
-        if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET): out.append(("PRON", [wl])); i += 1; continue
+        if wl in PRON and not (i > 0 and tokens[i - 1].lower() in DET) and not (wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in STOP and tokens[i + 1] not in SPAN_STOP): out.append(("PRON", [wl])); i += 1; continue
         if wl in DET and i + 1 < len(tokens) and tokens[i + 1].islower() and tokens[i + 1] not in ("and", "to", "of"):
             j = i + 2
             if j < len(tokens) and tokens[j].islower() and tokens[j] not in STOP and tokens[j] not in DET and tokens[j] not in PRON and tokens[j] not in SPAN_STOP: j += 1   # a determiner or a verb-like word ends the span

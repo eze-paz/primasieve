@@ -26,6 +26,7 @@ def lemma(w):
     for suf in ("ied", "ed", "ing", "es", "s"):
         if w.endswith(suf) and len(w) - len(suf) >= 3:
             stem = w[:-len(suf)] + ("y" if suf == "ied" else "")
+            if suf in ("ed", "ing") and (stem + "e") in T.COMMON and stem not in T.COMMON: return stem + "e"          # 'raced' -> 'race', 'used' -> 'use' (the common vocabulary decides)
             return stem[:-1] if suf in ("ed", "ing") and len(stem) > 3 and stem[-1] == stem[-2] else stem
     return w
 

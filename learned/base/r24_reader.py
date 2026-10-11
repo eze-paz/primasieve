@@ -19,12 +19,14 @@ def canonical(q, gold):
     def thing(x): return x if x.split()[0] in T.DET else "the " + x
     m = re.match(r"who (\w+) (.+)$", ql)
     if m and m.group(1) not in ("was", "were", "had", "is"): return f"{g.capitalize()} {m.group(1)} {m.group(2)}."
-    m = re.match(r"what did (.+?) (\w+)$", ql)
-    if m: return f"{m.group(1).capitalize()} {E.lemma(m.group(2))} {thing(g)}."         # 'What did Rosa buy?' -> 'Rosa buy the bread.' (the verb stays a stem: aligned by lemma)
+    m = re.match(r"what did (.+)$", ql)
+    if m:
+        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        if vi: return f"{' '.join(ws[:vi]).capitalize()} {E.lemma(ws[vi])} {' '.join(ws[vi + 1:])} {thing(g)}.".replace("  ", " ")   # 'What did Domett give Grudden?' -> 'Domett give Grudden the pot of jam.'
     m = re.match(r"where did (.+?) (\w+) (.+)$", ql)
     if m and m.group(2) != "start":
-        place = g if g.split()[0] in PLACE_WORDS else f"at {g if g.split()[0] in T.DET else 'the ' + g}"
-        return f"{m.group(1).capitalize()} {E.lemma(m.group(2))} {m.group(3)} {place}."
+        gp = g.split(" ", 1)[1] if g.split()[0] in PLACE_WORDS else g
+        return f"{m.group(1).capitalize()} {E.lemma(m.group(2))} {m.group(3)} at {thing(gp)}."      # one place form for every preposition: the shape matches the question's
     return None
 
 
@@ -38,6 +40,7 @@ def is_verb(w):
 
 def construction(sent, names):
     """(symbols, fillers): slot symbols keep their filler; a verb word is kept as its lemma (verbs matched across forms)"""
+    sent = sent.replace("Dr.", "Dr").replace("Mr.", "Mr").replace("Mrs.", "Mrs")
     items = T.slotify(T.TOK.findall(sent), names); syms = []; fillers = []
     for k, (sym, filler) in enumerate(items):
         if sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
@@ -103,9 +106,11 @@ def ask(R, text, names, q):
     if m and m.group(1) not in ("was", "were", "had", "is"):
         cs, cf = construction(f"{who} {m.group(1)} {m.group(2)}.", names)
         return art(R.fill(sents, names, cs, 0)) if cs and cs[0] == "PERSON" else None
-    m = re.match(r"what did (.+?) (\w+)$", ql)
+    m = re.match(r"what did (.+)$", ql)
     if m:
-        cs, cf = construction(f"{m.group(1).capitalize()} {E.lemma(m.group(2))} the thing.", names)
+        ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
+        if not vi: return None
+        cs, cf = construction(f"{' '.join(ws[:vi]).capitalize()} {E.lemma(ws[vi])} {' '.join(ws[vi + 1:])} the thing.".replace("  ", " "), names)
         j = [k for k, s in enumerate(cs) if s == "ENT"]
         return art(R.fill(sents, names, cs, j[-1])) if j else None
     m = re.match(r"where did (.+?) (\w+) (.+)$", ql)
