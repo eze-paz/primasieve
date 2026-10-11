@@ -163,3 +163,6 @@ Learner alone on the untouched set val_fresh2 (200): this morning's configuratio
 
 ## R25-q registration (the learner chooses which of its routes to trust)
 From the R25-p run's per-question lines, a route is kept when its practice fitness (+1 / -3 / 0) on the old 110 and val_more 200 is above zero; the kept set is applied once to the untouched val_fresh2 (total only). Passes if the untouched-set fitness with kept routes is higher than with all routes.
+
+## R25-q result (PASS)
+The learner kept 16 of 21 routes by its practice fitness and dropped cue-alone-loose+soft, learned-alone-exact, learned-alone-noword, role-alone, soft-alone (each answers on one weak source). Practice 130 / 20 (fitness 70) -> 112 / 7 (91). **Untouched val_fresh2: 69 / 29 (fitness -18) -> 47 / 13 (+8), precision 0.70 -> 0.78**, decided on practice only and applied once. Trade-off set by the -3 weight for a wrong answer (a choice the owner may change).
