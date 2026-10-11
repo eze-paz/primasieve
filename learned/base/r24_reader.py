@@ -24,6 +24,7 @@ def canonical(q, gold):
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
         if vi:
             head = ' '.join(ws[:vi]); head = head[0].upper() + head[1:]; tail = ' '.join(ws[vi + 1:])
+            if tail and len(tail.split()) == 1 and tail in PLACE_WORDS | {"with", "for"}: return f"{head} {E.lemma(ws[vi])} {tail} {thing(g)}."              # 'What did the mouse gnaw through?' -> 'The mouse gnaw through the net.'
             if tail and (tail.split()[0] in PLACE_WORDS or tail.split()[0] in ("as", "for", "with")): return f"{head} {E.lemma(ws[vi])} {thing(g)} {tail}."      # 'What did Sara bring as a gift?' -> 'Sara bring the kite as a gift.'
             return f"{head} {E.lemma(ws[vi])} {tail} {thing(g)}.".replace("  ", " ")                                                                      # 'What did Domett give Grudden?' -> 'Domett give Grudden the pot of jam.'
     m = re.match(r"where did (.+?) (\w+) (.+)$", ql)
@@ -82,7 +83,8 @@ def construction(sent, names):
         if j <= 7 and (starter or timeish) and not (xs[0] == "PERSON" and not timeish):
             syms.append("WHEN"); fillers.append(opening); items = items[j + 1:]
     for k, (sym, filler) in enumerate(items):
-        if sym == "ENT" and filler[-1] in E.TIMEISH: syms.append("TIME"); fillers.append(None)                 # 'every morning' is when, not what
+        if sym == "ENT" and (filler[-1] in E.TIMEISH or filler[-1] in ("year", "month", "week", "day", "night", "hour", "minute", "summer", "winter", "spring", "autumn", "morning", "evening", "afternoon", "noon", "dawn", "dusk")): syms.append("TIME"); fillers.append(None)   # 'one year', 'every morning': when, not what
+        elif sym == "ENT" and k + 2 < len(items) and items[k + 1][0] in ("named", "called") and items[k + 2][0] == "PERSON": continue      # 'a boy named Erlend': the name is the slot
         elif sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
         elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
@@ -251,7 +253,9 @@ def ask(R, text, names, q):
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
         if not vi: return None
         head = ' '.join(ws[:vi]); head = head[0].upper() + head[1:]; tail = ' '.join(ws[vi + 1:])
-        if tail and (tail.split()[0] in PLACE_WORDS or tail.split()[0] in ("as", "for", "with")):
+        if tail and len(tail.split()) == 1 and tail in PLACE_WORDS | {"with", "for"}:
+            cs, cf = construction(f"{head} {E.lemma(ws[vi])} {tail} the thing.", names); j = [k for k, s in enumerate(cs) if s == "ENT" and cf[k] == "thing"]
+        elif tail and (tail.split()[0] in PLACE_WORDS or tail.split()[0] in ("as", "for", "with")):
             cs, cf = construction(f"{head} {E.lemma(ws[vi])} the thing {tail}.", names); j = [k for k, s in enumerate(cs) if s == "ENT" and cf[k] == "thing"]
         else:
             cs, cf = construction(f"{head} {E.lemma(ws[vi])} {tail} the thing.".replace("  ", " "), names); j = [k for k, s in enumerate(cs) if s == "ENT"]
