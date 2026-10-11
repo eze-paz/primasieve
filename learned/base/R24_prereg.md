@@ -345,3 +345,5 @@ R24-t run 1 (13,195 of 59,120 questions paraphrased; regex teacher): the regexes
 R24-t run 2 (event-statement teacher, regexes out): 171 question shapes from 14,991 pairs; held-out exact level 1,088 / 1,487 = 0.73 -- below admission, so validation 0 answered. Cause: an event statement carries slots the question never mentions (the place, the recipient), and those stay in the template as empty slots that the sentence reader then fills at random. Run 3: a template keeps only the question's slots and the missing one (an unmentioned slot and its preposition are dropped).
 
 R24-t run 3 (unmentioned slots dropped): exact level 1,081 / 1,488 = 0.73 unchanged, nothing admitted. Being traced: the templates the event teacher yields against the regex ask forms for the same questions.
+
+R24-t run 4 ('at' convention, order words carried): shape agreement 0.46, exact level 1,089 / 1,446 = 0.75; still below admission. Tracing the exact-level misses end to end.

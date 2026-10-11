@@ -65,6 +65,9 @@ class QReader:
                 elif x.startswith("V:"): tmpl.append(f"V{[v for v in qs if v.startswith('V:')].index(x) if x in qs else 0}")
                 elif x in qwords: tmpl.append(f"W{qwords.index(x)}")
                 else: tmpl.append(x)
+            for i in range(1, len(tmpl)):                                                 # the sentence reader's convention: a missing place is asked with 'at'
+                if tmpl[i] == "MISSING:ENT" and tmpl[i - 1] in R.PLACE_WORDS: tmpl[i - 1] = "at"
+            if any(x == "ORDER" for x in qs) and "ORDER" not in tmpl: tmpl.insert(len(tmpl) - 1 if tmpl and tmpl[-1] == "." else len(tmpl), "ORDER")   # the question's order word rides along
             for key in keys_of(qs):                                                       # coarser keys store templates without the references they cannot resolve
                 t2 = tuple(x for x in tmpl if not (key[0] in ("noword", "coarse") and x.startswith("W") and x[1:].isdigit()))
                 self.map[key][t2] += 1
@@ -83,6 +86,10 @@ class QReader:
                 i = int(t[1:])
                 if i >= len(qwords): return None
                 syms.append(qwords[i]); fillers.append(None)
+            elif t == "ORDER":
+                o = next((f for x, f in zip(qs, qf) if x == "ORDER"), None)
+                if o is None: return None
+                syms.append("ORDER"); fillers.append(o)
             elif t.startswith("Q"):
                 i = int(t[1:])
                 if i >= len(qslots): return None
