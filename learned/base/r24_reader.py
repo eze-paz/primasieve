@@ -20,6 +20,11 @@ def canonical(q, gold):
     m = re.match(r"who (\w+) (.+)$", ql)
     if m and m.group(1) not in ("was", "were", "had", "is"): return f"{g[0].upper()}{g[1:]} {m.group(1)} {m.group(2)}."
     m = re.match(r"what did (.+)$", ql)
+    if m and (g.startswith("to ") or ql.endswith(" to do") or ql.endswith(" to learn")):
+        ws = q[9:].rstrip("?").split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x.lower()) and x.lower() not in E.NOUNISH), None)
+        if vi:
+            gc = g if g.startswith("to ") else "to " + g
+            return f"{ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} {gc}.".replace("  ", " ")       # 'What did Patti promise?' -> 'Patti promise to share it.'
     if m:
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
         if vi:
@@ -97,12 +102,18 @@ def construction(sent, names):
             if (nxt in ("ENT", "PERSON") and TIMEW(word.lower())) or (nxt not in ("ENT", "PERSON") and TIMEW(nxt)):
                 phrase = f"{syms[k]} {fillers[k + 1] if fillers[k + 1] else nxt}".lower(); end = k + 2
                 syms = syms[:k] + ["WHEN"] + syms[end:]; fillers = fillers[:k] + [phrase] + fillers[end:]; break
+    comp = None
+    for k in range(1, len(syms) - 1):                                                    # 'wanted to learn to ride a horse', 'refused to climb the hill', 'promised to share it'
+        if syms[k] == "to" and syms[k - 1].startswith("V:") and (syms[k + 1].startswith("V:") or (syms[k + 1].isalpha() and syms[k + 1] not in T.DET and syms[k + 1] not in T.STOP)):
+            end = next((t for t in range(k + 1, len(syms)) if syms[t] in ("and", ",", ".", "because")), len(syms))
+            comp = "to " + " ".join((syms[t][2:] if syms[t].startswith("V:") else (fillers[t] or syms[t])) for t in range(k + 1, end)); break
     if why is None:                                                                      # 'opened its mouth to answer': a purpose phrase is a why
         for k in range(1, len(syms) - 1):
             if syms[k] == "to" and (syms[k + 1].startswith("V:") or (syms[k + 1].isalpha() and syms[k + 1] not in T.DET and syms[k + 1] not in PLACE_WORDS and syms[k + 1] not in T.STOP)) and syms[k - 1] in ("ENT", "PERSON", "PRON"):
                 end = next((t for t in range(k + 1, len(syms)) if syms[t] in ("and", ",", ".")), len(syms))
                 why = "to " + " ".join((syms[t][2:] if syms[t].startswith("V:") else (fillers[t] or syms[t])) for t in range(k + 1, end)); break
     if why: syms.append("WHY"); fillers.append(why)
+    if comp: syms.append("COMP"); fillers.append(comp)
     return tuple(syms), fillers
 
 
@@ -191,10 +202,10 @@ class Reader:
                 cs, cf = construction(a, names); cv = verbs_of(cs)
                 for ss, sf in sents:
                     if not set(verbs_of(ss)) & set(cv): continue
-                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY")]; v = (set(verbs_of(ss)) & set(cv)).pop()
+                    si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]; cj = [k for k, s in enumerate(cs) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP")]; v = (set(verbs_of(ss)) & set(cv)).pop()
                     for i in si:
                         for j in cj:
-                            if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower() or (ss[i] in ("WHEN", "WHY") and (cf[j].lower() in sf[i].lower() or sf[i].lower() in cf[j].lower()))):
+                            if sf[i] and cf[j] and (sf[i] == cf[j] or sf[i].lower() == cf[j].lower() or (ss[i] in ("WHEN", "WHY", "COMP") and (cf[j].lower() in sf[i].lower() or sf[i].lower() in cf[j].lower()))):
                                 self.align[(ss, cs, i, j)] += 1; self.align[(ss, None, i, j)] += 1; self.prior[(i, j)] += 1; self.feat[(feat(ss, i, v), feat(cs, j, v))] += 1
                                 if self.chunks: self.cfeat[(self.chunks.feat(ss, i), self.chunks.feat(cs, j))] += 1
                                 fs = features(ss, i, v, self.chunks); fc = features(cs, j, v, self.chunks)
@@ -217,12 +228,12 @@ class Reader:
         for ss, sf in story_sents:
             if not cv & set(verbs_of(ss)): continue
             v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
-            si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and (lo <= k < hi or s in ("WHEN", "WHY"))]
+            si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY", "COMP") and sf[k] and (lo <= k < hi or s in ("WHEN", "WHY", "COMP"))]
             if not any(k < vi for k in si if ss[k] in ("PERSON", "ENT")) and lo > 0:   # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
                 si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
-            if cs[missing] in ("WHEN", "WHY"): si = [k for k in si if ss[k] == cs[missing]]                 # a when / why question takes only when / why spans
-            else: si = [k for k in si if ss[k] not in ("WHEN", "WHY")]                                       # and a who / what / where question never takes a span
+            if cs[missing] in ("WHEN", "WHY", "COMP"): si = [k for k, s in enumerate(ss) if s == cs[missing] and sf[k]]   # a span question takes only spans of its kind
+            else: si = [k for k in si if ss[k] not in ("WHEN", "WHY", "COMP")]                               # and a who / what / where question never takes a span
             if not si: continue
             fc = features(cs, missing, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
             score = {i: 0.0 for i in si}
@@ -248,6 +259,15 @@ def ask(R, text, names, q):
     if m and m.group(1) not in ("was", "were", "had", "is"):
         cs, cf = construction(f"{who} {m.group(1)} {m.group(2)}.", names)
         return art(R.fill(sents, names, cs, 0)) if cs and cs[0] == "PERSON" else None
+    m = re.match(r"what did (.+)$", ql)
+    if m:
+        ws = q[9:].rstrip("?").split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x.lower()) and x.lower() not in E.NOUNISH), None)
+        if vi and (ql.endswith(" to do") or ql.endswith(" to learn") or E.lemma(ws[vi].lower()) in ("promise", "want", "refuse", "try", "begin", "learn", "agree", "decide", "hope")):
+            cs, cf = construction(f"{ws[0][0].upper() + ws[0][1:]} {' '.join(ws[1:vi])} {E.lemma(ws[vi].lower())} to do something.".replace("  ", " "), names)
+            j = [k for k, s in enumerate(cs) if s == "COMP"]
+            if j:
+                a = R.fill(sents, names, cs, j[0])
+                if a: return a
     m = re.match(r"what did (.+)$", ql)
     if m:
         ws = m.group(1).split(); vi = next((i for i, x in enumerate(ws) if i and is_verb(x)), None)
