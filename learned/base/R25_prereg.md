@@ -279,3 +279,9 @@ Practice sets C and D (200 each; separate writers barred from the tests folder a
 Model on 1,310: 877 (C+D 267/400). Trust chosen on 1,110 practice: kept more routes (only those under 0.75 practice precision drop under the -3 weight); practice 338 / 36 (+230); untouched 53 / 13, +14 < +28. More practice did not keep helping past 710.
 
 **Selection caution (stated):** val_fresh2's total has now been the gate in about 14 registrations (R25-p to R25-ab). Picking the best of many results on the same 200 questions makes the best (+28, R25-x) optimistic. A fourth hand-written set, val_fresh3 (200), is commissioned; the best configuration (R25-x: vectors from 13M tokens, role thresholds 0.8 / 0.5, trust chosen on the 710) will be scored on it exactly once, with B6 once. That number is the day's reportable result.
+
+## R25-c13 result (PASS, diminishing)
+From 526 saved groups on all text: exchange 8.8421 -> 8.8400 -> 8.8389; 45 of 150 splits kept -> 571 groups; held-out 8.8361. Group cycles are paused: gains are small and the reading configuration does not use the groups.
+
+## R25-ac registration (the learner's groups in the next-word game, against a fair baseline)
+Same tokens (lowercase words), same training text (all training paragraphs) and same held-out books as R25-c: (a) the learner's class-bigram model (its 571 groups) and (b) an interpolated word-bigram model with its mixing weight chosen on a slice of the training text; bits per token on the held-out books. Also (c) the two mixed, weight chosen on the training slice. Reported as is.
