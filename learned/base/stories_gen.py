@@ -106,6 +106,7 @@ def fables(R, P):
                 [(f"Where was {a} at the end?", [p2.lower(), p2.lower().replace("the ", "")]), (f"Where did {a} start?", [p1.lower(), p1.lower().replace("the ", "")]),
                  (f"Where did {a} set the {obj} down?", [spot, spot.split()[-1]]), (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} set it down?", [b.lower()]),
                  (f"Who took the {obj}?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
+                 (f"What did {a} set down?", [f"the {obj}", obj]), (f"What did {b} take?", [f"the {obj}", obj]),
                  (f"Where was the {obj} after {a} set it down?", [spot, spot.split()[-1]]), (f"Who was holding the {obj} right after {a} set it down?", ["no one", "nobody"]),
                  (f"Where was {a} when {b} took the {obj}?", ["the well", "well"]), (f"Who was holding the {obj} right after {b} took it?", [b.lower()]), (f"Who was holding the {obj} right after {b} gave it to {a}?", [a.lower()])], g1_events))
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES); p2 = R.choice(PLACES)
@@ -115,7 +116,7 @@ def fables(R, P):
                  (2, a, "follow", b, f"to {p2}", None), (2, a, "take", f"the {obj}", None, None), (3, a, "row", None, "home", None)]
     out.append((f"{a} carried a {obj} to {p1} and dropped it near the gate. {b} stole the {obj} and ran to {p2}. "
                 f"{a} followed {o2} to {p2} and took the {obj} back. Then {a} rowed home with the {obj}.",
-                [(f"Where did {a} drop the {obj}?", ["near the gate", "the gate", "gate"]), (f"Who stole the {obj}?", [b.lower()]), (f"Where did {b} run?", [p2.lower(), p2.lower().replace("the ", "")]),
+                [(f"Where did {a} drop the {obj}?", ["near the gate", "the gate", "gate"]), (f"Who stole the {obj}?", [b.lower()]), (f"What did {a} carry to {p1}?", [f"a {obj}", obj]), (f"What did {b} steal?", [f"the {obj}", obj]), (f"Where did {b} run?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Who had the {obj} at the end?", [a.lower()]), (f"Who had the {obj} after {a} dropped it?", [b.lower()]), (f"Where was {b} at the end?", [p2.lower(), p2.lower().replace("the ", "")]),
                  (f"Where was {a} at the end?", ["home"]), (f"Where was the {obj} after {a} dropped it?", ["near the gate", "the gate", "gate"]),
                  (f"Who was holding the {obj} right after {a} dropped it?", ["no one", "nobody"]), (f"Who had the {obj} first?", [a.lower()]),
@@ -127,7 +128,7 @@ def fables(R, P):
     spot1 = R.choice(["on the hook", "on the shelf", "in the drawer", "on the bench"]); spot2 = R.choice(["near the well", "by the gate", "under the tree", "on the wall"])
     g3_events = [(1, a, "take", f"the {obj}", f"to {p1}", None), (1, a, "leave", f"the {obj}", spot2, None), (2, b, "find", f"the {obj}", spot2, None), (2, b, "put", f"the {obj}", spot1, None)]
     out.append((f"In the morning the {obj} was {spot1}. At noon {a} took the {obj} to {p1} and left it {spot2}. In the evening {b} found the {obj} {spot2} and put it back {spot1}.",
-                [(f"Where was the {obj} in the morning?", [spot1, spot1.split()[-1]]), (f"Where was the {obj} at noon?", [p1.lower(), p1.lower().replace("the ", ""), spot2.split()[-1]]),
+                [(f"Where was the {obj} in the morning?", [spot1, spot1.split()[-1]]), (f"What did {a} take to {p1}?", [f"the {obj}", obj]), (f"What did {b} find?", [f"the {obj}", obj]), (f"Where was the {obj} at noon?", [p1.lower(), p1.lower().replace("the ", ""), spot2.split()[-1]]),
                  (f"Where was the {obj} in the evening?", [spot1, spot1.split()[-1]]), (f"Where did {a} leave the {obj}?", [spot2, spot2.split()[-1]]),
                  (f"Where did {b} find the {obj}?", [spot2, spot2.split()[-1]]), (f"Who had the {obj} after {a} left it?", [b.lower()]),
                  (f"Who was holding the {obj} right after {a} left it?", ["no one", "nobody"]), (f"Where was the {obj} at the end?", [spot1, spot1.split()[-1]]),
@@ -168,7 +169,7 @@ def skeletons(R, P):
                  (3, b, "come", None, None, None), (3, a, "wait", None, "the door", None), (4, a, "make", b, None, None)]
     out.append((f"{a} had a {obj}. One afternoon {p} {rel} {b} borrowed the {obj} without asking. {cap(s2)} took it to {place}. "
                 f"When {s2} came back, {a} was waiting at the door. {cap(s)} made {o2} promise {promise} next time.",
-                [(f"Who owned the {obj}?", [a.lower()]), (f"Who borrowed the {obj}?", [b.lower(), f"{p} {rel}"]),
+                [(f"Who owned the {obj}?", [a.lower()]), (f"Who borrowed the {obj}?", [b.lower(), f"{p} {rel}"]), (f"What did {b} borrow?", [f"the {obj}", obj]),
                  (f"Where did {b} take the {obj}?", [place.lower(), place.lower().replace("the ", "")]),
                  (f"Where was the {obj} at the end?", [place.lower(), place.lower().replace("the ", "")]),           # R20: state questions the generator knows
                  (f"Who had the {obj} at the end?", [b.lower()]), (f"Who had the {obj} first?", [a.lower()]),
