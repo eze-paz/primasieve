@@ -3,7 +3,7 @@ questions, generated from skeletons with random names (the L3 name pool), object
 are new combinations, so nothing in them can be in the pretrained weights: the only way to answer is to read the story.
 The B6 test stories (tests/battery/stories.json) are never used; skeletons are written fresh and checked for overlap.
 Run: python learned/base/stories_gen.py [n]  -> learned/base/stories_train.json"""
-import os, sys, json, random
+import os, sys, re, json, random
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE))
 OBJECTS = ["lantern", "fishing rod", "blue bicycle", "wooden flute", "silver watch", "map", "kite", "notebook", "umbrella", "basket of apples",
@@ -222,6 +222,27 @@ def skeletons(R, P):
     return out
 
 
+FRONTS = ["That day, ", "Later that day, ", "Without a word, ", "As it happened, ", "Soon after, ", "Before long, "]
+PARA_ROLES = ["the farmer", "a tall farmer", "the baker", "a young sailor", "the old teacher", "a quiet neighbour", "the miller", "a travelling tinker"]
+PASSIVE = re.compile(r"^([A-Z][a-z]+) (\w+ed) (the [a-z]+(?: [a-z]+)?|a [a-z]+(?: [a-z]+)?)( .*)?\.$")
+
+
+def paraphrase(R, text):
+    """R24-j run 9: surface variety with the events untouched -- fronted adjuncts, appositions, regular passives; one
+    sentence stays one sentence so the exact events keep their indices"""
+    out = []
+    for sent in re.split(r"(?<=[.!?])\s+(?=[A-Z\"'])", text):
+        r = R.random(); m = PASSIVE.match(sent)
+        if r < 0.22 and m and " to " not in (m.group(4) or "") and m.group(2) not in ("wanted", "needed", "agreed", "waited", "promised"):
+            sent = f"{m.group(3)[0].upper()}{m.group(3)[1:]} was {m.group(2)}{m.group(4) or ''} by {m.group(1)}."
+        elif r < 0.42 and sent[:1].isupper() and sent.split()[0].isalpha() and sent.split()[0] not in ("The", "A", "An", "In", "At", "On", "One", "When", "While", "After", "Then", "He", "She", "They", "It", "Her", "His", "Right"):
+            name = sent.split()[0]; sent = f"{name}, {R.choice(PARA_ROLES)}, {sent[len(name) + 1:]}"
+        elif r < 0.60 and not sent.startswith(("In the", "At noon", "At night", "At dawn", "One ", "When", "While", "After", "Right", "Then")):
+            sent = R.choice(FRONTS) + sent[0].lower() + sent[1:] if not sent.split()[0][0].isupper() or sent.split()[0] in ("The", "A", "An", "He", "She", "They", "It") else R.choice(FRONTS) + sent
+        out.append(sent)
+    return " ".join(out)
+
+
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else 6000
     names = json.load(open(os.path.join(ROOT, "learned", "cache", "names.json"), encoding="utf-8"))["pool"]
@@ -238,6 +259,7 @@ def main():
                 if x not in used and x not in test_names: used.add(x); return x, g
         for item in skeletons(R, P) + (fables(R, P) if "--v2" in sys.argv else []):
             text, qs = item[0], item[1]
+            if "--paraphrase" in sys.argv: text = paraphrase(R, text)
             data.append(dict(text=text, qs=qs, events=item[2] if len(item) > 2 else None))      # R20c: exact events where the skeleton emits them
     R.shuffle(data); data = data[:n]
     assert not any(d["text"] == s["text"] for d in data for s in test)

@@ -44,8 +44,8 @@ def construction(sent, names):
     items = T.slotify(T.TOK.findall(sent), names); syms = []; fillers = []
     for k, (sym, filler) in enumerate(items):
         if sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
-        elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
+        elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
     return tuple(syms), fillers
@@ -126,6 +126,9 @@ class Reader:
                 scored.append((c, i))
             c, i = max(scored)
             if best is None or c > best[0]: best = (c, sf[i])
+        if best and best[1] and best[1].lower() in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler: the learned latest-person rule
+            persons = [f for ss, sf in story_sents for ss_k, f in zip(ss, sf) if ss_k == "PERSON" and f]
+            return persons[-1] if persons else None
         return best[1] if best else None
 
 
