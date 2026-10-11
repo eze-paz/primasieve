@@ -434,3 +434,5 @@ R24-u result (sentence reader on event statements only, no regex renderings): he
 
 **R24-ap result:** B6 once 82 (spoke 28, right 27: the dictionary added five reader answers on B6, all right); fresh 200 52 spoke / 44 right (0.85, from 0.90): it fixed 'Where did the spider spin her web?' and 'Where did the wolf collapse?' but broke others. Cause found on validation: any inflected form of any WordNet verb counted as a verb, so 'bees' (of the rare verb 'bee') became a verb. **R24-ap2 (bug fix, same registration):** an inflected form counts only if its base is mainly a verb, or it is a listed irregular form. Second B6 run on the R24-ap design, disclosed.
 R24-ap2 amended before any B6 run: the first fix still read 'bees' as a form of 'be' through suffix stripping; suffix-derived bases must now have at least three letters (the stopped run never reached B6).
+
+**R24-ap2 result (neutral):** B6 once 82 (spoke 28, right 27); fresh 200 53 spoke / 45 right (0.85; R24-ao 50/45); validation after admission 89/86. The dictionary adds reach on B6 without new errors there and is neutral on fresh text. Kept on.
