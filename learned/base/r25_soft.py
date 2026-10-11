@@ -115,5 +115,84 @@ def main():
     json.dump(dict(lam=best[0], margin=best[1], practice=res[best], holdout=hb), open("r25_soft_results.json", "w"))
 
 
+# ---------------- R25-j: informativeness and proximity, weights chosen by the learner ----------------
+def candidates2(text, names):
+    out = []
+    for si, sent in enumerate(x for x in T.SENT.split(text) if x.strip()):
+        cs, cf = R.construction(sent, names); raws = list(R.LAST_RAWS)
+        words = [x for x in T.TOK.findall(sent) if x.isalpha()]; low = [w.lower() for w in words]
+        for k, (sym, f) in enumerate(zip(cs, cf)):
+            if sym in ("PERSON", "ENT") and f:
+                span = raws[k] if k < len(raws) and raws[k] else f; sw = [x.lower() for x in span.split() if x.isalpha()]
+                pos = next((i for i in range(len(low)) if sw and low[i:i + len(sw)] == sw), None)
+                if pos is None: pos = next((i for i, w in enumerate(low) if sw and w == sw[-1]), 0)
+                ctx = [(j, w) for j, w in enumerate(words) if not (pos <= j < pos + max(1, len(sw)))]
+                out.append(dict(span=span, pos=pos, n=max(1, len(sw)), ctx=ctx))
+    return out
+
+
+def features2(text, q, names, protos, idf, use_idf, decay):
+    qws = [w for w in T.TOK.findall(q) if w.isalpha() and w.lower() not in QW and w.lower() not in T.STOP]
+    qv = [(vec(w), (idf.get(w.lower(), max(idf.values())) if use_idf else 1.0)) for w in qws]; qv = [(v, wt) for v, wt in qv if v is not None]
+    kind = q.lower().split()[0]; proto = protos.get(kind); qslots = {w.lower() for w in qws}; rows = []
+    for c in candidates2(text, names):
+        if c["span"].split()[-1].lower() in qslots and len(c["span"].split()) <= 2: continue
+        cv = [(j, vec(w)) for j, w in c["ctx"]]; cv = [(j, v) for j, v in cv if v is not None]
+        if qv and cv:
+            tot = sum(wt for _, wt in qv); m = 0.0
+            for v, wt in qv:
+                best = 0.0
+                for j, u in cv:
+                    d = j - (c["pos"] + c["n"] - 1) if j > c["pos"] else c["pos"] - j
+                    best = max(best, float(np.dot(v, u)) * (1.0 if decay is None else decay ** max(0, d - 1)))
+                m += wt * best
+            match = m / tot
+        else: match = 0.0
+        h = head(c["span"]); hv = vec(h) if h else None
+        typ = float(np.dot(hv, proto)) if (hv is not None and proto is not None) else (0.3 if (h and h[:1].isupper()) else 0.0)
+        rows.append((c["span"], match, typ))
+    return rows
+
+
+def main_j():
+    t0 = time.time()
+    data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
+    train_b, _ = D0.books(); paras = B.paragraphs(train_b, 150000); E.induce_verbish([p["text"] for p in paras], k=200)
+    D.ON = True; T.SPAN_STOP.update(D.verb_forms() - E.NOUNISH)
+    dfc = collections.Counter()
+    for p_ in paras: dfc.update({w.lower() for w in T.TOK.findall(p_["text"]) if w.isalpha()})
+    idf = {w: float(np.log(len(paras) / (1 + c))) for w, c in dfc.items()}
+    protos = protos_from(data[:7000])
+    old = json.load(open("val_stories.json", encoding="utf-8"))["stories"] + json.load(open("val_fables.json", encoding="utf-8"))["stories"] + json.load(open("val_timespace.json", encoding="utf-8"))["stories"]
+    more = json.load(open("val_more.json", encoding="utf-8"))["stories"]
+    K = ("who", "what", "where", "when", "whom")
+    practice = [(s["text"], q, g) for s in old + more[:20] for q, g in s["qs"] if q.lower().split()[0] in K]
+    holdout = [(s["text"], q, g) for s in more[20:] for q, g in s["qs"] if q.lower().split()[0] in K]
+    print(f"R25-j informativeness learned for {len(idf)} words ({time.time() - t0:.0f} s)", flush=True)
+    def fit(F, items, lam, margin):
+        r = w = 0
+        for rows, (t, q, g) in zip(F, items):
+            a = decide(rows, lam, margin)
+            if a is None: continue
+            r, w = (r + 1, w) if hit(a, g) else (r, w + 1)
+        return r - 3 * w, r, w
+    best = None
+    for use_idf in (False, True):
+        for decay in (None, 0.8, 0.6):
+            fp = [features2(t, q, names, protos, idf, use_idf, decay) for t, q, g in practice]
+            for lam in (0.0, 0.5, 1.0):
+                top1 = fit(fp, practice, lam, 0.0)[1]
+                for margin in (0.0, 0.1, 0.2, 0.3):
+                    f_ = fit(fp, practice, lam, margin)
+                    if best is None or f_[0] > best[0][0]: best = (f_, use_idf, decay, lam, margin)
+                print(f"  idf {use_idf} decay {decay} LAM {lam}: practice top-1 right always answering {top1}/{len(practice)}", flush=True)
+    f_, use_idf, decay, lam, margin = best
+    fh = [features2(t, q, names, protos, idf, use_idf, decay) for t, q, g in holdout]
+    print(f"R25-j the learner chose idf {use_idf} decay {decay} LAM {lam} MARGIN {margin}: practice fitness {f_} | holdout top-1 right always answering {fit(fh, holdout, lam, 0.0)[1]}/{len(holdout)} | holdout fitness at chosen margin {fit(fh, holdout, lam, margin)}", flush=True)
+    fb = [features2(t, q, names, protos, idf, False, None) for t, q, g in holdout]
+    print(f"R25-j reference (R25-h settings: no idf, no decay, LAM 0.5): holdout top-1 right always answering {fit(fb, holdout, 0.5, 0.0)[1]}/{len(holdout)}", flush=True)
+    json.dump(dict(use_idf=use_idf, decay=decay, lam=lam, margin=margin), open("r25_soft_j.json", "w"))
+
+
 if __name__ == "__main__":
-    main()
+    main_j() if "--j" in ARGV else main()
