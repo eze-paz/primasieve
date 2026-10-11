@@ -184,3 +184,9 @@ Only 88 of 248 answers get a role score (who / what questions built on a verb). 
 
 ## R25-t registration (the role reader's three practice errors, fixed together, judged with learner-chosen trust)
 Practice-only look at the role reader alone: 15 right / 6 wrong. Causes: the question's time words are ignored when choosing a clause (R25-n), no action / complement answers (R25-m), modal verbs swallowed into name spans ('the beaver must', new: --modal-stop). R25-m and R25-n each missed the old 100-question holdout by one point; here the three are combined (--do --time-args --modal-stop) on the R25-l configuration, the learner re-chooses its trusted routes on practice, and the untouched set is reported once as a total. Passes if untouched fitness beats +8.
+
+## R25-t result (negative)
+Combined role fixes: practice (trusted) 112 / 7 (+91) -> 120 / 9 (+93); untouched 47 / 13 (+8) -> 49 / 19 (-8). With the fixes the learner also trusted cue-alone-loose+soft, which added untouched errors. Pattern stated: what transferred today was learned from large data (vectors, groups, role reader, route trust); narrow fixes chosen on ~300 practice questions do not. Next: more practice signal (two more hand-written sets of 200, by separate agents barred from the tests folder), and continued group cycles.
+
+## R25-c8 registration
+Next group cycle from the 337 saved groups (2 exchange passes, 150 split tries). Passes if held-out bits fall below 9.0830.
