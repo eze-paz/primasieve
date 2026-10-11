@@ -87,31 +87,35 @@ def construction(sent, names):
         starter = xs[0] in ("on", "in", "at", "when", "while", "after", "before", "one", "every", "that", "the", "soon", "later", "by", "during", "without", "as")
         if j <= 7 and (starter or timeish) and not (xs[0] == "PERSON" and not timeish):
             syms.append("WHEN"); fillers.append(opening); items = items[j + 1:]
+    raws = [fillers[0]] if syms else []                                                 # the words behind each symbol, for spans (kept parallel to syms)
     for k, (sym, filler) in enumerate(items):
+        n0 = len(syms)
         if sym == "ENT" and (filler[-1] in E.TIMEISH or filler[-1] in ("year", "month", "week", "day", "night", "hour", "minute", "summer", "winter", "spring", "autumn", "morning", "evening", "afternoon", "noon", "dawn", "dusk")): syms.append("TIME"); fillers.append(None)   # 'one year', 'every morning': when, not what
         elif sym == "ENT" and k + 2 < len(items) and items[k + 1][0] in ("named", "called") and items[k + 2][0] == "PERSON": continue      # 'a boy named Erlend': the name is the slot
         elif sym in ("PERSON", "ENT"): syms.append(sym); fillers.append(E.T.key_of(sym, filler) if sym == "ENT" else filler[0])
         elif sym == "PRON": syms.append("PRON"); fillers.append(filler[0])
+        elif sym in ("were", "are"): syms.append("was" if sym == "were" else "is"); fillers.append(None)
         elif sym.isalpha() and k >= 1 and items[k - 1][0].isalpha() and is_verb(items[k - 1][0]) and not is_verb(sym) and sym not in T.STOP and sym not in T.DET and sym not in PLACE_WORDS and sym not in T.PRON and sym not in E.SKIP_VERB and len(sym) > 2: syms.append("ENT"); fillers.append(sym)   # 'kept bees': a bare noun right after a verb
         elif sym.isalpha() and is_verb(sym): syms.append("V:" + E.lemma(sym)); fillers.append(None)
         else: syms.append(sym); fillers.append(None)
+        if len(syms) > n0: raws.append(" ".join(filler))
     TIMEW = lambda w: w in E.TIMEISH or w.endswith("day") or w in ("noon", "dawn", "dusk", "dark", "midnight", "lunch", "supper", "breakfast", "dinner", "nightfall", "sunset", "sunrise", "summer", "winter", "spring", "autumn", "week", "year", "month")
     for k in range(len(syms) - 2, 0, -1):                                                 # trailing 'at dawn' / 'before dark' / 'on Sunday'
         if syms[k] in ("at", "before", "after", "on", "in", "by", "until") and k + 1 < len(syms):
             nxt = syms[k + 1]; word = (fillers[k + 1] or "").split()[-1] if fillers[k + 1] else nxt
             if (nxt in ("ENT", "PERSON") and TIMEW(word.lower())) or (nxt not in ("ENT", "PERSON") and TIMEW(nxt)):
                 phrase = f"{syms[k]} {fillers[k + 1] if fillers[k + 1] else nxt}".lower(); end = k + 2
-                syms = syms[:k] + ["WHEN"] + syms[end:]; fillers = fillers[:k] + [phrase] + fillers[end:]; break
+                syms = syms[:k] + ["WHEN"] + syms[end:]; fillers = fillers[:k] + [phrase] + fillers[end:]; raws = raws[:k] + [phrase] + raws[end:]; break
     comp = None
     for k in range(1, len(syms) - 1):                                                    # 'wanted to learn to ride a horse', 'refused to climb the hill', 'promised to share it'
         if syms[k] == "to" and syms[k - 1].startswith("V:") and (syms[k + 1].startswith("V:") or (syms[k + 1].isalpha() and syms[k + 1] not in T.DET and syms[k + 1] not in T.STOP)):
             end = next((t for t in range(k + 1, len(syms)) if syms[t] in ("and", ",", ".", "because")), len(syms))
-            comp = "to " + " ".join((syms[t][2:] if syms[t].startswith("V:") else (fillers[t] or syms[t])) for t in range(k + 1, end)); break
+            comp = "to " + " ".join(raws[t] for t in range(k + 1, end)); break
     if why is None:                                                                      # 'opened its mouth to answer': a purpose phrase is a why
         for k in range(1, len(syms) - 1):
             if syms[k] == "to" and (syms[k + 1].startswith("V:") or (syms[k + 1].isalpha() and syms[k + 1] not in T.DET and syms[k + 1] not in PLACE_WORDS and syms[k + 1] not in T.STOP)) and syms[k - 1] in ("ENT", "PERSON", "PRON"):
                 end = next((t for t in range(k + 1, len(syms)) if syms[t] in ("and", ",", ".")), len(syms))
-                why = "to " + " ".join((syms[t][2:] if syms[t].startswith("V:") else (fillers[t] or syms[t])) for t in range(k + 1, end)); break
+                why = "to " + " ".join(raws[t] for t in range(k + 1, end)); break
     if why: syms.append("WHY"); fillers.append(why)
     if comp: syms.append("COMP"); fillers.append(comp)
     return tuple(syms), fillers
