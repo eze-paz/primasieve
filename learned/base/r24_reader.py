@@ -277,13 +277,19 @@ class Reader:
             if not any(k < vi for k in si if ss[k] in ("PERSON", "ENT")) and lo > 0:   # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
                 si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
-            if cs[missing] == "ENT" and missing >= 1 and cs[missing - 1] in PLACE_WORDS and lo > 0 and not any(ss[k] == "ENT" and k >= 1 and ss[k - 1] in PLACE_WORDS and lo <= k < hi for k in range(len(ss))):
-                si = [k for k in range(lo) if ss[k] == "ENT" and sf[k] and k >= 1 and ss[k - 1] in PLACE_WORDS] + si      # 'went to the gate and bought': the place is in the previous clause
+            TRUE_PLACE = PLACE_WORDS - {"from", "with", "by", "through"}
+            if cs[missing] == "ENT" and missing >= 1 and cs[missing - 1] in PLACE_WORDS and lo > 0 and not any(ss[k] == "ENT" and k >= 1 and ss[k - 1] in TRUE_PLACE and lo <= k < hi for k in range(len(ss))):
+                si = [k for k in range(lo) if ss[k] == "ENT" and sf[k] and k >= 1 and ss[k - 1] in TRUE_PLACE] + si      # 'went to the gate and bought': the place is in the previous clause
             if cs[missing] in ("WHEN", "WHY", "COMP"): si = [k for k, s in enumerate(ss) if s == cs[missing] and sf[k]]   # a span question takes only spans of its kind
             else: si = [k for k in si if ss[k] not in ("WHEN", "WHY", "COMP")]                               # and a who / what / where question never takes a span
             if not si: continue
             fc = features(cs, missing, cvv, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
             score = {i: 0.0 for i in si}
+            n_shape = {i: self.tab["shape"][(fsd[i]["shape"], fc["shape"])] for i in si}
+            if sum(n_shape.values()) >= 5:                                             # this exact shape has been seen: its own evidence decides
+                scored = [(n_shape[i], i) for i in si]; c, i = max(scored)
+                if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
+                continue
             for f in FEATS:                                                            # a learned mixture over the views; each view is a distribution over the candidates,
                 n = {i: self.tab[f][(fsd[i][f], fc[f])] for i in si if f in fsd[i]}; tot = sum(n.values())   # weighted by how often that view was right with this much evidence
                 if tot:
