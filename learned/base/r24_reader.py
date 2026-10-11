@@ -230,7 +230,7 @@ class Reader:
             scored = [(score[i], i) for i in si]
             c, i = max(scored)
             if best is None or c > best[0]: best = (c, (f"{ss[i - 1]} {sf[i]}" if keep_prep and i and ss[i - 1] in PLACE_WORDS else sf[i]))
-        if best and best[1] and best[1].lower().split()[-1] in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler: the learned latest-person rule
+        if best and best[1] and best[1].lower() in ("he", "she", "him", "her", "his", "they", "them", "it"):      # a pronoun filler (a whole slot, never a span): the learned latest-person rule
             persons = [f for ss, sf in story_sents for ss_k, f in zip(ss, sf) if ss_k == "PERSON" and f]
             return persons[-1] if persons else None
         return best[1] if best else None
