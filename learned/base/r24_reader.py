@@ -65,13 +65,14 @@ def is_verb(w):
 
 def event_statement(ev):
     """an exact generator event as a plain statement: 'Rosa took the key to the garden.'"""
-    i, a, v, p, place, rec = ev; past = {"take": "took", "give": "gave", "come": "came", "go": "went", "run": "ran", "steal": "stole", "find": "found", "leave": "left", "put": "put", "set": "set", "drop": "dropped",
+    i, a, v, p, place, rec = ev[:6]; when = ev[6] if len(ev) > 6 else None; past = {"take": "took", "give": "gave", "come": "came", "go": "went", "run": "ran", "steal": "stole", "find": "found", "leave": "left", "put": "put", "set": "set", "drop": "dropped",
                                         "carry": "carried", "walk": "walked", "return": "returned", "borrow": "borrowed", "follow": "followed", "row": "rowed", "reach": "reached", "arrive": "arrived", "ride": "rode", "wait": "waited", "have": "had"}
     past["be"] = "was"; past["belong"] = "belonged"
     s = f"{a} {past.get(v, v + 'ed')}"
     if p: s += f" {p}"
     if rec: s += f" to {rec}"
     if place: s += f" {place}" if place.split()[0] in PLACE_WORDS else f" to {place}"
+    if when: s += f" {when}"                                                             # R24-af: 'Rosa took the key to the garden at noon.'
     return s + "."
 
 

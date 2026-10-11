@@ -25,7 +25,7 @@ def main():
         sents = [x.strip() for x in RI.SENT.split(s["text"]) if x.strip()]; c = []
         if gen_events:
             for k, sent in enumerate(sents):
-                evs = [dict(agent=a, verb=v, patient=p, place=place, rec=rec, status="realis") for (i, a, v, p, place, rec) in s["events"] if i == k]
+                evs = [dict(agent=a, verb=v, patient=p, place=place, rec=rec, status="realis") for (i, a, v, p, place, rec) in (e[:6] for e in s["events"]) if i == k]
                 c.append((sent, evs))
         else:
             R.last_agent = None; R.last_patient = None

@@ -126,7 +126,7 @@ def fables(R, P):
     # G3: a thing left somewhere, found and put back, with time marks
     a, ga, g1 = actor(R, P, "name"); b, gb, g2 = actor(R, P, "name"); obj = R.choice(OBJECTS); p1 = R.choice(PLACES)
     spot1 = R.choice(["on the hook", "on the shelf", "in the drawer", "on the bench"]); spot2 = R.choice(["near the well", "by the gate", "under the tree", "on the wall"])
-    g3_events = [(1, a, "take", f"the {obj}", f"to {p1}", None), (1, a, "leave", f"the {obj}", spot2, None), (2, b, "find", f"the {obj}", spot2, None), (2, b, "put", f"the {obj}", spot1, None)]
+    g3_events = [(1, a, "take", f"the {obj}", f"to {p1}", None, "at noon"), (1, a, "leave", f"the {obj}", spot2, None, "at noon"), (2, b, "find", f"the {obj}", spot2, None, "in the evening"), (2, b, "put", f"the {obj}", spot1, None, "in the evening")]   # R24-af: events carry their time phrase
     out.append((f"In the morning the {obj} was {spot1}. At noon {a} took the {obj} to {p1} and left it {spot2}. In the evening {b} found the {obj} {spot2} and put it back {spot1}.",
                 [(f"Where was the {obj} in the morning?", [spot1, spot1.split()[-1]]), (f"What did {a} take to {p1}?", [f"the {obj}", obj]), (f"What did {b} find?", [f"the {obj}", obj]), (f"Where was the {obj} at noon?", [p1.lower(), p1.lower().replace("the ", ""), spot2.split()[-1]]),
                  (f"Where was the {obj} in the evening?", [spot1, spot1.split()[-1]]), (f"Where did {a} leave the {obj}?", [spot2, spot2.split()[-1]]),
