@@ -38,6 +38,17 @@ def is_verb(w):
     return E.verbish(w) or w in LEMMAS
 
 
+def event_statement(ev):
+    """an exact generator event as a plain statement: 'Rosa took the key to the garden.'"""
+    i, a, v, p, place, rec = ev; past = {"take": "took", "give": "gave", "come": "came", "go": "went", "run": "ran", "steal": "stole", "find": "found", "leave": "left", "put": "put", "set": "set", "drop": "dropped",
+                                        "carry": "carried", "walk": "walked", "return": "returned", "borrow": "borrowed", "follow": "followed", "row": "rowed", "reach": "reached", "arrive": "arrived", "ride": "rode", "wait": "waited", "have": "had"}
+    s = f"{a} {past.get(v, v + 'ed')}"
+    if p: s += f" {p}"
+    if rec: s += f" to {rec}"
+    if place: s += f" {place}" if place.split()[0] in PLACE_WORDS else f" to {place}"
+    return s + "."
+
+
 def construction(sent, names):
     """(symbols, fillers): slot symbols keep their filler; a verb word is kept as its lemma (verbs matched across forms)"""
     sent = sent.replace("Dr.", "Dr").replace("Mr.", "Mr").replace("Mrs.", "Mrs")
@@ -192,7 +203,7 @@ def main():
     names = T.mid_caps([s["text"] for s in data[:7000]])
     import r24_books as B, data as D
     train_b, _ = D.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
-    train = [(s["text"], [a for a in (canonical(q, g) for q, g in s["qs"]) if a]) for s in data[:7000]]
+    train = [(s["text"], [a for a in (canonical(q, g) for q, g in s["qs"]) if a] + [event_statement(e) for e in (s.get("events") or [])]) for s in data[:7000]]
     seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
