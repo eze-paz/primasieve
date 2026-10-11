@@ -214,10 +214,11 @@ class Reader:
             if not cv & set(verbs_of(ss)): continue
             v = (cv & set(verbs_of(ss))).pop(); vi = next(i for i, x in enumerate(ss) if x == "V:" + v); lo, hi = clause_of(ss, vi)
             si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and (lo <= k < hi or s in ("WHEN", "WHY"))]
-            if cs[missing] in ("WHEN", "WHY"): si = [k for k in si if ss[k] == cs[missing]]                 # a when / why question takes only when / why spans
-            if not any(k < vi for k in si) and lo > 0:                                 # a clause without its own subject shares the previous clause's subject
+            if not any(k < vi for k in si if ss[k] in ("PERSON", "ENT")) and lo > 0:   # a clause without its own subject shares the previous clause's subject
                 pv = max([i for i, x in enumerate(ss[:lo]) if x.startswith("V:")], default=lo)
-                si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT", "WHEN", "WHY") and sf[k] and k < pv] + si
+                si = [k for k, s in enumerate(ss) if s in ("PERSON", "ENT") and sf[k] and k < pv] + si
+            if cs[missing] in ("WHEN", "WHY"): si = [k for k in si if ss[k] == cs[missing]]                 # a when / why question takes only when / why spans
+            else: si = [k for k in si if ss[k] not in ("WHEN", "WHY")]                                       # and a who / what / where question never takes a span
             if not si: continue
             fc = features(cs, missing, v, self.chunks); fsd = {i: features(ss, i, v, self.chunks) for i in si}
             score = {i: 0.0 for i in si}
