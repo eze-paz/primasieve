@@ -57,7 +57,21 @@ def main():
     def score(items): return [one(*x) for x in items]
     def summary(sc): return dict(right=sum(1 for x in sc if x == 1), wrong=sum(1 for x in sc if x == -3), fitness=sum(sc))
 
-    base = score(practice); hold0 = summary(score(holdout))
+    QR.STORE.clear(); hold_empty = summary(score(holdout)); QR.STORE.update(store)        # the learner with no store at all: the reference for the gate
+    base = score(practice)
+    if "--prune" in ARGV:                                                                # R25-b: the learner re-judges its own earlier revisions by the transfer rule
+        nw0 = lambda q: repr(tuple(x for x in QR.abstract_q(QR.qshape(q, names)[0]) if x != "w"))
+        for key in ("shape_alias", "verb_alias"):
+            for a in list(store[key]):
+                b = store[key].pop(a); QR.STORE.clear(); QR.STORE.update(store)
+                without = score(practice)
+                better = {practice[i][0] for i in range(len(practice)) if base[i] > without[i]}; worse = [i for i in range(len(practice)) if base[i] < without[i]]
+                if sum(base) - sum(without) > 0 and len(better) >= 2 and not worse: store[key][a] = b
+                else: store["history"].append(dict(op="prune", kind=key, src=a, dst=b, gain=sum(base) - sum(without), stories=len(better))); print(f"  pruned {key}: {a} -> {b} (gain {sum(base) - sum(without)}, stories {len(better)})", flush=True); base = without
+                QR.STORE.clear(); QR.STORE.update(store)
+        json.dump(store, open(STORE_F, "w", encoding="utf-8"), indent=1)
+        print(f"R25 after pruning: practice {summary(base)} | store {dict((k, len(v)) for k, v in store.items())}", flush=True)
+    hold0 = summary(score(holdout))
     print(f"R25 start: practice {summary(base)} | holdout {hold0}", flush=True)
     nw = lambda q: tuple(x for x in QR.abstract_q(QR.qshape(q, names)[0]) if x != "w")
     targets = {k[1] for k in QRD.map if k[0] == "noword"}
@@ -97,7 +111,8 @@ def main():
             new = list(base)
             for i in touched: new[i] = one(*practice[i])
             delta = sum(new) - sum(base)
-            if delta > 0:
+            better = {practice[i][0] for i in touched if new[i] > base[i]}; worse = [i for i in touched if new[i] < base[i]]
+            if delta > 0 and len(better) >= 2 and not worse:                              # R25-b: it must transfer -- help questions in two or more stories, break none
                 base = new; accepted += 1; store["history"].append(dict(round=len(store["history"]), op=kind, src=a, dst=b, delta=delta))
                 print(f"  kept {kind}: {a} -> {b} (practice +{delta})", flush=True)
             else:
@@ -106,8 +121,8 @@ def main():
         json.dump(store, open(STORE_F, "w", encoding="utf-8"), indent=1)
         if not accepted: break
     hold1 = summary(score(holdout))
-    print(f"R25 end: practice {summary(base)} | holdout before {hold0} -> after {hold1} | store {dict((k, len(v)) for k, v in store.items())}", flush=True)
-    json.dump(dict(practice=summary(base), holdout_before=hold0, holdout_after=hold1), open("r25_results.json", "w"))
+    print(f"R25 end: practice {summary(base)} | holdout empty store {hold_empty} | start of run {hold0} -> end {hold1} | store {dict((k, len(v)) for k, v in store.items())}", flush=True)
+    json.dump(dict(practice=summary(base), holdout_empty=hold_empty, holdout_before=hold0, holdout_after=hold1), open("r25_results.json", "w"))
 
 
 if __name__ == "__main__":

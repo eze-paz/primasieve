@@ -15,3 +15,11 @@ Owner, 2026-10-11: "i want our epistemic system to be super emergent and be able
 
 ## Base
 R24-ap2 configuration (dictionary on, reinterpretation on, closed-loop readers).
+
+## R25-a result (gate failed)
+Practice fitness 14 -> 30 (59/15 -> 75/15) with 13 revisions kept, but holdout -9 -> -10 (21/10 -> 23/11). The 5 shape aliases are general (a preposition the template did not need: 'who V to REF' read as 'who V REF'); the 8 verb aliases are memorisation, each fixing one question ('walk' -> 'refuse', 'own' -> 'like', 'say' -> 'slide'). Keeping any +1 revision memorises single questions.
+
+## R25-b registration (transfer rule, self-pruning)
+- A revision is kept only if it improves practice questions in at least two different stories and worsens none.
+- --prune: at the start of a run the learner re-judges every stored revision by the same rule (remove it, rescore, keep it only if it meets the rule) and drops those that fail, logging them in the store's history. The store is not wiped; the learner revises it.
+- Gate: holdout fitness at the end of the run > holdout fitness with an empty store (-9). If met, the policy runs once with --store and B6 once.

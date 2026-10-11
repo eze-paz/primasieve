@@ -1,0 +1,112 @@
+{
+ "shape_alias": {
+  "('what', 'did', 'REF', 'V', 'in', 'REF')": "('what', 'did', 'REF', 'V', 'REF')",
+  "('who', 'V', 'to', 'REF')": "('who', 'V', 'REF')",
+  "('who', 'V', 'at', 'REF')": "('who', 'V', 'REF')",
+  "('who', 'V', 'in', 'REF')": "('who', 'V', 'REF')",
+  "('who', 'V', 'REF', 'V', 'REF')": "('who', 'V', 'REF', 'V')"
+ },
+ "verb_alias": {
+  "bring": "arrive",
+  "carry": "sail",
+  "walk": "refuse",
+  "take": "climb",
+  "boast": "be",
+  "circle": "shine",
+  "own": "like",
+  "say": "slide"
+ },
+ "history": [
+  {
+   "round": 0,
+   "op": "shape",
+   "src": "('what', 'did', 'REF', 'V', 'in', 'REF')",
+   "dst": "('what', 'did', 'REF', 'V', 'REF')",
+   "delta": 2
+  },
+  {
+   "round": 1,
+   "op": "shape",
+   "src": "('who', 'V', 'to', 'REF')",
+   "dst": "('who', 'V', 'REF')",
+   "delta": 2
+  },
+  {
+   "round": 2,
+   "op": "verb",
+   "src": "bring",
+   "dst": "arrive",
+   "delta": 2
+  },
+  {
+   "round": 3,
+   "op": "shape",
+   "src": "('who', 'V', 'at', 'REF')",
+   "dst": "('who', 'V', 'REF')",
+   "delta": 1
+  },
+  {
+   "round": 4,
+   "op": "shape",
+   "src": "('who', 'V', 'in', 'REF')",
+   "dst": "('who', 'V', 'REF')",
+   "delta": 1
+  },
+  {
+   "round": 5,
+   "op": "shape",
+   "src": "('who', 'V', 'REF', 'V', 'REF')",
+   "dst": "('who', 'V', 'REF', 'V')",
+   "delta": 1
+  },
+  {
+   "round": 6,
+   "op": "verb",
+   "src": "carry",
+   "dst": "sail",
+   "delta": 1
+  },
+  {
+   "round": 7,
+   "op": "verb",
+   "src": "walk",
+   "dst": "refuse",
+   "delta": 1
+  },
+  {
+   "round": 8,
+   "op": "verb",
+   "src": "take",
+   "dst": "climb",
+   "delta": 1
+  },
+  {
+   "round": 9,
+   "op": "verb",
+   "src": "boast",
+   "dst": "be",
+   "delta": 1
+  },
+  {
+   "round": 10,
+   "op": "verb",
+   "src": "circle",
+   "dst": "shine",
+   "delta": 1
+  },
+  {
+   "round": 11,
+   "op": "verb",
+   "src": "own",
+   "dst": "like",
+   "delta": 1
+  },
+  {
+   "round": 12,
+   "op": "verb",
+   "src": "say",
+   "dst": "slide",
+   "delta": 1
+  }
+ ]
+}
