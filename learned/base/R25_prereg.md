@@ -265,3 +265,9 @@ Trust per (route, question kind) chosen on 710 practice: practice 198 / 10 (+168
 
 ## R25-ab plan (more practice evidence)
 Trust chosen on 310 -> 710 practice questions moved untouched fitness +8 -> +24. Two more practice sets (C, D; 200 each) are commissioned from separate writers barred from the tests folder and b6_ files, avoiding every name already used; trust will then be chosen on 1,110. Registered when the sets arrive.
+
+## R25-c12 result (PASS)
+From the 500 saved groups counted on all training paragraphs (13.0M tokens, 41,195 words): held-out 8.9261 -> 8.8689 from the data alone; exchange 8.8441 -> 8.8437; 25 of 120 splits kept -> 525 groups; held-out 8.8421. The groups are not yet used by the best reading configuration (the readers use the vectors).
+
+## R25-c13 registration
+One more cycle on all text from the 525 saved groups (2 exchange passes, 150 split tries). Passes if held-out bits fall below 8.8421.
