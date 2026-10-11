@@ -119,11 +119,15 @@ def main():
         return False
     if FINE: print("R24-y admission keys with >= 8 evidence and precision >= 0.95:", sorted(str(k) for k, (r, t) in pooled.items() if t >= 8 and r / t >= 0.95), flush=True)
     print("R24-p admitted (kind, route):", sorted(admitted), "| validation by kind and route:", {f"{k[0]}/{k[1]}": f"{v[0]}/{v[1]}" for k, v in valk.items()}, flush=True)
-    adm_right = adm_n = 0
+    adm_right = adm_n = 0; vmi = json.load(open("b6_rwkv_val_ckpt_read1b.json", encoding="utf-8"))["items"] if "--vs-model" in ARGV else None; vi = 0; v_model = v_merged = 0
     for s in stories:
         for q, g in s["qs"]:
-            a, how = answer(s["text"], q)
-            if a is not None and admit(q, how, a): adm_n += 1; adm_right += hit(a, g)
+            a, how = answer(s["text"], q); ok = a is not None and admit(q, how, a)
+            if ok: adm_n += 1; adm_right += hit(a, g)
+            if vmi is not None:
+                assert vmi[vi]["q"] == q, (vmi[vi]["q"], q)
+                v_model += vmi[vi]["hit"]; v_merged += hit(a, g) if ok else vmi[vi]["hit"]; vi += 1
+    if vmi is not None: print(f"R24-ai validation merged (readers where admitted, else model): {v_merged}/{vi} vs model alone {v_model}/{vi} -- gate: merged > model", flush=True)
     print(f"R24-x validation after admission: matched {adm_n}, right {adm_right} (precision {adm_right / max(1, adm_n):.2f})", flush=True)
     if adm_n and adm_right / adm_n >= 0.90:
         tests = json.load(open(os.path.join(ROOT, "tests", "battery", "stories.json"), encoding="utf-8"))["stories"]; rep = json.load(open("b6_rwkv_ckpt_read1b.json", encoding="utf-8"))["items"]; i = 0

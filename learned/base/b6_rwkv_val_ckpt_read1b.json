@@ -1,8 +1,8 @@
 {
  "ckpt": "ckpt_read1b.pth",
  "mismatch": false,
- "right": 35,
- "n": 50,
+ "right": 73,
+ "n": 110,
  "items": [
   {
    "story": "v1",
@@ -487,6 +487,617 @@
     "reeds"
    ],
    "reply": "red flags",
+   "hit": false
+  },
+  {
+   "story": "f1",
+   "q": "Who was drinking at the stream?",
+   "gold": [
+    "the lamb",
+    "lamb"
+   ],
+   "reply": "a wolf",
+   "hit": false
+  },
+  {
+   "story": "f1",
+   "q": "What did the wolf say the lamb was doing?",
+   "gold": [
+    "muddying his water",
+    "muddying"
+   ],
+   "reply": "drinking",
+   "hit": false
+  },
+  {
+   "story": "f1",
+   "q": "Where did the lamb stand?",
+   "gold": [
+    "downstream"
+   ],
+   "reply": "downstream",
+   "hit": true
+  },
+  {
+   "story": "f1",
+   "q": "Who ate the lamb?",
+   "gold": [
+    "the wolf",
+    "wolf"
+   ],
+   "reply": "the wolf",
+   "hit": true
+  },
+  {
+   "story": "f1",
+   "q": "Who saw the lamb?",
+   "gold": [
+    "the wolf",
+    "wolf"
+   ],
+   "reply": "a wolf",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "Who stored grain?",
+   "gold": [
+    "the ant",
+    "ant"
+   ],
+   "reply": "the ant",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "Who sang in the sun?",
+   "gold": [
+    "the grasshopper",
+    "grasshopper"
+   ],
+   "reply": "the grasshopper",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "Who begged for food?",
+   "gold": [
+    "the grasshopper",
+    "grasshopper"
+   ],
+   "reply": "the grasshopper",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "What did the ant give the grasshopper?",
+   "gold": [
+    "a single seed",
+    "seed"
+   ],
+   "reply": "seed",
+   "hit": true
+  },
+  {
+   "story": "f2",
+   "q": "When did the grasshopper beg?",
+   "gold": [
+    "when winter came",
+    "winter"
+   ],
+   "reply": "in the winter",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Who asked for the lantern?",
+   "gold": [
+    "marta"
+   ],
+   "reply": "marta",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Who handed over the lantern?",
+   "gold": [
+    "piet",
+    "her brother"
+   ],
+   "reply": "marta",
+   "hit": false
+  },
+  {
+   "story": "f3",
+   "q": "Where did they walk?",
+   "gold": [
+    "the cellar",
+    "cellar"
+   ],
+   "reply": "the cellar",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Where was the cat?",
+   "gold": [
+    "behind a barrel",
+    "barrel"
+   ],
+   "reply": "behind a barrel",
+   "hit": true
+  },
+  {
+   "story": "f3",
+   "q": "Who carried the cat upstairs?",
+   "gold": [
+    "marta"
+   ],
+   "reply": "marta",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "Who freed the lion?",
+   "gold": [
+    "the mouse",
+    "mouse"
+   ],
+   "reply": "the mouse",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "What did the mouse gnaw through?",
+   "gold": [
+    "the net",
+    "net"
+   ],
+   "reply": "net",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "Who had laughed at the mouse?",
+   "gold": [
+    "the lion",
+    "lion"
+   ],
+   "reply": "the lion",
+   "hit": true
+  },
+  {
+   "story": "f4",
+   "q": "Who thanked the mouse?",
+   "gold": [
+    "the lion",
+    "lion"
+   ],
+   "reply": "the hunters",
+   "hit": false
+  },
+  {
+   "story": "f4",
+   "q": "What did the hunters find?",
+   "gold": [
+    "an empty net",
+    "empty net"
+   ],
+   "reply": "empty net",
+   "hit": true
+  },
+  {
+   "story": "f5",
+   "q": "Who asked about the bridge?",
+   "gold": [
+    "the traveller",
+    "traveller"
+   ],
+   "reply": "the miller",
+   "hit": false
+  },
+  {
+   "story": "f5",
+   "q": "What took the middle plank?",
+   "gold": [
+    "the flood",
+    "flood"
+   ],
+   "reply": "the flood",
+   "hit": true
+  },
+  {
+   "story": "f5",
+   "q": "Who shook his head?",
+   "gold": [
+    "the miller",
+    "miller"
+   ],
+   "reply": "the miller",
+   "hit": true
+  },
+  {
+   "story": "f5",
+   "q": "How did the traveller cross?",
+   "gold": [
+    "by the ford",
+    "the ford",
+    "ford"
+   ],
+   "reply": "the miller",
+   "hit": false
+  },
+  {
+   "story": "f5",
+   "q": "Where did the traveller reach by nightfall?",
+   "gold": [
+    "the inn",
+    "inn"
+   ],
+   "reply": "the inn",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "Who stole the ring?",
+   "gold": [
+    "a crow",
+    "the crow",
+    "crow"
+   ],
+   "reply": "the crow",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "Where did the crow take the ring?",
+   "gold": [
+    "the church tower",
+    "church tower",
+    "tower"
+   ],
+   "reply": "the church tower",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "Who followed the crow?",
+   "gold": [
+    "ines",
+    "the goldsmith's daughter"
+   ],
+   "reply": "ines",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "What did Ines find in the tower?",
+   "gold": [
+    "a nest full of rings",
+    "a nest",
+    "nest"
+   ],
+   "reply": "nest",
+   "hit": true
+  },
+  {
+   "story": "f6",
+   "q": "What did Ines return to the village?",
+   "gold": [
+    "every ring",
+    "the rings",
+    "rings",
+    "ring"
+   ],
+   "reply": "every ring",
+   "hit": true
+  },
+  {
+   "story": "t1",
+   "q": "Where was Jack at the end?",
+   "gold": [
+    "the mill",
+    "mill"
+   ],
+   "reply": "unknown",
+   "hit": false
+  },
+  {
+   "story": "t1",
+   "q": "Where did Jack fall?",
+   "gold": [
+    "in the mud",
+    "the mud",
+    "mud"
+   ],
+   "reply": "the mud",
+   "hit": true
+  },
+  {
+   "story": "t1",
+   "q": "Where did Jane meet Jack?",
+   "gold": [
+    "by the river",
+    "the river",
+    "river"
+   ],
+   "reply": "the mill",
+   "hit": false
+  },
+  {
+   "story": "t1",
+   "q": "Where did Jack start?",
+   "gold": [
+    "the farm",
+    "farm"
+   ],
+   "reply": "the mill",
+   "hit": false
+  },
+  {
+   "story": "t1",
+   "q": "Who was with Jack at the mill?",
+   "gold": [
+    "jane"
+   ],
+   "reply": "jane",
+   "hit": true
+  },
+  {
+   "story": "t2",
+   "q": "Where was the red boat at the end?",
+   "gold": [
+    "the beach",
+    "on the beach",
+    "beach",
+    "the island"
+   ],
+   "reply": "unknown",
+   "hit": false
+  },
+  {
+   "story": "t2",
+   "q": "Where was Tomas at the end?",
+   "gold": [
+    "the lighthouse",
+    "lighthouse"
+   ],
+   "reply": "unknown",
+   "hit": false
+  },
+  {
+   "story": "t2",
+   "q": "Who had the red boat first?",
+   "gold": [
+    "mira"
+   ],
+   "reply": "mira",
+   "hit": true
+  },
+  {
+   "story": "t2",
+   "q": "Where did Mira find the red boat?",
+   "gold": [
+    "on the beach",
+    "the beach",
+    "beach"
+   ],
+   "reply": "the beach",
+   "hit": true
+  },
+  {
+   "story": "t2",
+   "q": "Who took the boat to the island?",
+   "gold": [
+    "tomas"
+   ],
+   "reply": "tomas",
+   "hit": true
+  },
+  {
+   "story": "t3",
+   "q": "Who had the roll first?",
+   "gold": [
+    "the baker",
+    "baker"
+   ],
+   "reply": "ivo",
+   "hit": false
+  },
+  {
+   "story": "t3",
+   "q": "Who had the roll after Petra?",
+   "gold": [
+    "ivo",
+    "her brother"
+   ],
+   "reply": "ivo",
+   "hit": true
+  },
+  {
+   "story": "t3",
+   "q": "Where was the half roll before the dog took it?",
+   "gold": [
+    "in his pocket",
+    "his pocket",
+    "pocket",
+    "ivo's pocket"
+   ],
+   "reply": "before the dog took it",
+   "hit": false
+  },
+  {
+   "story": "t3",
+   "q": "Who had the half roll at the end?",
+   "gold": [
+    "a dog",
+    "the dog",
+    "dog"
+   ],
+   "reply": "ivo",
+   "hit": false
+  },
+  {
+   "story": "t3",
+   "q": "What did Ivo do with the first half?",
+   "gold": [
+    "ate",
+    "ate half"
+   ],
+   "reply": "Ivo ate half of the roll",
+   "hit": true
+  },
+  {
+   "story": "t4",
+   "q": "Who reached the bridge first?",
+   "gold": [
+    "olaf"
+   ],
+   "reply": "kemal",
+   "hit": false
+  },
+  {
+   "story": "t4",
+   "q": "Who arrived last?",
+   "gold": [
+    "kemal"
+   ],
+   "reply": "kemal",
+   "hit": true
+  },
+  {
+   "story": "t4",
+   "q": "Where was Beth at the end?",
+   "gold": [
+    "the village",
+    "village"
+   ],
+   "reply": "at the village",
+   "hit": true
+  },
+  {
+   "story": "t4",
+   "q": "Where was Olaf at the end?",
+   "gold": [
+    "at the bridge",
+    "the bridge",
+    "bridge"
+   ],
+   "reply": "at the village",
+   "hit": false
+  },
+  {
+   "story": "t4",
+   "q": "Why did Kemal come last?",
+   "gold": [
+    "his horse lost a shoe",
+    "lost a shoe",
+    "a shoe"
+   ],
+   "reply": "because his horse lost a shoe",
+   "hit": true
+  },
+  {
+   "story": "t5",
+   "q": "Where was the key at noon?",
+   "gold": [
+    "the garden",
+    "garden"
+   ],
+   "reply": "on the hook",
+   "hit": false
+  },
+  {
+   "story": "t5",
+   "q": "Where was the key in the evening?",
+   "gold": [
+    "on the hook",
+    "the hook",
+    "hook"
+   ],
+   "reply": "in the garden",
+   "hit": false
+  },
+  {
+   "story": "t5",
+   "q": "Where did Rosa drop the key?",
+   "gold": [
+    "near the well",
+    "the well",
+    "well"
+   ],
+   "reply": "the garden",
+   "hit": false
+  },
+  {
+   "story": "t5",
+   "q": "Who found the key?",
+   "gold": [
+    "felix"
+   ],
+   "reply": "felix",
+   "hit": true
+  },
+  {
+   "story": "t5",
+   "q": "Where was the key in the morning?",
+   "gold": [
+    "on the hook",
+    "the hook",
+    "hook"
+   ],
+   "reply": "on the hook",
+   "hit": true
+  },
+  {
+   "story": "t6",
+   "q": "Where did Nils leave the lantern?",
+   "gold": [
+    "at the fork",
+    "the fork",
+    "fork"
+   ],
+   "reply": "at the fork",
+   "hit": true
+  },
+  {
+   "story": "t6",
+   "q": "Which way did Nils go first?",
+   "gold": [
+    "left"
+   ],
+   "reply": "left",
+   "hit": true
+  },
+  {
+   "story": "t6",
+   "q": "Where did Nils find the chest?",
+   "gold": [
+    "the right tunnel",
+    "right tunnel",
+    "the end of the right tunnel"
+   ],
+   "reply": "the chest",
+   "hit": false
+  },
+  {
+   "story": "t6",
+   "q": "Did Nils have the lantern when he found the chest?",
+   "gold": [
+    "yes"
+   ],
+   "reply": "no",
+   "hit": false
+  },
+  {
+   "story": "t6",
+   "q": "Where was Nils at the end?",
+   "gold": [
+    "the right tunnel",
+    "right tunnel",
+    "the end of the right tunnel"
+   ],
+   "reply": "at the end",
    "hit": false
   }
  ]
