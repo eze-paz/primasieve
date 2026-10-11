@@ -142,7 +142,7 @@ class Reader:
         self.align = collections.Counter(); self.prior = collections.Counter(); self.feat = collections.Counter(); self.cfeat = collections.Counter(); self.chunks = chunks
         self.tab = {f: collections.Counter() for f in FEATS}; self.tot = {f: collections.Counter() for f in FEATS}; self.w = collections.Counter(); self.wn = collections.Counter()
 
-    def learn(self, stories, names):
+    def learn(self, stories, names, weigh=True):
         """for each canonical statement, find the story sentence sharing a verb; count (story shape, canonical shape, story slot i, canonical slot j)
         whenever story slot i and canonical slot j carry the same filler"""
         for text, answers in stories:
@@ -160,7 +160,7 @@ class Reader:
                                 fs = features(ss, i, v, self.chunks); fc = features(cs, j, v, self.chunks)
                                 for f in FEATS:
                                     if f in fs: self.tab[f][(fs[f], fc[f])] += 1
-                    # the feature weights: which view would have picked the right story slot for each canonical slot (counted on the same pass, one story behind)
+                    if not weigh: continue
                     for j in cj:
                         gold_i = [i for i in si if sf[i] and cf[j] and sf[i].lower() == cf[j].lower()]
                         if not gold_i: continue
@@ -236,7 +236,8 @@ def main():
     seqs = [list(construction(x, names)[0]) for s in data[:7000] for x in T.SENT.split(s["text"]) if x.strip()]
     seqs += [list(construction(x, names)[0]) for p in B.paragraphs(train_b, 60000) for x in T.SENT.split(p["text"]) if x.strip()]      # book sentences too: general phrase chunks
     CH = Chunks(seqs); print(f"{len(CH.chunks)} phrase chunks over construction symbols (generator + books)", flush=True)
-    R = Reader(CH); R.learn(train, names); print(f"alignment table: {len(R.align)} entries; learned view accuracy by evidence: {[(f, b, round((R.w[(f, b)] + 0.5) / (R.wn[(f, b)] + 1.0), 2)) for f in FEATS for b in range(4) if R.wn[(f, b)]]}", flush=True)
+    R = Reader(CH); R.learn(train[:6000], names, weigh=False); R.learn(train[6000:], names, weigh=True)      # reliabilities measured on stories the tables had not seen
+    tabs = (R.w, R.wn); R = Reader(CH); R.w, R.wn = tabs; R.learn(train, names, weigh=False); print(f"alignment table: {len(R.align)} entries; learned view accuracy by evidence: {[(f, b, round((R.w[(f, b)] + 0.5) / (R.wn[(f, b)] + 1.0), 2)) for f in FEATS for b in range(4) if R.wn[(f, b)]]}", flush=True)
     ok = tot = 0
     for s in data[7000:]:
         for q, g in s["qs"]:
