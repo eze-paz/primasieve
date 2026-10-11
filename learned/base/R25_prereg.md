@@ -23,3 +23,6 @@ Practice fitness 14 -> 30 (59/15 -> 75/15) with 13 revisions kept, but holdout -
 - A revision is kept only if it improves practice questions in at least two different stories and worsens none.
 - --prune: at the start of a run the learner re-judges every stored revision by the same rule (remove it, rescore, keep it only if it meets the rule) and drops those that fail, logging them in the store's history. The store is not wiped; the learner revises it.
 - Gate: holdout fitness at the end of the run > holdout fitness with an empty store (-9). If met, the policy runs once with --store and B6 once.
+
+## R25-b result (gate failed; self-pruning works)
+Pruning removed 11 of 13 stored revisions by the learner's own transfer rule (all 8 memorised verb aliases, 3 single-story shape aliases); 2 shape aliases with support in >= 2 stories remain. No new revision met the rule (204 candidates). Holdout -12 with the store vs -9 empty. Finding: with 210 practice questions nearly every failure is unique to one story; the learner cannot discover transferable relations from that little signal. Next: a large self-supervised signal -- prediction of real book text.

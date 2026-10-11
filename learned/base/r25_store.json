@@ -1,21 +1,9 @@
 {
  "shape_alias": {
   "('what', 'did', 'REF', 'V', 'in', 'REF')": "('what', 'did', 'REF', 'V', 'REF')",
-  "('who', 'V', 'to', 'REF')": "('who', 'V', 'REF')",
-  "('who', 'V', 'at', 'REF')": "('who', 'V', 'REF')",
-  "('who', 'V', 'in', 'REF')": "('who', 'V', 'REF')",
-  "('who', 'V', 'REF', 'V', 'REF')": "('who', 'V', 'REF', 'V')"
+  "('who', 'V', 'to', 'REF')": "('who', 'V', 'REF')"
  },
- "verb_alias": {
-  "bring": "arrive",
-  "carry": "sail",
-  "walk": "refuse",
-  "take": "climb",
-  "boast": "be",
-  "circle": "shine",
-  "own": "like",
-  "say": "slide"
- },
+ "verb_alias": {},
  "history": [
   {
    "round": 0,
@@ -107,6 +95,94 @@
    "src": "say",
    "dst": "slide",
    "delta": 1
+  },
+  {
+   "op": "prune",
+   "kind": "shape_alias",
+   "src": "('who', 'V', 'at', 'REF')",
+   "dst": "('who', 'V', 'REF')",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "shape_alias",
+   "src": "('who', 'V', 'in', 'REF')",
+   "dst": "('who', 'V', 'REF')",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "shape_alias",
+   "src": "('who', 'V', 'REF', 'V', 'REF')",
+   "dst": "('who', 'V', 'REF', 'V')",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "bring",
+   "dst": "arrive",
+   "gain": 2,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "carry",
+   "dst": "sail",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "walk",
+   "dst": "refuse",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "take",
+   "dst": "climb",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "boast",
+   "dst": "be",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "circle",
+   "dst": "shine",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "own",
+   "dst": "like",
+   "gain": 1,
+   "stories": 1
+  },
+  {
+   "op": "prune",
+   "kind": "verb_alias",
+   "src": "say",
+   "dst": "slide",
+   "gain": 1,
+   "stories": 1
   }
  ]
 }
