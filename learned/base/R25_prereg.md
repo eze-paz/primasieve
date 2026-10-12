@@ -361,3 +361,6 @@ R25-al: val_fresh7.json delivered and verified (40 stories, 200 questions, every
 
 ## R25-al result (pre-registered comparison, val_fresh7 scored once per configuration)
 Model on val_fresh7: 135 / 200. A (adopted): all routes 70 / 20; trusted 49 / 2, 0.961, +43. **B (adopted + state role): all routes 74 / 18; trusted 51 / 2, 0.962, +45** -- adopted (a small margin).
+
+## R25-am registration (the verb after 'did', one pre-registered comparison on a ninth untouched set)
+Practice-only diagnosis of silent 'where did' / 'when did' questions: the question verb is not recognised ('sign', 'pack', 'stitch' read as nouns; 'Mrs Bello' gives two name slots; 'the heron watch' glues the verb onto a thing). With --did-verb the role reader reads the word after 'did' and its subject (the end of a run of name slots) as the verb, base form from the dictionary, or splits a dictionary verb off the end of a thing span; checked on four practice questions. A ninth hand-written set, val_fresh8 (200), is commissioned. Two configurations scored once each: adopted (full-text vectors, --do --time-args --state) and adopted + --did-verb.

@@ -199,6 +199,13 @@ def qparse(q, names):
     """(asked role, question verb, question argument heads) or None"""
     qs, qf = QR.qshape(q, names); k = q.lower().split()[0]
     verbs = [x[2:] for x in qs if x.startswith("V:")]; v = verbs[0] if verbs else None
+    if v is None and "--did-verb" in ARGV_SOFT and "did" in qs:                             # R25-am: the word after 'did' and its subject is the verb ('When did Carmen pack ...')
+        i0 = qs.index("did"); j = next((j for j in range(i0 + 1, len(qs)) if qs[j] in ("PERSON", "ENT", "PRON") or (qs[j] == "w" and str(qf[j]).lower() in ("he", "she", "they", "it", "we", "you", "i"))), None)
+        while j is not None and j + 1 < len(qs) and qs[j + 1] in ("PERSON", "ENT"): j += 1                 # 'Mrs Bello': the end of a run of name slots
+        if j is not None and j + 1 < len(qs) and qs[j + 1] == "w" and str(qf[j + 1]).isalpha():
+            w_ = str(qf[j + 1]).lower(); v = D.verb_base(w_) or E.lemma(w_); verbs = [v]
+        elif j is not None and qs[j] == "ENT" and isinstance(qf[j], str) and len(qf[j].split()) >= 2 and D.verb_base(qf[j].split()[-1]):   # 'the heron watch': a verb glued onto a thing
+            v = D.verb_base(qf[j].split()[-1]); verbs = [v]; qf = list(qf); qf[j] = " ".join(qf[j].split()[:-1])
     if "--state" in ARGV_SOFT and k == "where" and verbs in ([], ["be"]) and len(qs) > 1 and qs[1] in ("was", "were", "w", "V:be"):   # R25-o2: the dictionary reads 'was' as the verb 'be'   # R25-o: 'where was X (at the end / at noon)' asks for a state
         a0 = [(f if isinstance(f, str) else " ".join(f)) for x, f in zip(qs, qf) if x in ("PERSON", "ENT") and f]
         tw = [w for w in T.TOK.findall(q) if w.isalpha() and w.lower() not in T.STOP and w.lower() not in ("where", "was", "were", "end")]
