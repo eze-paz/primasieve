@@ -276,7 +276,14 @@ def soft_role(text, q, names, story_cache=None):
         if role not in ("do", "comp") and any(ans.split()[-1].lower() == a.lower() for a in args): continue   # the question already names it
         if role == "do" and (not c["subj"] or not args or not any(c["subj"].split()[-1].lower() == a.lower() or (vec(a) is not None and vec(c["subj"].split()[-1]) is not None and float(np.dot(vec(a), vec(c["subj"].split()[-1]))) >= 0.8) for a in args[:1])): continue   # the action of the one the question names
         vs = 1.0 if (role == "do" or c["verb"] == v) else float(np.dot(vv, cu))
-        am = float(np.mean([max([1.0 if h.lower() == a.lower() else max(0.0, float(np.dot(vec(a), vec(h)))) for h in c["heads"] if vec(h) is not None] or [0.0]) for a in args if vec(a) is not None])) if args else 0.5
+        def one(a, h):                                                                   # R25-an: an exact match counts with or without a vector (names rarely have one)
+            if "--old-args" in ARGV_SOFT and (vec(a) is None or vec(h) is None): return None
+            if h.lower() == a.lower(): return 1.0
+            va, vh = vec(a), vec(h)
+            return max(0.0, float(np.dot(va, vh))) if (va is not None and vh is not None) else 0.0
+        if "--old-args" in ARGV_SOFT:                                                    # the pre-R25-an behaviour, kept for the comparison
+            am = float(np.mean([max([1.0 if h.lower() == a.lower() else max(0.0, float(np.dot(vec(a), vec(h)))) for h in c["heads"] if vec(h) is not None] or [0.0]) for a in args if vec(a) is not None])) if args else 0.5
+        else: am = float(np.mean([max([one(a, h) for h in c["heads"]] or [0.0]) for a in args])) if args else 0.5
         sc = vs + am
         if sc > best[1] + best[2]: best = (ans, vs, am)
     return best
