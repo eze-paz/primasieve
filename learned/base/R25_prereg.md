@@ -414,3 +414,18 @@ Model on val_fresh10: 148 / 200. A (adopted) and B (adopted + world layers alone
 
 ## R25-at registration (three-way next-word comparison)
 The attention network, at its 75-minute weights and at the end of R25-ar2, is scored on exactly the language model's predictions of R25-ao (first 3,000 held-out sentences, sentence scope, 47,478 predictions; long sentences use the last 63 words as context). Compared with the language model (7.6694) and the learner's count models (8.7663) on the same predictions.
+
+## R25-ar2 result (continued training)
+18,630 steps in all (about 2.9 passes): **held-out paragraphs 7.8042 bits/word** over the 270,358 predictions (75 minutes: 8.0587; best count model with copy memory: 8.2022). Still falling. Weights kept as r25_attn_ar2.pt.
+
+## R25-at result (three-way next-word comparison, same 47,478 predictions, sentence scope)
+| model | bits/word |
+|---|---|
+| language model (RWKV-7, 0.4B) | 7.6694 |
+| attention network, 4 h 15 min (5.0M) | 8.3858 |
+| attention network, 75 min | 8.5929 |
+| learner's count models | 8.7663 |
+The gap to the language model fell from 1.10 to 0.72 bits/word, with about 80 times fewer parameters.
+
+## R25-ar3 registration (third round of training, detached)
+Resume from r25_attn.pt, train 4 more hours (same data, settings, checkpoints every 500 steps), then score the 270,358 held-out paragraph predictions and the 47,478 matched predictions. Pass if held-out paragraphs fall below 7.8042; also report the matched score against 7.6694.
