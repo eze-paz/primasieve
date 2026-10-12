@@ -379,3 +379,8 @@ Model on val_fresh9: 152 / 200. A (old argument match, with the empty-average be
 
 ## R25-ao registration (the language model on the next-word game, matched)
 Same lowercase word sentences from the held-out books, the first 3,000; words 2.. predicted from the earlier words of the same sentence; the model's cost for a word is the sum over its sub-word tokens (checkpoint ckpt_read1b, the one used throughout). The learner's next-word models (word-pair, groups, four-group + tuned word-triple mix) are re-scored on the same 3,000 sentences. Reported as is.
+
+Owner, 2026-10-12: 'go ahead' with the five-step plan (LLM next-word measurement; copy memory and long-range associations; agent axis for who-questions; verb-sequence table; a small attention network over the learner's vectors). Item 5 read as approval to build and test.
+
+## R25-ap registration (copy memory in the next-word game)
+Paragraph scope: the base model (four groups + tuned word-triple, as R25-ag) keeps its short context; a copy memory gives each word already used earlier in the paragraph a probability in proportion to its use; mixed with weight from {0, 0.03, 0.06, 0.1, 0.15, 0.2} chosen on held-out training paragraphs. Held-out books' paragraphs scored once: base vs base + memory.
