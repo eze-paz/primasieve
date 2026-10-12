@@ -351,3 +351,9 @@ Model on val_fresh5: 133 / 200. 100 dims (adopted full-text vectors): all routes
 ## R25-ak registration (action and time roles, one pre-registered comparison on a seventh untouched set)
 Practice (710) silences: 'what did' 68, 'where was / were' 58, 'where did' 24, 'when did' 22. The action / complement roles (--do) and time phrases as arguments (--time-args) target the largest gap; they were last judged on an over-consulted or too-small set. A seventh hand-written set, val_fresh6 (200), is commissioned. Exactly two configurations are scored once each on it: the adopted configuration (full-text 100-dim vectors) as is, and with --do --time-args; trust chosen on the same 710 for each.
 R25-ak: val_fresh6.json delivered and verified (40 stories, 200 questions, every gold form in its story). Model on all 1,710; configuration A = adopted (R25_VEC=r25_vectors_all.npz); B = A plus --do --time-args; trust on the 710; val_fresh6 (positions 1510-1710) scored once each.
+
+## R25-ak result (pre-registered comparison, val_fresh6 scored once per configuration)
+Model on val_fresh6: 136 / 200. A (adopted): all routes 83 / 12; trusted 54 / 3, 0.947, fitness +45. **B (adopted + action and time roles, --do --time-args): all routes 85 / 15; trusted 62 / 3, 0.954, fitness +53** -- adopted. Earlier negative verdicts on these roles rested on a too-small or over-consulted set and on trust chosen with less evidence.
+
+## R25-al registration (the state role, one pre-registered comparison on an eighth untouched set)
+Practice silences: 'where was / were' 58. The state role of R25-o2 (--state: places of the clauses about X, chosen by time words, else the latest) is retested with trust chosen on the 710. An eighth hand-written set, val_fresh7 (200), is commissioned. Exactly two configurations, scored once each: the adopted configuration (B above) and B plus --state.
