@@ -408,3 +408,6 @@ Two-layer causal attention over the learner's vectors, 4,998,149 parameters, 7,7
 
 ## R25-ar2 registration (continued training, detached)
 Resume from r25_attn.pt (75-minute weights kept as r25_attn_75min.pt), train 4 more hours as a detached process with checkpoints every 500 steps, then score the same 270,358 held-out paragraph predictions; afterwards score it on the language model's 47,478 sentence-scope predictions for a three-way comparison.
+
+## R25-as result (item 4: world layers alone -- negative)
+Model on val_fresh10: 148 / 200. A (adopted) and B (adopted + world layers alone) score identically on val_fresh10 (all routes 67 / 22; trusted 50 / 6, 0.893, +32): the world-layer route never fired there. Elsewhere it is mostly wrong: practice 17 answered, 5 right / 12 wrong; earlier untouched sets 23 answered, 6 right / 17 wrong. The learner's trust rule refused it, correctly. The world layers were learned from the generator's tidy events and read hand-written stories poorly; 'where was X at the end' and 'who had X after' need a new learned state tracker, not these layers.
