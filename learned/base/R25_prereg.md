@@ -402,3 +402,9 @@ val_fresh10.json delivered and verified (40 stories, 200 questions, every gold f
 
 ## R25-ao result (matched next-word comparison)
 Same lowercase word sentences, first 3,000 held-out sentences, 47,478 predictions, sentence scope: **language model 7.6694 bits/word**; learner's best (four groups + tuned word-triple) **8.7663**; word-pair 9.2137; learner's groups alone 9.2211. Gap 1.10 bits/word (the model narrows each next word to about half as many candidates). This subset is harder than the full held-out set (learner 8.77 here vs 8.28 overall).
+
+## R25-ar result (attention network, 75 minutes)
+Two-layer causal attention over the learner's vectors, 4,998,149 parameters, 7,765 steps (about 1.2 passes over the training paragraphs), training loss still falling: **held-out paragraphs 8.0587 bits/word** over the same 270,358 predictions -- better than the best count model (8.2022 with copy memory) by 0.14. The language model's 7.67 was measured on a different subset at sentence scope; not yet comparable.
+
+## R25-ar2 registration (continued training, detached)
+Resume from r25_attn.pt (75-minute weights kept as r25_attn_75min.pt), train 4 more hours as a detached process with checkpoints every 500 steps, then score the same 270,358 held-out paragraph predictions; afterwards score it on the language model's 47,478 sentence-scope predictions for a three-way comparison.

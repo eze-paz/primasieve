@@ -56,7 +56,9 @@ class Net(nn.Module):
         return s.out(s.out_ln(h))
 
 
+if "--threads" in ARGV: torch.set_num_threads(int(ARGV[ARGV.index("--threads") + 1]))
 net = Net(); opt = torch.optim.AdamW(net.parameters(), lr=1e-3, weight_decay=0.01); lossf = nn.CrossEntropyLoss(reduction="none")
+if "--resume" in ARGV and os.path.exists("r25_attn.pt"): net.load_state_dict(torch.load("r25_attn.pt")); print("R25-ar resumed from r25_attn.pt", flush=True)
 print(f"R25-ar model: {sum(p.numel() for p in net.parameters()):,} parameters", flush=True)
 def windows(ids, mask):
     for st in range(0, max(1, len(ids) - 1), CTX):
@@ -71,7 +73,7 @@ while time.time() - t0 < MIN * 60:
     out = net(x); loss = (lossf(out.reshape(-1, out.shape[-1]), y.reshape(-1)) * w8.reshape(-1)).sum() / w8.sum()
     opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); opt.step(); step += 1
     if step % 200 == 0: print(f"  step {step}: training loss {loss.item() / math.log(2):.3f} bits/token ({time.time() - t0:.0f} s)", flush=True)
-    if step % 1000 == 0: torch.save(net.state_dict(), "r25_attn.pt")
+    if step % 500 == 0: torch.save(net.state_dict(), "r25_attn.pt")
 torch.save(net.state_dict(), "r25_attn.pt"); net.eval()
 tot = 0.0; n = 0
 with torch.no_grad():
