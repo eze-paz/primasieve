@@ -12,6 +12,7 @@ fit = collections.defaultdict(lambda: [0, 0])
 PRACTICE = L[:310] + L[510:] if "--big" in sys.argv else L[:310]
 if "--trust-half" in sys.argv: PRACTICE = L[:110] + L[710:910]                             # R25-z2: choose trust on the half that did not teach (old 110 + practice B)                          # R25-u: old 110 + val_more + practice A / B; the untouched val_fresh2 is L[310:510]
 UNTOUCHED = L[310:510]
+if "--final" in sys.argv: PRACTICE = L[:310] + L[510:910]; FINAL = L[910:1110]            # R25-final: trust on the same 710 as R25-x; val_fresh3 scored once
 for l in PRACTICE:
     if spoke(l): fit[route(l)][0 if right(l) else 1] += 1
 keep = {r for r, (a, w) in fit.items() if a - 3 * w > 0}
@@ -56,3 +57,20 @@ if "--by-kind" in sys.argv:                                                     
         a = sum(1 for l in part if spoke(l) and right(l) and trusted(l)); w = sum(1 for l in part if spoke(l) and not right(l) and trusted(l))
         print(f"R25-aa {nm}: trust by route and kind -> {a} right / {w} wrong (fitness {a - 3 * w})")
     print("R25-aa (route, kind) decisions with >= 10 practice answers:", {f"{k[0]}/{k[1]}": ("keep" if v[0] - 3 * v[1] > 0 else "drop", tuple(v)) for k, v in fk.items() if sum(v) >= 10})
+
+
+if "--final" in sys.argv:
+    a = sum(1 for l in FINAL if spoke(l) and right(l) and route(l) in keep); w = sum(1 for l in FINAL if spoke(l) and not right(l) and route(l) in keep)
+    a0 = sum(1 for l in FINAL if spoke(l) and right(l)); w0 = sum(1 for l in FINAL if spoke(l) and not right(l))
+    print(f"R25-final val_fresh3 ({len(FINAL)} questions, scored once): all routes {a0} right / {w0} wrong | trusted routes {a} right / {w} wrong, precision {a / max(1, a + w):.3f}, fitness {a - 3 * w}")
+
+
+if "--final4" in sys.argv:                                                               # R25-ai: trust on the same 710; val_fresh4 = L[1110:1310], scored once per configuration
+    P4 = L[:310] + L[510:910]; F4 = L[1110:1310]
+    fit4 = collections.defaultdict(lambda: [0, 0])
+    for l in P4:
+        if spoke(l): fit4[route(l)][0 if right(l) else 1] += 1
+    keep4 = {r for r, (a, w) in fit4.items() if a - 3 * w > 0}
+    a = sum(1 for l in F4 if spoke(l) and right(l) and route(l) in keep4); w = sum(1 for l in F4 if spoke(l) and not right(l) and route(l) in keep4)
+    a0 = sum(1 for l in F4 if spoke(l) and right(l)); w0 = sum(1 for l in F4 if spoke(l) and not right(l))
+    print(f"R25-ai val_fresh4 ({len(F4)} questions): all routes {a0} right / {w0} wrong | trusted routes {a} right / {w} wrong, precision {a / max(1, a + w):.3f}, fitness {a - 3 * w}")
