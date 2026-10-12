@@ -438,3 +438,9 @@ The step counter restarts on every resume. R25-ar2 trained 18,630 steps on top o
 
 ## R25-au registration (mixing)
 r25_mix.py: per held-out paragraph prediction, mix the R25-ar3 network with the R25-ap model (count models + copy memory); the mixing weight is chosen on the first half of the held-out paragraphs and reported on the second half only, with each model alone on the same half. Pass if the mix beats the network alone on the second half.
+
+## R25-au result (mixing) -- PASS
+Second half of the held-out paragraphs, 122,818 predictions: attention network alone 7.4566; count models + copy memory 7.9477; **mix 7.3647 bits/word** (attention weight 0.75, chosen on the first half; copy-memory weight 0.03). The counting models still add information the network has not learned (-0.09 bits/word).
+
+## R25-av registration (more text and a larger network)
+r25_attn.py gains --all-text (every paragraph of the training books, 21.2M tokens / 354,551 paragraphs, instead of the filtered 13.0M), --width, --layers, --out. New network: width 256, 4 layers, 10.3M parameters, same vectors as starting embeddings, same held-out predictions. Trained 8 hours detached from scratch (weights r25_attn_av.pt). Gate: held-out paragraphs below 7.7313 (the 5.0M network after about 10.5 hours on the filtered text). Then scored on the 47,478 matched predictions against the language model's 7.6694.

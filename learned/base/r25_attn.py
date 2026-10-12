@@ -12,7 +12,9 @@ import numpy as np, torch, torch.nn as nn
 import r24_tlm as T, r24_books as B, data as D0
 torch.manual_seed(0); random.seed(0)
 MIN = float(ARGV[ARGV.index("--minutes") + 1]) if "--minutes" in ARGV else 90
-CTX, D, H, LAYERS, BATCH = 64, 128, 4, 2, 32
+opt_ = lambda k, d: type(d)(ARGV[ARGV.index(k) + 1]) if k in ARGV else d
+CTX, D, H, LAYERS, BATCH = 64, opt_("--width", 128), 4, opt_("--layers", 2), 32
+OUT = opt_("--out", "r25_attn.pt")                                                        # R25-av: separate weights file
 
 
 def paras_of(paras):
@@ -27,7 +29,8 @@ def paras_of(paras):
 
 
 t0 = time.time()
-tr_b, te_b = D0.books(); trp = paras_of(B.paragraphs(tr_b, 1000000)); tep = paras_of(B.paragraphs(te_b, 20000))
+tr_b, te_b = D0.books(); tep = paras_of(B.paragraphs(te_b, 20000))
+trp = paras_of([dict(text=p.replace(chr(8217), "'")) for b in tr_b for p in D0.read(b).split(chr(10)) if p.strip()] if "--all-text" in ARGV else B.paragraphs(tr_b, 1000000))   # R25-av: every paragraph of the training books
 z = np.load("r25_vectors_all.npz"); vocab = z["vocab"].tolist()[:20000]; vi = {w: i + 1 for i, w in enumerate(vocab)}   # 0 = unknown
 uni = collections.Counter(x for p in trp for s in p for x in s); N = sum(uni.values())
 unk_words = sum(c for w, c in uni.items() if w not in vi); n_unk_types = sum(1 for w in uni if w not in vi) + 1
@@ -58,7 +61,7 @@ class Net(nn.Module):
 
 if "--threads" in ARGV: torch.set_num_threads(int(ARGV[ARGV.index("--threads") + 1]))
 net = Net(); opt = torch.optim.AdamW(net.parameters(), lr=1e-3, weight_decay=0.01); lossf = nn.CrossEntropyLoss(reduction="none")
-if "--resume" in ARGV and os.path.exists("r25_attn.pt"): net.load_state_dict(torch.load("r25_attn.pt")); print("R25-ar resumed from r25_attn.pt", flush=True)
+if "--resume" in ARGV and os.path.exists(OUT): net.load_state_dict(torch.load(OUT)); print(f"R25-ar resumed from {OUT}", flush=True)
 print(f"R25-ar model: {sum(p.numel() for p in net.parameters()):,} parameters", flush=True)
 def windows(ids, mask):
     for st in range(0, max(1, len(ids) - 1), CTX):
@@ -73,8 +76,8 @@ while time.time() - t0 < MIN * 60:
     out = net(x); loss = (lossf(out.reshape(-1, out.shape[-1]), y.reshape(-1)) * w8.reshape(-1)).sum() / w8.sum()
     opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); opt.step(); step += 1
     if step % 200 == 0: print(f"  step {step}: training loss {loss.item() / math.log(2):.3f} bits/token ({time.time() - t0:.0f} s)", flush=True)
-    if step % 500 == 0: torch.save(net.state_dict(), "r25_attn.pt")
-torch.save(net.state_dict(), "r25_attn.pt"); net.eval()
+    if step % 500 == 0: torch.save(net.state_dict(), OUT)
+torch.save(net.state_dict(), OUT); net.eval()
 tot = 0.0; n = 0
 with torch.no_grad():
     for p in tep:
