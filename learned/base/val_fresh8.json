@@ -1,0 +1,1785 @@
+{
+ "note": "R25: ninth hand-written set, untouched test for one pre-registered comparison, written without access to the frozen test",
+ "stories": [
+  {
+   "id": "p1",
+   "text": "Deep under the hill at Brannock Farm, the cheesemaker, Wendeline Ferrand, turned the wheels of cheese every morning. Her apprentice, a quiet boy named Mawuli, brushed salt water onto the rinds. On Thursday a buyer from the city tasted a slice and ordered twelve wheels. They were wrapped in waxed cloth and loaded onto a van before dark.",
+   "qs": [
+    [
+     "Who turned the wheels of cheese every morning?",
+     [
+      "wendeline ferrand",
+      "wendeline",
+      "ferrand",
+      "the cheesemaker",
+      "cheesemaker"
+     ]
+    ],
+    [
+     "What did Mawuli brush onto the rinds?",
+     [
+      "salt water"
+     ]
+    ],
+    [
+     "Who ordered twelve wheels?",
+     [
+      "a buyer",
+      "buyer"
+     ]
+    ],
+    [
+     "How many wheels did the buyer order?",
+     [
+      "twelve wheels",
+      "twelve"
+     ]
+    ],
+    [
+     "What were the wheels wrapped in?",
+     [
+      "waxed cloth",
+      "cloth"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p2",
+   "text": "A badger called Brackwell dug a new burrow under a hawthorn hedge. Before he had finished, a family of rabbits moved into the front room and refused to leave. Brackwell did not argue with them. Instead he dug a second door at the back, and that winter the rabbits kept the front of the burrow warm while he slept snugly at the far end.",
+   "qs": [
+    [
+     "Who dug a new burrow?",
+     [
+      "brackwell",
+      "a badger",
+      "badger"
+     ]
+    ],
+    [
+     "Where did Brackwell dig the burrow?",
+     [
+      "under a hawthorn hedge",
+      "a hawthorn hedge",
+      "hawthorn hedge",
+      "hedge"
+     ]
+    ],
+    [
+     "Who moved into the front room?",
+     [
+      "a family of rabbits",
+      "the rabbits",
+      "rabbits"
+     ]
+    ],
+    [
+     "What did Brackwell dig at the back?",
+     [
+      "a second door",
+      "second door",
+      "door"
+     ]
+    ],
+    [
+     "What did the rabbits keep warm?",
+     [
+      "front of the burrow",
+      "the front"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p3",
+   "text": "The mountain bus left Vellara at six in the morning with eleven passengers. Its driver, Mr Saito, stopped at the dairy halfway up to collect the milk churns. At the pass a hiker named Sigrun got off with her map, and the bus went down the far side to the market town of Ostrell. By noon the churns had been unloaded, and Mr Saito was drinking coffee in the square.",
+   "qs": [
+    [
+     "When did the bus leave Vellara?",
+     [
+      "six in the morning",
+      "at six",
+      "six"
+     ]
+    ],
+    [
+     "Who drove the mountain bus?",
+     [
+      "mr saito",
+      "saito",
+      "its driver",
+      "driver"
+     ]
+    ],
+    [
+     "What did the driver collect at the dairy?",
+     [
+      "the milk churns",
+      "milk churns",
+      "churns"
+     ]
+    ],
+    [
+     "Where did Sigrun get off?",
+     [
+      "at the pass",
+      "the pass",
+      "pass"
+     ]
+    ],
+    [
+     "Where was Mr Saito at noon?",
+     [
+      "in the square",
+      "the square",
+      "square"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p4",
+   "text": "Mrs Ndukwe carried her husband's old boots to the cobbler's in Tannerby. The cobbler, a tall man named Cathal, found that both soles had worn through. He stitched new leather soles onto them while she waited, and he polished the toes until they shone. She paid him four coins and wrapped the boots in brown paper for the walk home.",
+   "qs": [
+    [
+     "Who carried the boots to the cobbler's?",
+     [
+      "mrs ndukwe",
+      "ndukwe"
+     ]
+    ],
+    [
+     "Whose old boots were they?",
+     [
+      "her husband's",
+      "husband's",
+      "husband"
+     ]
+    ],
+    [
+     "Who stitched new soles onto the boots?",
+     [
+      "cathal",
+      "the cobbler",
+      "cobbler"
+     ]
+    ],
+    [
+     "What did Cathal polish?",
+     [
+      "the toes",
+      "toes"
+     ]
+    ],
+    [
+     "What did Mrs Ndukwe wrap the boots in?",
+     [
+      "brown paper",
+      "paper"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p5",
+   "text": "In a dry summer a tortoise named Pembe found the last puddle in the valley. A proud stork, Altair, said the water was his because he had seen it first from the sky. Pembe answered that the sky did not drink. While they argued, the sun dried the puddle, and both of them had to walk to the river after all.",
+   "qs": [
+    [
+     "Who found the last puddle in the valley?",
+     [
+      "pembe",
+      "a tortoise",
+      "tortoise"
+     ]
+    ],
+    [
+     "Who said the water was his?",
+     [
+      "altair",
+      "a proud stork",
+      "proud stork",
+      "stork"
+     ]
+    ],
+    [
+     "Why did the stork say the water was his?",
+     [
+      "had seen it first",
+      "seen it first"
+     ]
+    ],
+    [
+     "What dried the puddle?",
+     [
+      "the sun",
+      "sun"
+     ]
+    ],
+    [
+     "Where did both of them have to walk?",
+     [
+      "to the river",
+      "the river",
+      "river"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p6",
+   "text": "Every morning at seven, Dr Rasmusdottir climbed the path from the village to the weather station above Skarvik. There she read the rain gauge and wrote the numbers in a green notebook. At ten a radio call came from the harbour master, Gergely, who wanted to know about the wind. She told him a storm was coming, so he kept the fishing boats in port, and in the afternoon she walked back down to the village.",
+   "qs": [
+    [
+     "Who climbed the path to the weather station?",
+     [
+      "dr rasmusdottir",
+      "rasmusdottir"
+     ]
+    ],
+    [
+     "Where did Dr Rasmusdottir write the numbers?",
+     [
+      "in a green notebook",
+      "a green notebook",
+      "green notebook",
+      "notebook"
+     ]
+    ],
+    [
+     "When did the radio call come?",
+     [
+      "at ten",
+      "ten"
+     ]
+    ],
+    [
+     "Who wanted to know about the wind?",
+     [
+      "gergely",
+      "the harbour master",
+      "harbour master"
+     ]
+    ],
+    [
+     "Where did Dr Rasmusdottir walk in the afternoon?",
+     [
+      "to the village",
+      "the village",
+      "village"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p7",
+   "text": "In the square at Hembury there is a hat shop run by two sisters, Esmeralda and Amparo Quirino. Esmeralda steams the felt and shapes it on wooden blocks, while Amparo sews the ribbons on. Last week a bride's mother ordered a wide blue hat for the wedding. The hat was finished on Friday, and the shop boy, Hipolito, delivered it in a round box.",
+   "qs": [
+    [
+     "Who steams the felt?",
+     [
+      "esmeralda"
+     ]
+    ],
+    [
+     "What does Amparo sew on?",
+     [
+      "the ribbons",
+      "ribbons"
+     ]
+    ],
+    [
+     "What did the bride's mother order?",
+     [
+      "a wide blue hat",
+      "wide blue hat",
+      "blue hat",
+      "hat"
+     ]
+    ],
+    [
+     "When was the hat finished?",
+     [
+      "on friday",
+      "friday"
+     ]
+    ],
+    [
+     "Who delivered the hat?",
+     [
+      "hipolito",
+      "the shop boy",
+      "shop boy"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p8",
+   "text": "A young otter, Sisu, was afraid of the deep pool below the weir. Each evening his grandmother floated on her back near the bank and called to him. One night a heron stood on the bank where Sisu usually sat, so he slipped into the water to get away from it. By morning he was swimming beside his grandmother as if he had never been afraid.",
+   "qs": [
+    [
+     "Who was afraid of the deep pool?",
+     [
+      "sisu",
+      "a young otter",
+      "young otter",
+      "otter"
+     ]
+    ],
+    [
+     "Where was the deep pool?",
+     [
+      "below the weir",
+      "the weir",
+      "weir"
+     ]
+    ],
+    [
+     "What did his grandmother do each evening?",
+     [
+      "floated on her back",
+      "floated"
+     ]
+    ],
+    [
+     "What stood on the bank where Sisu usually sat?",
+     [
+      "a heron",
+      "heron"
+     ]
+    ],
+    [
+     "Why did Sisu slip into the water?",
+     [
+      "to get away",
+      "get away"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p9",
+   "text": "The cafe at the end of Sandle Pier opens at dawn for the fishermen. Its owner, Rasha, bakes bread rolls in the back kitchen before anyone arrives. At midday the tourists come off the ferry, and her nephew Isandro carries trays out to the tables on the deck. In the evening the chairs are stacked inside and the shutters are locked.",
+   "qs": [
+    [
+     "Who bakes bread rolls?",
+     [
+      "rasha",
+      "its owner",
+      "owner"
+     ]
+    ],
+    [
+     "Where does Rasha bake the rolls?",
+     [
+      "in the back kitchen",
+      "the back kitchen",
+      "back kitchen",
+      "kitchen"
+     ]
+    ],
+    [
+     "When do the tourists come off the ferry?",
+     [
+      "at midday",
+      "midday"
+     ]
+    ],
+    [
+     "Who carries trays out to the tables?",
+     [
+      "isandro",
+      "her nephew",
+      "nephew"
+     ]
+    ],
+    [
+     "What are stacked inside in the evening?",
+     [
+      "the chairs",
+      "chairs"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p10",
+   "text": "Mr Uzoma grows young oak and birch trees at a forest nursery outside Lindqvarn. In April his daughter, Chidinma, planted three hundred acorns in a shaded bed by the stream. The seedlings came up in May, and a man from the council came to count them. In autumn they were dug up and taken to the burnt hillside, where volunteers planted them in the rain.",
+   "qs": [
+    [
+     "Who grows young oak and birch trees?",
+     [
+      "mr uzoma",
+      "uzoma"
+     ]
+    ],
+    [
+     "Who planted three hundred acorns?",
+     [
+      "chidinma",
+      "his daughter",
+      "daughter"
+     ]
+    ],
+    [
+     "Where did Chidinma plant the acorns?",
+     [
+      "in a shaded bed",
+      "a shaded bed",
+      "shaded bed",
+      "by the stream"
+     ]
+    ],
+    [
+     "Who came to count the seedlings?",
+     [
+      "a man",
+      "the council"
+     ]
+    ],
+    [
+     "Where were the seedlings taken in autumn?",
+     [
+      "to the burnt hillside",
+      "the burnt hillside",
+      "burnt hillside",
+      "hillside"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p11",
+   "text": "A crow named Ebon collected shiny buttons and kept them in a nest at the top of a chimney. When the family below lit their first fire of the year, smoke poured up through the nest. Ebon flew out coughing, and the buttons fell down the chimney into the hearth. The little girl of the house, Freya, found them in the ashes and sewed them onto her coat.",
+   "qs": [
+    [
+     "Who collected shiny buttons?",
+     [
+      "ebon",
+      "a crow",
+      "crow"
+     ]
+    ],
+    [
+     "What poured up through the nest?",
+     [
+      "smoke"
+     ]
+    ],
+    [
+     "What fell down the chimney?",
+     [
+      "the buttons",
+      "buttons"
+     ]
+    ],
+    [
+     "Where did Freya find the buttons?",
+     [
+      "in the ashes",
+      "the ashes",
+      "ashes"
+     ]
+    ],
+    [
+     "What did Freya do with the buttons?",
+     [
+      "sewed them",
+      "sewed"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p12",
+   "text": "Early on Monday the sailmaker, Ambrose Nkemelu, unrolled a torn mainsail across the floor of the sail loft. He had fetched it the evening before from the yacht Merrow, which was tied up in the marina. All morning he stitched a canvas patch over the tear with a curved needle. At three o'clock his assistant, Clea, rowed the sail back out to the yacht.",
+   "qs": [
+    [
+     "What did the sailmaker unroll across the floor?",
+     [
+      "a torn mainsail",
+      "torn mainsail",
+      "mainsail"
+     ]
+    ],
+    [
+     "Where was the yacht tied up?",
+     [
+      "in the marina",
+      "the marina",
+      "marina"
+     ]
+    ],
+    [
+     "What did he stitch over the tear?",
+     [
+      "a canvas patch",
+      "canvas patch",
+      "patch"
+     ]
+    ],
+    [
+     "When did Clea row the sail back to the yacht?",
+     [
+      "at three o'clock",
+      "three o'clock",
+      "three"
+     ]
+    ],
+    [
+     "Who rowed the sail back out to the yacht?",
+     [
+      "clea",
+      "his assistant",
+      "assistant"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p13",
+   "text": "Old Mr Fitzgibbon could no longer reach the apples on his tallest tree. His neighbour, a nurse called Divya, brought a ladder over the fence one Saturday. While she picked, he held the basket steady, and her two sons carried the full baskets to his shed. In return he gave them a jar of apple jelly every week until Christmas.",
+   "qs": [
+    [
+     "What could Mr Fitzgibbon no longer reach?",
+     [
+      "the apples",
+      "apples"
+     ]
+    ],
+    [
+     "Who brought a ladder over the fence?",
+     [
+      "divya",
+      "a nurse",
+      "nurse",
+      "his neighbour",
+      "neighbour"
+     ]
+    ],
+    [
+     "What did Mr Fitzgibbon hold steady?",
+     [
+      "the basket",
+      "basket"
+     ]
+    ],
+    [
+     "Who carried the full baskets to his shed?",
+     [
+      "her two sons",
+      "two sons",
+      "sons"
+     ]
+    ],
+    [
+     "What did he give them every week?",
+     [
+      "jar of apple jelly",
+      "apple jelly",
+      "jelly"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p14",
+   "text": "Two squirrels, Kestrin and Moll, shared an old elm at the edge of the park. Kestrin hid his nuts in a hundred places and forgot most of them, while Moll kept hers in one hole in the trunk. One winter a woodpecker drilled into the trunk and ate everything in Moll's hole. That spring Kestrin shared the few nuts he could still find, and his forgotten ones grew into young trees all over the park.",
+   "qs": [
+    [
+     "Who hid his nuts in a hundred places?",
+     [
+      "kestrin"
+     ]
+    ],
+    [
+     "Where did Moll keep her nuts?",
+     [
+      "in one hole",
+      "one hole",
+      "in the trunk",
+      "the trunk"
+     ]
+    ],
+    [
+     "What drilled into the trunk?",
+     [
+      "a woodpecker",
+      "woodpecker"
+     ]
+    ],
+    [
+     "Whose hole did the woodpecker empty?",
+     [
+      "moll's",
+      "moll"
+     ]
+    ],
+    [
+     "What did the forgotten nuts grow into?",
+     [
+      "young trees",
+      "trees"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p15",
+   "text": "On Saturday the Monteiro family left their flat in the city and drove to the lake. At the boathouse they hired a rowing boat, and Ernesto, the eldest, rowed them across to a small island. They ate lunch under a willow there while their dog, Bosun, chased ducks along the shore. In the evening they rowed back, returned the boat, and drove home in the dark.",
+   "qs": [
+    [
+     "Where did the family hire a rowing boat?",
+     [
+      "at the boathouse",
+      "the boathouse",
+      "boathouse"
+     ]
+    ],
+    [
+     "Who rowed them across to the island?",
+     [
+      "ernesto",
+      "the eldest",
+      "eldest"
+     ]
+    ],
+    [
+     "Where did they eat lunch?",
+     [
+      "under a willow",
+      "a willow",
+      "willow"
+     ]
+    ],
+    [
+     "What did Bosun chase along the shore?",
+     [
+      "ducks"
+     ]
+    ],
+    [
+     "When did they row back?",
+     [
+      "in the evening",
+      "evening"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p16",
+   "text": "A library van that visits the hill villages broke down near Ashcombe on Tuesday. Its driver, Mrs Stavrou, telephoned the garage, and a mechanic named Esteban arrived within the hour. While he mended the fan belt, she lent books to the children who had gathered round. The van reached its last village two hours late, but nobody seemed to mind.",
+   "qs": [
+    [
+     "What broke down near Ashcombe?",
+     [
+      "a library van",
+      "library van",
+      "van"
+     ]
+    ],
+    [
+     "Who telephoned the garage?",
+     [
+      "mrs stavrou",
+      "stavrou",
+      "its driver",
+      "driver"
+     ]
+    ],
+    [
+     "Who mended the fan belt?",
+     [
+      "esteban",
+      "a mechanic",
+      "mechanic"
+     ]
+    ],
+    [
+     "What did Mrs Stavrou do while he worked?",
+     [
+      "lent books",
+      "lent"
+     ]
+    ],
+    [
+     "When did the van break down?",
+     [
+      "on tuesday",
+      "tuesday"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p17",
+   "text": "A field mouse named Tansy lived beneath a scarecrow in a wheat field. Every year the farmer replaced the scarecrow's straw, and every year Tansy lined her nest with the old straw. One autumn the farmer brought a cat instead of new straw. That night Tansy packed her seeds into the scarecrow's hat and moved to the hedge, where the cat never thought to look.",
+   "qs": [
+    [
+     "Who lived beneath a scarecrow?",
+     [
+      "tansy",
+      "a field mouse",
+      "field mouse",
+      "mouse"
+     ]
+    ],
+    [
+     "What did Tansy line her nest with?",
+     [
+      "the old straw",
+      "old straw"
+     ]
+    ],
+    [
+     "What did the farmer bring instead of new straw?",
+     [
+      "a cat",
+      "cat"
+     ]
+    ],
+    [
+     "Where did Tansy pack her seeds?",
+     [
+      "into the scarecrow's hat",
+      "the scarecrow's hat",
+      "scarecrow's hat",
+      "hat"
+     ]
+    ],
+    [
+     "Where did Tansy move?",
+     [
+      "to the hedge",
+      "the hedge",
+      "hedge"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p18",
+   "text": "At eight the post van dropped three sacks at the village shop in Tregarth. The postwoman, Dobrawa, sorted the letters on the counter and set off on her bicycle. She went first to the farms along the river, then up to the vicarage, and she ate her sandwiches on the bench by the war memorial. By four o'clock her bag was empty and her bicycle was back in the shed behind the shop.",
+   "qs": [
+    [
+     "When did the post van drop the sacks?",
+     [
+      "at eight",
+      "eight"
+     ]
+    ],
+    [
+     "Who sorted the letters?",
+     [
+      "dobrawa",
+      "the postwoman",
+      "postwoman"
+     ]
+    ],
+    [
+     "What did Dobrawa set off on?",
+     [
+      "her bicycle",
+      "bicycle"
+     ]
+    ],
+    [
+     "Where did she eat her sandwiches?",
+     [
+      "on the bench",
+      "the bench",
+      "bench",
+      "by the war memorial"
+     ]
+    ],
+    [
+     "Where was her bicycle by four o'clock?",
+     [
+      "in the shed",
+      "the shed",
+      "shed"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p19",
+   "text": "Ms Horvath teaches music at the school in Wrexley. Before the spring concert she lent her own violin to a pupil, Chukwudi, because his had a cracked neck. The cracked one was sent to a repairer in town, who glued it and fitted new strings. On the night of the concert Chukwudi played a solo, and his grandparents clapped from the front row.",
+   "qs": [
+    [
+     "Who teaches music at the school?",
+     [
+      "ms horvath",
+      "horvath"
+     ]
+    ],
+    [
+     "Who did Ms Horvath lend her violin to?",
+     [
+      "chukwudi",
+      "a pupil",
+      "pupil"
+     ]
+    ],
+    [
+     "Why did Ms Horvath lend her violin?",
+     [
+      "a cracked neck",
+      "cracked neck"
+     ]
+    ],
+    [
+     "What did Chukwudi play on the night of the concert?",
+     [
+      "a solo",
+      "solo"
+     ]
+    ],
+    [
+     "Who clapped from the front row?",
+     [
+      "his grandparents",
+      "grandparents"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p20",
+   "text": "A goat named Brimble and a donkey named Osk shared a field behind the farmhouse. When the gate blew open in a gale, the goat wanted to run to the cabbage garden, but the donkey said the road was dangerous. The goat went alone and was chased all the way back by the farm dog, Sabre. After that Brimble listened when Osk spoke, and Osk let him stand on his back to reach the apple branches.",
+   "qs": [
+    [
+     "What blew the gate open?",
+     [
+      "a gale",
+      "gale"
+     ]
+    ],
+    [
+     "Where did the goat want to run?",
+     [
+      "to the cabbage garden",
+      "the cabbage garden",
+      "cabbage garden"
+     ]
+    ],
+    [
+     "Who said the road was dangerous?",
+     [
+      "osk",
+      "the donkey",
+      "donkey"
+     ]
+    ],
+    [
+     "Who chased the goat back?",
+     [
+      "sabre",
+      "the farm dog",
+      "farm dog"
+     ]
+    ],
+    [
+     "What did Osk let Brimble do?",
+     [
+      "stand on his back",
+      "stand"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p21",
+   "text": "On Wednesday morning Mr Abernathy's class took the train from Corrin to the coast. They spent the morning at the tide pools, where a ranger named Nasrin showed them starfish and crabs. After lunch they visited the lighthouse and climbed its hundred and twelve steps. The train brought them home at six, and parents were waiting on the platform.",
+   "qs": [
+    [
+     "Whose class took the train to the coast?",
+     [
+      "mr abernathy's",
+      "abernathy's",
+      "abernathy"
+     ]
+    ],
+    [
+     "Where did the class spend the morning?",
+     [
+      "at the tide pools",
+      "the tide pools",
+      "tide pools"
+     ]
+    ],
+    [
+     "Who showed them starfish and crabs?",
+     [
+      "nasrin",
+      "a ranger",
+      "ranger"
+     ]
+    ],
+    [
+     "What did they visit after lunch?",
+     [
+      "the lighthouse",
+      "lighthouse"
+     ]
+    ],
+    [
+     "What did they climb at the lighthouse?",
+     [
+      "hundred and twelve steps",
+      "steps"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p22",
+   "text": "At the Pewter Jug cafe the cook, Vojtech, starts the soup at five in the morning. His sister Zelda takes the orders and writes them on a slate. On Sundays the cafe is closed, so Vojtech goes fishing on the reservoir with his friend Okello. Whatever they catch is cooked for Monday's lunch.",
+   "qs": [
+    [
+     "Who starts the soup?",
+     [
+      "vojtech",
+      "the cook",
+      "cook"
+     ]
+    ],
+    [
+     "When does Vojtech start the soup?",
+     [
+      "five in the morning",
+      "at five",
+      "five"
+     ]
+    ],
+    [
+     "Who writes the orders on a slate?",
+     [
+      "zelda",
+      "his sister",
+      "sister"
+     ]
+    ],
+    [
+     "What does Zelda write the orders on?",
+     [
+      "a slate",
+      "slate"
+     ]
+    ],
+    [
+     "Where does Vojtech go fishing?",
+     [
+      "on the reservoir",
+      "the reservoir",
+      "reservoir"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p23",
+   "text": "A snail named Pellam decided to visit his cousin on the far side of the garden path. A blackbird, Merle, offered to carry him in her beak, but Pellam did not trust her. He crossed the path slowly through a whole afternoon, and the blackbird kept watch so that no thrush could reach him. When he arrived he thanked her, and the two have been friends ever since.",
+   "qs": [
+    [
+     "Who decided to visit his cousin?",
+     [
+      "pellam",
+      "a snail",
+      "snail"
+     ]
+    ],
+    [
+     "Who offered to carry Pellam?",
+     [
+      "merle",
+      "a blackbird",
+      "blackbird"
+     ]
+    ],
+    [
+     "What did Merle offer to carry him in?",
+     [
+      "her beak",
+      "beak"
+     ]
+    ],
+    [
+     "How long did Pellam take to cross the path?",
+     [
+      "a whole afternoon",
+      "whole afternoon",
+      "afternoon"
+     ]
+    ],
+    [
+     "What did Pellam cross?",
+     [
+      "the garden path",
+      "garden path",
+      "the path",
+      "path"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p24",
+   "text": "Captain Kabongo's ferry left Tarbet harbour at nine with a cargo of flour and two cars. Halfway across the sound the fog came down, and she slowed the engines and sounded the horn. The ferry reached the island an hour late, where young Rhodri was waiting on the slipway with a tractor. By the afternoon the flour was in the island bakery and the ferry was on its way back.",
+   "qs": [
+    [
+     "Whose ferry left Tarbet harbour?",
+     [
+      "captain kabongo's",
+      "kabongo's",
+      "captain kabongo",
+      "kabongo"
+     ]
+    ],
+    [
+     "When did the ferry leave the harbour?",
+     [
+      "at nine",
+      "nine"
+     ]
+    ],
+    [
+     "What came down halfway across the sound?",
+     [
+      "the fog",
+      "fog"
+     ]
+    ],
+    [
+     "Who was waiting on the slipway?",
+     [
+      "young rhodri",
+      "rhodri"
+     ]
+    ],
+    [
+     "Where was the flour by the afternoon?",
+     [
+      "in the island bakery",
+      "the island bakery",
+      "island bakery",
+      "bakery"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p25",
+   "text": "Every year the residents of Thimble Court sign a card for their caretaker, Mr Zungu. This year Mrs Holloway took the card from door to door, and forty neighbours signed it in the hallway. The children drew a picture of his red toolbox on the back. On his birthday they left it on his desk in the boiler room, with a cake from the corner bakery.",
+   "qs": [
+    [
+     "What did the residents sign for their caretaker?",
+     [
+      "a card",
+      "card"
+     ]
+    ],
+    [
+     "Who took the card from door to door?",
+     [
+      "mrs holloway",
+      "holloway"
+     ]
+    ],
+    [
+     "Where did the neighbours sign the card?",
+     [
+      "in the hallway",
+      "the hallway",
+      "hallway"
+     ]
+    ],
+    [
+     "How many neighbours signed the card?",
+     [
+      "forty neighbours",
+      "forty"
+     ]
+    ],
+    [
+     "Where did they leave the card?",
+     [
+      "on his desk",
+      "his desk",
+      "desk",
+      "in the boiler room",
+      "the boiler room"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p26",
+   "text": "A frog named Bulmer lived in a rain barrel behind a greenhouse. Every night he sang so loudly that the gardener's cat, Pashmina, could not sleep. The cat complained to the moths, and the moths complained to the moon, but nobody could stop the frog. In the end a dry week quieted him, because the barrel ran low and he went off to find a pond.",
+   "qs": [
+    [
+     "Where did Bulmer live?",
+     [
+      "in a rain barrel",
+      "a rain barrel",
+      "rain barrel",
+      "barrel"
+     ]
+    ],
+    [
+     "Who could not sleep?",
+     [
+      "pashmina",
+      "the gardener's cat",
+      "gardener's cat"
+     ]
+    ],
+    [
+     "Who did the cat complain to?",
+     [
+      "the moths",
+      "moths"
+     ]
+    ],
+    [
+     "What quieted the frog in the end?",
+     [
+      "a dry week",
+      "dry week"
+     ]
+    ],
+    [
+     "Why did Bulmer go off to find a pond?",
+     [
+      "the barrel ran low",
+      "barrel ran low",
+      "ran low"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p27",
+   "text": "On the morning of the fair, Grandpa Anand packed his jars of honey into a wooden crate. His granddaughter, Golnar, carried the crate to the car while he locked the hives. They drove to the fairground at Wetherby Green and set up a table beside the cider tent. Golnar watched the stall at lunchtime while her grandfather walked round the show ring, and by evening every jar was sold.",
+   "qs": [
+    [
+     "Where did Grandpa Anand pack his jars of honey?",
+     [
+      "into a wooden crate",
+      "a wooden crate",
+      "wooden crate",
+      "crate"
+     ]
+    ],
+    [
+     "Who carried the crate to the car?",
+     [
+      "golnar",
+      "his granddaughter",
+      "granddaughter"
+     ]
+    ],
+    [
+     "What did Grandpa Anand lock?",
+     [
+      "the hives",
+      "hives"
+     ]
+    ],
+    [
+     "When did Golnar watch the stall?",
+     [
+      "at lunchtime",
+      "lunchtime"
+     ]
+    ],
+    [
+     "Where did her grandfather walk at lunchtime?",
+     [
+      "round the show ring",
+      "the show ring",
+      "show ring"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p28",
+   "text": "Dr Ngata is the only vet on the island of Skerra. When a ewe at Hollins Farm had trouble with her lamb, the farmer, Ciaran, phoned her at midnight. She drove across the island in her old jeep and helped the lamb into the world. The farmer's wife made her tea in the kitchen, and the lamb was named Midnight.",
+   "qs": [
+    [
+     "Who is the only vet on the island?",
+     [
+      "dr ngata",
+      "ngata"
+     ]
+    ],
+    [
+     "Who phoned Dr Ngata?",
+     [
+      "ciaran"
+     ]
+    ],
+    [
+     "When did Ciaran phone the vet?",
+     [
+      "at midnight",
+      "midnight"
+     ]
+    ],
+    [
+     "How did Dr Ngata cross the island?",
+     [
+      "in her old jeep",
+      "her old jeep",
+      "old jeep",
+      "jeep"
+     ]
+    ],
+    [
+     "What did Dr Ngata help into the world?",
+     [
+      "the lamb",
+      "lamb"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p29",
+   "text": "A young fox, Rufina, wanted to learn to climb like the cats in the village. Each night she practised on the woodpile behind the inn, and each night she fell off. The innkeeper's old tomcat, Barnaby, watched her from the windowsill and finally came down to show her how to use her claws. By midsummer she could reach the roof of the woodshed, though she never did learn to come down gracefully.",
+   "qs": [
+    [
+     "Who wanted to learn to climb?",
+     [
+      "rufina",
+      "a young fox",
+      "young fox",
+      "fox"
+     ]
+    ],
+    [
+     "Where did Rufina practise?",
+     [
+      "on the woodpile",
+      "the woodpile",
+      "woodpile"
+     ]
+    ],
+    [
+     "Who watched her from the windowsill?",
+     [
+      "barnaby",
+      "the innkeeper's old tomcat",
+      "old tomcat",
+      "tomcat"
+     ]
+    ],
+    [
+     "What did Barnaby show her how to use?",
+     [
+      "her claws",
+      "claws"
+     ]
+    ],
+    [
+     "When could she reach the roof of the woodshed?",
+     [
+      "by midsummer",
+      "midsummer"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p30",
+   "text": "On Monday a parcel of rare seeds left a seed bank in the north and travelled by train to the capital. On Tuesday it was flown to a mountain town, and a courier named Dawit carried it by motorbike to the research garden. There the head gardener, Mrs Llewellyn, signed for the parcel at the gate. By Friday the seeds were planted in the glasshouse, each in its own labelled pot.",
+   "qs": [
+    [
+     "How did the parcel travel to the capital?",
+     [
+      "by train",
+      "train"
+     ]
+    ],
+    [
+     "Who carried the parcel by motorbike?",
+     [
+      "dawit",
+      "a courier",
+      "courier"
+     ]
+    ],
+    [
+     "Who signed for the parcel?",
+     [
+      "mrs llewellyn",
+      "llewellyn",
+      "the head gardener",
+      "head gardener"
+     ]
+    ],
+    [
+     "Where did Mrs Llewellyn sign for the parcel?",
+     [
+      "at the gate",
+      "the gate",
+      "gate"
+     ]
+    ],
+    [
+     "Where were the seeds planted?",
+     [
+      "in the glasshouse",
+      "the glasshouse",
+      "glasshouse"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p31",
+   "text": "The clock on the bus station in Dunmarra stopped at twenty past four one windy night. In the morning the town clerk, Ms Akinyemi, sent for a clockmaker, Mr Bergkvist, who arrived on the noon bus. He climbed the ladder inside the tower and found that a pigeon had built a nest against the hands. He moved the nest to a box on the roof, oiled the gears, and the clock was going again by tea time.",
+   "qs": [
+    [
+     "When did the clock stop?",
+     [
+      "at twenty past four",
+      "twenty past four"
+     ]
+    ],
+    [
+     "Who sent for a clockmaker?",
+     [
+      "ms akinyemi",
+      "akinyemi",
+      "the town clerk",
+      "town clerk"
+     ]
+    ],
+    [
+     "Who arrived on the noon bus?",
+     [
+      "mr bergkvist",
+      "bergkvist",
+      "a clockmaker",
+      "clockmaker"
+     ]
+    ],
+    [
+     "What had built a nest against the hands?",
+     [
+      "a pigeon",
+      "pigeon"
+     ]
+    ],
+    [
+     "What did Mr Bergkvist oil?",
+     [
+      "the gears",
+      "gears"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p32",
+   "text": "A beaver named Osgood built a dam that turned the meadow into a pond. The moorhens loved the pond, but an old vole, Hepzibah, grumbled because her tunnels had flooded. Osgood felt sorry for her and built her a dry room in the side of his lodge. Now the vole sleeps above the water and the moorhens nest in the reeds outside.",
+   "qs": [
+    [
+     "Who built a dam?",
+     [
+      "osgood",
+      "a beaver",
+      "beaver"
+     ]
+    ],
+    [
+     "What did the dam turn the meadow into?",
+     [
+      "a pond",
+      "pond"
+     ]
+    ],
+    [
+     "Who grumbled about the pond?",
+     [
+      "hepzibah",
+      "an old vole",
+      "old vole",
+      "vole"
+     ]
+    ],
+    [
+     "Why did Hepzibah grumble?",
+     [
+      "her tunnels had flooded",
+      "tunnels had flooded",
+      "flooded"
+     ]
+    ],
+    [
+     "Where do the moorhens nest?",
+     [
+      "in the reeds",
+      "the reeds",
+      "reeds"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p33",
+   "text": "At dawn the herder, Batzorig, drove his goats from the village to the high pasture. He spent the day on a rock above the stream, carving a spoon and watching for wolves. When the sun dropped behind the ridge, he whistled for his dog and brought the goats down again. By nightfall the goats were in their pen behind the house, and Batzorig was eating noodles by the stove.",
+   "qs": [
+    [
+     "Where did Batzorig drive his goats at dawn?",
+     [
+      "to the high pasture",
+      "the high pasture",
+      "high pasture"
+     ]
+    ],
+    [
+     "What did Batzorig watch for?",
+     [
+      "wolves"
+     ]
+    ],
+    [
+     "What did Batzorig carve?",
+     [
+      "a spoon",
+      "spoon"
+     ]
+    ],
+    [
+     "Where were the goats by nightfall?",
+     [
+      "in their pen",
+      "their pen",
+      "pen"
+     ]
+    ],
+    [
+     "What was Batzorig doing by the stove?",
+     [
+      "eating noodles",
+      "eating"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p34",
+   "text": "The footbridge over the river in Kilnsey was painted by volunteers last weekend. The paint was donated by a hardware shop owned by Mr Banerjee, and the brushes were lent by the primary school. A retired engineer, Mrs Adewale, checked every bolt before the painting began. The work was finished on Sunday afternoon, and the bridge is now bright green.",
+   "qs": [
+    [
+     "What was painted by volunteers?",
+     [
+      "the footbridge",
+      "footbridge"
+     ]
+    ],
+    [
+     "Who owns the hardware shop?",
+     [
+      "mr banerjee",
+      "banerjee"
+     ]
+    ],
+    [
+     "What was lent by the primary school?",
+     [
+      "the brushes",
+      "brushes"
+     ]
+    ],
+    [
+     "Who checked every bolt?",
+     [
+      "mrs adewale",
+      "adewale",
+      "a retired engineer",
+      "retired engineer",
+      "engineer"
+     ]
+    ],
+    [
+     "When was the work finished?",
+     [
+      "on sunday afternoon",
+      "sunday afternoon",
+      "sunday"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p35",
+   "text": "On the roof of the railway station lived two pigeons, Vesper and Cobble. Vesper boasted that she could fly to the next town faster than the express train. Cobble did not believe her, so they agreed on a race the next morning. Vesper flew straight, but a gust blew her into a church tower, and Cobble, who had ridden on the roof of the train, was waiting for her on the platform.",
+   "qs": [
+    [
+     "Who boasted she could fly faster than the train?",
+     [
+      "vesper"
+     ]
+    ],
+    [
+     "Who did not believe Vesper?",
+     [
+      "cobble"
+     ]
+    ],
+    [
+     "What blew Vesper into a church tower?",
+     [
+      "a gust",
+      "gust"
+     ]
+    ],
+    [
+     "How did Cobble get to the next town?",
+     [
+      "ridden on the roof",
+      "the train",
+      "train"
+     ]
+    ],
+    [
+     "Where was Cobble waiting?",
+     [
+      "on the platform",
+      "the platform",
+      "platform"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p36",
+   "text": "Each Saturday Mrs Tembo takes the early boat from her island to the mainland market. She sells woven baskets from a stall under the clock tower until the church bells ring at one. Then she buys rice, lamp oil and a newspaper, and she meets her son, Chilufya, for lunch at a cafe on the quay. The last boat carries her home at five.",
+   "qs": [
+    [
+     "Who takes the early boat to the mainland?",
+     [
+      "mrs tembo",
+      "tembo"
+     ]
+    ],
+    [
+     "Where is Mrs Tembo's stall?",
+     [
+      "under the clock tower",
+      "the clock tower",
+      "clock tower"
+     ]
+    ],
+    [
+     "What does Mrs Tembo sell?",
+     [
+      "woven baskets",
+      "baskets"
+     ]
+    ],
+    [
+     "Who does she meet for lunch?",
+     [
+      "chilufya",
+      "her son",
+      "son"
+     ]
+    ],
+    [
+     "When does the last boat carry her home?",
+     [
+      "at five",
+      "five"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p37",
+   "text": "Captain Ngcobo, who retired from the sea last year, now builds model ships in his garage. His granddaughter, Ayodele, paints the tiny flags, and his dog sleeps under the workbench. This spring one of his models, a three-masted schooner, won first prize at the county show. The judges asked where he had learned to tie such small knots, and he said he had learned on a real ship long ago.",
+   "qs": [
+    [
+     "Who builds model ships?",
+     [
+      "captain ngcobo",
+      "ngcobo"
+     ]
+    ],
+    [
+     "Where does Captain Ngcobo build model ships?",
+     [
+      "in his garage",
+      "his garage",
+      "garage"
+     ]
+    ],
+    [
+     "Who paints the tiny flags?",
+     [
+      "ayodele",
+      "his granddaughter",
+      "granddaughter"
+     ]
+    ],
+    [
+     "What did Captain Ngcobo retire from?",
+     [
+      "the sea",
+      "sea"
+     ]
+    ],
+    [
+     "What won first prize at the county show?",
+     [
+      "a three-masted schooner",
+      "three-masted schooner",
+      "schooner"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p38",
+   "text": "A spider called Nettlewick spun her web across the window of a garden shed. A clumsy bumblebee, Barrow, flew into it twice in one morning and tore it both times. The spider was angry at first, but she noticed that the bee always came from the lavender. She moved her web to the other window, and after that the two of them never troubled each other again.",
+   "qs": [
+    [
+     "Who spun a web across the window of a garden shed?",
+     [
+      "nettlewick",
+      "a spider",
+      "spider"
+     ]
+    ],
+    [
+     "Who flew into the web?",
+     [
+      "barrow",
+      "a clumsy bumblebee",
+      "clumsy bumblebee",
+      "bumblebee"
+     ]
+    ],
+    [
+     "How many times did the bee fly into the web?",
+     [
+      "twice"
+     ]
+    ],
+    [
+     "What did Barrow tear?",
+     [
+      "her web",
+      "web"
+     ]
+    ],
+    [
+     "Where did the spider move her web?",
+     [
+      "to the other window",
+      "the other window",
+      "other window"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p39",
+   "text": "On Monday morning a child's red mitten was dropped on the tram. The conductor, Hildegard, found it under a seat and took it to the lost property office at the depot. On Wednesday a woman named Mrs Villaverde came to the depot asking for a mitten, and the clerk gave it back to her. That evening the mitten was back on her daughter's hand at the skating rink.",
+   "qs": [
+    [
+     "When was the mitten dropped?",
+     [
+      "on monday morning",
+      "monday morning",
+      "monday"
+     ]
+    ],
+    [
+     "Who found the mitten?",
+     [
+      "hildegard",
+      "the conductor",
+      "conductor"
+     ]
+    ],
+    [
+     "What was dropped on the tram?",
+     [
+      "a child's red mitten",
+      "red mitten",
+      "mitten"
+     ]
+    ],
+    [
+     "Who came to the depot asking for a mitten?",
+     [
+      "mrs villaverde",
+      "villaverde"
+     ]
+    ],
+    [
+     "Where was the mitten that evening?",
+     [
+      "on her daughter's hand",
+      "her daughter's hand",
+      "at the skating rink",
+      "the skating rink",
+      "skating rink"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "p40",
+   "text": "Przemek cut his knee on a rock while he was crabbing with his cousin, Leilani, on Saturday. She helped him limp to the small clinic by the harbour, where Dr Rahimi stitched the cut. The doctor wrapped the knee in a white bandage and told him to keep it dry for a week. Przemek spent Sunday on the sofa, reading comics his cousin had brought from the shop.",
+   "qs": [
+    [
+     "What did Przemek cut on a rock?",
+     [
+      "his knee",
+      "knee"
+     ]
+    ],
+    [
+     "Who helped Przemek limp to the clinic?",
+     [
+      "leilani",
+      "his cousin",
+      "cousin"
+     ]
+    ],
+    [
+     "Who stitched the cut?",
+     [
+      "dr rahimi",
+      "rahimi",
+      "the doctor",
+      "doctor"
+     ]
+    ],
+    [
+     "What did the doctor wrap the knee in?",
+     [
+      "a white bandage",
+      "white bandage",
+      "bandage"
+     ]
+    ],
+    [
+     "Where did Przemek spend Sunday?",
+     [
+      "on the sofa",
+      "the sofa",
+      "sofa"
+     ]
+    ]
+   ]
+  }
+ ]
+}
