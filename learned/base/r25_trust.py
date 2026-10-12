@@ -85,3 +85,15 @@ if "--final5" in sys.argv:                                                      
     a = sum(1 for l in F5 if spoke(l) and right(l) and route(l) in keep5); w = sum(1 for l in F5 if spoke(l) and not right(l) and route(l) in keep5)
     a0 = sum(1 for l in F5 if spoke(l) and right(l)); w0 = sum(1 for l in F5 if spoke(l) and not right(l))
     print(f"R25-aj val_fresh5 ({len(F5)} questions): all routes {a0} right / {w0} wrong | trusted routes {a} right / {w} wrong, precision {a / max(1, a + w):.3f}, fitness {a - 3 * w}")
+
+
+if "--score-range" in sys.argv:                                                          # any untouched block L[a:b], scored once; trust on the same 710 practice questions
+    a_, b_ = int(sys.argv[sys.argv.index("--score-range") + 1]), int(sys.argv[sys.argv.index("--score-range") + 2])
+    PR = L[:310] + L[510:910]; FR = L[a_:b_]
+    fr = collections.defaultdict(lambda: [0, 0])
+    for l in PR:
+        if spoke(l): fr[route(l)][0 if right(l) else 1] += 1
+    kr = {r for r, (x, y) in fr.items() if x - 3 * y > 0}
+    a = sum(1 for l in FR if spoke(l) and right(l) and route(l) in kr); w = sum(1 for l in FR if spoke(l) and not right(l) and route(l) in kr)
+    a0 = sum(1 for l in FR if spoke(l) and right(l)); w0 = sum(1 for l in FR if spoke(l) and not right(l))
+    print(f"scored once, questions {a_}-{b_} ({len(FR)}): all routes {a0} right / {w0} wrong | trusted routes {a} right / {w} wrong, precision {a / max(1, a + w):.3f}, fitness {a - 3 * w}")
