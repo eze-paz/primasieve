@@ -387,3 +387,9 @@ Paragraph scope: the base model (four groups + tuned word-triple, as R25-ag) kee
 
 ## R25-aq result (item 3, decided on practice)
 Agent axis = principal direction 3 of the learner's vectors (people end: client, rector, engineer, physician, visitor, waiter, foreman; other end: threw, brought, struck, took, gave, carried). On the 710 practice questions, trusted routes: no cut-off 226 / 22 (+160); loosest 225 / 22; strictest tried 201 / 21. The learner chose no cut-off: its remaining wrong 'who' answers are the wrong person, not the wrong kind of word. No untouched set is spent on it.
+
+## R25-ap result (PASS)
+Held-out paragraphs, 270,358 predictions: base (four groups + tuned word-triple) 8.2798 bits/word; with copy memory **8.2022** (weight 0.03, chosen inside the grid on training paragraphs). Words already used in the story are worth about 0.08 bits/word, with counts only.
+
+## R25-ar registration (item 5: a small attention network over the learner's vectors)
+Two-layer causal self-attention (128 wide, 4 heads, context 64 words of the paragraph; about 5.0M parameters), embeddings initialised from r25_vectors_all.npz and tuned; trained 75 minutes on the CPU on the training paragraphs; scored on the same 270,358 held-out predictions as R25-ap (words outside its 20,000-word vocabulary charged their share of the unknown mass). Reported against the count models (8.2022 with copy memory) and the language model (R25-ao).
