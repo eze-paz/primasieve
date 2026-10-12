@@ -74,3 +74,14 @@ if "--final4" in sys.argv:                                                      
     a = sum(1 for l in F4 if spoke(l) and right(l) and route(l) in keep4); w = sum(1 for l in F4 if spoke(l) and not right(l) and route(l) in keep4)
     a0 = sum(1 for l in F4 if spoke(l) and right(l)); w0 = sum(1 for l in F4 if spoke(l) and not right(l))
     print(f"R25-ai val_fresh4 ({len(F4)} questions): all routes {a0} right / {w0} wrong | trusted routes {a} right / {w} wrong, precision {a / max(1, a + w):.3f}, fitness {a - 3 * w}")
+
+
+if "--final5" in sys.argv:                                                               # R25-aj: trust on the same 710; val_fresh5 = L[1310:1510], scored once per configuration
+    P5 = L[:310] + L[510:910]; F5 = L[1310:1510]
+    fit5 = collections.defaultdict(lambda: [0, 0])
+    for l in P5:
+        if spoke(l): fit5[route(l)][0 if right(l) else 1] += 1
+    keep5 = {r for r, (a, w) in fit5.items() if a - 3 * w > 0}
+    a = sum(1 for l in F5 if spoke(l) and right(l) and route(l) in keep5); w = sum(1 for l in F5 if spoke(l) and not right(l) and route(l) in keep5)
+    a0 = sum(1 for l in F5 if spoke(l) and right(l)); w0 = sum(1 for l in F5 if spoke(l) and not right(l))
+    print(f"R25-aj val_fresh5 ({len(F5)} questions): all routes {a0} right / {w0} wrong | trusted routes {a} right / {w} wrong, precision {a / max(1, a + w):.3f}, fitness {a - 3 * w}")

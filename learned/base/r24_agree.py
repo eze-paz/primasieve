@@ -211,6 +211,7 @@ def main():
     if "--val-practice" in ARGV: stories = stories + json.load(open("val_practice_a.json", encoding="utf-8"))["stories"] + json.load(open("val_practice_b.json", encoding="utf-8"))["stories"]
     if "--val-fresh3" in ARGV: stories = stories + json.load(open("val_fresh3.json", encoding="utf-8"))["stories"]     # R25-final: the last untouched set, after practice B
     if "--val-fresh4" in ARGV: stories = stories + json.load(open("val_fresh4.json", encoding="utf-8"))["stories"]     # R25-ai: the fifth untouched set, after val_fresh3
+    if "--val-fresh5" in ARGV: stories = stories + json.load(open("val_fresh5.json", encoding="utf-8"))["stories"]     # R25-aj: the sixth untouched set, after val_fresh4
     if "--val-practice2" in ARGV: stories = stories + json.load(open("val_practice_c.json", encoding="utf-8"))["stories"] + json.load(open("val_practice_d.json", encoding="utf-8"))["stories"]   # R25-ab   # R25-u: 400 more practice questions     # R24-al: the second hand-written validation set
     n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0]); valkk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
