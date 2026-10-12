@@ -444,3 +444,14 @@ Second half of the held-out paragraphs, 122,818 predictions: attention network a
 
 ## R25-av registration (more text and a larger network)
 r25_attn.py gains --all-text (every paragraph of the training books, 21.2M tokens / 354,551 paragraphs, instead of the filtered 13.0M), --width, --layers, --out. New network: width 256, 4 layers, 10.3M parameters, same vectors as starting embeddings, same held-out predictions. Trained 8 hours detached from scratch (weights r25_attn_av.pt). Gate: held-out paragraphs below 7.7313 (the 5.0M network after about 10.5 hours on the filtered text). Then scored on the 47,478 matched predictions against the language model's 7.6694.
+
+## R25-av stopped (owner's order)
+The 10.3M-parameter attention run had already stopped by itself at step 800 (no process left; the log ends at 1,051 s). Not restarted: the owner replaced it with R25-aw.
+
+## R25-aw registration (brain-like network: running state + small sparse look-up)
+r25_rnn.py. Two GRU layers of width 128 read the words in order (the running state); the look-up lets the current state fetch only the 4 best-matching earlier moments of the paragraph by one similarity match and adds what it fetched. 4,857,605 parameters (attention network 4,998,149). Same starting vectors, same filtered 13.0M training tokens, same windows of 64 words, batch, optimiser and unknown-word charge; about the same speed (about 1.8 steps per second on 6 threads in a probe). Held-out paragraphs are read whole (most paragraphs are under 64 words, so the attention network's windows rarely cut context).
+Runs, one after the other, detached, 75 minutes each, 6 threads:
+- A: running state + look-up of 4 (r25_rnn_k4.pt)
+- B: running state alone (r25_rnn_k0.pt)
+Compared with the attention network after 75 minutes: held-out paragraphs 8.0587, matched predictions 8.5929 (language model 7.6694).
+Verdicts: the brain-like design PASSES if A is at or below 8.0587 on held-out paragraphs. The look-up PASSES if A beats B. Both also reported on the matched predictions.
