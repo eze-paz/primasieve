@@ -347,3 +347,6 @@ R25-aj: val_fresh5.json delivered and verified (40 stories, 200 questions, every
 
 ## R25-aj result (pre-registered comparison, val_fresh5 scored once per configuration)
 Model on val_fresh5: 133 / 200. 100 dims (adopted full-text vectors): all routes 77 / 28; **trusted 54 / 6, precision 0.900, fitness +36**. 200 dims: all routes 76 / 29; trusted 45 / 6, 0.882, +27 -- not adopted. Across the two latest clean sets (val_fresh4, val_fresh5) the adopted configuration's trusted answers are 111 right / 11 wrong (precision 0.91) on about 30% of questions; all routes about 80 of 200 right.
+
+## R25-ak registration (action and time roles, one pre-registered comparison on a seventh untouched set)
+Practice (710) silences: 'what did' 68, 'where was / were' 58, 'where did' 24, 'when did' 22. The action / complement roles (--do) and time phrases as arguments (--time-args) target the largest gap; they were last judged on an over-consulted or too-small set. A seventh hand-written set, val_fresh6 (200), is commissioned. Exactly two configurations are scored once each on it: the adopted configuration (full-text 100-dim vectors) as is, and with --do --time-args; trust chosen on the same 710 for each.
