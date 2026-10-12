@@ -4,7 +4,7 @@ fitness (+1 right, -3 wrong) over the old 110 and val_more 200 is above zero; th
 untouched val_fresh2 200, reported as a total only. Run: python learned/base/r25_trust.py r24_diag_r25p_l.txt"""
 import sys, collections
 f = sys.argv[1]
-L = [l for l in open(f, encoding="utf-8") if l.startswith("VAL |")]
+L = [l for l in open(f, encoding="utf-8", errors="replace") if l.startswith("VAL |")]      # logs may carry accented names in another encoding
 route = lambda l: l.split("| route ")[1].split(" |")[0]
 spoke = lambda l: "| ans None |" not in l
 right = lambda l: "hit True" in l
