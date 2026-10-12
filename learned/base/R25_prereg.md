@@ -344,3 +344,6 @@ Model on val_fresh4: 140 / 200. Configuration 1 (13M-token vectors): all routes 
 ## R25-aj registration (vector size, one pre-registered comparison on a sixth untouched set)
 Full-text vectors at 200 dimensions (r25_vectors_all200.npz) against the adopted 100. A sixth hand-written set, val_fresh5 (200), is commissioned. Exactly two configurations are scored once each on it: R25-x with R25_VEC=r25_vectors_all.npz and with R25_VEC=r25_vectors_all200.npz; role thresholds 0.8 / 0.5; trust chosen on the same 710.
 R25-aj: val_fresh5.json delivered and verified (40 stories, 200 questions, every gold form in its story, ASCII names). Model on all 1,510; configuration A = R25_VEC=r25_vectors_all.npz (100 dims); configuration B = R25_VEC=r25_vectors_all200.npz (200 dims); trust on the 710; val_fresh5 scored once each.
+
+## R25-aj result (pre-registered comparison, val_fresh5 scored once per configuration)
+Model on val_fresh5: 133 / 200. 100 dims (adopted full-text vectors): all routes 77 / 28; **trusted 54 / 6, precision 0.900, fitness +36**. 200 dims: all routes 76 / 29; trusted 45 / 6, 0.882, +27 -- not adopted. Across the two latest clean sets (val_fresh4, val_fresh5) the adopted configuration's trusted answers are 111 right / 11 wrong (precision 0.91) on about 30% of questions; all routes about 80 of 200 right.
