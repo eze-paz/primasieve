@@ -17,7 +17,7 @@ import r24_qreader as QR
 from b6_rwkv import hit
 
 QW = {"who", "what", "where", "when", "why", "how", "which", "whose", "whom", "did", "does", "do", "was", "were", "is", "are", "had", "has"}
-Z = np.load(os.path.join(HERE, "r25_vectors.npz")); VEC = {w: v for w, v in zip(Z["vocab"].tolist(), Z["vecs"])}
+Z = np.load(os.path.join(HERE, os.environ.get("R25_VEC", "r25_vectors.npz")))           # R25-ai: which vector file, set by the caller's environment; VEC = {w: v for w, v in zip(Z["vocab"].tolist(), Z["vecs"])}
 
 
 def vec(w):

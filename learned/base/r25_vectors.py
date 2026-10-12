@@ -13,8 +13,9 @@ import r24_tlm as T, r24_books as B, data as D0
 def main():
     t0 = time.time(); train_b, _ = D0.books(); paras = B.paragraphs(train_b, int(ARGV[ARGV.index("--sents") + 1]) if "--sents" in ARGV else 400000)
     sents = []
-    for p in paras:
-        for s in T.SENT.split(p["text"]):
+    texts = [D0.read(b) for b in train_b] if "--all" in ARGV else [p["text"] for p in paras]      # R25-ai: every sentence of the training books, not only filtered paragraphs
+    for text in texts:
+        for s in T.SENT.split(text):
             w = [x.lower() for x in T.TOK.findall(s) if x.isalpha()]
             if len(w) >= 2: sents.append(w)
     uni = collections.Counter(x for w in sents for x in w)
@@ -34,7 +35,7 @@ def main():
         pmi = np.log((M / tot) / (pr * pc)); pmi[~np.isfinite(pmi)] = 0; pmi = np.maximum(pmi, 0)
     U, S, _ = np.linalg.svd(pmi, full_matrices=False)
     V = U[:, :100] * np.sqrt(S[:100]); V /= (np.linalg.norm(V, axis=1, keepdims=True) + 1e-9)
-    np.savez_compressed(os.path.join(HERE, "r25_vectors.npz"), vocab=np.array(vocab), vecs=V.astype(np.float32))
+    np.savez_compressed(os.path.join(HERE, "r25_vectors_all.npz" if "--all" in ARGV else "r25_vectors.npz"), vocab=np.array(vocab), vecs=V.astype(np.float32))
     print(f"R25-g vectors saved ({time.time() - t0:.0f} s)", flush=True)
     for probe in ("lend", "give", "borrow", "own", "doctor", "nephew", "dusk", "parcel", "spin", "count"):
         if probe in vi:
