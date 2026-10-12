@@ -350,3 +350,4 @@ Model on val_fresh5: 133 / 200. 100 dims (adopted full-text vectors): all routes
 
 ## R25-ak registration (action and time roles, one pre-registered comparison on a seventh untouched set)
 Practice (710) silences: 'what did' 68, 'where was / were' 58, 'where did' 24, 'when did' 22. The action / complement roles (--do) and time phrases as arguments (--time-args) target the largest gap; they were last judged on an over-consulted or too-small set. A seventh hand-written set, val_fresh6 (200), is commissioned. Exactly two configurations are scored once each on it: the adopted configuration (full-text 100-dim vectors) as is, and with --do --time-args; trust chosen on the same 710 for each.
+R25-ak: val_fresh6.json delivered and verified (40 stories, 200 questions, every gold form in its story). Model on all 1,710; configuration A = adopted (R25_VEC=r25_vectors_all.npz); B = A plus --do --time-args; trust on the 710; val_fresh6 (positions 1510-1710) scored once each.
