@@ -14,6 +14,7 @@ def sents_of(paras):
 
 tr_b, te_b = D0.books(); tr = list(sents_of(B.paragraphs(tr_b, 1000000))); te = list(sents_of(B.paragraphs(te_b, 20000)))
 cut = int(len(tr) * 0.95); fit, tune = tr[:cut], tr[cut:]
+if "--subset" in ARGV: te = te[:int(ARGV[ARGV.index("--subset") + 1])]                  # R25-ao: the same held-out sentences the language model is scored on
 cls = json.load(open("r25_classes.json", encoding="utf-8")); UNK = "<unk>"
 uni = collections.Counter(x for w in fit for x in w); big = collections.Counter((w[i - 1], w[i]) for w in fit for i in range(1, len(w)))
 V = set(uni); N = sum(uni.values())
@@ -131,3 +132,34 @@ if "--wtri" in ARGV:
     mm = min((0.2, 0.3, 0.4, 0.5, 0.6), key=lambda m: bits4(tune, lambda q3_, p_, a, b: m * p_wtri(p_, a, b, mu_w) + (1 - m) * p_g(q3_, p_, a, b)))
     print(f"R25-af learner's three-group model alone (R25-ae settings): {bits4(te, p_g):.4f} bits/token", flush=True)
     print(f"R25-af word-triple model mixed with the learner's groups ({mm} word-triple): {bits4(te, lambda q3_, p_, a, b: mm * p_wtri(p_, a, b, mu_w) + (1 - mm) * p_g(q3_, p_, a, b)):.4f} bits/token", flush=True)
+
+# ---------------- R25-ag: four groups of context ----------------
+if "--five" in ARGV:
+    tri = collections.Counter(); tric = collections.Counter()
+    c3 = collections.Counter(); c3r = collections.Counter(); c4 = collections.Counter(); c4r = collections.Counter(); c5 = collections.Counter(); c5r = collections.Counter()
+    for w in fit:
+        g = [cof(x) for x in w]
+        for i in range(2, len(w)):
+            tri[(w[i - 2], w[i - 1], w[i])] += 1; tric[(w[i - 2], w[i - 1])] += 1
+            c3[(g[i - 2], g[i - 1], g[i])] += 1; c3r[(g[i - 2], g[i - 1])] += 1
+        for i in range(3, len(w)): c4[(g[i - 3], g[i - 2], g[i - 1], g[i])] += 1; c4r[(g[i - 3], g[i - 2], g[i - 1])] += 1
+        for i in range(4, len(w)): c5[(g[i - 4], g[i - 3], g[i - 2], g[i - 1], g[i])] += 1; c5r[(g[i - 4], g[i - 3], g[i - 2], g[i - 1])] += 1
+    def p_wt(w, i):
+        pp = w[i - 2] if i >= 2 else "<s>"; n = tric[(pp, w[i - 1])]; l = n / (n + 300)
+        return l * (tri[(pp, w[i - 1], w[i])] / n if n else 0.0) + (1 - l) * p_big(w[i - 1], w[i], best_lam)
+    def p_g5(w, i, mu5):
+        g = [cof(x) for x in w[max(0, i - 4):i + 1]]; g = [-9] * (5 - len(g)) + g
+        p2 = (cb[(g[3], g[4])] + 0.1) / (rows[g[3]] + 0.1 * C)
+        n3 = c3r[(g[2], g[3])]; q3 = (n3 / (n3 + 500)) * (c3[(g[2], g[3], g[4])] / n3 if n3 else 0) + (1 - n3 / (n3 + 500)) * p2
+        n4 = c4r[(g[1], g[2], g[3])]; q4 = (n4 / (n4 + 200)) * (c4[(g[1], g[2], g[3], g[4])] / n4 if n4 else 0) + (1 - n4 / (n4 + 200)) * q3
+        n5 = c5r[(g[0], g[1], g[2], g[3])]; q5 = (n5 / (n5 + mu5)) * (c5[tuple(g)] / n5 if n5 else 0) + (1 - n5 / (n5 + mu5)) * q4
+        x = w[i]; return q5 * (uni[x] / cn[g[4]] if (x in V and cn[g[4]]) else p_uni(x))
+    def bitsw(data, f):
+        t = n = 0
+        for w in data:
+            for i in range(1, len(w)): t -= math.log2(max(f(w, i), 1e-12)); n += 1
+        return t / n
+    mu5 = min((50, 200, 1000, 5000), key=lambda m: bitsw(tune, lambda w, i: p_g5(w, i, m)))
+    print(f"R25-ag four groups of context (backoff {mu5}): {bitsw(te, lambda w, i: p_g5(w, i, mu5)):.4f} bits/token", flush=True)
+    m5 = min((0.3, 0.4, 0.5), key=lambda m: bitsw(tune, lambda w, i: m * p_wt(w, i) + (1 - m) * p_g5(w, i, mu5)))
+    print(f"R25-ag mixed with the tuned word-triple model ({m5} word-triple): {bitsw(te, lambda w, i: m5 * p_wt(w, i) + (1 - m5) * p_g5(w, i, mu5)):.4f} bits/token", flush=True)

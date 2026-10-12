@@ -376,3 +376,6 @@ R25-an: val_fresh9.json delivered and verified (40 stories, 200 questions, every
 
 ## R25-an result (pre-registered comparison, val_fresh9 scored once per configuration)
 Model on val_fresh9: 152 / 200. A (old argument match, with the empty-average behaviour): all routes 89 / 21; trusted 74 / 12, 0.860, +38. B (fixed): all routes 89 / 22; trusted 75 / 14, 0.843, +33. The fix lets the role reader answer name-only questions but those answers are not more often right: the old behaviour acted as a filter. Under the rule, A stays: the adopted configuration keeps --old-args (recorded as a known quirk that helps precision).
+
+## R25-ao registration (the language model on the next-word game, matched)
+Same lowercase word sentences from the held-out books, the first 3,000; words 2.. predicted from the earlier words of the same sentence; the model's cost for a word is the sum over its sub-word tokens (checkpoint ckpt_read1b, the one used throughout). The learner's next-word models (word-pair, groups, four-group + tuned word-triple mix) are re-scored on the same 3,000 sentences. Reported as is.
