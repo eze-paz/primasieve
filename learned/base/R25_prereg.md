@@ -358,3 +358,6 @@ Model on val_fresh6: 136 / 200. A (adopted): all routes 83 / 12; trusted 54 / 3,
 ## R25-al registration (the state role, one pre-registered comparison on an eighth untouched set)
 Practice silences: 'where was / were' 58. The state role of R25-o2 (--state: places of the clauses about X, chosen by time words, else the latest) is retested with trust chosen on the 710. An eighth hand-written set, val_fresh7 (200), is commissioned. Exactly two configurations, scored once each: the adopted configuration (B above) and B plus --state.
 R25-al: val_fresh7.json delivered and verified (40 stories, 200 questions, every gold form in its story). Model on all 1,910; configuration A = adopted (full-text vectors, --do --time-args); B = A plus --state; trust on the 710; val_fresh7 (positions 1710-1910) scored once each.
+
+## R25-al result (pre-registered comparison, val_fresh7 scored once per configuration)
+Model on val_fresh7: 135 / 200. A (adopted): all routes 70 / 20; trusted 49 / 2, 0.961, +43. **B (adopted + state role): all routes 74 / 18; trusted 51 / 2, 0.962, +45** -- adopted (a small margin).
