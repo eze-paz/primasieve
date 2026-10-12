@@ -458,3 +458,10 @@ Verdicts: the brain-like design PASSES if A is at or below 8.0587 on held-out pa
 
 ## R25-aw result A (running state + look-up of 4) -- brain-like design PASS
 7,748 steps in 75 minutes (attention network: 7,765). **Held-out paragraphs 7.9758 bits/word** (attention network at 75 minutes 8.0587; gate at or below 8.0587: pass). **Matched predictions 8.5098** (attention 8.5929; language model 7.6694). Run B (running state alone) in progress.
+
+## R25-aw result B (running state alone) -- look-up FAILS
+8,288 steps in 75 minutes (faster: no look-up). **Held-out paragraphs 7.9545** (A with look-up 7.9758; attention 8.0587). **Matched 8.5100** (A 8.5098). The look-up does not beat the running state alone (gate: A beats B -- fail). B had 7% more steps, so at equal steps the two are about even; either way the look-up adds nothing measurable to next-word prediction. The running state alone also beats the attention network at equal time (7.9545 vs 8.0587).
+Reading: next words depend mostly on recent words, which the running state already holds. If the look-up matters, it should show on questions that need an exact earlier detail, not on next-word bits.
+
+## R25-ax registration (running state alone, longer)
+Resume r25_rnn_k0.pt for 180 more minutes (255 in all, the attention network's R25-ar + R25-ar2 budget), same settings, detached. Compared with the attention network at the same budget: held-out paragraphs 7.8042, matched 8.3858. Pass if at or below 7.8042.
