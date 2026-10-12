@@ -411,3 +411,6 @@ Resume from r25_attn.pt (75-minute weights kept as r25_attn_75min.pt), train 4 m
 
 ## R25-as result (item 4: world layers alone -- negative)
 Model on val_fresh10: 148 / 200. A (adopted) and B (adopted + world layers alone) score identically on val_fresh10 (all routes 67 / 22; trusted 50 / 6, 0.893, +32): the world-layer route never fired there. Elsewhere it is mostly wrong: practice 17 answered, 5 right / 12 wrong; earlier untouched sets 23 answered, 6 right / 17 wrong. The learner's trust rule refused it, correctly. The world layers were learned from the generator's tidy events and read hand-written stories poorly; 'where was X at the end' and 'who had X after' need a new learned state tracker, not these layers.
+
+## R25-at registration (three-way next-word comparison)
+The attention network, at its 75-minute weights and at the end of R25-ar2, is scored on exactly the language model's predictions of R25-ao (first 3,000 held-out sentences, sentence scope, 47,478 predictions; long sentences use the last 63 words as context). Compared with the language model (7.6694) and the learner's count models (8.7663) on the same predictions.
