@@ -328,3 +328,9 @@ Four groups of context: 8.5130 alone; mixed with the tuned word-triple model **8
 
 ## R25-c14 + R25-ah registration
 Group refinement resumes on all training text from the 571 saved groups (2 exchange passes, 200 split tries; gate: held-out class-pair bits below 8.8361); then the next-word model of R25-ag is re-scored with the refined groups (gate: mix below 8.2826).
+
+## R25-c14 + R25-ah results
+Groups on all text from 572: exchange 8.8361 -> 8.8328 (pass 2 rejected); 61 of 200 splits kept -> 633 groups; held-out 8.8290. Next-word with the refined groups: four groups alone 8.5061, mixed **8.2822** (from 8.2826; a negligible 0.0004). The next-word line has converged for this method: word-pair 8.8078 -> learner's groups + tuned word-triple 8.2822.
+
+## R25-ai registration (vectors from all 22M training words; one pre-registered comparison on a new untouched set)
+The vectors so far use the 13M tokens the paragraph filter keeps; the training books hold 22.1M words. Vectors are rebuilt from every sentence of the training books (--all), same size (25,000 words, 4,000 contexts). A fifth hand-written set, val_fresh4 (200), is commissioned. Exactly two configurations are then scored once each on it: R25-x as is (13M vectors) and R25-x with the full-text vectors; route trust chosen on the 710 practice questions for both. Reported as is.
