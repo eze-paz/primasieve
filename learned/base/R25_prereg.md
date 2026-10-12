@@ -399,3 +399,6 @@ Of 710 practice questions, 62 mention order or cause; 43 are silent, 15 right, 4
 
 ## R25-as registration (the world layers alone, judged with 710-question trust, on the eleventh untouched set)
 val_fresh10.json delivered and verified (40 stories, 200 questions, every gold form in its story; neutral brief). Two configurations scored once each on it (positions 2310-2510): adopted (full-text vectors, --do --time-args --state --did-verb --old-args) and adopted + --state-alone (the world layers answer on their own; trust chosen on the 710). Started after the R25-ar training to avoid processor contention.
+
+## R25-ao result (matched next-word comparison)
+Same lowercase word sentences, first 3,000 held-out sentences, 47,478 predictions, sentence scope: **language model 7.6694 bits/word**; learner's best (four groups + tuned word-triple) **8.7663**; word-pair 9.2137; learner's groups alone 9.2211. Gap 1.10 bits/word (the model narrows each next word to about half as many candidates). This subset is harder than the full held-out set (learner 8.77 here vs 8.28 overall).
