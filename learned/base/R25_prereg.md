@@ -455,3 +455,6 @@ Runs, one after the other, detached, 75 minutes each, 6 threads:
 - B: running state alone (r25_rnn_k0.pt)
 Compared with the attention network after 75 minutes: held-out paragraphs 8.0587, matched predictions 8.5929 (language model 7.6694).
 Verdicts: the brain-like design PASSES if A is at or below 8.0587 on held-out paragraphs. The look-up PASSES if A beats B. Both also reported on the matched predictions.
+
+## R25-aw result A (running state + look-up of 4) -- brain-like design PASS
+7,748 steps in 75 minutes (attention network: 7,765). **Held-out paragraphs 7.9758 bits/word** (attention network at 75 minutes 8.0587; gate at or below 8.0587: pass). **Matched predictions 8.5098** (attention 8.5929; language model 7.6694). Run B (running state alone) in progress.
