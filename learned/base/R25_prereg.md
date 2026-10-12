@@ -384,3 +384,6 @@ Owner, 2026-10-12: 'go ahead' with the five-step plan (LLM next-word measurement
 
 ## R25-ap registration (copy memory in the next-word game)
 Paragraph scope: the base model (four groups + tuned word-triple, as R25-ag) keeps its short context; a copy memory gives each word already used earlier in the paragraph a probability in proportion to its use; mixed with weight from {0, 0.03, 0.06, 0.1, 0.15, 0.2} chosen on held-out training paragraphs. Held-out books' paragraphs scored once: base vs base + memory.
+
+## R25-aq result (item 3, decided on practice)
+Agent axis = principal direction 3 of the learner's vectors (people end: client, rector, engineer, physician, visitor, waiter, foreman; other end: threw, brought, struck, took, gave, carried). On the 710 practice questions, trusted routes: no cut-off 226 / 22 (+160); loosest 225 / 22; strictest tried 201 / 21. The learner chose no cut-off: its remaining wrong 'who' answers are the wrong person, not the wrong kind of word. No untouched set is spent on it.
