@@ -393,3 +393,9 @@ Held-out paragraphs, 270,358 predictions: base (four groups + tuned word-triple)
 
 ## R25-ar registration (item 5: a small attention network over the learner's vectors)
 Two-layer causal self-attention (128 wide, 4 heads, context 64 words of the paragraph; about 5.0M parameters), embeddings initialised from r25_vectors_all.npz and tuned; trained 75 minutes on the CPU on the training paragraphs; scored on the same 270,358 held-out predictions as R25-ap (words outside its 20,000-word vocabulary charged their share of the unknown mass). Reported against the count models (8.2022 with copy memory) and the language model (R25-ao).
+
+## Item 4 redirected (practice-only analysis)
+Of 710 practice questions, 62 mention order or cause; 43 are silent, 15 right, 4 wrong. The silent ones track a thing or person through the story's own events ('Where was the umbrella at the end?', 'Who had the roll after Petra?', 'Where was the half roll before the dog took it?'). World verb sequences from the books cannot answer these; the story's own timeline can. The learned world layers (holder rules: take / steal / find hold, drop / leave / put release, give passes; place memory) already track it but answer only when a reader agrees.
+
+## R25-as registration (the world layers alone, judged with 710-question trust, on the eleventh untouched set)
+val_fresh10.json delivered and verified (40 stories, 200 questions, every gold form in its story; neutral brief). Two configurations scored once each on it (positions 2310-2510): adopted (full-text vectors, --do --time-args --state --did-verb --old-args) and adopted + --state-alone (the world layers answer on their own; trust chosen on the 710). Started after the R25-ar training to avoid processor contention.
