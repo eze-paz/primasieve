@@ -429,3 +429,12 @@ The gap to the language model fell from 1.10 to 0.72 bits/word, with about 80 ti
 
 ## R25-ar3 registration (third round of training, detached)
 Resume from r25_attn.pt, train 4 more hours (same data, settings, checkpoints every 500 steps), then score the 270,358 held-out paragraph predictions and the 47,478 matched predictions. Pass if held-out paragraphs fall below 7.8042; also report the matched score against 7.6694.
+
+## Correction to R25-ar2
+The step counter restarts on every resume. R25-ar2 trained 18,630 steps on top of R25-ar's 7,765: 26,395 steps in all (about 4.1 passes over the 13.0M training tokens), not "18,630 in all, about 2.9 passes".
+
+## R25-ar3 result (third round) -- PASS
+25,067 more steps (51,462 in all, about 8 passes): **held-out paragraphs 7.7313 bits/word** (R25-ar2 7.8042; gate < 7.8042, pass). Matched predictions: **8.3135** (language model 7.6694; gap 0.64, was 0.72). Gains are slowing: about 0.075 bits per doubling of training, down from about 0.16. At that rate the gap would need about 8 more doublings, so more of the same training will not close it; more text and a larger network are the levers.
+
+## R25-au registration (mixing)
+r25_mix.py: per held-out paragraph prediction, mix the R25-ar3 network with the R25-ap model (count models + copy memory); the mixing weight is chosen on the first half of the held-out paragraphs and reported on the second half only, with each model alone on the same half. Pass if the mix beats the network alone on the second half.
