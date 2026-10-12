@@ -340,3 +340,6 @@ R25-ai first attempt: both configurations crashed before scoring (my edit to r25
 
 ## R25-ai result (pre-registered comparison, val_fresh4 scored once per configuration)
 Model on val_fresh4: 140 / 200. Configuration 1 (13M-token vectors): all routes 86 / 19; trusted 53 / 5, precision 0.914, fitness +38. Configuration 2 (vectors from all 21.2M training tokens): all routes 85 / 19; **trusted 57 / 5, precision 0.919, fitness +42** -- adopted (R25_VEC=r25_vectors_all.npz). Set-to-set variation is large: configuration 1 scored 43 / 13 (+4) on val_fresh3 and 53 / 5 (+38) here. Over the two clean sets, the learner alone answers about 80-85 of 200 right across all routes, and its trusted answers (about a quarter of the questions) are right about 85% of the time. B6 gate not met; no B6. (First attempt crashed on my own edit to r25_soft.py; the scorer then needed to tolerate accented names; the scored runs are the clean reruns.)
+
+## R25-aj registration (vector size, one pre-registered comparison on a sixth untouched set)
+Full-text vectors at 200 dimensions (r25_vectors_all200.npz) against the adopted 100. A sixth hand-written set, val_fresh5 (200), is commissioned. Exactly two configurations are scored once each on it: R25-x with R25_VEC=r25_vectors_all.npz and with R25_VEC=r25_vectors_all200.npz; role thresholds 0.8 / 0.5; trust chosen on the same 710.

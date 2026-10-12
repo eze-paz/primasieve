@@ -34,8 +34,9 @@ def main():
     with np.errstate(divide="ignore", invalid="ignore"):
         pmi = np.log((M / tot) / (pr * pc)); pmi[~np.isfinite(pmi)] = 0; pmi = np.maximum(pmi, 0)
     U, S, _ = np.linalg.svd(pmi, full_matrices=False)
-    V = U[:, :100] * np.sqrt(S[:100]); V /= (np.linalg.norm(V, axis=1, keepdims=True) + 1e-9)
-    np.savez_compressed(os.path.join(HERE, "r25_vectors_all.npz" if "--all" in ARGV else "r25_vectors.npz"), vocab=np.array(vocab), vecs=V.astype(np.float32))
+    DIM = int(ARGV[ARGV.index("--dim") + 1]) if "--dim" in ARGV else 100                     # R25-aj: vector size
+    V = U[:, :DIM] * np.sqrt(S[:DIM]); V /= (np.linalg.norm(V, axis=1, keepdims=True) + 1e-9)
+    np.savez_compressed(os.path.join(HERE, (ARGV[ARGV.index("--out") + 1] if "--out" in ARGV else ("r25_vectors_all.npz" if "--all" in ARGV else "r25_vectors.npz"))), vocab=np.array(vocab), vecs=V.astype(np.float32))
     print(f"R25-g vectors saved ({time.time() - t0:.0f} s)", flush=True)
     for probe in ("lend", "give", "borrow", "own", "doctor", "nephew", "dusk", "parcel", "spin", "count"):
         if probe in vi:
