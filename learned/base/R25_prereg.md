@@ -588,3 +588,6 @@ The sequence memoizer's own inference is stochastic (Monte Carlo); its fixed-dep
 
 ## R25-bn result (spectral hidden-state model, k = 64) -- behind
 After fixing a shape error in the first run (no result), **9.8256** bits/word in 577 s, no gradients (gradient-trained paragraph-scope group network 8.6295; reservoir 10.4855). Better than the reservoir, well behind training. Likely causes, not separated: 64 hidden dimensions, clipped negative estimates, and only group triples as evidence.
+
+## R25-bo result (Kneser-Ney, the memoizer's deterministic form)
+13.8M training tokens, built and scored in 26 s: **8.5120** on paragraphs 500-999 (8.7626 on all 1,000). Behind the count four-group model + copy (8.4211) and the best network (8.3011) alone; its value is as a mixing component (R25-bp, running).
