@@ -11,7 +11,7 @@ EXTRA = [a.split("=", 1) for a in sys.argv[1:] if "=" in a and not a.startswith(
 sys.argv = ["r25_ens.py", "r25_bg.pt"]
 src = open("r25_ens.py", encoding="utf-8").read(); src = src[:src.index("names = list(M)")]
 E = {"__name__": "r25_ens_defs", "__file__": os.path.join(HERE, "r25_ens.py")}; exec(compile(src, "r25_ens.py", "exec"), E)
-M = E["M"]; kn = np.load("r25_kn_probs.npz")
+M = E["M"]; kn = np.load(os.environ.get("R25_KN", "r25_kn_probs.npz"))
 cols = {k: np.array([q for r in M[k] for q in r]) for k in M}; para = np.array([i for i, r in enumerate(M["W"]) for _ in r])
 assert len(kn["p"]) == len(para) and (kn["para"] == para).all(), "Kneser-Ney predictions do not line up"
 cols["K"] = kn["p"]

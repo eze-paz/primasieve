@@ -633,3 +633,9 @@ r25_cm.py with R25_ONLINE=1: start from the depth weights (floored at 0.02), the
 
 ## R25-bw registration (fast count variants, about a minute each)
 r25_kn2.py generalises R25-bo (hashed n-grams, any order); its order-4 run reproduces R25-bo (8.5119 vs 8.5120 on paragraphs 500-999). Variants, each scored once on the same predictions: o4m (modified Kneser-Ney, 3 discounts), o5m, o6m (longer phrases), o5mx (context crosses sentence boundaries in the paragraph), o5ma (all 21M training tokens), o5mxa (both). Reported alone; the best goes into the mix as K.
+
+## R25-bw result (fast count variants), paragraphs 500-999
+o4 8.5119 -> o4m (modified KN) 8.4600 -> o5m 8.4537 -> o6m 8.4493; o5mx (across sentences) 8.4035; o5ma (21M tokens) 8.4011; **o5mxa 8.3580** in 128 s -- the counts alone now beat the four-group count model (8.4211) and approach the networks (8.30). Gains: modified discounts -0.05, context across sentences -0.05, more text -0.05, longer phrases small.
+
+## R25-bx registration (best counts into the mix)
+r25_cm.py with K = o5mxa (and its match depth as the mixing context), components as R25-bt. Compared with 7.6361.
