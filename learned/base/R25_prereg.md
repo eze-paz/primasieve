@@ -556,3 +556,9 @@ Alone X 8.3084 (was 8.4118). Best blend W+G+X+C **8.0814** (weights 0.1/0.2/0.3/
 
 ## R25-bj registration (rare words predicted through their own group)
 The group network's output no longer needs the 20,000-word input vocabulary: a word outside it that has a learned group (41,195 words have one) is predicted as P(its group) x its count share in the group, in training targets and in scoring; only words with no group stay in the unknown bucket (charged their share among those words). r25_rnn.py --groups --oov-groups, learned groups, 6,000 steps, 6 threads, first 1,000 held-out paragraphs. Compared with R25-be C (8.6436, same settings without the change). PASS if lower.
+
+## R25-bk registration (read whole stretches of books: the state carries across paragraphs)
+r25_chapter.py: group-output running state (learned groups, rare words through their group), training paragraphs in book order joined into one stream, 32 parallel streams read 64-word window by window, 6,000 steps each.
+- A (--reset): state empty at every window in training, at every paragraph in scoring (paragraph scope).
+- B: state carried from window to window in training (gradients stop at window edges) and through all 1,000 scored held-out paragraphs in book order.
+Same 50,114 predictions as R25-be/bj. PASS if B beats A. Runs alongside R25-bj (fixed steps, so sharing the processor changes only the time).
