@@ -7,6 +7,7 @@ Models on the first 1,000 held-out paragraphs (same predictions as R25-be: every
 Blend = weighted average of the probabilities; weights on a 0.1 grid chosen on paragraphs 0-499, reported on 500-999 only.
 Run: py -3.12 r25_ens.py"""
 import os, sys, math, itertools, collections, time, random, json
+XW = sys.argv[1] if len(sys.argv) > 1 else "r25_bf_wnx.pt"                                 # R25-bi: which learned x dictionary network to blend
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
 sys.argv = ["r25_attn.py", "--minutes", "0"]
 src = open("r25_attn.py", encoding="utf-8").read(); src = src[:src.index("class Net(nn.Module)")]
@@ -35,7 +36,7 @@ def net_probs(net, ns):
     return out
 t0 = time.time(); M = {}
 for name, argv, wts in (("W", ["--lookup", "0"], "r25_be_a.pt"), ("G", ["--lookup", "0", "--groups"], "r25_be_c.pt"),
-                        ("X", ["--lookup", "0", "--groups", "--groups-file", "r25_classes_wnx.json"], "r25_bf_wnx.pt")):
+                        ("X", ["--lookup", "0", "--groups", "--groups-file", "r25_classes_wnx.json"], XW)):
     net, ns = rnet(argv, wts); M[name] = net_probs(net, ns); print(f"  {name} scored ({time.time() - t0:.0f} s)", flush=True)
 csrc = open("r25_cache.py", encoding="utf-8").read(); csrc = csrc[:csrc.index("best = min(")]
 c = {"__name__": "c", "__file__": os.path.join(HERE, "r25_cache.py")}; sys.argv = ["r25_cache.py"]; exec(compile(csrc, "r25_cache.py", "exec"), c)

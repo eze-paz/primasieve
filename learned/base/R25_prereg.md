@@ -544,3 +544,9 @@ r25_ens.py: word-output network (2,000 steps), group-output network (6,000 steps
 
 ## R25-bh result (blends, no training) -- PASS
 Held-out paragraphs 500-999 (weights chosen on 0-499): alone W 8.4002, G 8.3011, X 8.4118, counts+copy C 8.4211. Blends: G+X 8.2450; W+G+X 8.2180; G+X+C 8.1095; **W+G+X+C 8.0967** (weights W 0.2, G 0.4, C 0.4). The blend beats the best single model by 0.20 bits/word with no training: the networks and the count models make different mistakes.
+
+## R25-bg result (learned x dictionary groups, 4,000 steps)
+**8.5947** bits/word in 1,533 s (learned groups, 6,000 steps: 8.6436 in 1,188 s). Lower bits: pass on quality. The time gate is not judged: the processor was shared with R25-bh for most of the run.
+
+## R25-bi registration (blend with the better dictionary network)
+r25_ens.py r25_bg.pt: the R25-bh blend with X = the 4,000-step learned x dictionary network. Same halves. Compared with R25-bh's best blend 8.0967.
