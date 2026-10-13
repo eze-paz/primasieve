@@ -612,3 +612,9 @@ r25_bookcopy.py: probability of reusing an earlier word of the book (all earlier
 
 ## R25-bs registration (copy memory decay)
 Same mix with the copy memory's decay at 0.99 (short memory) and 0.9999 (long memory) instead of 0.999; one run each; reported as is.
+
+## R25-bs result (copy memory decay)
+Decay 0.99 (about the last 100 words): **7.6435**; 0.999: 7.6650; 0.9999: 7.7257. Shorter memory is better.
+
+## R25-bt registration (two copy memories, and a shorter one)
+(a) decay 0.97 alone as Y; (b) two copy memories at once, 0.99 and 0.999, with the word network W dropped (weight 0 in every blend so far) to keep the weight grid small. Compared with R25-bs 7.6435.
