@@ -9,7 +9,9 @@ import numpy as np
 ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
 NMAX = int(ARGV[ARGV.index("--order") + 1]) if "--order" in ARGV else 4; MKN = "--mkn" in ARGV; CROSS = "--cross" in ARGV
-TAG = f"o{NMAX}{'m' if MKN else ''}{'x' if CROSS else ''}{'a' if '--all-text' in ARGV else ''}"
+SKIP = "--skip" in ARGV                                                                            # R25-bz: the word just before the target is left out of the context
+TAG = f"o{NMAX}{'m' if MKN else ''}{'x' if CROSS else ''}{'a' if '--all-text' in ARGV else ''}{'s' if SKIP else ''}"
+def offs(n): return list(range(n)) if (not SKIP or n == 1) else list(range(n - 1)) + [n]          # token offsets of an order-n pattern (context offsets, then the target)
 sys.argv = ["r25_attn.py", "--minutes", "0"] + (["--all-text"] if "--all-text" in ARGV else [])
 src = open("r25_attn.py", encoding="utf-8").read(); src = src[:src.index("class Net(nn.Module)")]
 g = {"__name__": "r25_attn_defs", "__file__": os.path.join(HERE, "r25_attn.py")}; exec(compile(src, "r25_attn.py", "exec"), g)
@@ -24,9 +26,9 @@ for p in g["trp"]:
         if not CROSS: toks.append(0)
         toks += [wid.get(x, RARE) for x in s]
 T = np.array(toks, dtype=np.uint64); start = (T == 0)
-def hseq(pos, n):                                                                                  # 64-bit hash of tokens pos .. pos+n-1
+def hseq(pos, of):                                                                                 # 64-bit hash of tokens pos + o for o in of
     h = np.zeros(len(pos), dtype=np.uint64)
-    for j in range(n): h = (h ^ T[pos + j]) * MUL + np.uint64(j + 1)
+    for j, o in enumerate(of): h = (h ^ T[pos + o]) * MUL + np.uint64(j + 1)
     return h
 def hlist(ids):
     h = np.uint64(0)
@@ -34,7 +36,8 @@ def hlist(ids):
         for j, x in enumerate(ids): h = (h ^ np.uint64(x)) * MUL + np.uint64(j + 1)
     return h
 np.seterr(over="ignore")
-def positions(n):
+def positions(of):
+    n = of[-1] + 1
     if n == 1: return np.nonzero(~start)[0]
     ok = np.ones(len(T) - n + 1, dtype=bool)
     for j in range(1, n): ok &= ~start[j:len(T) - n + 1 + j]
@@ -42,10 +45,10 @@ def positions(n):
 C, H, Dn = {}, {}, {}
 for n in range(1, NMAX + 1):
     if n == NMAX:
-        pos = positions(n); codes, first, cnt = np.unique(hseq(pos, n), return_index=True, return_counts=True); ctx = hseq(pos[first], n - 1) if n > 1 else None
+        of = offs(n); pos = positions(of); codes, first, cnt = np.unique(hseq(pos, of), return_index=True, return_counts=True); ctx = hseq(pos[first], of[:-1]) if n > 1 else None
     else:                                                                                          # continuation counts: distinct one-word-longer left extensions
-        pos = positions(n + 1); _, first = np.unique(hseq(pos, n + 1), return_index=True); sp = pos[first] + 1
-        codes, f2, cnt = np.unique(hseq(sp, n), return_index=True, return_counts=True); ctx = hseq(sp[f2], n - 1) if n > 1 else None
+        of1 = offs(n + 1); pos = positions(of1); _, first = np.unique(hseq(pos, of1), return_index=True); sp = pos[first]
+        codes, f2, cnt = np.unique(hseq(sp, of1[1:]), return_index=True, return_counts=True); ctx = hseq(sp[f2], of1[1:-1]) if n > 1 else None
     C[n] = (codes, cnt)
     nk = [(cnt == k).sum() for k in (1, 2, 3, 4)]; Y = nk[0] / (nk[0] + 2 * nk[1])
     Dn[n] = (1 - 2 * Y * nk[1] / nk[0], 2 - 3 * Y * nk[2] / nk[1], 3 - 4 * Y * nk[3] / nk[2]) if MKN else (Y, Y, Y)
@@ -61,10 +64,11 @@ def prob(ctx, w):
     codes, cnt = C[1]; c = look(codes, cnt, hlist([w]))
     p = max(c - Dn[1][min(c, 3) - 1], 0) / TOT1 + C1disc / TOT1 / (RARE + 1) if c else C1disc / TOT1 / (RARE + 1); deep = 0
     for n in range(2, NMAX + 1):
-        if len(ctx) < n - 1: break
-        hc = hlist(ctx[-(n - 1):]); hu, tot, dm = H[n]; i = np.searchsorted(hu, hc)
+        if len(ctx) < (n if SKIP else n - 1): break
+        cw = ctx[-n:-1] if SKIP else ctx[-(n - 1):]
+        hc = hlist(cw); hu, tot, dm = H[n]; i = np.searchsorted(hu, hc)
         if i >= len(hu) or hu[i] != hc: break
-        codes, cnt = C[n]; c = look(codes, cnt, hlist(ctx[-(n - 1):] + [w]))
+        codes, cnt = C[n]; c = look(codes, cnt, hlist(cw + [w]))
         p = (max(c - Dn[n][min(c, 3) - 1], 0) if c else 0) / tot[i] + dm[i] / tot[i] * p; deep = n - 1
     return p, deep
 P, A, Dp = [], [], []
@@ -75,7 +79,7 @@ for pi, pg in enumerate(g["tep"][:1000]):
         if not CROSS: prev = [0]
         for i in range(len(ids)):
             if i >= 1:
-                q, d = prob(prev[-(NMAX - 1):], ids[i])
+                q, d = prob(prev[-NMAX:], ids[i])
                 if ids[i] == RARE: q *= rare_share(s[i])
                 P.append(q); A.append(pi); Dp.append(d)
             prev.append(ids[i])

@@ -648,3 +648,9 @@ Content words: 32% of predictions, 50% of bits, 11.8 bits each; the 300 most fre
 
 ## R25-bz registration (skip-phrase counts: the word just before the target is skipped)
 r25_kn2.py --skip: the context is the 1-4 words before the previous one (for example "the ___ dog" counts toward "the old dog" and "the big dog"); modified Kneser-Ney, across sentences, all text, order 5. Added to the mix as a further component S. Compared with R25-bx 7.6188.
+
+## R25-bz result (skip-phrase counts) -- FAIL
+The edited counter still reproduces R25-bo (8.5119). Skip counts alone 9.6959; the mix gives them weight 0 (7.6193 vs 7.6188). Skipping the word right before the target throws away too much here.
+
+## R25-bu interrupted
+The 12,000-step book-scope run stopped silently after step 1,500 at 23:23 (no error in its log; it ran alongside the 21M-token count builds, likely memory pressure). Restarted alone, unchanged.
