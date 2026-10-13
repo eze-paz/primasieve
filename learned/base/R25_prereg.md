@@ -639,3 +639,12 @@ o4 8.5119 -> o4m (modified KN) 8.4600 -> o5m 8.4537 -> o6m 8.4493; o5mx (across 
 
 ## R25-bx registration (best counts into the mix)
 r25_cm.py with K = o5mxa (and its match depth as the mixing context), components as R25-bt. Compared with 7.6361.
+
+## R25-bx result (best counts in the mix) -- PASS
+K = o5mxa alone 8.3580; mix global 7.6190, by depth **7.6188** (R25-bt 7.6361).
+
+## R25-by measurement (where the best mix loses bits; paragraphs 500-999, 11,812 predictions)
+Content words: 32% of predictions, 50% of bits, 11.8 bits each; the 300 most frequent words: 68%, 50%, 5.6 each. Frequency bands: words seen 10,000+ times in training take 41% of bits (5.3 each); 1,000-9,999: 25% (9.0); 100-999: 20% (12.2); rarer: 13%. Words not yet used in this text: 6.6% of predictions, 14% of bits (16.1 each). Position in the sentence makes almost no difference (7.5-7.9). Reading: half the loss is in choosing among very common words (grammar-like choices such as the / a / his), the other half in content words.
+
+## R25-bz registration (skip-phrase counts: the word just before the target is skipped)
+r25_kn2.py --skip: the context is the 1-4 words before the previous one (for example "the ___ dog" counts toward "the old dog" and "the big dog"); modified Kneser-Ney, across sentences, all text, order 5. Added to the mix as a further component S. Compared with R25-bx 7.6188.

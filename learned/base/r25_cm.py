@@ -27,8 +27,8 @@ def bits(wfun):
     p = np.array([X[i] @ wfun(i) for i in np.nonzero(te)[0]]); return -np.log2(np.clip(p, 1e-12, None)).mean()
 for k in names: print(f"R25-bp alone {k}: {-np.log2(np.clip(cols[k][te], 1e-12, None)).mean():.4f}", flush=True)
 wg = best_w(tr); print(f"R25-bp one global blend {dict(zip(names, wg))}: {bits(lambda i: wg):.4f} bits/word", flush=True)
-wd = {d: best_w(tr & (deep == d)) if (tr & (deep == d)).sum() > 200 else wg for d in range(4)}
-for d in range(4): print(f"  depth {d}: {dict(zip(names, wd[d]))} ({int((te & (deep == d)).sum())} test predictions)", flush=True)
+wd = {d: best_w(tr & (deep == d)) if (tr & (deep == d)).sum() > 200 else wg for d in range(int(deep.max()) + 1)}
+for d in range(int(deep.max()) + 1): print(f"  depth {d}: {dict(zip(names, wd[d]))} ({int((te & (deep == d)).sum())} test predictions)", flush=True)
 print(f"R25-bp context mixing (weights by Kneser-Ney depth): {bits(lambda i: wd[int(deep[i])]):.4f} bits/word", flush=True)
 if "-online" in " ".join(EXTRA_ARGS if "EXTRA_ARGS" in dir() else []) or os.environ.get("R25_ONLINE"):  # R25-bv: PAQ-style online weights
     def online(idx, eta, w0):
@@ -42,3 +42,5 @@ if "-online" in " ".join(EXTRA_ARGS if "EXTRA_ARGS" in dir() else []) or os.envi
     eta = min((0.005, 0.02, 0.05, 0.1), key=lambda e: online(tri, e, w0)[0])
     _, Wtr = online(tri, eta, w0)
     print(f"R25-bv online mixing (eta {eta} chosen on 0-499, weights carried on from there): {online(tei, eta, Wtr)[0]:.4f} bits/word", flush=True)
+if os.environ.get("R25_SAVE"):                                                            # R25-by: save the mix's per-prediction probabilities (test half) for the loss breakdown
+    tei = np.nonzero(te)[0]; np.savez(os.environ["R25_SAVE"], p=np.array([X[i] @ wd[int(deep[i])] for i in tei]), idx=tei)
