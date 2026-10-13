@@ -1,0 +1,17 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (48 s)
+  W scored (36 s)
+  G scored (72 s)
+  X scored (110 s)
+R25-ap counts built: 199531 training paragraphs, 5276 held-out paragraphs (315 s)
+  C scored (426 s)
+R25-bp alone W: 8.4002
+R25-bp alone G: 8.3011
+R25-bp alone X: 8.3084
+R25-bp alone C: 8.4211
+R25-bp alone K: 8.5120
+R25-bp one global blend {'W': np.float64(0.1), 'G': np.float64(0.2), 'X': np.float64(0.3), 'C': np.float64(0.2), 'K': np.float64(0.2)}: 7.9954 bits/word
+  depth 0: {'W': np.float64(0.1), 'G': np.float64(0.2), 'X': np.float64(0.3), 'C': np.float64(0.2), 'K': np.float64(0.2)} (1 test predictions)
+  depth 1: {'W': np.float64(0.1), 'G': np.float64(0.3), 'X': np.float64(0.3), 'C': np.float64(0.1), 'K': np.float64(0.2)} (2561 test predictions)
+  depth 2: {'W': np.float64(0.1), 'G': np.float64(0.2), 'X': np.float64(0.3), 'C': np.float64(0.2), 'K': np.float64(0.2)} (3682 test predictions)
+  depth 3: {'W': np.float64(0.1), 'G': np.float64(0.1), 'X': np.float64(0.3), 'C': np.float64(0.2), 'K': np.float64(0.3)} (5568 test predictions)
+R25-bp context mixing (weights by Kneser-Ney depth): 7.9876 bits/word

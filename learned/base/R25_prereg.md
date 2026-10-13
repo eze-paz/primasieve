@@ -591,3 +591,12 @@ After fixing a shape error in the first run (no result), **9.8256** bits/word in
 
 ## R25-bo result (Kneser-Ney, the memoizer's deterministic form)
 13.8M training tokens, built and scored in 26 s: **8.5120** on paragraphs 500-999 (8.7626 on all 1,000). Behind the count four-group model + copy (8.4211) and the best network (8.3011) alone; its value is as a mixing component (R25-bp, running).
+
+## R25-bp result (context mixing) -- PASS
+Paragraphs 500-999: alone W 8.4002, G 8.3011, X 8.3084, C 8.4211, Kneser-Ney K 8.5120. One global blend with K: **7.9954** (without K, R25-bi: 8.0814). Weights selected by Kneser-Ney match depth: **7.9876**. Adding the memoizer-style counts is worth -0.09; depth-selected weights add -0.008 more. First result under 8 bits/word.
+
+## R25-bl result (book-scope reading + learned x dictionary groups) -- PASS
+**8.4507** bits/word on all 1,000 paragraphs (book scope with learned groups 8.5987; best paragraph-scope network 8.5947). The two gains compound: -0.15.
+
+## R25-bq registration (book-scope network into the mix)
+The weights of R25-bl were not saved; r25_chapter.py gains --save. Re-run R25-bl exactly (same seed, 6,000 steps) with --save, then r25_cm.py with it as component B. Compared with R25-bp 7.9876.

@@ -33,9 +33,9 @@ for step in range(1, STEPS + 1):
     opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); opt.step()
     h = hn.detach()
     if step % 500 == 0: print(f"  step {step}: training loss {loss.item() / math.log(2):.3f} bits/token ({time.time() - t1:.0f} s)", flush=True)
-net.eval(); tot = 0.0; n = 0; h = None
+net.eval(); tot = 0.0; n = 0; h = None; PR = []; PA = []
 with torch.no_grad():
-    for p in g["tep"][:1000]:
+    for pi, p in enumerate(g["tep"][:1000]):
         a, mask = encode(p); words = [x for s in p for x in s]
         if RESET: h = None
         lp, h = run(torch.tensor([a]), h); lp = torch.log_softmax(lp[0], -1)
@@ -43,5 +43,7 @@ with torch.no_grad():
             if not mask[k]: continue
             gid = gw(words[k]); b = -lp[k - 1, gid].item() / math.log(2)
             b += -math.log2((_uni[words[k]] + 0.5) / _cnt[gid]) if gid != UNKG else unk2(words[k])
-            tot += b; n += 1
+            tot += b; n += 1; PR.append(2 ** -b); PA.append(pi)
 print(f"R25-bk {'A reset (paragraph scope)' if RESET else 'B carried (book scope)'} after {STEPS} steps: held-out {tot / n:.4f} bits/word over {n} predictions ({time.time() - t1:.0f} s)", flush=True)
+if "--save" in ARGV:
+    import numpy as _np; torch.save(net.state_dict(), ARGV[ARGV.index("--save") + 1] + ".pt"); _np.savez(ARGV[ARGV.index("--save") + 1] + "_probs.npz", p=_np.array(PR), para=_np.array(PA))

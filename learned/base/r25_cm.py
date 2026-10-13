@@ -7,13 +7,17 @@ depth, chosen on paragraphs 0-499; reported on 500-999, against one global set c
 import os, sys, itertools
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
+EXTRA = [a.split("=", 1) for a in sys.argv[1:] if "=" in a]                                 # extra components: NAME=probs.npz
 sys.argv = ["r25_ens.py", "r25_bg.pt"]
 src = open("r25_ens.py", encoding="utf-8").read(); src = src[:src.index("names = list(M)")]
 E = {"__name__": "r25_ens_defs", "__file__": os.path.join(HERE, "r25_ens.py")}; exec(compile(src, "r25_ens.py", "exec"), E)
 M = E["M"]; kn = np.load("r25_kn_probs.npz")
 cols = {k: np.array([q for r in M[k] for q in r]) for k in M}; para = np.array([i for i, r in enumerate(M["W"]) for _ in r])
 assert len(kn["p"]) == len(para) and (kn["para"] == para).all(), "Kneser-Ney predictions do not line up"
-cols["K"] = kn["p"]; names = list(cols); X = np.stack([cols[k] for k in names], 1); deep = kn["deep"]
+cols["K"] = kn["p"]
+for nm, f in EXTRA:
+    z_ = np.load(f); assert (z_["para"] == para).all(), f; cols[nm] = z_["p"]
+names = list(cols); X = np.stack([cols[k] for k in names], 1); deep = kn["deep"]
 tr, te = para < 500, para >= 500
 grid = np.array([w for w in itertools.product(range(11), repeat=len(names)) if sum(w) == 10], dtype=float) / 10
 def best_w(mask):
