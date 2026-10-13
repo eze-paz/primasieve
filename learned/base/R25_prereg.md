@@ -574,3 +574,9 @@ r25_chapter.py --groups-file r25_classes_wnx.json, carried state, 6,000 steps. C
 
 ## R25-bm registration (gradient-free running state: reservoir + closed-form output; owner's priority)
 r25_reservoir.py: fixed seeded random recurrent state 1,024 wide reading the first 4,000,000 training tokens in book order (32 streams); output fitted once by ridge regression to the next word's group; ridge strength and softmax scale chosen on the last 5% of the training streams; word = group x count share, unknown words as in the group networks. Scored on the first 1,000 held-out paragraphs, state carried (as R25-bk B). Probe (256 wide, 200,000 tokens): 10.68 bits/word. Compared with the gradient-trained book-scope network R25-bk B (8.5987) and reported with its time. Reported as is.
+
+## R25-bm result (gradient-free reservoir) -- far behind
+1,024 wide, 4,000,000 training tokens, 1,183 s: **10.4855** bits/word (gradient-trained book-scope network 8.5987). The closed-form ridge output predicts groups worse than plain group counts (8.18 bits per group on its held-in slice; the four-group count model spends 6.6): a fixed random memory plus a linear least-squares output does not give usable probabilities here.
+
+## R25-bn registration (spectral hidden-state model, no gradients)
+r25_spectral.py, k = 64: counts of groups, group pairs and triples over the training paragraphs; the Hsu-Kakade-Zhang spectral construction; clipped and renormalised predictions mixed 0.99/0.01 with group frequencies; word = group x count share. Paragraph scope, the same 50,114 predictions. Compared with the gradient-trained paragraph-scope group network (R25-bk A 8.6295) and the reservoir. Reported as is.
