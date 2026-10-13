@@ -465,3 +465,9 @@ Reading: next words depend mostly on recent words, which the running state alrea
 
 ## R25-ax registration (running state alone, longer)
 Resume r25_rnn_k0.pt for 180 more minutes (255 in all, the attention network's R25-ar + R25-ar2 budget), same settings, detached. Compared with the attention network at the same budget: held-out paragraphs 7.8042, matched 8.3858. Pass if at or below 7.8042.
+
+## R25-ax result -- PASS
+21,117 more steps (29,405 in all; attention network at the same budget 26,395). **Held-out paragraphs 7.7894** (attention 7.8042; gate at or below 7.8042: pass). **Matched 8.3955** (attention 8.3858; language model 7.6694): even on the matched set. The running state alone matches attention at equal time and size.
+
+## R25-ay registration (running state alone, third round)
+Resume r25_rnn_k0.pt for 240 more minutes (495 in all, the attention network's R25-ar3 budget), same settings, detached. Compared with the attention network at the same budget: held-out paragraphs 7.7313, matched 8.3135. Pass if at or below 7.7313.
