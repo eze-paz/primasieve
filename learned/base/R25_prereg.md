@@ -507,3 +507,6 @@ Both networks' gaps grow at the same rate, so the running state does not memoris
 
 ## R25-bb registration (a wider running state)
 r25_rnn.py gains --hidden (GRU state width, projected back to 128 before the output) and --steps (a fixed step budget instead of minutes, for repeatability). Run: state width 384, look-up off, from scratch, exactly 8,288 steps (what the 128-wide state did in its first 75 minutes), 6 threads, detached; 6,187,909 parameters (128-wide: 4,857,605). PASS if held-out paragraphs fall below 7.9545 (the 128-wide state at the same steps). If it passes, it continues with the same schedule as before, to test whether the stall moves later.
+
+## R25-bc / R25-bd measurement (where the next-word bits go)
+Four-group model, first 3,000 held-out paragraphs, 168,995 predictions. With the learner's 634 groups: which kind of word 6.631 bits, which word of that kind 2.162 (total 8.793). With the groups merged into 30 grammar-sized classes (k-means on group mean vectors; r25_classes_coarse.json): which kind of word 4.090, which word of that kind 5.838 (total 9.928). Grammar-sized choice is about 40% of the cost; content about 60%.
