@@ -618,3 +618,12 @@ Decay 0.99 (about the last 100 words): **7.6435**; 0.999: 7.6650; 0.9999: 7.7257
 
 ## R25-bt registration (two copy memories, and a shorter one)
 (a) decay 0.97 alone as Y; (b) two copy memories at once, 0.99 and 0.999, with the word network W dropped (weight 0 in every blend so far) to keep the weight grid small. Compared with R25-bs 7.6435.
+
+## R25-bt result
+(a) decay 0.97: 7.6753 (worse). (b) two copy memories 0.99 + 0.999, W dropped: **7.6361** (-0.007 vs 7.6435). Diminishing returns from copy memories.
+
+## R25-bu registration (train the best network longer)
+Book-scope, learned x dictionary groups (R25-bl configuration), 12,000 steps instead of 6,000, saved as r25_bu; then mixed as B. Compared with R25-bl 8.4507 alone and R25-bt 7.6361 mixed.
+
+## R25-bv registration (PAQ-style online mixing weights)
+r25_cm.py with R25_ONLINE=1: start from the depth weights (floored at 0.02), then after every prediction multiply each component's weight by (its probability / the mix's)^eta and renormalise, per depth; eta from {0.005, 0.02, 0.05, 0.1} chosen on paragraphs 0-499, weights carried into 500-999. Uses only past predictions, like PAQ. Compared with R25-bt 7.6361 (same components).

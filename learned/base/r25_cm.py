@@ -30,3 +30,15 @@ wg = best_w(tr); print(f"R25-bp one global blend {dict(zip(names, wg))}: {bits(l
 wd = {d: best_w(tr & (deep == d)) if (tr & (deep == d)).sum() > 200 else wg for d in range(4)}
 for d in range(4): print(f"  depth {d}: {dict(zip(names, wd[d]))} ({int((te & (deep == d)).sum())} test predictions)", flush=True)
 print(f"R25-bp context mixing (weights by Kneser-Ney depth): {bits(lambda i: wd[int(deep[i])]):.4f} bits/word", flush=True)
+if "-online" in " ".join(EXTRA_ARGS if "EXTRA_ARGS" in dir() else []) or os.environ.get("R25_ONLINE"):  # R25-bv: PAQ-style online weights
+    def online(idx, eta, w0):
+        W_ = {d: w0[d].copy() for d in w0}; t = 0.0
+        for i in idx:
+            d = int(deep[i]); w = W_[d]; pm = max(X[i] @ w, 1e-12); t -= np.log2(pm)
+            w = w * (np.clip(X[i], 1e-12, None) / pm) ** eta; W_[d] = w / w.sum()
+        return t / len(idx), W_
+    w0 = {d: np.clip(wd[d], 0.02, None) / np.clip(wd[d], 0.02, None).sum() for d in wd}
+    tri = np.nonzero(tr)[0]; tei = np.nonzero(te)[0]
+    eta = min((0.005, 0.02, 0.05, 0.1), key=lambda e: online(tri, e, w0)[0])
+    _, Wtr = online(tri, eta, w0)
+    print(f"R25-bv online mixing (eta {eta} chosen on 0-499, weights carried on from there): {online(tei, eta, Wtr)[0]:.4f} bits/word", flush=True)
