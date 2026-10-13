@@ -627,3 +627,6 @@ Book-scope, learned x dictionary groups (R25-bl configuration), 12,000 steps ins
 
 ## R25-bv registration (PAQ-style online mixing weights)
 r25_cm.py with R25_ONLINE=1: start from the depth weights (floored at 0.02), then after every prediction multiply each component's weight by (its probability / the mix's)^eta and renormalise, per depth; eta from {0.005, 0.02, 0.05, 0.1} chosen on paragraphs 0-499, weights carried into 500-999. Uses only past predictions, like PAQ. Compared with R25-bt 7.6361 (same components).
+
+## R25-bv result (online mixing) -- FAIL
+**8.1521** (static depth weights 7.6361); eta chose the smallest value offered (0.005), i.e. less updating was always better. Likely cause: the copy memories give near-zero probability to every word not seen yet, so each such word shrinks their weight multiplicatively and the update erodes the most useful components. Not pursued; static depth-selected weights stay.
