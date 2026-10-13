@@ -664,3 +664,9 @@ Given only primitives, the learner chose backoff by the number of distinct words
 
 ## R25-cb registration (rung 2: search over context shapes)
 r25_discover2.py: the same primitives plus context shapes -- previous words (lengths 1-5, within and across sentences), previous learned groups (634), previous learned x dictionary groups, previous word endings (last two letters) -- each built as a self-derived count model (R25-ca procedure). Greedy forward selection: start with the best single shape, add the shape that most lowers bits of an equal-weight-searched mixture on held-out training text, stop when nothing helps by 0.005. The chosen mixture is rebuilt on all training text and scored once on paragraphs 500-999, against the same-text word model across sentences (o5mx 8.4035; 13.0M tokens, to keep memory low while R25-bu trains).
+
+## R25-cb result (rung 2: the learner searches context shapes) -- PASS
+Held-out training slice, single shapes: words within sentences 8.5279, words across sentences 8.5364, dictionary-split groups 8.5940, groups 8.7172, dictionary classes 8.8068, word endings 9.3752. Greedy selection kept words + dictionary classes (8.3928) + learned groups (8.3667) and stopped (dictionary-split groups added only 0.002). Paragraphs 500-999: **8.3469** (same-text word model across sentences 8.4035; it also beats o5mxa, 8.3580, which counted 21M tokens). The learner found that coarse class contexts (dictionary classes, learned groups) complement exact words, a class-backoff rule it was not given.
+
+## R25-cc registration (self-searched counts into the best mix)
+r25_cm.py with K = o5mxa (depth context) plus the R25-cb mixture as component Q, components as R25-bx. Compared with 7.6188.
