@@ -630,3 +630,6 @@ r25_cm.py with R25_ONLINE=1: start from the depth weights (floored at 0.02), the
 
 ## R25-bv result (online mixing) -- FAIL
 **8.1521** (static depth weights 7.6361); eta chose the smallest value offered (0.005), i.e. less updating was always better. Likely cause: the copy memories give near-zero probability to every word not seen yet, so each such word shrinks their weight multiplicatively and the update erodes the most useful components. Not pursued; static depth-selected weights stay.
+
+## R25-bw registration (fast count variants, about a minute each)
+r25_kn2.py generalises R25-bo (hashed n-grams, any order); its order-4 run reproduces R25-bo (8.5119 vs 8.5120 on paragraphs 500-999). Variants, each scored once on the same predictions: o4m (modified Kneser-Ney, 3 discounts), o5m, o6m (longer phrases), o5mx (context crosses sentence boundaries in the paragraph), o5ma (all 21M training tokens), o5mxa (both). Reported alone; the best goes into the mix as K.
