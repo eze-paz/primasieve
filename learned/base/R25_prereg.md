@@ -600,3 +600,9 @@ Paragraphs 500-999: alone W 8.4002, G 8.3011, X 8.3084, C 8.4211, Kneser-Ney K 8
 
 ## R25-bq registration (book-scope network into the mix)
 The weights of R25-bl were not saved; r25_chapter.py gains --save. Re-run R25-bl exactly (same seed, 6,000 steps) with --save, then r25_cm.py with it as component B. Compared with R25-bp 7.9876.
+
+## R25-bq result (book-scope network in the mix) -- PASS
+The re-run reproduced R25-bl exactly (8.4507: the runs are deterministic). On paragraphs 500-999 the book-scope network alone is **8.1568**, the best single model. Global blend 7.9352; weights by Kneser-Ney depth **7.9227** (R25-bp 7.9876).
+
+## R25-br registration (book-wide copy memory as a component)
+r25_bookcopy.py: probability of reusing an earlier word of the book (all earlier held-out paragraphs in order, weight 0.999^distance). Added to r25_cm.py with B as component Y. Compared with R25-bq 7.9227.
