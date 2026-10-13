@@ -654,3 +654,7 @@ The edited counter still reproduces R25-bo (8.5119). Skip counts alone 9.6959; t
 
 ## R25-bu interrupted
 The 12,000-step book-scope run stopped silently after step 1,500 at 23:23 (no error in its log; it ran alongside the 21M-token count builds, likely memory pressure). Restarted alone, unchanged.
+
+## R25-ca registration (the learner derives its own counting rules -- first rung of a rule-discovery engine)
+Owner, 2026-10-14: give the system flexible primitive operators and time to derive rules from the corpus itself, starting with what Chen and Goodman found by hand. r25_discover.py gives primitives only (count patterns; compare with held-out training text; bucket by count; two backoff kinds; score on held-out training text) and no discount formula. The learner measures per length and bucket how much counts over-state future use, chooses the number of buckets and the backoff kind by its score on a held-out training slice, then rebuilds on all training text and is scored once on paragraphs 500-999. Order 4, same text as R25-bw. PASS if at or below plain Kneser-Ney (8.5119); reported against Chen-Goodman (8.4600).
+Later rungs (to register): more primitive families (pattern shapes with gaps, word groups as context, copy and position features, mixing by context) searched under a time budget, every kept rule scored on held-out training text only, the library of kept rules persisting across runs.
