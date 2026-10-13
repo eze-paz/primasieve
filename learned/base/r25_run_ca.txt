@@ -1,0 +1,13 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (57 s)
+  learner tries B= 1 backoff=raw counts     : V slice 8.8297 bits/word  discounts at length 4: [0.958] (80 s)
+  learner tries B= 1 backoff=distinct-before: V slice 8.5978 bits/word  discounts at length 4: [0.958] (156 s)
+  learner tries B= 2 backoff=raw counts     : V slice 8.8072 bits/word  discounts at length 4: [0.922, 1.438] (217 s)
+  learner tries B= 2 backoff=distinct-before: V slice 8.5927 bits/word  discounts at length 4: [0.922, 1.438] (286 s)
+  learner tries B= 3 backoff=raw counts     : V slice 8.8057 bits/word  discounts at length 4: [0.922, 1.289, 1.683] (349 s)
+  learner tries B= 3 backoff=distinct-before: V slice 8.5940 bits/word  discounts at length 4: [0.922, 1.289, 1.683] (423 s)
+  learner tries B= 5 backoff=raw counts     : V slice 8.8044 bits/word  discounts at length 4: [0.922, 1.289, 1.363, 1.41, 2.17] (484 s)
+  learner tries B= 5 backoff=distinct-before: V slice 8.5951 bits/word  discounts at length 4: [0.922, 1.289, 1.363, 1.41, 2.17] (536 s)
+  learner tries B=10 backoff=raw counts     : V slice 8.8035 bits/word  discounts at length 4: [0.922, 1.289, 1.363, 1.41, 1.518] (584 s)
+  learner tries B=10 backoff=distinct-before: V slice 8.5968 bits/word  discounts at length 4: [0.922, 1.289, 1.363, 1.41, 1.518] (637 s)
+R25-ca learner's choice: B=2, backoff=distinct-before (V 8.5927); its discounts per length: {"1": [0.0, 0.891], "2": [0.637, 1.031], "3": [0.817, 1.198], "4": [0.922, 1.438]}
+R25-ca self-derived counting model: paragraphs 500-999 8.4812 bits/word (plain KN 8.5119, Chen-Goodman 8.4600) over 50114 predictions (714 s)
