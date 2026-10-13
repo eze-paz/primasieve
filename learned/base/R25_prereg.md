@@ -471,3 +471,6 @@ Resume r25_rnn_k0.pt for 180 more minutes (255 in all, the attention network's R
 
 ## R25-ay registration (running state alone, third round)
 Resume r25_rnn_k0.pt for 240 more minutes (495 in all, the attention network's R25-ar3 budget), same settings, detached. Compared with the attention network at the same budget: held-out paragraphs 7.7313, matched 8.3135. Pass if at or below 7.7313.
+
+## R25-ay interrupted and resumed
+The PC disconnected at 12:03 (step 17,400 of the round, 10,515 s of 14,400). The last checkpoint was step 17,000 (10,288 s). Resumed from it for the remaining 69 minutes (run_ay2.ps1, log r25_run_ay2.txt); the optimiser state restarts, as at every earlier resume. Gate unchanged: held-out paragraphs at or below 7.7313.
