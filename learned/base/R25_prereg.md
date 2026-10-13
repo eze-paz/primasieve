@@ -673,3 +673,9 @@ r25_cm.py with K = o5mxa (depth context) plus the R25-cb mixture as component Q,
 
 ## R25-cc result
 Q alone 8.3469; global blend gives it weight 0 (7.6190), depth-selected mixing 7.6137 (-0.005 vs 7.6188): in the full mix it overlaps with K. Its value is as a self-built replacement for hand-built counters, not an extra.
+
+## R25-bu result (best network trained twice as long) -- PASS
+12,000 steps: **8.3708** on all 1,000 paragraphs (6,000 steps 8.4507); alone on 500-999 8.0693 (was 8.1568). Mix with K = o5mxa, both copy memories and Q: global 7.5809, by depth **7.5721** (R25-cc 7.6137).
+
+## R25-ce registration (rung 3: a new primitive family -- long-range word associations)
+r25_trigger.py: content-word pairs within 30 words in training paragraphs give P(w | earlier content word c); the component averages over the content words among the previous 30 words of the held-out text. Added to the R25-bu mix as R. Compared with 7.5721.
