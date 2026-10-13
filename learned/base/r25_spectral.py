@@ -24,11 +24,11 @@ for s in seqs:
 P1 /= P1.sum(); P21 /= P21.sum()
 U = torch.linalg.svd(P21)[0][:, :K]                                                        # NG x K
 UP21pinv = torch.linalg.pinv(U.T @ P21)                                                     # NG x K
-Bn = torch.zeros(NG, K, K, dtype=torch.float64); ntri = 0
+Bn = torch.zeros(NG, K, NG, dtype=torch.float64); ntri = 0; kk = torch.arange(K)
 for s in seqs:
     if len(s) < 3: continue
-    a, x, c = s[:-2], s[1:-1], s[2:]
-    Bn.index_add_(0, x, U[c].unsqueeze(2) * U[a].unsqueeze(1)); ntri += len(x)          # U' P3x1(x) U, accumulated triple by triple
+    a, x, c = s[:-2], s[1:-1], s[2:]; m = len(x)
+    Bn.index_put_((x.repeat_interleave(K), kk.repeat(m), a.repeat_interleave(K)), U[c].flatten(), accumulate=True); ntri += m   # U' P3x1(x), triple by triple
 Bn /= ntri
 B = Bn @ UP21pinv.unsqueeze(0)                                                              # NG x K x K
 b1 = U.T @ P1; binf = torch.linalg.pinv(P21.T @ U) @ P1

@@ -580,3 +580,11 @@ r25_reservoir.py: fixed seeded random recurrent state 1,024 wide reading the fir
 
 ## R25-bn registration (spectral hidden-state model, no gradients)
 r25_spectral.py, k = 64: counts of groups, group pairs and triples over the training paragraphs; the Hsu-Kakade-Zhang spectral construction; clipped and renormalised predictions mixed 0.99/0.01 with group frequencies; word = group x count share. Paragraph scope, the same 50,114 predictions. Compared with the gradient-trained paragraph-scope group network (R25-bk A 8.6295) and the reservoir. Reported as is.
+
+## R25-bo registration (sequence memoizer, approximated deterministically)
+The sequence memoizer's own inference is stochastic (Monte Carlo); its fixed-depth deterministic approximation is interpolated Kneser-Ney (Teh 2006). r25_kn.py: word Kneser-Ney up to 4 words, continuation counts, per-order discounts, 65,534 own-id words plus a shared rare id split by counts. Same 50,114 predictions. Compared with the count four-group model + copy (C: 8.4211 on paragraphs 500-999) and the best single network (G: 8.3011). Probabilities saved for R25-bp.
+
+## R25-bp (to register after R25-bo): context mixing -- PAQ-style weights selected by a context (how deep the Kneser-Ney match went), over all components.
+
+## R25-bn result (spectral hidden-state model, k = 64) -- behind
+After fixing a shape error in the first run (no result), **9.8256** bits/word in 577 s, no gradients (gradient-trained paragraph-scope group network 8.6295; reservoir 10.4855). Better than the reservoir, well behind training. Likely causes, not separated: 64 hidden dimensions, clipped negative estimates, and only group triples as evidence.
