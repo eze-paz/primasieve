@@ -490,3 +490,20 @@ Decay helps attention clearly (-0.04) and the running state barely (-0.01 held-o
 
 ## R25-ba registration (diagnosis of the stall, no training)
 r25_diag.py scores every saved checkpoint of both networks on two fixed samples: 2,000 training paragraphs and 2,000 held-out paragraphs, each cut to its first 64 words (deterministic, one thread). Reading, fixed in advance: if the running state's training bits keep falling across checkpoints while its held-out bits stop, the stall is overfitting (too little text for it); if its training bits also stop, it is a capacity limit (state too small); attention is the reference.
+
+## R25-ba result (diagnosis) -- the running state's limit is capacity, not memorising
+| checkpoint | training sample | held-out sample | gap |
+|---|---|---|---|
+| running state 75 min | 7.1940 | 8.2302 | 1.04 |
+| running state 255 min | 6.9174 | 8.1043 | 1.19 |
+| running state mid round 3 | 6.8534 | 8.0897 | 1.24 |
+| running state end round 3 | 6.8683 | 8.1063 | 1.24 |
+| running state after decay | 6.8088 | 8.1048 | 1.30 |
+| attention 75 min | 7.3189 | 8.3150 | 1.00 |
+| attention 255 min | 6.9300 | 8.1065 | 1.18 |
+| attention end round 3 | 6.7728 | 8.0332 | 1.26 |
+| attention after decay | 6.7056 | 7.9974 | 1.29 |
+Both networks' gaps grow at the same rate, so the running state does not memorise more than attention. The difference is that after 255 minutes the running state's training score nearly stops (6.92 to 6.81) while attention's keeps falling (6.93 to 6.71); held-out follows training in both. By the reading fixed in advance: a capacity limit -- the 128-number state cannot hold more. Also visible: the restart after the disconnect made the running state slightly worse on both samples (6.85 to 6.87, 8.09 to 8.11).
+
+## R25-bb registration (a wider running state)
+r25_rnn.py gains --hidden (GRU state width, projected back to 128 before the output) and --steps (a fixed step budget instead of minutes, for repeatability). Run: state width 384, look-up off, from scratch, exactly 8,288 steps (what the 128-wide state did in its first 75 minutes), 6 threads, detached; 6,187,909 parameters (128-wide: 4,857,605). PASS if held-out paragraphs fall below 7.9545 (the 128-wide state at the same steps). If it passes, it continues with the same schedule as before, to test whether the stall moves later.

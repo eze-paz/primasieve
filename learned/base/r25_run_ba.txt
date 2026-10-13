@@ -1,0 +1,12 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (33 s)
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (31 s)
+R25-ar model: 4,998,149 parameters
+R25-ba running state  r25_rnn_k0_75min.pt          training sample 7.1940 | held-out sample 8.2302 | gap +1.0362 bits/word
+R25-ba running state  r25_rnn_k0_255min.pt         training sample 6.9174 | held-out sample 8.1043 | gap +1.1869 bits/word
+R25-ba running state  r25_rnn_k0_ay_s17000.pt      training sample 6.8534 | held-out sample 8.0897 | gap +1.2363 bits/word
+R25-ba running state  r25_rnn_k0_495min.pt         training sample 6.8683 | held-out sample 8.1063 | gap +1.2381 bits/word
+R25-ba running state  r25_rnn_az.pt                training sample 6.8088 | held-out sample 8.1048 | gap +1.2960 bits/word
+R25-ba attention      r25_attn_75min.pt            training sample 7.3189 | held-out sample 8.3150 | gap +0.9960 bits/word
+R25-ba attention      r25_attn_ar2.pt              training sample 6.9300 | held-out sample 8.1065 | gap +1.1765 bits/word
+R25-ba attention      r25_attn_ar3.pt              training sample 6.7728 | held-out sample 8.0332 | gap +1.2605 bits/word
+R25-ba attention      r25_attn_az.pt               training sample 6.7056 | held-out sample 7.9974 | gap +1.2919 bits/word

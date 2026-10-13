@@ -17,6 +17,7 @@ vocab, z, vi, unk_bits, encode, train, tep, t0 = g["vocab"], g["z"], g["vi"], g[
 opt_ = lambda k, d: type(d)(ARGV[ARGV.index(k) + 1]) if k in ARGV else d
 MIN, K, OUT = opt_("--minutes", 75.0), opt_("--lookup", 4), opt_("--out", "r25_rnn.pt")
 CTX, D, LAYERS, BATCH = 64, 128, 2, 32
+HS, STEPS = opt_("--hidden", 128), opt_("--steps", 0)                                       # R25-bb: a wider running state (projected back to 128); a fixed step budget
 torch.manual_seed(0); random.seed(0)
 if "--threads" in ARGV: torch.set_num_threads(opt_("--threads", 6))
 
@@ -26,11 +27,13 @@ class RNet(nn.Module):
         super().__init__()
         E = np.zeros((len(vocab) + 1, 100), dtype=np.float32); E[1:] = z["vecs"][:len(vocab)]
         s.emb = nn.Embedding(len(vocab) + 1, 100); s.emb.weight.data = torch.tensor(E)
-        s.inp = nn.Linear(100, D); s.rnn = nn.GRU(D, D, LAYERS, batch_first=True, dropout=0.1)
+        s.inp = nn.Linear(100, D); s.rnn = nn.GRU(D, HS, LAYERS, batch_first=True, dropout=0.1)
+        if HS != D: s.proj = nn.Linear(HS, D)
         s.q = nn.Linear(D, D); s.k = nn.Linear(D, D); s.v = nn.Linear(D, D); s.mix = nn.Linear(D, D)
         s.out_ln = nn.LayerNorm(D); s.out = nn.Linear(D, len(vocab) + 1); s.drop = nn.Dropout(0.1)
     def forward(s, x):
         h, _ = s.rnn(s.drop(s.inp(s.emb(x))))                                             # the running state, word by word
+        if HS != D: h = s.proj(h)
         if K > 0:
             L = x.shape[1]; sc = (s.q(h) @ s.k(h).transpose(1, 2)) / math.sqrt(D)
             sc = sc.masked_fill(torch.triu(torch.ones(L, L, dtype=torch.bool), 1), float("-inf"))
@@ -48,7 +51,7 @@ def windows(ids, mask):
         a = ids[max(0, st - 1):st + CTX]; m = mask[max(0, st - 1):st + CTX]
         if len(a) >= 2: yield a, m
 pool = [w for a, m in train for w in windows(a, m)]; step = 0; net.train(); t1 = time.time()
-while time.time() - t1 < MIN * 60:
+while (step < STEPS) if STEPS else (time.time() - t1 < MIN * 60):
     batch = random.sample(pool, BATCH); L = max(len(a) for a, _ in batch)
     x = torch.zeros((BATCH, L - 1), dtype=torch.long); y = torch.zeros((BATCH, L - 1), dtype=torch.long); w8 = torch.zeros((BATCH, L - 1))
     for i, (a, m) in enumerate(batch):
