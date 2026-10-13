@@ -670,3 +670,6 @@ Held-out training slice, single shapes: words within sentences 8.5279, words acr
 
 ## R25-cc registration (self-searched counts into the best mix)
 r25_cm.py with K = o5mxa (depth context) plus the R25-cb mixture as component Q, components as R25-bx. Compared with 7.6188.
+
+## R25-cc result
+Q alone 8.3469; global blend gives it weight 0 (7.6190), depth-selected mixing 7.6137 (-0.005 vs 7.6188): in the full mix it overlaps with K. Its value is as a self-built replacement for hand-built counters, not an extra.
