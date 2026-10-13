@@ -562,3 +562,6 @@ r25_chapter.py: group-output running state (learned groups, rare words through t
 - A (--reset): state empty at every window in training, at every paragraph in scoring (paragraph scope).
 - B: state carried from window to window in training (gradients stop at window edges) and through all 1,000 scored held-out paragraphs in book order.
 Same 50,114 predictions as R25-be/bj. PASS if B beats A. Runs alongside R25-bj (fixed steps, so sharing the processor changes only the time).
+
+## R25-bj result (rare words through their own group) -- FAIL
+**8.6487** bits/word (R25-be C without the change 8.6436): no gain (+0.005, within run-to-run noise). The unknown-word charge already priced rare words about as well as their groups do. Not adopted for the blend; R25-bk keeps it on (registered before this result), so its A/B is unaffected.
