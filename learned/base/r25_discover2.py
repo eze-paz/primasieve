@@ -10,7 +10,7 @@ Compared with the same-text word model across sentences (o5mx, 8.4035). Run: py 
 import os, sys, math, time, json, itertools
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
-sys.argv = ["r25_attn.py", "--minutes", "0"]
+ALLT = "--all-text" in sys.argv; sys.argv = ["r25_attn.py", "--minutes", "0"] + (["--all-text"] if ALLT else [])
 src = open("r25_attn.py", encoding="utf-8").read(); src = src[:src.index("class Net(nn.Module)")]
 g = {"__name__": "r25_attn_defs", "__file__": os.path.join(HERE, "r25_attn.py")}; exec(compile(src, "r25_attn.py", "exec"), g)
 np.seterr(over="ignore"); t0 = time.time(); NMAX = 5; RARE = 65535; MUL = np.uint64(0x9E3779B97F4A7C15); BK = 2
@@ -122,5 +122,5 @@ for name in chosen:
     cmap, cross = SHAPES[name]; M = build(streams(trp, cmap, cross), KEEP[name]); cols.append(predict(M, KEEP[name], cmap, cross, tep)); del M
     print(f"  {name} on paragraphs 500-999 alone: {-np.log2(cols[-1][para >= 500]).mean():.4f} ({time.time() - t0:.0f} s)", flush=True)
 P = np.stack(cols, 1) @ cur[1]
-np.savez("r25_discover2_probs.npz", p=P, para=para)
+np.savez("r25_discover2a_probs.npz" if ALLT else "r25_discover2_probs.npz", p=P, para=para)
 print(f"R25-cb self-searched count mixture: paragraphs 500-999 {-np.log2(P[para >= 500]).mean():.4f} bits/word (same-text words across sentences o5mx 8.4035) over {len(P)} predictions ({time.time() - t0:.0f} s)", flush=True)

@@ -682,3 +682,6 @@ r25_trigger.py: content-word pairs within 30 words in training paragraphs give P
 
 ## R25-ce result (trigger associations) -- FAIL
 36M pair occurrences, built in 9 s; nonzero for 32.5% of predictions; alone useless (32.09). In the mix it gets weight 0 on the 0.1 grid (7.5727 vs 7.5721); a fine weight chosen on 0-499 (0.005) gives 7.5717 on 500-999 (-0.0004). Averaging association probabilities into a linear mix cannot use them: an association should multiply the odds of related words, which needs a multiplicative (normalised) combiner -- the operator family to add next.
+
+## R25-cf registration (rung 2 on all 21M training tokens)
+r25_discover2.py --all-text: the same shape search and learned rules, counting all training paragraphs. Alone compared with R25-cb (8.3469) and o5mxa (8.3580); then in the R25-bu mix as Q. Compared with 7.5721.
