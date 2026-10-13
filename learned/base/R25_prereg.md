@@ -679,3 +679,6 @@ Q alone 8.3469; global blend gives it weight 0 (7.6190), depth-selected mixing 7
 
 ## R25-ce registration (rung 3: a new primitive family -- long-range word associations)
 r25_trigger.py: content-word pairs within 30 words in training paragraphs give P(w | earlier content word c); the component averages over the content words among the previous 30 words of the held-out text. Added to the R25-bu mix as R. Compared with 7.5721.
+
+## R25-ce result (trigger associations) -- FAIL
+36M pair occurrences, built in 9 s; nonzero for 32.5% of predictions; alone useless (32.09). In the mix it gets weight 0 on the 0.1 grid (7.5727 vs 7.5721); a fine weight chosen on 0-499 (0.005) gives 7.5717 on 500-999 (-0.0004). Averaging association probabilities into a linear mix cannot use them: an association should multiply the odds of related words, which needs a multiplicative (normalised) combiner -- the operator family to add next.

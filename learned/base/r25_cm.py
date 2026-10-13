@@ -43,4 +43,4 @@ if "-online" in " ".join(EXTRA_ARGS if "EXTRA_ARGS" in dir() else []) or os.envi
     _, Wtr = online(tri, eta, w0)
     print(f"R25-bv online mixing (eta {eta} chosen on 0-499, weights carried on from there): {online(tei, eta, Wtr)[0]:.4f} bits/word", flush=True)
 if os.environ.get("R25_SAVE"):                                                            # R25-by: save the mix's per-prediction probabilities (test half) for the loss breakdown
-    tei = np.nonzero(te)[0]; np.savez(os.environ["R25_SAVE"], p=np.array([X[i] @ wd[int(deep[i])] for i in tei]), idx=tei)
+    alli = np.arange(len(para)); np.savez(os.environ["R25_SAVE"], p=np.array([X[i] @ wd[int(deep[i])] for i in alli]), idx=alli, para=para)
