@@ -565,3 +565,9 @@ Same 50,114 predictions as R25-be/bj. PASS if B beats A. Runs alongside R25-bj (
 
 ## R25-bj result (rare words through their own group) -- FAIL
 **8.6487** bits/word (R25-be C without the change 8.6436): no gain (+0.005, within run-to-run noise). The unknown-word charge already priced rare words about as well as their groups do. Not adopted for the blend; R25-bk keeps it on (registered before this result), so its A/B is unaffected.
+
+## R25-bk result (book-scope reading) -- PASS
+A reset (paragraph scope) **8.6295**; B carried through the book **8.5987** (-0.031), same 50,114 predictions, about 985 s each on a shared processor. Carrying the state across paragraphs helps, modestly.
+
+## R25-bl registration (book-scope reading with learned x dictionary groups)
+r25_chapter.py --groups-file r25_classes_wnx.json, carried state, 6,000 steps. Compared with R25-bk B (8.5987) and the best paragraph-scope network R25-bg (8.5947, 4,000 steps). PASS if below both.

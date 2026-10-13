@@ -9,7 +9,7 @@ import os, sys, math, time, random
 ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
 RESET = "--reset" in ARGV; STEPS = int(ARGV[ARGV.index("--steps") + 1]) if "--steps" in ARGV else 6000
-sys.argv = ["r25_rnn.py", "--groups", "--oov-groups", "--lookup", "0", "--threads", "6"]
+sys.argv = ["r25_rnn.py", "--groups", "--oov-groups", "--lookup", "0", "--threads", "6"] + (["--groups-file", ARGV[ARGV.index("--groups-file") + 1]] if "--groups-file" in ARGV else [])
 src = open("r25_rnn.py", encoding="utf-8").read(); src = src[:src.index("net = RNet()")]
 R = {"__name__": "r25_rnn_defs", "__file__": os.path.join(HERE, "r25_rnn.py")}; exec(compile(src, "r25_rnn.py", "exec"), R)
 torch, nn, g, encode, gw, unk2, _uni, _cnt, UNKG = (R[k] for k in "torch nn g encode gw unk2 _uni _cnt UNKG".split())
