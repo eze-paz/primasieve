@@ -538,3 +538,6 @@ Group output, 6,000 steps: **8.6436** bits/word in 1,188 s, against word output 
 
 ## R25-bg registration (best of both: learned x dictionary groups at about equal time)
 Group output with r25_classes_wnx.json, 4,000 steps, 6 threads, same scoring. Compared with C (8.6436, 1,188 s); time reported. PASS if lower bits in no more time than C.
+
+## R25-bh registration (quick win, no training: blend the trained networks and the count models)
+r25_ens.py: word-output network (2,000 steps), group-output network (6,000 steps), learned x dictionary group network (2,000 steps), count models + copy memory. Probability blends with weights on a 0.1 grid chosen on held-out paragraphs 0-499 and reported on 500-999 only. PASS if any blend beats the best single model on 500-999.
