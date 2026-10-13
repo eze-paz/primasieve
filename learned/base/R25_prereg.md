@@ -541,3 +541,6 @@ Group output with r25_classes_wnx.json, 4,000 steps, 6 threads, same scoring. Co
 
 ## R25-bh registration (quick win, no training: blend the trained networks and the count models)
 r25_ens.py: word-output network (2,000 steps), group-output network (6,000 steps), learned x dictionary group network (2,000 steps), count models + copy memory. Probability blends with weights on a 0.1 grid chosen on held-out paragraphs 0-499 and reported on 500-999 only. PASS if any blend beats the best single model on 500-999.
+
+## R25-bh result (blends, no training) -- PASS
+Held-out paragraphs 500-999 (weights chosen on 0-499): alone W 8.4002, G 8.3011, X 8.4118, counts+copy C 8.4211. Blends: G+X 8.2450; W+G+X 8.2180; G+X+C 8.1095; **W+G+X+C 8.0967** (weights W 0.2, G 0.4, C 0.4). The blend beats the best single model by 0.20 bits/word with no training: the networks and the count models make different mistakes.
