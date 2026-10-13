@@ -606,3 +606,9 @@ The re-run reproduced R25-bl exactly (8.4507: the runs are deterministic). On pa
 
 ## R25-br registration (book-wide copy memory as a component)
 r25_bookcopy.py: probability of reusing an earlier word of the book (all earlier held-out paragraphs in order, weight 0.999^distance). Added to r25_cm.py with B as component Y. Compared with R25-bq 7.9227.
+
+## R25-br result (book-wide copy memory) -- PASS, large
+86.7% of next words already appeared earlier in the held-out text. Copy memory alone is useless (12.02) but in the mix: global **7.6689**, by depth **7.6650** (R25-bq 7.9227): -0.26 bits/word, the largest single gain today. (The memory reads earlier held-out text only, in order, as a reader would; the mixing weights come from paragraphs 0-499.) Not comparable with the language model's 7.6694, which was measured at sentence scope on a different subset.
+
+## R25-bs registration (copy memory decay)
+Same mix with the copy memory's decay at 0.99 (short memory) and 0.9999 (long memory) instead of 0.999; one run each; reported as is.
