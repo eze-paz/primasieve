@@ -532,3 +532,9 @@ r25_wn_groups.py: each word's main WordNet class (most-tagged part of speech, it
 | dictionary-seeded 461 groups | 8.9901 | 455 s (shared processor) |
 | learned x dictionary 6,072 groups | **8.7437** | 958 s (shared processor) |
 Dictionary classes replacing the learned groups: FAIL (+0.18). Dictionary classes splitting the learned groups: PASS (-0.06 vs B), equal to word output per step. The dictionary helps as a refinement of what the learner found, not as a replacement.
+
+## R25-be result C -- PASS
+Group output, 6,000 steps: **8.6436** bits/word in 1,188 s, against word output 8.7392 in 1,214 s (A). At equal time the network that predicts groups, with a count table picking the word, wins by 0.10 bits/word with half the weights.
+
+## R25-bg registration (best of both: learned x dictionary groups at about equal time)
+Group output with r25_classes_wnx.json, 4,000 steps, 6 threads, same scoring. Compared with C (8.6436, 1,188 s); time reported. PASS if lower bits in no more time than C.
