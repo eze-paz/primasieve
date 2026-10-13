@@ -510,3 +510,12 @@ r25_rnn.py gains --hidden (GRU state width, projected back to 128 before the out
 
 ## R25-bc / R25-bd measurement (where the next-word bits go)
 Four-group model, first 3,000 held-out paragraphs, 168,995 predictions. With the learner's 634 groups: which kind of word 6.631 bits, which word of that kind 2.162 (total 8.793). With the groups merged into 30 grammar-sized classes (k-means on group mean vectors; r25_classes_coarse.json): which kind of word 4.090, which word of that kind 5.838 (total 9.928). Grammar-sized choice is about 40% of the cost; content about 60%.
+
+## R25-bb stopped (owner: skip the memory test; minutes-scale tests from now on, multi-hour runs go to Colab)
+
+## R25-be registration (the network predicts groups; a count table picks the word)
+r25_rnn.py --groups: the running state (128 wide, look-up off) predicts which of the learner's 634 groups comes next (plus one group for words without a group and one for unknown words); P(word) = P(group) x the word's training count share inside its group. 2,359,391 parameters (word-output version 4,857,605); about 3 times as many steps per second. From scratch, single runs, scored on the first 1,000 held-out paragraphs (--fast: no matched set):
+- A: word output, 2,000 steps
+- B: group output, 2,000 steps (equal steps)
+- C: group output, 6,000 steps (about A's time)
+PASS if C beats A (the factorisation wins at equal time). B vs A shows whether it wins per step too.

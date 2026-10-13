@@ -16,6 +16,15 @@ np, torch, nn, T, B, D0 = g["np"], g["torch"], g["nn"], g["T"], g["B"], g["D0"]
 vocab, z, vi, unk_bits, encode, train, tep, t0 = g["vocab"], g["z"], g["vi"], g["unk_bits"], g["encode"], g["train"], g["tep"], g["t0"]
 opt_ = lambda k, d: type(d)(ARGV[ARGV.index(k) + 1]) if k in ARGV else d
 MIN, K, OUT = opt_("--minutes", 75.0), opt_("--lookup", 4), opt_("--out", "r25_rnn.pt")
+GROUPS = "--groups" in ARGV                                                                 # R25-be: the network predicts the learner's word group; a count table picks the word in it
+if GROUPS:
+    import json as _json, collections
+    _cl = _json.load(open(opt_("--groups-file", "r25_classes.json"), encoding="utf-8")); _ids = sorted(set(_cl.values())); _gi = {c: i for i, c in enumerate(_ids)}
+    REST, UNKG = len(_ids), len(_ids) + 1; NG = len(_ids) + 2; _uni = g["uni"]
+    G = torch.tensor([UNKG] + [_gi.get(_cl.get(w), REST) for w in vocab], dtype=torch.long)
+    _cnt = collections.Counter()
+    for i, w in enumerate(vocab): _cnt[int(G[i + 1])] += _uni[w] + 0.5
+    LW = torch.tensor([0.0] + [math.log((_uni[w] + 0.5) / _cnt[int(G[i + 1])]) for i, w in enumerate(vocab)])
 CTX, D, LAYERS, BATCH = 64, 128, 2, 32
 HS, STEPS = opt_("--hidden", 128), opt_("--steps", 0)                                       # R25-bb: a wider running state (projected back to 128); a fixed step budget
 torch.manual_seed(0); random.seed(0)
@@ -30,7 +39,7 @@ class RNet(nn.Module):
         s.inp = nn.Linear(100, D); s.rnn = nn.GRU(D, HS, LAYERS, batch_first=True, dropout=0.1)
         if HS != D: s.proj = nn.Linear(HS, D)
         s.q = nn.Linear(D, D); s.k = nn.Linear(D, D); s.v = nn.Linear(D, D); s.mix = nn.Linear(D, D)
-        s.out_ln = nn.LayerNorm(D); s.out = nn.Linear(D, len(vocab) + 1); s.drop = nn.Dropout(0.1)
+        s.out_ln = nn.LayerNorm(D); s.out = nn.Linear(D, NG if GROUPS else len(vocab) + 1); s.drop = nn.Dropout(0.1)
     def forward(s, x):
         h, _ = s.rnn(s.drop(s.inp(s.emb(x))))                                             # the running state, word by word
         if HS != D: h = s.proj(h)
@@ -56,6 +65,7 @@ while (step < STEPS) if STEPS else (time.time() - t1 < MIN * 60):
     x = torch.zeros((BATCH, L - 1), dtype=torch.long); y = torch.zeros((BATCH, L - 1), dtype=torch.long); w8 = torch.zeros((BATCH, L - 1))
     for i, (a, m) in enumerate(batch):
         x[i, :len(a) - 1] = torch.tensor(a[:-1]); y[i, :len(a) - 1] = torch.tensor(a[1:]); w8[i, :len(a) - 1] = 1.0
+    if GROUPS: y = G[y]
     out = net(x); loss = (lossf(out.reshape(-1, out.shape[-1]), y.reshape(-1)) * w8.reshape(-1)).sum() / w8.sum()
     optm.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); optm.step(); step += 1
     if "--decay" in ARGV:                                                                 # R25-az: learning rate falls linearly to zero over the time budget
@@ -65,10 +75,11 @@ while (step < STEPS) if STEPS else (time.time() - t1 < MIN * 60):
 torch.save(net.state_dict(), OUT); net.eval()
 tot = 0.0; n = 0
 with torch.no_grad():
-    for p in tep:
+    for p in tep[:opt_("--eval-paras", len(tep))]:
         ids, mask = encode(p); words = [x for s in p for x in s]
         if len(ids) < 2: continue
         lp = torch.log_softmax(net(torch.tensor([ids[:-1]]))[0], -1)
+        if GROUPS: lp = lp[:, G] + LW                                                     # word = its group's probability x its share inside the group
         for k in range(1, len(ids)):
             if not mask[k]: continue
             b = -lp[k - 1, ids[k]].item() / math.log(2)
@@ -80,6 +91,7 @@ def sents_of(paras):
         for s in T.SENT.split(p["text"]):
             w = [x.lower() for x in T.TOK.findall(s) if x.isalpha()]
             if len(w) >= 2: yield w
+if "--fast" in ARGV: sys.exit(0)
 _, te_b = D0.books(); te = list(sents_of(B.paragraphs(te_b, 20000)))[:3000]; tot = 0.0; n = 0
 with torch.no_grad():
     for w in te:
