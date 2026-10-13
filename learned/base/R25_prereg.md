@@ -474,3 +474,9 @@ Resume r25_rnn_k0.pt for 240 more minutes (495 in all, the attention network's R
 
 ## R25-ay interrupted and resumed
 The PC disconnected at 12:03 (step 17,400 of the round, 10,515 s of 14,400). The last checkpoint was step 17,000 (10,288 s). Resumed from it for the remaining 69 minutes (run_ay2.ps1, log r25_run_ay2.txt); the optimiser state restarts, as at every earlier resume. Gate unchanged: held-out paragraphs at or below 7.7313.
+
+## R25-ay result (running state alone, third round) -- FAIL
+After the interruption the round got 22,527 steps (attention's third round: 25,067), with two optimiser restarts. **Held-out paragraphs 7.7972** (gate at or below 7.7313: fail; its own previous round 7.7894, so no gain). **Matched 8.4000** (attention after its third round 8.3135). The running state tied attention at 255 minutes but stalled after that, while attention kept improving. Possible causes, not separated: the running state overfits the 13.0M tokens sooner (about 8 passes now), or the repeated restarts at full learning rate undo progress.
+
+## R25-az registration (learning-rate decay on both, equal time)
+Neither network has ever had its learning rate lowered; both restarted at 1e-3 on every resume. Both final weights (attention r25_attn_ar3.pt, running state r25_rnn_k0_495min.pt) get 45 more minutes with the learning rate falling linearly to zero (--decay), run one after the other on 6 threads, writing r25_attn_az.pt and r25_rnn_az.pt. Compared on held-out paragraphs (attention scored by r25_attn.py, running state by r25_rnn.py, same 270,358 predictions) and the matched 47,478 predictions (r25_attn_eval.py for attention). Reported as is: whether decay helps each, and which design leads after it.

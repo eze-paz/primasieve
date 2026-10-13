@@ -67,7 +67,7 @@ def windows(ids, mask):
     for st in range(0, max(1, len(ids) - 1), CTX):
         a = ids[max(0, st - 1):st + CTX]; m = mask[max(0, st - 1):st + CTX]
         if len(a) >= 2: yield a, m
-pool = [w for a, m in train for w in windows(a, m)]; step = 0; net.train()
+pool = [w for a, m in train for w in windows(a, m)]; step = 0; net.train(); t_train = time.time()
 while time.time() - t0 < MIN * 60:
     batch = random.sample(pool, BATCH); L = max(len(a) for a, _ in batch)
     x = torch.zeros((BATCH, L - 1), dtype=torch.long); y = torch.zeros((BATCH, L - 1), dtype=torch.long); w8 = torch.zeros((BATCH, L - 1))
@@ -75,6 +75,8 @@ while time.time() - t0 < MIN * 60:
         x[i, :len(a) - 1] = torch.tensor(a[:-1]); y[i, :len(a) - 1] = torch.tensor(a[1:]); w8[i, :len(a) - 1] = 1.0
     out = net(x); loss = (lossf(out.reshape(-1, out.shape[-1]), y.reshape(-1)) * w8.reshape(-1)).sum() / w8.sum()
     opt.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); opt.step(); step += 1
+    if "--decay" in ARGV:                                                                 # R25-az: learning rate falls linearly to zero over the time budget
+        for g_ in opt.param_groups: g_["lr"] = 1e-3 * max(0.0, 1 - (time.time() - t_train) / (MIN * 60))
     if step % 200 == 0: print(f"  step {step}: training loss {loss.item() / math.log(2):.3f} bits/token ({time.time() - t0:.0f} s)", flush=True)
     if step % 500 == 0: torch.save(net.state_dict(), OUT)
 torch.save(net.state_dict(), OUT); net.eval()

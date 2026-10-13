@@ -55,6 +55,8 @@ while time.time() - t1 < MIN * 60:
         x[i, :len(a) - 1] = torch.tensor(a[:-1]); y[i, :len(a) - 1] = torch.tensor(a[1:]); w8[i, :len(a) - 1] = 1.0
     out = net(x); loss = (lossf(out.reshape(-1, out.shape[-1]), y.reshape(-1)) * w8.reshape(-1)).sum() / w8.sum()
     optm.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); optm.step(); step += 1
+    if "--decay" in ARGV:                                                                 # R25-az: learning rate falls linearly to zero over the time budget
+        for g_ in optm.param_groups: g_["lr"] = 1e-3 * max(0.0, 1 - (time.time() - t1) / (MIN * 60))
     if step % 200 == 0: print(f"  step {step}: training loss {loss.item() / math.log(2):.3f} bits/token ({time.time() - t1:.0f} s)", flush=True)
     if step % 500 == 0: torch.save(net.state_dict(), OUT)
 torch.save(net.state_dict(), OUT); net.eval()
