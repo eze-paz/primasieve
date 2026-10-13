@@ -480,3 +480,13 @@ After the interruption the round got 22,527 steps (attention's third round: 25,0
 
 ## R25-az registration (learning-rate decay on both, equal time)
 Neither network has ever had its learning rate lowered; both restarted at 1e-3 on every resume. Both final weights (attention r25_attn_ar3.pt, running state r25_rnn_k0_495min.pt) get 45 more minutes with the learning rate falling linearly to zero (--decay), run one after the other on 6 threads, writing r25_attn_az.pt and r25_rnn_az.pt. Compared on held-out paragraphs (attention scored by r25_attn.py, running state by r25_rnn.py, same 270,358 predictions) and the matched 47,478 predictions (r25_attn_eval.py for attention). Reported as is: whether decay helps each, and which design leads after it.
+
+## R25-az result (learning-rate decay, 45 minutes each)
+| network | held-out paragraphs | matched predictions |
+|---|---|---|
+| attention, before / after decay | 7.7313 / **7.6906** | 8.3135 / **8.2942** |
+| running state, before / after decay | 7.7972 / **7.7852** | 8.4000 / 8.4174 |
+Decay helps attention clearly (-0.04) and the running state barely (-0.01 held-out, +0.02 worse on the matched set). Attention leads by 0.09 on held-out paragraphs. The running state's stall is not mainly the missing decay.
+
+## R25-ba registration (diagnosis of the stall, no training)
+r25_diag.py scores every saved checkpoint of both networks on two fixed samples: 2,000 training paragraphs and 2,000 held-out paragraphs, each cut to its first 64 words (deterministic, one thread). Reading, fixed in advance: if the running state's training bits keep falling across checkpoints while its held-out bits stop, the stall is overfitting (too little text for it); if its training bits also stop, it is a capacity limit (state too small); attention is the reference.
