@@ -519,3 +519,6 @@ r25_rnn.py --groups: the running state (128 wide, look-up off) predicts which of
 - B: group output, 2,000 steps (equal steps)
 - C: group output, 6,000 steps (about A's time)
 PASS if C beats A (the factorisation wins at equal time). B vs A shows whether it wins per step too.
+
+## R25-bf registration (word groups seeded from the WordNet dictionary)
+r25_wn_groups.py: each word's main WordNet class (most-tagged part of speech, its most frequent sense's lexicographer file, e.g. noun.food, verb.motion); the 300 most frequent words and words WordNet lacks keep their learned group. Two group sets: dictionary-seeded (r25_classes_wn.json, 461 groups) and learned x dictionary intersection (r25_classes_wnx.json, 6,072 groups). Same group-output network as R25-be B (2,000 steps, first 1,000 held-out paragraphs, --fast), run locally in parallel with fixed steps (the Colab upload was refused by the session's safety check). Compared with R25-be B (learned 634 groups). PASS for either if it beats B.
