@@ -522,3 +522,13 @@ PASS if C beats A (the factorisation wins at equal time). B vs A shows whether i
 
 ## R25-bf registration (word groups seeded from the WordNet dictionary)
 r25_wn_groups.py: each word's main WordNet class (most-tagged part of speech, its most frequent sense's lexicographer file, e.g. noun.food, verb.motion); the 300 most frequent words and words WordNet lacks keep their learned group. Two group sets: dictionary-seeded (r25_classes_wn.json, 461 groups) and learned x dictionary intersection (r25_classes_wnx.json, 6,072 groups). Same group-output network as R25-be B (2,000 steps, first 1,000 held-out paragraphs, --fast), run locally in parallel with fixed steps (the Colab upload was refused by the session's safety check). Compared with R25-be B (learned 634 groups). PASS for either if it beats B.
+
+## R25-bf result (dictionary-seeded groups), with R25-be A and B
+2,000 steps each, first 1,000 held-out paragraphs (50,114 predictions):
+| network output | bits/word | time |
+|---|---|---|
+| words (R25-be A) | 8.7392 | 1,214 s |
+| learned 634 groups (R25-be B) | 8.8071 | 384 s |
+| dictionary-seeded 461 groups | 8.9901 | 455 s (shared processor) |
+| learned x dictionary 6,072 groups | **8.7437** | 958 s (shared processor) |
+Dictionary classes replacing the learned groups: FAIL (+0.18). Dictionary classes splitting the learned groups: PASS (-0.06 vs B), equal to word output per step. The dictionary helps as a refinement of what the learner found, not as a replacement.
