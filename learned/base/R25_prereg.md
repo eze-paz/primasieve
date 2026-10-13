@@ -571,3 +571,6 @@ A reset (paragraph scope) **8.6295**; B carried through the book **8.5987** (-0.
 
 ## R25-bl registration (book-scope reading with learned x dictionary groups)
 r25_chapter.py --groups-file r25_classes_wnx.json, carried state, 6,000 steps. Compared with R25-bk B (8.5987) and the best paragraph-scope network R25-bg (8.5947, 4,000 steps). PASS if below both.
+
+## R25-bm registration (gradient-free running state: reservoir + closed-form output; owner's priority)
+r25_reservoir.py: fixed seeded random recurrent state 1,024 wide reading the first 4,000,000 training tokens in book order (32 streams); output fitted once by ridge regression to the next word's group; ridge strength and softmax scale chosen on the last 5% of the training streams; word = group x count share, unknown words as in the group networks. Scored on the first 1,000 held-out paragraphs, state carried (as R25-bk B). Probe (256 wide, 200,000 tokens): 10.68 bits/word. Compared with the gradient-trained book-scope network R25-bk B (8.5987) and reported with its time. Reported as is.
