@@ -550,3 +550,9 @@ Held-out paragraphs 500-999 (weights chosen on 0-499): alone W 8.4002, G 8.3011,
 
 ## R25-bi registration (blend with the better dictionary network)
 r25_ens.py r25_bg.pt: the R25-bh blend with X = the 4,000-step learned x dictionary network. Same halves. Compared with R25-bh's best blend 8.0967.
+
+## R25-bi result (blend with the 4,000-step dictionary network)
+Alone X 8.3084 (was 8.4118). Best blend W+G+X+C **8.0814** (weights 0.1/0.2/0.3/0.4; R25-bh 8.0967): -0.015.
+
+## R25-bj registration (rare words predicted through their own group)
+The group network's output no longer needs the 20,000-word input vocabulary: a word outside it that has a learned group (41,195 words have one) is predicted as P(its group) x its count share in the group, in training targets and in scoring; only words with no group stay in the unknown bucket (charged their share among those words). r25_rnn.py --groups --oov-groups, learned groups, 6,000 steps, 6 threads, first 1,000 held-out paragraphs. Compared with R25-be C (8.6436, same settings without the change). PASS if lower.

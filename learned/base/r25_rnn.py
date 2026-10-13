@@ -25,6 +25,14 @@ if GROUPS:
     _cnt = collections.Counter()
     for i, w in enumerate(vocab): _cnt[int(G[i + 1])] += _uni[w] + 0.5
     LW = torch.tensor([0.0] + [math.log((_uni[w] + 0.5) / _cnt[int(G[i + 1])]) for i, w in enumerate(vocab)])
+OOVG = GROUPS and "--oov-groups" in ARGV                                                   # R25-bj: words outside the 20,000-word input vocabulary are predicted through their own group
+if OOVG:
+    def gw(w): return int(G[vi[w]]) if w in vi else (_gi[_cl[w]] if w in _cl else UNKG)
+    for w in _uni:
+        if w not in vi and w in _cl: _cnt[_gi[_cl[w]]] += _uni[w] + 0.5
+    LW = torch.tensor([0.0] + [math.log((_uni[w] + 0.5) / _cnt[int(G[i + 1])]) for i, w in enumerate(vocab)])
+    _u2 = [w for w in _uni if w not in vi and w not in _cl]; _U2 = sum(_uni[w] for w in _u2); _n2 = len(_u2) + 1
+    def unk2(w): return -math.log2(max((_uni[w] + 0.5) / (_U2 + 0.5 * _n2), 1e-12))
 CTX, D, LAYERS, BATCH = 64, 128, 2, 32
 HS, STEPS = opt_("--hidden", 128), opt_("--steps", 0)                                       # R25-bb: a wider running state (projected back to 128); a fixed step budget
 torch.manual_seed(0); random.seed(0)
@@ -60,12 +68,18 @@ def windows(ids, mask):
         a = ids[max(0, st - 1):st + CTX]; m = mask[max(0, st - 1):st + CTX]
         if len(a) >= 2: yield a, m
 pool = [w for a, m in train for w in windows(a, m)]; step = 0; net.train(); t1 = time.time()
+if OOVG:                                                                                    # items become (input ids, target groups)
+    pool = []
+    for p in g["trp"]:
+        ids_, mask_ = encode(p)
+        if len(ids_) >= 3: tg_ = [gw(x) for s in p for x in s]; pool += [(a, t) for (a, _), (t, _) in zip(windows(ids_, mask_), windows(tg_, mask_))]
+    t1 = time.time()
 while (step < STEPS) if STEPS else (time.time() - t1 < MIN * 60):
     batch = random.sample(pool, BATCH); L = max(len(a) for a, _ in batch)
     x = torch.zeros((BATCH, L - 1), dtype=torch.long); y = torch.zeros((BATCH, L - 1), dtype=torch.long); w8 = torch.zeros((BATCH, L - 1))
     for i, (a, m) in enumerate(batch):
-        x[i, :len(a) - 1] = torch.tensor(a[:-1]); y[i, :len(a) - 1] = torch.tensor(a[1:]); w8[i, :len(a) - 1] = 1.0
-    if GROUPS: y = G[y]
+        x[i, :len(a) - 1] = torch.tensor(a[:-1]); y[i, :len(a) - 1] = torch.tensor((m if OOVG else a)[1:]); w8[i, :len(a) - 1] = 1.0
+    if GROUPS and not OOVG: y = G[y]
     out = net(x); loss = (lossf(out.reshape(-1, out.shape[-1]), y.reshape(-1)) * w8.reshape(-1)).sum() / w8.sum()
     optm.zero_grad(); loss.backward(); nn.utils.clip_grad_norm_(net.parameters(), 1.0); optm.step(); step += 1
     if "--decay" in ARGV:                                                                 # R25-az: learning rate falls linearly to zero over the time budget
@@ -79,9 +93,14 @@ with torch.no_grad():
         ids, mask = encode(p); words = [x for s in p for x in s]
         if len(ids) < 2: continue
         lp = torch.log_softmax(net(torch.tensor([ids[:-1]]))[0], -1)
-        if GROUPS: lp = lp[:, G] + LW                                                     # word = its group's probability x its share inside the group
+        lpg = lp
+        if GROUPS and not OOVG: lp = lp[:, G] + LW                                        # word = its group's probability x its share inside the group
         for k in range(1, len(ids)):
             if not mask[k]: continue
+            if OOVG:
+                gid = gw(words[k]); b = -lpg[k - 1, gid].item() / math.log(2)
+                b += -math.log2((_uni[words[k]] + 0.5) / _cnt[gid]) if gid != UNKG else unk2(words[k])
+                tot += b; n += 1; continue
             b = -lp[k - 1, ids[k]].item() / math.log(2)
             if ids[k] == 0: b += unk_bits(words[k])
             tot += b; n += 1

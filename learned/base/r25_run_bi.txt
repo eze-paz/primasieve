@@ -1,0 +1,14 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (19 s)
+  W scored (17 s)
+  G scored (30 s)
+  X scored (46 s)
+R25-ap counts built: 199531 training paragraphs, 5276 held-out paragraphs (125 s)
+  C scored (171 s)
+R25-bh alone W: 8.4002 bits/word
+R25-bh alone G: 8.3011 bits/word
+R25-bh alone X: 8.3084 bits/word
+R25-bh alone C: 8.4211 bits/word
+R25-bh blend G+X weights {'W': 0.0, 'G': 0.4, 'X': 0.6, 'C': 0.0}: 8.2130 bits/word
+R25-bh blend W+G+X weights {'W': 0.2, 'G': 0.4, 'X': 0.4, 'C': 0.0}: 8.1830 bits/word
+R25-bh blend G+X+C weights {'W': 0.0, 'G': 0.2, 'X': 0.4, 'C': 0.4}: 8.0938 bits/word
+R25-bh blend W+G+X+C weights {'W': 0.1, 'G': 0.2, 'X': 0.3, 'C': 0.4}: 8.0814 bits/word
