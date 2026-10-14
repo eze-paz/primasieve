@@ -1,0 +1,16 @@
+R25-cv-t fit: 323 books, 3174 events (16 s)
+R25-cv-t dev: 36 books, 379 events (18 s)
+R25-cv-t test: 41 books, 374 events (20 s)
+R25-cv-t 15 verbs with 30+ events
+R25-cv-t K=2: dev 1.3199 bits (prior 1.3136, per verb 1.3105)
+R25-cv-t K=3: dev 1.3174 bits (prior 1.3136, per verb 1.3105)
+R25-cv-t K=4: dev 1.3162 bits (prior 1.3136, per verb 1.3105)
+R25-cv-t K=5: dev 1.3143 bits (prior 1.3136, per verb 1.3105)
+R25-cv-t chosen K=5. Held-out books (374 events): no verb 1.3401, learned classes 1.3459, per verb 1.3533; classes recover -583357603.2% of the per-verb gain
+  class 0: agent named near the next mention 0.050, 4 verbs: leave, put, find, hold
+  class 1: agent named near the next mention 0.084, 2 verbs: give, send
+  class 2: agent named near the next mention 0.092, 5 verbs: say, see, cry, tell, call
+  class 3: agent named near the next mention 0.101, 3 verbs: take, make, like
+  class 4: agent named near the next mention 0.208, 1 verbs: enter
+R25-cv-t lexicon check: 3 / 6 acquire x release pairs ordered as the hand lists say (2 in the same class); acquire [('take', 3), ('find', 0)], release [('put', 0), ('leave', 0), ('give', 1)]
+R25-cv-t per-verb agent-near share, acquire: [('take', 0.107), ('find', 0.079)]; release: [('put', 0.025), ('leave', 0.044), ('give', 0.067)]

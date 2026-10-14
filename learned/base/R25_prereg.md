@@ -889,3 +889,9 @@ Events found: 4,039 in 323 training books (about 12 per book), 501 dev, 523 held
 
 ## R25-cv-t registration (emergence, iteration 2: a holding judge)
 r25_emerge2.py. Events: NAME VERB [particle up/down/off/out/away/back/over/on/in] DET [one adjective] THING (NAME = capitalised word not opening its sentence and not a function word; verb as before). Judge: at THING's next mention after the event's sentence, within the same and the next two paragraphs, which name stands within 8 words of it: the event's agent (A), another name (O), or none (N); conditioned on whether that mention is in the same paragraph. Learner, classes, K choice, splits, gate and lexicon check as R25-cu-t, with the lexicon order read on the agent-near share (acquire verbs should keep the agent near the thing more than release verbs).
+
+## R25-cv-t result -- FAIL (yield)
+Events: see r25_run_cv.txt (374 held-out); 15 verbs with 30+ events. Held-out: no verb 1.3401, classes (K=5) 1.3459, per verb 1.3533. Direction is as expected for the few verbs with data (agent near the next mention: take 0.107, find 0.079; put 0.025, leave 0.044, give 0.067 -- give's next mention more often has another name near, 'give' class shared with 'send') but 3 / 6 pairs is chance; far too few events.
+
+## R25-cw-t registration (emergence, iteration 3: yield)
+r25_emerge3.py = R25-cv-t plus: the agent may be he / she / they, resolved to the most recently named person in the same or previous paragraph; one adverb (a word ending in -ly) may stand between agent and verb. Everything else, gate and check unchanged.
