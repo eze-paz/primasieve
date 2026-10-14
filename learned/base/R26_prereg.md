@@ -173,3 +173,12 @@ Group-keyed copy (key seen always; target found 58.5%; 5.16 bits where nonzero a
 
 ## T02b result -- PASS
 Two-word in-group choice on the decayed adapted network: alone **7.5063** (T08 7.5234). Gate with it as B and the decayed network as D: **7.1199** (T07c 7.1226). New best; gap to the language model 0.42. Best gate components listed in r26_gate_best_args.txt.
+
+## T07d registration (more group-shaped keys for book memories)
+Copy memories (decay 0.9999) keyed by: (a) the previous word's dictionary-split group (r25_classes_wnx); (b) its dictionary class (r25_classes_wn); (c) the word two back plus the previous word's learned group. Each added alone to the best gate (T02b set), then all that helped together. PASS if the gate falls below 7.1199.
+
+## T07d result, and a correction to the selection method
+Single additions to the T02b gate (test 500-999 / slice 400-499): dictionary-split-group key 7.1184 / 7.2472; dictionary-class key 7.1193 / 7.2465; word-two-back + group key 7.1205 / 7.2463; both group keys 7.1206 / 7.2498; plus the evolved shapes 7.1202 / 7.2484. Correction: since T07b, gate additions were accepted by their 500-999 score, which is selection on the test half; differences of 0.001-0.003 are within that noise (by the slice, T07b's skip keys would not have been accepted: 7.2571 vs 7.2556). From here components join the gate only by the 400-499 slice, which the gate does not fit on, and 500-999 is reported once per registration.
+
+## T35 registration (gate components chosen by forward selection on the validation slice)
+r26_select.py: start from the T12 base set (the R25-co components with B, D from T02b); candidates: KP, QM, S1, S2, G1, G2, X1 (dictionary-split-group key), X2 (dictionary-class key), X3 (word two back + group), E1, E2 (evolved shapes), T08's B as B2. Each round adds the candidate that most lowers the 400-499 slice bits (gate refitted on 0-399), stopping when no candidate gains 0.001. The chosen set is reported once on 500-999. PASS if below 7.1199 (T02b, the last gate accepted before the correction).

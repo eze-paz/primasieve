@@ -1,0 +1,10 @@
+R25-cl bigram copy memory (decay 0.9999): 50114 predictions; previous word seen as a context before: 0.985; target has nonzero copy probability: 0.536; mean bits where nonzero: 5.016
+wnx: T12 gate: fit 7.4788, early-stop slice 7.2472, paragraphs 500-999 7.1184 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'KP', 'QM', 'S1', 'S2', 'G1', 'G2', 'X'])
+R25-cl bigram copy memory (decay 0.9999): 50114 predictions; previous word seen as a context before: 1.000; target has nonzero copy probability: 0.641; mean bits where nonzero: 5.527
+wn: T12 gate: fit 7.4798, early-stop slice 7.2465, paragraphs 500-999 7.1193 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'KP', 'QM', 'S1', 'S2', 'G1', 'G2', 'X'])
+R25-cl bigram copy memory (decay 0.9999): 50114 predictions; previous word seen as a context before: 0.540; target has nonzero copy probability: 0.117; mean bits where nonzero: 2.382
+w2g1: T12 gate: fit 7.4807, early-stop slice 7.2463, paragraphs 500-999 7.1205 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'KP', 'QM', 'S1', 'S2', 'G1', 'G2', 'X'])
+wnx+wn:
+T12 gate: fit 7.4788, early-stop slice 7.2498, paragraphs 500-999 7.1206 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'KP', 'QM', 'S1', 'S2', 'G1', 'G2', 'X1', 'X2'])
+wnx+wn+evo1+evo2:
+T12 gate: fit 7.4783, early-stop slice 7.2484, paragraphs 500-999 7.1202 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'KP', 'QM', 'S1', 'S2', 'G1', 'G2', 'X1', 'X2', 'E1', 'E2'])

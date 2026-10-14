@@ -1,0 +1,11 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (47 s)
+T11 data ready: 3,046,012 tokens for fitness models (14 s)
+T11 generation 0: best ('word', 'word', 'word', 'word') 9.0606; 2nd ('word', 'word', 'group', 'group') 9.0654; 3rd ('group', 'group', 'group', 'group') 9.0877 (298 s)
+T11 generation 1: best ('word', 'word', 'word', 'word') 9.0606; 2nd ('word', 'word', 'group', 'word') 9.0652; 3rd ('word', 'word', 'group', 'group') 9.0654 (478 s)
+T11 generation 2: best ('group', 'word', 'word', 'word') 9.0038; 2nd ('group', 'word', 'word', 'group') 9.0041; 3rd ('word', 'word', 'word', 'word') 9.0606 (612 s)
+T11 generation 3: best ('group', 'word', 'word', 'word') 9.0038; 2nd ('group', 'word', 'word', 'group') 9.0041; 3rd ('dgroup', 'word', 'word', 'group') 9.0114 (754 s)
+T11 generation 4: best ('group', 'word', 'word', 'word') 9.0038; 2nd ('group', 'word', 'word', 'dgroup') 9.0039; 3rd ('group', 'word', 'word', 'group') 9.0041 (912 s)
+T11 generation 5: best ('group', 'word', 'word', 'word') 9.0038; 2nd ('group', 'word', 'word', 'dgroup') 9.0039; 3rd ('group', 'word', 'word', 'group') 9.0041 (1027 s)
+T11 top genomes: [(('group', 'word', 'word', 'word'), np.float64(9.0038)), (('group', 'word', 'word', 'dgroup'), np.float64(9.0039)), (('group', 'word', 'word', 'group'), np.float64(9.0041)), (('group', 'word', 'word', 'end'), np.float64(9.0054)), (('dgroup', 'word', 'word', 'group'), np.float64(9.0114)), (('group', 'word', 'group', 'dgroup'), np.float64(9.0144))]
+T11 genome ('group', 'word', 'word', 'word'): held-out 500-999 8.4887 -> r26_evo1_probs.npz (1174 s)
+T11 genome ('group', 'word', 'word', 'dgroup'): held-out 500-999 8.4888 -> r26_evo2_probs.npz (1265 s)
