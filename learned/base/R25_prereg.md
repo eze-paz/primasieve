@@ -810,3 +810,9 @@ r25_recur2.py. Families: power (d + c)^-b, exponential r^d, log decay ln(d + c)^
 
 ## R25-cs registration (log-domain and other combining operators)
 r25_logmix.py. Components that can give a full distribution over the 65,535 most frequent words plus one rare bucket: Kneser-Ney o5mxa, the static network, the adapted network (dynamic evaluation run inside), and the copy memories (plain 0.99 / 0.9999, keyed by 1-3 words). Combining operators, each with weights fit on a sample of paragraphs 0-499 and scored exactly (normaliser summed over the whole vocabulary) on 500-999: linear (power 1), power mean with exponent 0.5 (square root) and 0.25, and geometric / log-linear (exponent 0, i.e. exp of a weighted sum of natural logs). Compared with the linear mix of the same components. PASS if any non-linear operator beats linear on 500-999.
+
+## Naming note (two sessions writing to this file)
+A second working session registered its own R25-cp, R25-cp2 and R25-cq (rival check, recurrence curve) at the same time as this session's R25-cp (live group counting) and R25-cq (language model on the mix's test). To keep them apart, this session's entries are renamed: live group counting = R25-cp-g; language model on the mix's test = R25-cs; dictionary lookup stays R25-cr. The other session's script also writes r25_run_cq.txt; R25-cs's numbers will be read from r25_llm_book_probs.npz.
+
+## R25-cr result (dictionary and thesaurus lookup for unknown context words) -- no effect
+Only 429 context positions held a word outside the counter's list (0.9% of predictions); 79 resolved by base form, 51 by synonym, 44 by broader word, 255 not found. Paragraphs 500-999: 8.3589 (without lookup 8.3580). With a 65,534-word list, unknown words are too rare in context for a lookup to matter here; it would matter for a small vocabulary or for question answering, where one unknown word can decide the answer.
