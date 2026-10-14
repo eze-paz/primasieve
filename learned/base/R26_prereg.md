@@ -272,3 +272,9 @@ Margins on both practice pools: fix {who 0, what 8} -> untouched +454 (670 / 72)
 
 ## T22j result -- PASS
 Fix3 alone: main practice 180 / 16 (+132), untouched 535 / 74 (+313). Margins (both pools): who 0, what 8, where 8, when 8 -- all four question words now used. Policy: practice +243; **untouched +467 -> +485 (767 right / 94 wrong)**. Best comprehension policy: r26_policy.py --why-because --fix3 --t22h r26_t22i_fix3_policy.json.
+
+## T22k registration (pronoun-aware sentence matching)
+Diagnosis on the extra practice: of 554 who / what / where / when questions, 364 have exactly one sentence holding all content words, 185 none (117 of these have every content word somewhere in the story -- typically the name in one sentence and 'she' in the next; 64 miss one word), 5 several. Fix under --fix4 (implies fix3): (1) possessive 's stripped for matching ("Kwame's" -> kwame); (2) a sentence containing he / she / him / her / his / they / them / their also counts as mentioning the most recently named person before it (the name's position is the pronoun's); (3) order words (first, end, last, beginning) are dropped from the content words. Margins by the T22i protocol. PASS if the policy beats +485.
+
+## T22k result -- FAIL in the policy (better alone)
+Fix4 alone: main practice 193 / 23, untouched 575 / 83 (+326; fix3 +313). Margins (both pools): who 0, what never-veto, where 2, when 8. Policy: practice +235, untouched **+475** (754 / 93) vs +485. The pronoun-aware matching reaches more answers, but with the looser 'what' margin it brings in more wrong ones than right.

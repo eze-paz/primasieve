@@ -13,7 +13,7 @@ PLACEP = {"in", "on", "at", "into", "onto", "near", "under", "behind", "by", "in
 STOP = AUX | DET | {"who", "what", "where", "when", "whom", "of", "for", "with", "and", "or", "but", "it", "he", "she", "they", "him", "them", "there", "then", "so"} | PREP
 TIMEW = set("morning evening night noon dawn dusk midnight afternoon day days week weeks month months year years winter summer spring autumn monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december yesterday today tomorrow tonight hour hours minute minutes later o clock christmas birthday holiday".split())
 CLAUSE_END = {"and", "but", "because", "while", "when", "so", "then", "who", "which", "that", "after", "before", "until"}
-FIX3 = "--fix3" in sys.argv; FIX2 = "--fix2" in sys.argv or FIX3; FIX = "--fix" in sys.argv or FIX2
+FIX4 = "--fix4" in sys.argv; FIX3 = "--fix3" in sys.argv or FIX4; FIX2 = "--fix2" in sys.argv or FIX3; FIX = "--fix" in sys.argv or FIX2
 WEEKMONTH = set("monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december".split())
 NUMW = set("one two three four five six seven eight nine ten eleven twelve twenty thirty a few several".split())
 PRONS = {"he", "she", "it", "they", "him", "her", "them", "his", "its", "their"}
@@ -54,13 +54,22 @@ def answer(text, q, relax=False):
     obj_q = rest[0].lower() in AUX
     if obj_q: rest = rest[1:]
     content = [norm(w) for w in rest if w.lower() not in STOP]
+    if FIX4: content = [c[:-2] if c.endswith("'s") else c for c in content if c not in ("first", "end", "last", "beginning")]   # T22k (1), (3)
     if not content: return None
     sents = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
-    hits = []
+    hits = []; last_name = None
     for s in sents:
         toks = TOK.findall(s); nt = [norm(t) for t in toks]
+        if FIX4:
+            nt = [x[:-2] if x.endswith("'s") else x for x in nt]
+            if last_name:                                                                 # T22k (2): a pronoun stands for the most recent name
+                nt = [last_name if (x in ("he", "she", "him", "her", "his", "they", "them", "their") and last_name not in nt) else x for x in nt]
         pos = [next((i for i, x in enumerate(nt) if x == c), None) for c in content]
         if all(p is not None for p in pos): hits.append((toks, nt, pos))
+        if FIX4:
+            for i, t in enumerate(toks):
+                if t[0].isupper() and t.lower() not in STOP and t.lower() not in PRONS and not (i == 0 and t.lower() in ("the", "a", "an", "one", "every", "when", "after", "at", "on", "in")):
+                    last_name = norm(t)[:-2] if norm(t).endswith("'s") else norm(t)
     if not hits and relax:                                                               # T22d: all but one content word (not a name)
         for s in sents:
             toks = TOK.findall(s); nt = [norm(t) for t in toks]
@@ -146,7 +155,7 @@ def main():
     if SF != "val_all13.json":
         A = [answer(t, q, False) for t, q, g in items]; json.dump(A, open(sys.argv[sys.argv.index("--out") + 1], "w", encoding="utf-8")); print("answers", sum(a is not None for a in A)); return
     RELAX = "--relax" in sys.argv
-    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix3_answers.json" if FIX3 else "r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
+    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix4_answers.json" if FIX4 else "r26_stmatch_fix3_answers.json" if FIX3 else "r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
     gold = [g for _, _, g in items]
     L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")]
     route = [l.split("| route ")[1].split(" |")[0] for l in L]; ans = [l.split("| ans ")[1].split(" |")[0] for l in L]; ans = [None if a == "None" else a for a in ans]
