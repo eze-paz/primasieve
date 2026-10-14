@@ -5,7 +5,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE); sys.path.inse
 from b6_rwkv import hit
 st = json.load(open('val_all13.json', encoding='utf-8'))['stories']; items = [(s['text'], q, g) for s in st for q, g in s['qs']]; gold = [g for _, _, g in items]
 SC = json.load(open('r25_steelman2_scores.json', encoding='utf-8')); W_ = 'w' if '--wilson' in sys.argv else ''
-T22 = json.load(open(f'r26_t22f{W_}_policy.json' if '--fix2' in sys.argv else f'r26_t22e{W_}_policy.json' if '--fix' in sys.argv else 'r26_t22c_policy.json', encoding='utf-8')); O = json.load(open('r26_ops_answers.json', encoding='utf-8'))
+T22 = json.load(open(sys.argv[sys.argv.index('--t22h') + 1] if '--t22h' in sys.argv else f'r26_t22f{W_}_policy.json' if '--fix2' in sys.argv else f'r26_t22e{W_}_policy.json' if '--fix' in sys.argv else 'r26_t22c_policy.json', encoding='utf-8')); O = json.load(open('r26_ops_answers.json', encoding='utf-8'))
 L = [l for l in open('r24_diag_asA.txt', encoding='utf-8', errors='replace') if l.startswith('VAL |')]
 route = [l.split('| route ')[1].split(' |')[0] for l in L]; ans = [l.split('| ans ')[1].split(' |')[0] for l in L]; ans = [None if a == 'None' else a for a in ans]
 PR = list(range(310)) + list(range(510, 910)); UN = list(range(310, 510)) + list(range(910, 2510))

@@ -239,3 +239,9 @@ r26_select.py --fixed (the T35 set) --try T13: the T35 set with and without r26_
 
 ## T13b result -- PASS (slice rule)
 Adding the adapted shuffled-paragraph network: slice 7.2475 -> 7.2448 (kept); **test 7.1397 -> 7.1370**. Two differently trained networks, both adapted while reading, complement each other. Fixed gate set now = T35 set + W2.
+
+## T13c registration (more adapted networks)
+(a) two-word in-group choice (T08 grid, chosen on 0-499) on the T13 network -> W2I; (b) r25_bq.pt (6,000-step book-stream network) adapted with SGD 0.3 / decay 0.001 -> W3. Each tried on the fixed set (T35 + W2) by the slice rule; test reported for kept ones.
+
+## T22h result -- FAIL
+Margins chosen on the 600 extra practice questions: fix {who 0, what 4} -> untouched +444 (639 / 65); fix2 {who 0, what 4, where 2} -> +441 (669 / 76). Both more precise than T22e (715 / 84) but they drop 'when' (negative on the extra practice at every margin) and admit fewer 'what' answers; T22e (+463) stays the best policy.

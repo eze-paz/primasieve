@@ -7,7 +7,7 @@ Phase 2: thresholds chosen on the 710 practice questions; reported once on the 1
 Run: py -3.12 r25_steelman.py"""
 import os, sys, math, json, time, re, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
-V2 = "--v2" in sys.argv; ADAPT = "--adapt" in sys.argv; CACHE = sys.argv[sys.argv.index("--cache") + 1] if "--cache" in sys.argv else "r26_steelman3_scores.json" if ADAPT else "r25_steelman2_scores.json" if V2 else "r25_steelman_scores.json"
+ARGV0 = list(sys.argv); V2 = "--v2" in sys.argv; ADAPT = "--adapt" in sys.argv; CACHE = sys.argv[sys.argv.index("--cache") + 1] if "--cache" in sys.argv else "r26_steelman3_scores.json" if ADAPT else "r25_steelman2_scores.json" if V2 else "r25_steelman_scores.json"
 FUNC = set("the a an his her their its my your our this that these those of to in on at by for with from into onto as and or but "
            "was were is are be been had has have did does do not no he she it they we i you him them me us who what where when why "
            "how which whose then so very there here up out off over under near behind after before about".split())
@@ -104,7 +104,7 @@ def phase1():
                 hh.append(w)
             out.append(b)
         return out
-    SF = sys.argv[sys.argv.index("--stories") + 1] if "--stories" in sys.argv else "val_all13.json"
+    SF = ARGV0[ARGV0.index("--stories") + 1] if "--stories" in ARGV0 else "val_all13.json"
     stories = json.load(open(SF, encoding="utf-8"))["stories"]
     items = [(s["text"], q, g) for s in stories for q, g in s["qs"]]
     L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")] if SF == "val_all13.json" else [f"VAL | lift None | {q} | gold - | route none | ans None | hit -" for _, q, _ in items]
@@ -174,4 +174,4 @@ def phase2():
 
 if __name__ == "__main__":
     if not os.path.exists(CACHE) or "--rescore" in sys.argv: phase1()
-    if "--stories" not in sys.argv: phase2()
+    if "--stories" not in ARGV0: phase2()

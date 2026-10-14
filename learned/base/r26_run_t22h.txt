@@ -1,0 +1,14 @@
+  who: extra practice {0: (73, 76, 1), 1: (63, 78, 5), 2: (57, 78, 7), 4: (57, 81, 8), 8: (54, 84, 10), None: (54, 84, 10)}
+  what: extra practice {0: (17, 26, 3), 1: (26, 38, 4), 2: (22, 40, 6), 4: (29, 50, 7), 8: (28, 58, 10), None: (25, 58, 11)}
+  where: extra practice {0: (-3, 0, 1), 1: (-3, 33, 12), 2: (-12, 36, 16), 4: (-21, 39, 20), 8: (-34, 41, 25), None: (-34, 41, 25)}
+  when: extra practice {0: (-2, 1, 1), 1: (-12, 12, 8), 2: (-11, 13, 8), 4: (-11, 13, 8), 8: (-9, 15, 8), None: (-9, 15, 8)}
+T22h margins chosen on the extra practice (fix): {'who': 0, 'what': 4}
+  who: extra practice {0: (75, 81, 2), 1: (68, 83, 5), 2: (69, 84, 5), 4: (69, 84, 5), 8: (66, 84, 6), None: (66, 84, 6)}
+  what: extra practice {0: (18, 24, 2), 1: (26, 35, 3), 2: (24, 36, 4), 4: (29, 44, 5), 8: (27, 48, 7), None: (24, 48, 8)}
+  where: extra practice {0: (3, 6, 1), 1: (27, 45, 6), 2: (31, 49, 6), 4: (26, 50, 8), 8: (30, 54, 8), None: (30, 54, 8)}
+  when: extra practice {0: (-2, 1, 1), 1: (-12, 12, 8), 2: (-11, 13, 8), 4: (-11, 13, 8), 8: (-9, 15, 8), None: (-9, 15, 8)}
+T22h margins chosen on the extra practice (fix2): {'who': 0, 'what': 4, 'where': 2}
+WHY-because practice on silent: (4, 4, 0)
+policy ['--why-because', '--fix', '--t22h', 'r26_t22h_fix_policy.json']: practice (223, 268, 15), untouched (444, 639, 65)
+WHY-because practice on silent: (4, 4, 0)
+policy ['--why-because', '--fix2', '--t22h', 'r26_t22h_fix2_policy.json']: practice (239, 284, 15), untouched (441, 669, 76)
