@@ -1028,3 +1028,9 @@ Reader, who-only trust: **34 right, 7 wrong** (0.829; fitness +13). Main system'
 
 ## R25-dp registration (main system + reader together on val_fresh10)
 r25_combo.py: the main system's trusted answer when it has one (its R25-as answers and routes, trust on the 710 practice questions), else the reader's trusted who-answer (trust from practice A+B), else silent. Scored once on val_fresh10; compared with the main system alone (50 / 6, fitness +32).
+
+## R25-dp result (main system + reader on val_fresh10) -- tie on fitness, more answers
+Main alone 50 right / 6 wrong (fitness +32); reader alone 34 / 7 (+13); **together 68 right / 12 wrong** (+32), 120 silent instead of 144. The reader adds 18 right answers the main system could not give, at the cost of 6 wrong: equal fitness, a third more questions answered. val_fresh10 is now spent for the reader.
+
+## R25-dq registration (a sharper fallback, and a new untouched set)
+(a) Development on practice: the reader's fallback limited to answers that are names (capitalised words in the story); reported on A+B and C+D. (b) A writer agent writes val_fresh12 (same brief as val_fresh11) for the next once-only score of the combination.
