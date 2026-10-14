@@ -1,0 +1,11 @@
+T45 states: 53432 positions, 50114 predictions (7 s)
+  N 500 theta 1: nonzero 0.618; 0-499 19.466, 500-999 18.068
+  N 500 theta 3: nonzero 0.618; 0-499 19.243, 500-999 17.826
+  N 500 theta 10: nonzero 0.618; 0-499 18.982, 500-999 17.546
+  N 500 theta 30: nonzero 0.618; 0-499 21.373, 500-999 20.377
+  N 2000 theta 1: nonzero 0.731; 0-499 16.342, 500-999 14.676
+  N 2000 theta 3: nonzero 0.731; 0-499 16.071, 500-999 14.381
+  N 2000 theta 10: nonzero 0.731; 0-499 15.640, 500-999 13.880
+  N 2000 theta 30: nonzero 0.731; 0-499 18.104, 500-999 16.605
+T45 chosen (2000, 10) (15 s)
+T39 fit on 0-399 + ['r26_range1', 'r26_range2']: early-stop slice 7.1942, paragraphs 500-999 7.0890

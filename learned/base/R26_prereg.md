@@ -365,3 +365,9 @@ For questions still unanswered by the T22p policy, the answer given by at least 
 
 ## T22q result -- FAIL
 Votes chosen: who >= 3, what >= 4, where >= 3, when >= 3. Policy untouched **+495** (837 / 114) vs +512: on questions the margin-checked match already declined, agreement among versions is not evidence of correctness (versions share most of their errors).
+
+## T45 registration (neural continuous cache, Grave et al. 2017)
+r26_ncache.py: the static network r25_ch reads the held-out stream (state carried); its normalised output-layer input h_t (128 values) is stored per position. P_cache(w at t) = sum over earlier positions j in the last N words with x_(j+1) = w of softmax_j(theta * h_t . h_j). N in {500, 2000}, theta in {1, 3, 10, 30}, chosen on 0-499. Added to the T43 gate as a component on all three ranges. PASS if the test falls below 7.1022.
+
+## T45 result -- PASS
+Neural cache (N 2000, theta 10 chosen on 0-499): alone 13.88 on 500-999 (it covers 73% of predictions). In the T43 gate on all ranges: slice 7.1942, **test 7.0890** (T43 7.1022): the largest single-component gain since T39. Matching earlier contexts by the network's state finds repeats the exact-word memories miss. Gap to the language model 0.39.
