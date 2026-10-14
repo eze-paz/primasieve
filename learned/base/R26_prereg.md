@@ -356,3 +356,12 @@ r25_kndyn.py --perlen --more (unchanged; the first session's R25 component KP, 7
 
 ## T43 result -- PASS
 Live per-length counts on the larger text (r25_kndyn.py --perlen --more) on range 1: 7.8389 alone (static 7.8958), range 2: 8.5482 (8.5649). T41 gate + KP: slice 7.2190, **test 7.1022** (T41 7.1090). Best next-word result; gap to the language model 0.40.
+
+## T44 registration (the first session's self-searched counts on the larger text, on the ranges)
+r25_discover2.py --all-text --more (unchanged; component QM) rebuilt on ranges 1 and 2 (each run capped at 30 minutes); the T43 gate with QM added. PASS if the test falls below 7.1022.
+
+## T22q registration (agreement among matcher versions)
+For questions still unanswered by the T22p policy, the answer given by at least k of the six matcher versions (same answer up to containment), k in {3, 4, 5, 6}, chosen per question word on both practice pools (fitness > 0 required). PASS if the policy beats +512.
+
+## T22q result -- FAIL
+Votes chosen: who >= 3, what >= 4, where >= 3, when >= 3. Policy untouched **+495** (837 / 114) vs +512: on questions the margin-checked match already declined, agreement among versions is not evidence of correctness (versions share most of their errors).
