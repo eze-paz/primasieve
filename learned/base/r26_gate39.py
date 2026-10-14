@@ -19,11 +19,21 @@ def load(d, files):
     F = np.concatenate(PF + [np.eye(5)[np.minimum(deep, 4)], np.stack(sn, 1), rec[0], rec[1], np.ones((n, 1))], 1).astype(np.float32)
     return X.astype(np.float32), F, para
 import sys
-PREV = "--prev" in sys.argv; RANGES = [a for a in sys.argv[1:] if a.startswith("r26_range")] or ["r26_range1"]
+PREV = "--prev" in sys.argv; MLP = "--mlp" in sys.argv; RANGES = [a for a in sys.argv[1:] if a.startswith("r26_range")] or ["r26_range1"]
 Xm, Fm, pm = load(".", MAIN); RR = [load(r, C) for r in RANGES]; Xr = np.concatenate([r[0] for r in RR]); Fr = np.concatenate([r[1] for r in RR])
 print("main", Xm.shape, "ranges", RANGES, Xr.shape, "previous-word features" if PREV else "", flush=True)
 def fit(Xf, Ff, Xv, Fv):
     Xf, Ff, Xv, Fv = map(torch.tensor, (Xf, Ff, Xv, Fv))
+    if MLP:                                                                                     # T40: one hidden layer (64 ReLU units)
+        torch.manual_seed(0); W = torch.nn.Sequential(torch.nn.Linear(Ff.shape[1], 64), torch.nn.ReLU(), torch.nn.Linear(64, Xf.shape[1]))
+        def nll(W, X, F): lw = torch.log_softmax(W(F), 1); return -(torch.logsumexp(lw + torch.log(X), 1)).mean() / np.log(2)
+        opt = torch.optim.Adam(W.parameters(), lr=0.003); best = (1e9, None)
+        for it in range(3000):
+            opt.zero_grad(); l = nll(W, Xf, Ff); l.backward(); opt.step()
+            if it % 50 == 0:
+                with torch.no_grad(): v = nll(W, Xv, Fv).item()
+                if v < best[0]: best = (v, {k: t.clone() for k, t in W.state_dict().items()})
+        W.load_state_dict(best[1]); return W, nll
     def nll(W, X, F): lw = torch.log_softmax(F @ W, 1); return -(torch.logsumexp(lw + torch.log(X), 1)).mean() / np.log(2)
     W = torch.zeros(Ff.shape[1], Xf.shape[1], requires_grad=True); opt = torch.optim.Adam([W], lr=0.01); best = (1e9, None)
     for it in range(3000):

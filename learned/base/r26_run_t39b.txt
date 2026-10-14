@@ -1,0 +1,6 @@
+main (50114, 15) ranges ['r26_range1', 'r26_range2'] (118881, 15) 
+T39 fit on 0-399 only: early-stop slice 7.2419, paragraphs 500-999 7.1342
+T39 fit on 0-399 + ['r26_range1', 'r26_range2']: early-stop slice 7.2307, paragraphs 500-999 7.1171
+main (50114, 15) ranges ['r26_range1', 'r26_range2'] (118881, 15) previous-word features
+T39 fit on 0-399 only: early-stop slice 7.2415, paragraphs 500-999 7.1427
+T39 fit on 0-399 + ['r26_range1', 'r26_range2']: early-stop slice 7.2202, paragraphs 500-999 7.1127

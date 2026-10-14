@@ -317,3 +317,9 @@ Components rebuilt on held-out paragraphs 1,000-1,999 (59,824 predictions; read 
 
 ## T39b interim (range 1 only)
 Previous-word features with range 1 in the fit: fit on 0-399 only 7.1427 (overfits, as T12b); fit on 0-399 + 1,000-1,999 **7.1084** (T39 7.1163). With five times more fitting data the richer gate pays. The registered T39b uses ranges 1 and 2 (running).
+
+## T40 registration (a one-hidden-layer gate)
+r26_gate39.py --mlp: mixing weights from a 64-unit ReLU layer over the same features (with previous-word features), fitted on 0-399 + ranges 1 and 2, early stop on 400-499, test 500-999. PASS if below the best linear gate of T39b.
+
+## T39b result
+(a) Linear gate, ranges 1 + 2 (118,881 extra predictions): test **7.1171** vs 7.1163 (range 1 only) -- FAIL: the linear gate is saturated. (b) With previous-word features: test **7.1127** -- PASS against 7.1163 (registered bar), though above the range-1-only interim 7.1084 (that number was not the registered configuration).
