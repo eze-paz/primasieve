@@ -146,3 +146,15 @@ Bucketed EM mix (16 order buckets) over the T33 component set with B = T08; each
 
 ## T30 result (leave-one-out values, bucketed EM, all 13 components 7.1364)
 Rise in bits when dropped: B (adapted network + two-word in-group) +0.024; U (keyed copy 0.999) +0.012; I (static network in-group with book pairs) +0.011; N2 (2-word keyed copy) +0.011; Y (copy 0.99) +0.010; QM (self-searched counts, larger text) +0.009; Z (copy 0.9999) +0.005; N3 +0.001; V +0.0005; K, Q, D, KP: 0.000 (covered by the others). Reading: the book-reading parts (adapted network, keyed and plain copies) carry the mix; the static count models are interchangeable.
+
+## T07b registration (skip-keyed copy memory)
+Copy memory of the text read so far keyed by the word two back (the previous word skipped), decay 0.9999 and 0.999; added to the best gate (T33 set). PASS if the gate falls below 7.1308.
+
+## T02 result -- PASS
+Plain SGD 0.3 with decay back to the trained weights (lam, steps; 0-499 / 500-999): (0.001, 1) 8.2168 / **7.6067**; (0.01, 1) 8.2265 / 7.6670; (0.03, 1) 8.2540 / 7.7355; two steps of 0.15 with 0.01: 8.2256 / 7.6736. Chosen (0.001, 1): alone 7.6067 (plain SGD 7.6238). Saved as r26_t02_dyn_probs.npz.
+
+## T19 result -- FAIL
+Story-adapted rival scores (r26_steelman3_scores.json): best candidate right on 37.8% of untouched questions (38.0% unadapted); as a plain verifier +286 (unadapted +291). Not carried into the policy.
+
+## T02b registration (the decayed adapted network in the mix)
+r26_ingroup2.py on r26_t02_dyn_probs (two-word in-group choice, grid as T08), then the best gate (T33 set) with this B and D. PASS if the gate falls below 7.1308.
