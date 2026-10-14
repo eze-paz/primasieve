@@ -727,3 +727,12 @@ The networks give a group, then the word by its unigram share inside the group (
 
 ## R25-cl result (context-keyed copy memories, exact weights) -- PASS
 EM weights by Kneser-Ney depth, same components as R25-ch: 7.5291 (grid 7.5430). Adding copy memories keyed by the previous 1-3 words, with the bucket also saying which orders have seen their key: **7.2803** (-0.26). Coverage on 500-999: the previous word had been seen before 94% of the time and the target followed it before 50%; the 3-word key fires on 2% of predictions and is then nearly certain (0.58 bits). The book being read is the largest unused source of evidence.
+
+## R25-cm result (dynamic evaluation) -- PASS
+Paragraphs 0-499 / 500-999 by step size: 0: 8.3848 / 8.0096; 0.01: 8.3327 / 7.8797; 0.03: 8.2976 / 7.7638; 0.1: 8.2455 / 7.6133; 0.3: 8.2189 / 7.6238. Chosen 0.3 on 0-499 (the edge of the grid): the network alone **7.6238** (-0.39), about 80 s per pass. In the R25-cl mix in place of B: **7.1985** (7.2803). One SGD step per paragraph read is worth more than the last 24,000 training steps (-0.07).
+
+## R25-cn result (in-group word choice by context) -- PASS
+Training pair counts alone (a 10): B 8.0096 -> 7.9855; with the book's own pairs weighted 30 (a 10, m 30; m = 30 the edge of the grid): **7.9145**. In the mix: in place of B 7.2794 (7.2803); added beside the dynamic network **7.1762**. Most of the in-group gain also comes from the book read so far.
+
+## R25-co registration (in-group choice on the adapted network; wider grids at the edges)
+r25_ingroup.py on the dynamic network's probabilities (m up to 100), and r25_dyneval.py with step sizes {0.3, 0.5, 1.0}; best into the mix. Compared with 7.1762.

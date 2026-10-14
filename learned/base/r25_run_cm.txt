@@ -1,0 +1,7 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (23 s)
+R25-cm lr 0.0: paragraphs 0-499 8.3848, 500-999 8.0096 (28 s)
+R25-cm lr 0.01: paragraphs 0-499 8.3327, 500-999 7.8797 (151 s)
+R25-cm lr 0.03: paragraphs 0-499 8.2976, 500-999 7.7638 (259 s)
+R25-cm lr 0.1: paragraphs 0-499 8.2455, 500-999 7.6133 (391 s)
+R25-cm lr 0.3: paragraphs 0-499 8.2189, 500-999 7.6238 (489 s)
+R25-cm chosen lr 0.3 (on 0-499): paragraphs 500-999 7.6238 bits/word

@@ -1,4 +1,4 @@
-"""R25-ck: dynamic evaluation (Mikolov 2010; Krause et al. 2018) of the best book-scope network. Reading the first
+"""R25-cm: dynamic evaluation (Mikolov 2010; Krause et al. 2018) of the best book-scope network. Reading the first
 1,000 held-out paragraphs in book order with the state carried, after each paragraph the network takes one SGD step
 on that paragraph's own next-group loss (the paragraph has already been scored, so no word is seen before it is
 predicted). Step size chosen from a grid by bits on paragraphs 0-499; reported on 500-999; probabilities saved.
@@ -33,7 +33,7 @@ def run_all(lr):
 t0 = time.time(); res = {}
 for lr in GRID:
     P, A = run_all(lr); res[lr] = (P, A); b = -np.log2(P)
-    print(f"R25-ck lr {lr}: paragraphs 0-499 {b[A < 500].mean():.4f}, 500-999 {b[A >= 500].mean():.4f} ({time.time() - t0:.0f} s)", flush=True)
+    print(f"R25-cm lr {lr}: paragraphs 0-499 {b[A < 500].mean():.4f}, 500-999 {b[A >= 500].mean():.4f} ({time.time() - t0:.0f} s)", flush=True)
 best = min(GRID, key=lambda l: -np.log2(res[l][0][res[l][1] < 500]).mean())
 P, A = res[best]; np.savez(f"r25_dyn_probs.npz", p=P, para=A)
-print(f"R25-ck chosen lr {best} (on 0-499): paragraphs 500-999 {-np.log2(P[A >= 500]).mean():.4f} bits/word", flush=True)
+print(f"R25-cm chosen lr {best} (on 0-499): paragraphs 500-999 {-np.log2(P[A >= 500]).mean():.4f} bits/word", flush=True)
