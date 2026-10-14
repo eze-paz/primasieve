@@ -1,0 +1,13 @@
+R25-cu-t fit: 323 books, 4039 events (19 s)
+R25-cu-t dev: 36 books, 501 events (21 s)
+R25-cu-t test: 41 books, 523 events (24 s)
+R25-cu-t 26 verbs with 30+ events
+R25-cu-t K=2: dev 1.5449 bits (prior 1.5455, per verb 1.5749)
+R25-cu-t K=3: dev 1.5572 bits (prior 1.5455, per verb 1.5749)
+R25-cu-t K=4: dev 1.5672 bits (prior 1.5455, per verb 1.5749)
+R25-cu-t K=5: dev 1.5676 bits (prior 1.5455, per verb 1.5749)
+R25-cu-t chosen K=2. Held-out books (523 events): no verb 1.5867, learned classes 1.5908, per verb 1.5923; classes recover -405855172.8% of the per-verb gain
+  class 0: possessive next mention 0.111, 11 verbs: see, say, find, leave, tell, hear, enter, keep, meet, send, write
+  class 1: possessive next mention 0.219, 15 verbs: take, make, give, call, know, put, turn, reach, think, get, feel, hold, like, raise, pass
+R25-cu-t lexicon check: 2 / 9 acquire x release pairs ordered as the hand lists say (5 in the same class); acquire [('take', 1), ('find', 0), ('get', 1)], release [('put', 1), ('leave', 0), ('give', 1)]
+R25-cu-t per-verb possessive share, acquire: [('take', 0.197), ('find', 0.089), ('get', 0.263)]; release: [('put', 0.327), ('leave', 0.094), ('give', 0.169)]
