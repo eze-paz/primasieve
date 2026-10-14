@@ -1,0 +1,20 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (40 s)
+R25-cs index loaded (6 s)
+  paragraph 100 (75 s)
+  paragraph 200 (121 s)
+  paragraph 300 (170 s)
+  paragraph 400 (188 s)
+  paragraph 500 (200 s)
+R25-cs alpha 1.0: sample 7.5488 bits, weights {'K': np.float32(0.187), 'B': np.float32(0.146), 'D': np.float32(0.272), 'Y': np.float32(0.034), 'Z': np.float32(0.023), 'V': np.float32(0.015), 'U': np.float32(0.066), 'N2': np.float32(0.036), 'N3': np.float32(0.222)} (1046 s)
+R25-cs alpha 0.5: sample 7.5303 bits, weights {'K': np.float32(0.18), 'B': np.float32(0.09), 'D': np.float32(0.222), 'Y': np.float32(0.075), 'Z': np.float32(0.027), 'V': np.float32(0.018), 'U': np.float32(0.095), 'N2': np.float32(0.072), 'N3': np.float32(0.22)} (1708 s)
+R25-cs alpha 0.25: sample 7.6194 bits, weights {'K': np.float32(0.203), 'B': np.float32(0.068), 'D': np.float32(0.258), 'Y': np.float32(0.078), 'Z': np.float32(0.021), 'V': np.float32(0.017), 'U': np.float32(0.077), 'N2': np.float32(0.072), 'N3': np.float32(0.205)} (2249 s)
+R25-cs alpha 0.0: sample 7.7456 bits, weights {'K': np.float32(0.095), 'B': np.float32(0.034), 'D': np.float32(0.334), 'Y': np.float32(0.073), 'Z': np.float32(0.019), 'V': np.float32(0.012), 'U': np.float32(0.077), 'N2': np.float32(0.07), 'N3': np.float32(0.286)} (3088 s)
+  paragraph 600 (3192 s) | alpha 1.0: 7.5951 | alpha 0.5: 7.5589 | alpha 0.25: 7.5924 | alpha 0.0: 7.6499
+  paragraph 700 (3255 s) | alpha 1.0: 7.3728 | alpha 0.5: 7.3368 | alpha 0.25: 7.3638 | alpha 0.0: 7.4076
+  paragraph 800 (3308 s) | alpha 1.0: 7.3394 | alpha 0.5: 7.3044 | alpha 0.25: 7.3414 | alpha 0.0: 7.3987
+  paragraph 900 (3362 s) | alpha 1.0: 7.3084 | alpha 0.5: 7.2723 | alpha 0.25: 7.3109 | alpha 0.0: 7.3735
+  paragraph 1000 (3407 s) | alpha 1.0: 7.3236 | alpha 0.5: 7.2892 | alpha 0.25: 7.3277 | alpha 0.0: 7.3884
+R25-cs alpha 1.0: paragraphs 500-999 7.3236 bits/word over 11812 predictions
+R25-cs alpha 0.5: paragraphs 500-999 7.2892 bits/word over 11812 predictions
+R25-cs alpha 0.25: paragraphs 500-999 7.3277 bits/word over 11812 predictions
+R25-cs alpha 0.0: paragraphs 500-999 7.3884 bits/word over 11812 predictions

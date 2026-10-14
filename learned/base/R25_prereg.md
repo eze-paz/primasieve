@@ -843,3 +843,6 @@ r25_fetch_more.py fetches about 400 more English public-domain books with the pr
 
 ## R25-cv fetch and counter result
 400 new books (109 MB; 1,656,569 extra training paragraphs) fetched into _nldata/gutenberg_more (19 failed downloads skipped). Fast counter o5mxa + new books (o5mxap), built and scored in 277 s: **8.2657** on 500-999 (o5mxa 8.3580; -0.09 for about twice the text). Next in the same registration: live counters on it, then the mix.
+
+## R25-cs-t result (combining operators over full distributions) -- PASS (square root)
+Same nine components (Kneser-Ney, static and adapted network, six book memories), one global set of weights per operator fit on 600 predictions of 0-499, normalised over the whole vocabulary, scored on all 11,812 predictions of 500-999: linear **7.3236**; square root (power 0.5) **7.2892** (-0.034); power 0.25 7.3277; geometric / log-linear 7.3884 (worst). The square-root mix was also best on the fitting sample (7.5303 vs linear 7.5488). Reading: a mild move toward multiplying beats adding, but going fully multiplicative over-trusts confident components. Not comparable with 7.1524: this run lacks the self-searched counts, the in-group choice and the per-bucket weights (those components do not yet give full distributions). Cost: fitting took 48 min (four operators); scoring 500 paragraphs about 4 min.
