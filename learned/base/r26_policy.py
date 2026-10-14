@@ -55,6 +55,15 @@ ORD = json.load(open('r26_order_answers.json', encoding='utf-8')) if os.path.exi
 if "--order" in sys.argv:
     f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i: ORD[i]); fu = fit([i for i in UN if not spoke(i) and not T22[i]], lambda i: ORD[i]); print("ORDER on silent practice:", f, "untouched:", fu)
     if f[0] > 0: extra["order"] = lambda i: ORD[i]
+O2 = json.load(open('r26_ops2_answers.json', encoding='utf-8')) if os.path.exists('r26_ops2_answers.json') else [[None, None]] * len(items)
+if "--ops2" in sys.argv:
+    XO2 = json.load(open('r26_xp_ops2_answers.json', encoding='utf-8')); xs_ = json.load(open('r26_extra_practice.json', encoding='utf-8'))['stories']; xg_ = [g for s in xs_ for _, g in s['qs']]
+    for kind in ("WHY", "HOW"):
+        f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i, kind=kind: O2[i][1] if O2[i][0] == kind else None)
+        xr = sum(1 for (k, a), g in zip(XO2, xg_) if k == kind and a and hit(a, g)); xw = sum(1 for (k, a), g in zip(XO2, xg_) if k == kind and a and not hit(a, g))
+        tot = f[0] + xr - 3 * xw; print(f"{kind} v2: main practice silent {f}, extra practice {xr} / {xw}; combined fitness {tot}")
+        if tot > 0: extra[kind.lower() + "2"] = (lambda i, kind=kind: O2[i][1] if O2[i][0] == kind else None)
+    extra.pop("why", None)
 DOA = json.load(open('r26_do_answers.json', encoding='utf-8')) if os.path.exists('r26_do_answers.json') else [None] * len(items)
 if "--do" in sys.argv:
     f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i: DOA[i]); fu = fit([i for i in UN if not spoke(i) and not T22[i]], lambda i: DOA[i]); print("DO on silent practice:", f, "untouched:", fu)
@@ -64,6 +73,8 @@ def other(i):
     x = T22[i] or (T22D[i] if "--relax" in sys.argv else None) or (O[i][1] if O[i][0] in ("COUNT", "WHOSE") else None)
     if x is None and "order" in extra: x = extra["order"](i)
     if x is None and "do" in extra: x = extra["do"](i)
+    if x is None and "why2" in extra: x = extra["why2"](i)
+    if x is None and "how2" in extra: x = extra["how2"](i)
     if x is None and "why" in extra: x = extra["why"](i)
     return x
 SMA = json.load(open('r26_stmatch_fix3sim_answers.json' if '--fix3sim' in sys.argv else 'r26_stmatch_fix34_answers.json' if '--fix34' in sys.argv else 'r26_stmatch_fix4_answers.json' if '--fix4' in sys.argv else 'r26_stmatch_fix3_answers.json' if '--fix3' in sys.argv else 'r26_stmatch_fix2_answers.json' if '--fix2' in sys.argv else 'r26_stmatch_fix_answers.json' if '--fix' in sys.argv else 'r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}

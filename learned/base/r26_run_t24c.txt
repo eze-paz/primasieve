@@ -1,0 +1,4 @@
+WHY-because practice on silent: (4, 4, 0)
+WHY v2: main practice silent (2, 5, 1), extra practice 10 / 1; combined fitness 9
+HOW v2: main practice silent (2, 2, 0), extra practice 1 / 0; combined fitness 3
+policy ['--why-because', '--fix3', '--t22h', 'r26_t22i_fix3_policy.json', '--ops2']: practice (243, 300, 19), untouched (486, 777, 97)

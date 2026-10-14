@@ -290,3 +290,9 @@ On fix3: when no sentence holds all content words, a sentence holding all but on
 
 ## T22m result -- FAIL
 Similarity matching (fix3 + one word by cosine >= 0.6) alone: untouched 551 / 89 (+284; fix3 +313). As fallback to fix3, margins who 0, what 1, where 1, when 8; policy untouched **+432** (690 / 86). Synonym-level matching brings in wrong sentences; the stricter margins it forces cost more than its reach gains.
+
+## T24c registration (WHY and HOW operators, version 2; developed on the extra practice)
+r26_ops2.py. The matched sentence: the unique sentence holding the question's content words (pronouns stand for the most recent name, as fix4), else the next sentence if it opens with because / so. WHY: 'because X' -> X; 'X, so <the asked event>' -> X (the clause before 'so'); 'so that X' -> X; after the asked verb, 'to <verb> ...' or 'for ...' -> that phrase (to the clause end). HOW: after the asked verb, a phrase opened by by / on / through / with / in, or 'took a / the X'; 'how late / long' -> a number-word phrase with minutes / hours / days / years / late. Each operator is a route for silent questions, trusted if its fitness on (main practice silent) + (extra practice, all) is positive; replaces the 'because'-only WHY in the best policy. PASS if the policy beats +485.
+
+## T24c result -- PASS (by one point; caveat)
+WHY v2: main practice silent 5 / 1, extra practice 10 / 1 (kept); HOW v2: 2 / 0 and 1 / 0 (kept). Replacing the 'because'-only WHY: policy practice +243, **untouched +486 (777 right / 97 wrong)** vs +485. Caveat: the extra practice was also where the WHY v2 patterns were read, so its trust check there is optimistic; the untouched gain (+10 right / +3 wrong) is within noise. Best policy: r26_policy.py --why-because --fix3 --t22h r26_t22i_fix3_policy.json --ops2.
