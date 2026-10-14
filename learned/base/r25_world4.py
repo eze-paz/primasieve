@@ -8,6 +8,7 @@ import r25_soft as S                                                     # chdir
 T, E, R, B, D0, D, QR = S.T, S.E, S.R, S.B, S.D0, S.D, S.QR
 import r25_world3 as W3, r25_world2 as W2
 from b6_rwkv import hit
+os.chdir(HERE)
 t0 = time.time()
 data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
 train_b, _ = D0.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)

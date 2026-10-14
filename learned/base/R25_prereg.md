@@ -920,3 +920,13 @@ Next (to register): event reading from prose -- the learner's role reader in pla
 
 ## R25-da-t registration (events read by the learned role reader)
 r25_world4.py: the world state of R25-cz-t (emerged rules, the three literature rules) reads its events from the learned role reader (r25_soft.roles_of over the learned constructions: verb, subject, object per clause) instead of the hand reader: W4 = role reader only; W5 = both readers (the role reader's events added where the hand reader found none in that sentence). Setup as R25-k (induced verb groups, dictionary on). Scored on all 2,510 questions; world alone and as a route, against W3 (R25-cz-t). PASS if W4 or W5 answers more state questions right on the untouched sets than W3 at no lower untouched fitness (world alone).
+
+## R25-da-t result -- FAIL (more reach, same precision)
+World state alone (right, wrong, fitness): hand reader W3 practice 28 / 7 / +7, untouched 26 / 22 / -40; role reader W4 practice 27 / 8 / +3, untouched **40** / 30 / -50; both W5 = W3 (the hand reader always returned some event, so the role reader never filled in). The learned role reader reaches half again as many state questions, at the same ~0.57 precision on the untouched sets.
+
+## R25-db-t registration (role-reader state answers checked against their strongest rival)
+W4's answer is kept only when no rival candidate beats it by more than t bits in the R25-cp2 support scores (r25_steelman2_scores.json); t from {0, 1, 2, 4, 8, never-veto} chosen on practice. Reported: W4 alone after the check, and the reader policy with checked W4 filling silent questions, untouched against +288. PASS if the policy beats +288.
+
+## R25-db-t result -- FAIL
+Practice chose t = 2: checked W4 practice 23 right / 5 wrong (+8), untouched 36 / 26 (-42). Policy: practice +160 -> +166, untouched +288 -> **+270**. Same pattern as R25-ct-t and R25-cz-t: every state route is ~0.8 precise on practice and ~0.55-0.58 on the untouched sets, and at +1 / -3 a route needs 0.75 to pay. The practice sets were the ones the readers and the R19 world state were built against; their precision does not transfer to new writers' prose.
+Summary of the emergence line today: state rules do emerge from the next-word game where text states results (R24-f, reused in R25-cz-t at hand-rule quality); books give no usable signal for them (R25-cu-t to R25-cy-t); the learned role reader reads 50% more events than the hand reader (R25-da-t); the limit is reading precision on unfamiliar prose, not the rules.

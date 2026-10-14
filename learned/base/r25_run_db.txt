@@ -1,0 +1,8 @@
+  t=0: W4 checked practice (7, 7, 0)
+  t=1: W4 checked practice (5, 20, 5)
+  t=2: W4 checked practice (8, 23, 5)
+  t=4: W4 checked practice (3, 27, 8)
+  t=8: W4 checked practice (3, 27, 8)
+  t=None: W4 checked practice (3, 27, 8)
+R25-db-t chosen t=2 (practice); W4 checked alone: practice (8, 23, 5), untouched (-42, 36, 26); route trusted on practice: True
+R25-db-t policy: practice (166, 235, 23), untouched (270, 528, 86) (baseline practice (160, 226, 22), untouched (288, 519, 77))
