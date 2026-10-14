@@ -715,3 +715,12 @@ Alone it is worse than static (8.9794 vs 8.3580; beta chose the top of its range
 
 ## R25-ck registration (live counting, wider beta range, kept alongside the static counter)
 beta from {16, 32, 64, 128, 256, 512}; then the mix with K = static o5mxa and the live counter as an extra component N. Compared with 7.3701.
+
+## R25-cl registration (context-keyed copy memories; exact mixing weights) -- from R25_corners.md, owner's go-ahead
+r25_bicopy.py: copy memories of the held-out text read so far, keyed by the previous 1, 2 or 3 words (P(w | last n words) from earlier occurrences in the book, weight decay^distance; zero when the key is new). Orders 1 (decay 0.999 and 0.9999), 2 and 3 (0.9999). r25_em.py: mixing weights fit exactly by EM (no 0.1 grid) on paragraphs 0-499, one set per context bucket: Kneser-Ney depth x which copy orders have seen their key. Reported on 500-999 against R25-ch 7.5430. (Probes before registration, reported for honesty: EM by depth alone 7.5291; with orders 1-3 and the order context 7.2803.)
+
+## R25-cm registration (dynamic evaluation of the best network) -- owner's go-ahead on R25_corners.md
+r25_dyneval.py r25_ch.pt: the network reads held-out paragraphs in order, state carried; after each scored paragraph one SGD step on that paragraph's own loss. Step size from {0, 0.01, 0.03, 0.1, 0.3} chosen on 0-499; about a minute per setting, deterministic. Alone against 8.0096, then as B in the R25-cl mix. Note: R25-ci's stop said trained networks stay fixed; this run updates one only on text already scored, as a test the owner approved.
+
+## R25-cn registration (context-conditioned word choice inside the group)
+The networks give a group, then the word by its unigram share inside the group (about 60% of the bits, R25-bc/bd). r25_ingroup.py replaces that share in B's probabilities by P(w | group, previous word) counted on the training text (interpolated with the share, weight chosen on 0-499) and, as a second variant, also by the held-out text read so far. Alone against B, then in the mix.
