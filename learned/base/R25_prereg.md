@@ -764,3 +764,9 @@ With EM the weight search no longer limits the number of components: all saved c
 
 ## R25-co registration (richer mixing context)
 PAQ's mixers choose weights by richer contexts. Mixing context = static Kneser-Ney depth (0-4) x the longest phrase of the book read so far that matches the current context (0-4): up to 25 weight sets, EM-fitted on 0-499 (sets with under 200 predictions fall back to all of 0-499). Components as R25-cm. Compared with 7.3541 (R25-cm) and 7.3487 (R25-cn).
+
+## R25-co result (mixing context = static depth x book phrase match) -- PASS
+EM per context: **7.3418** (7.3541 with depth alone). The mixer trusts the live counters more where the book has repeated the current phrase.
+
+## R25-cp registration (live counting of the book's word-group sequences)
+r25_kndyn_group.py: the R25-cj update applied to learned x dictionary group patterns (1-5 groups) of the text read so far, times the word's training share in its group; beta chosen on 0-499. Added to the R25-co mix as component V. Compared with 7.3418.
