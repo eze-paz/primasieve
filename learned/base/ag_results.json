@@ -1,0 +1,27 @@
+{
+ "ag1_test": {
+  "event_P": 1.0,
+  "event_R": 1.0,
+  "event_F1": 1.0,
+  "verb_recall": 1.0,
+  "arg_F1": 1.0,
+  "n_gold": 1375
+ },
+ "ag2": {
+  "practice": [
+   30,
+   7,
+   9
+  ],
+  "untouched": [
+   21,
+   18,
+   -33
+  ],
+  "policy_untouched": [
+   275,
+   524,
+   83
+  ]
+ }
+}
