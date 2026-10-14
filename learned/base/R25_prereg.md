@@ -773,3 +773,6 @@ r25_kndyn_group.py: the R25-cj update applied to learned x dictionary group patt
 
 ## R25-cp result (live group counting) -- FAIL
 Alone 9.0523; EM gives it weight 0 (7.3426 vs 7.3418). How the book moves between kinds of words is already covered by the networks and counters.
+
+## R25-cq registration (the language model on exactly the mix's test)
+r25_llm_book.py: RWKV-7 0.4B on the first 1,000 held-out paragraphs, state carried across paragraphs, same text and the same 50,114 predictions; measurement only. Compared with the mix's 7.3418 on paragraphs 500-999 -- the first like-for-like head-to-head.
