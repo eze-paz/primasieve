@@ -1022,3 +1022,6 @@ Practice unchanged (A+B 142 / 88; C+D trusted 91 / 28). val_fresh11 (now develop
 
 ## R25-do registration (the reader on a set it never saw, against the main system on the same questions)
 The reader was developed only on practice A+B, so val_fresh10 is untouched for it; the main system scored val_fresh10 once in R25-as (trusted 50 right / 6 wrong, all routes 67 / 22). The reader's R25-df configuration (who-only trust from A+B) is scored once on val_fresh10, all kinds also reported. Reported as is.
+
+## R25-do result (reader vs main system on val_fresh10, untouched for the reader)
+Reader, who-only trust: **34 right, 7 wrong** (0.829; fitness +13). Main system's trusted routes on the same questions (R25-as): 50 right, 6 wrong (fitness +32). All kinds, no trust: reader **83 right / 47 wrong**, main system's all routes 67 / 22. The reader finds more right answers but with many more wrong ones; under trust the main system is stronger. They may be complementary.
