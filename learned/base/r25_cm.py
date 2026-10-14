@@ -44,3 +44,11 @@ if "-online" in " ".join(EXTRA_ARGS if "EXTRA_ARGS" in dir() else []) or os.envi
     print(f"R25-bv online mixing (eta {eta} chosen on 0-499, weights carried on from there): {online(tei, eta, Wtr)[0]:.4f} bits/word", flush=True)
 if os.environ.get("R25_SAVE"):                                                            # R25-by: save the mix's per-prediction probabilities (test half) for the loss breakdown
     alli = np.arange(len(para)); np.savez(os.environ["R25_SAVE"], p=np.array([X[i] @ wd[int(deep[i])] for i in alli]), idx=alli, para=para)
+if os.environ.get("R25_EM"):                                                              # R25-cm: exact mixture weights per depth by EM (deterministic, seconds) instead of the 0.1 grid
+    def em(mask, it=300):
+        Xm = np.clip(X[mask], 1e-300, None); w = np.ones(X.shape[1]) / X.shape[1]
+        for _ in range(it):
+            r = Xm * w; r /= r.sum(1, keepdims=True); w = r.mean(0)
+        return w
+    wem = {d: em(tr & (deep == d)) if (tr & (deep == d)).sum() > 200 else em(tr) for d in range(int(deep.max()) + 1)}
+    print(f"R25-cm EM weights by depth: {bits(lambda i: wem[int(deep[i])]):.4f} bits/word; depth 3 weights {dict(zip(names, np.round(wem[3], 3)))}", flush=True)

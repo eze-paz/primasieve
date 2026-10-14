@@ -746,3 +746,9 @@ beta 512 alone **8.0630** on 500-999 (static 8.3580) but in the mix 7.4429; with
 
 ## R25-cl registration (one strength per context length)
 beta_L = b1 / f^(L-1) for context length L = 1..4 (short contexts trust the book's counts less, long ones more), b1 in {64, 256, 1024, 4096}, f in {2, 4, 8, 16}, chosen by bits alone on paragraphs 0-499; then mixed as N with the R25-cj components. Compared with 7.3701.
+
+## R25-cl result
+Per-length strengths chose (1024, 128, 16, 2): alone **8.0052** (best single counter so far), but in the mix 7.4239 as an extra and 7.3780 next to the strong one -- R25-cj (7.3701) stays best.
+
+## R25-cm registration (exact mixing weights)
+Replace the 0.1 weight grid by EM-fitted mixture weights per depth (deterministic, seconds), on the R25-cj components (K = strong live counter) plus the per-length counter as N. Compared with 7.3701.
