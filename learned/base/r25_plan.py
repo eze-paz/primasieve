@@ -10,7 +10,7 @@ prompt paragraph's content words (higher = on topic). 12 prompts (openings of he
 both judges over lam = 0. Run: py -3.12 r25_plan.py"""
 import os, sys, math, random
 import numpy as np
-HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
+WITHIN = "--within" in sys.argv; HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
 src = open("r25_generate.py", encoding="utf-8").read(); src = src[:src.index("from rwkv7 import")]
 exec(compile(src, "r25_generate.py", "exec"))
 z = np.load("r25_vectors_all.npz"); VEC = {w: v / (np.linalg.norm(v) + 1e-9) for w, v in zip(z["vocab"].tolist(), z["vecs"])}
@@ -29,7 +29,7 @@ def gen(prompt, n, seed, lam):
         mix = 0.55 * pw[top] / pw[top].sum() + 0.45 * kn / kn.sum()
         if lam > 0 and np.linalg.norm(topic) > 0:
             cos = WV[top] @ (topic / np.linalg.norm(topic)); boost = np.where(content[top], np.exp(lam * cos), 1.0)
-            if "--within" in sys.argv:                                                            # R25-cz: each group keeps its mass; the topic only chooses among its words
+            if WITHIN:                                                            # R25-cz: each group keeps its mass; the topic only chooses among its words
                 gg = gids[top].numpy(); new = mix * boost
                 for gv in np.unique(gg):
                     m_ = gg == gv; new[m_] *= mix[m_].sum() / new[m_].sum()
