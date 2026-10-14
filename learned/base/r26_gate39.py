@@ -5,6 +5,9 @@ torch.set_num_threads(4)
 C = dict(K="r25_kn2_o5mxa.npz", B="r26_t02_ingroup2_probs.npz", D="r26_t02_dyn_probs.npz", I="r25_ingroup_book_probs.npz", Y="r25_bookcopy_0.99_probs.npz",
          Z="r25_bookcopy_0.999_probs.npz", V="r25_bicopy_0.9999_probs.npz", U="r25_bicopy_0.999_probs.npz", N2="r25_ncopy2_0.9999_probs.npz", N3="r25_ncopy3_0.9999_probs.npz",
          G2="r26_grpcopy_0.999_probs.npz", X1="r26_wnxcopy_0.9999_probs.npz", W2="r26_t13_dyn_probs.npz", W3="r26_t13c_bq_dyn_probs.npz", S0="r25_dyn_probs.npz")
+import sys as _s
+for _a in _s.argv[1:]:
+    if "=" in _a: _k, _f = _a.split("=", 1); C[_k] = _f                                       # T41: extra components, same file name in every folder
 MAIN = dict(C, I="r25_ingroup_book_ch_probs.npz", Z="r25_bookcopy_probs.npz", S0="r25_ch_probs.npz")   # main-range file names
 def load(d, files):
     X = np.stack([np.clip(np.load(os.path.join(d, files[k]))["p"], 1e-12, None) for k in C], 1)

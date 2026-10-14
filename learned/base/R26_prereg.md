@@ -326,3 +326,12 @@ r26_gate39.py --mlp: mixing weights from a 64-unit ReLU layer over the same feat
 
 ## T40 result -- PASS (small)
 One-hidden-layer gate (64 units) with previous-word features, fitted on 0-399 + ranges 1 and 2: slice 7.2198, **test 7.1110** (best linear T39b 7.1127; on 0-399 only the same gate gives 7.1341). Best next-word result of R26 with a fixed component set and no choice on the test half; gap to the language model (6.7001) 0.41. Gate gains are now small; further progress needs better components rather than better mixing.
+
+## T41 registration (in-group choice on the other adapted networks)
+r26_ingroup2.py (two-word in-group, grid chosen on the first half of each range as before) on W2 and W3 -> W2I, W3I, on the main range and ranges 1 and 2; the T40 gate (hidden layer, previous-word features, ranges 1 + 2) with the 17 components. PASS if the test falls below 7.1110.
+
+## T22o registration (matcher version chosen per question word)
+Per question word, the pair (matcher version in {fix3, fix4}, margin) maximising fitness on both practice pools (T22i protocol) is chosen; the policy uses each word's chosen pair. PASS if the policy beats +486.
+
+## T22o result -- PASS
+Chosen per word on both practice pools: who (fix3, margin 0), what (fix4, never-veto), where (fix3, 8), when (fix4, 8). Policy: practice +244; **untouched +497 (794 right / 99 wrong)** (T24c +486). Best comprehension policy: r26_policy.py --why-because --fix3 --t22h r26_t22o_policy.json --ops2.
