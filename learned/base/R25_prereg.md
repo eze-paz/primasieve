@@ -858,3 +858,6 @@ Self-searched counter with the extra books: alone **8.2096** (8.2933), kept the 
 
 ## R25-cx samples (r25_generate.py)
 Three held-out paragraph openings continued for 60 words by our engine (book-scope group network + fast counter, top-p 0.9) and by the language model checkpoint (same prompt, top-p 0.9). Ours: locally grammatical phrases, no sustained meaning. The language model checkpoint (ckpt_read1b, fine-tuned earlier in this project for reading and abstaining) drifts into modern text and in one sample loops on 'unknown', a side effect of that fine-tuning; it is not a fair picture of a stock language model's writing.
+
+## R25-cy registration (meaning first, words after -- rung 1: a topic signal carried ahead of the words)
+Owner, 2026-10-14: "we should be propagating a signal and figuring out the words afterwards"; "start iterating". r25_plan.py: a decayed topic vector of the passage's content words reweights candidate content words by exp(lam x cosine) during generation. Judges outside the engine: the language model's bits/word on the generated continuation, and topic similarity to the prompt paragraph. 12 prompts x 2 seeds, lam in {0, 2, 4, 8}. PASS if some lam > 0 improves both judges over lam = 0.
