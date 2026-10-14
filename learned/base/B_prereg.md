@@ -19,3 +19,24 @@ EM by depth, LM + the eight components: **6.4724 bits/word** on 500-999 (LM alon
 7.2034). Global weights: LM 0.866, live per-length counter KP 0.068, adapted in-group network B 0.042, adapted
 network D 0.013, group copy G2 0.005; skip and group copies near 0. Reading: the modules that learn from the book
 being read are worth 0.23 bits on top of a model that saw ~1T tokens; the model carries the rest. Path B stands.
+
+## B2 measurement (the model held to the +1 / -3 rule; computed from saved replies before registration, so a
+measurement, not a gated result)
+Saved replies of ckpt_read1b (b6_rwkv_val2310_ckpt_read1b.json; 1,600 of the 1,800 untouched questions covered),
+'unknown' counted as abstention: untouched **1,089 right / 480 wrong / 31 abstain, fitness -351, precision 0.694**.
+Our best policy (T22p): untouched +512 (833 right / 107 wrong, precision 0.886) on 1,800. Practice: model -148.
+Reading: the model answers more questions right but at 0.69 precision it is deeply negative under +1 / -3; the engine
+is the only side that can tell when it knows. Filling our silent questions from the model would lose about 0.24
+per question at that precision, so no fill without a confidence signal.
+
+## B2b registration (the model with a confidence threshold, chosen on practice)
+b2_conf.py: the model's reply is scored by the mean log-probability per generated token (and the probability of the
+first token) for all 2,510 questions of val_all13.json; a threshold is chosen on the 710 practice questions
+(0-309, 510-909) to maximise +1 / -3; applied once to the untouched sets (310-509, 910-2509). Reported: untouched
+right / wrong / fitness at the chosen threshold, and the policy 'ours, then the thresholded model where ours is
+silent'. PASS for the combined policy if untouched fitness beats +512. This decides whether honesty is a module we
+can add to a model (combined policy wins) or a property the model can get by itself (thresholded model alone beats
++512).
+Runtime note: 6 s per question on this CPU (0.4B model, story prompt), about 4 h for 2,510; launched detached
+2026-10-15 00:27 with checkpoints every 50 questions (b2_conf_answers.json), over the local minutes cap but no
+alternative substrate is reachable tonight; the threshold choice and scoring run in seconds once it ends.
