@@ -131,3 +131,6 @@ The gate (T12 with T08's B) gains the first session's components saved on the sa
 
 ## T33 result -- PASS
 Gate + live per-length counts on the larger text (KP): 7.1347; + self-searched counts on the larger text (QM, 8.2096 alone): **7.1308** (T08 gate 7.1433). The gate gives the old count models K, Q weight 0 and the new ones 0.10 / 0.16. Best next-word score so far (saved as r26_best_gate_probs.npz); gap to the language model 0.43.
+
+## T11 registration (EVOLVE: genetic search over count-model context shapes)
+r26_evo.py. Genome: for each of the previous 4 positions, one view of the word (word, learned group, dictionary-split group, dictionary class, last two letters, skip). Count rules learned by the learner (R25-ca). Fitness: bits on 6,000 predictions of a held-out training slice, with models built on 3M training tokens. Population 12 (four seeded: all words, words then groups, all dictionary classes, all groups; eight random), elite 4, eight children by uniform crossover and one-position mutation (0.7), up to 6 generations within 20 minutes. The two best genomes other than all-words are rebuilt on all training text and scored on the usual predictions, then added to the best gate (T33). PASS if the gate falls below 7.1308.
