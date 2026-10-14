@@ -1,0 +1,3 @@
+T32 best single component per paragraph: 7.4475 bits/word
+T32 max component per prediction (bound for any convex mix): 5.6963
+T32 R25-co mix 7.1524; language model 6.7001
