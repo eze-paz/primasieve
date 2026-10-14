@@ -874,3 +874,9 @@ World state alone: practice 28 right / 8 wrong; untouched 24 / 23 (W0) and 25 / 
 1. Events from the books, not a hand reader: use the learner's own role reader (the verb and argument groups already learned) to propose (agent, verb, thing, place) tuples on book text.
 2. Effects learned as Tandon's corpus priors, but scored by prediction: for each verb group and each candidate effect (holder := agent, holder := recipient, holder := none, place := phrase), keep the effect if it makes the thing's later mentions more predictable in the books ('his key', 'the key on the table', 'X ... the key'). The next-word game is the judge, as in the R25-ca rule-discovery engine.
 3. Carry-follow and constraint-resolved 'it' as candidate operators in the same search, kept only if they lower bits on later mentions.
+
+## R25-cy result -- FAIL
+Topic similarity rises (0.410 -> 0.473 / 0.517 / 0.507) but the judge's bits get worse (6.854 -> 7.274 / 7.779 / 7.577): the signal overrides grammar and the text turns into lists of on-topic nouns ("son robert son brother george w cousin john adams daughter ...").
+
+## R25-cz registration (rung 1b: grammar picks the slot, meaning picks the word)
+Same, but the topic reweighting acts only inside each word group: every group keeps its total probability (the grammar-like choice of what kind of word comes next) and the topic only redistributes probability among the candidate words of that group. Same judges, prompts, seeds; lam in {0, 2, 4, 8}. PASS if some lam > 0 improves both judges over lam = 0.

@@ -1,0 +1,9 @@
+R25-ar data: 354551 training paragraphs, 21168764 tokens; vocabulary 20000 + unknown (21 s)
+R25-bw o5mxa: 21,551,689 tokens counted; discounts [(0.18, 1.181, 2.523), (0.734, 1.071, 1.38), (0.847, 1.137, 1.344), (0.93, 1.253, 1.411), (0.965, 1.479, 1.524)] (92 s)
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (45 s)
+R25-cy lam 0: judge bits/word 6.854 | topic similarity 0.410 (24 samples)
+   e.g. again this time is in my absence to hear him after that i thought he had set back against this was that on which the whole house would call into him she had turned and was able to stay on
+R25-cy lam 2: judge bits/word 7.274 | topic similarity 0.473 (24 samples)
+R25-cy lam 4: judge bits/word 7.779 | topic similarity 0.517 (24 samples)
+   e.g. son robert son brother george w cousin john adams daughter s sister son mistress daughter son who from their old brother were great parents brother brother charles cousin with daughters son he was master of the duke of charles c
+R25-cy lam 8: judge bits/word 7.577 | topic similarity 0.507 (24 samples)

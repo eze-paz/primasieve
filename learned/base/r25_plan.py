@@ -28,7 +28,14 @@ def gen(prompt, n, seed, lam):
         kn = np.array([KN["prob"](ctx[-5:], KN["wid"].get(words[i], KN["RARE"]))[0] for i in top])
         mix = 0.55 * pw[top] / pw[top].sum() + 0.45 * kn / kn.sum()
         if lam > 0 and np.linalg.norm(topic) > 0:
-            cos = WV[top] @ (topic / np.linalg.norm(topic)); mix = mix * np.where(content[top], np.exp(lam * cos), 1.0); mix /= mix.sum()
+            cos = WV[top] @ (topic / np.linalg.norm(topic)); boost = np.where(content[top], np.exp(lam * cos), 1.0)
+            if "--within" in sys.argv:                                                            # R25-cz: each group keeps its mass; the topic only chooses among its words
+                gg = gids[top].numpy(); new = mix * boost
+                for gv in np.unique(gg):
+                    m_ = gg == gv; new[m_] *= mix[m_].sum() / new[m_].sum()
+                mix = new
+            else: mix = mix * boost
+            mix /= mix.sum()
         w = words[sample(mix, top, rng)]; out.append(w); upd(w)
         pg, h = step(vi.get(w, 0), h); ctx.append(KN["wid"].get(w, KN["RARE"]))
     return out
