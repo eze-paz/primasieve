@@ -74,3 +74,9 @@ On top of the T24 policy: each trusted reader route gets its own veto margin t i
 
 ## T18 result -- PASS
 Per-route margins chosen on practice: cue-alone-loose+soft 0, role-alone+soft 1, learned-alone-exact+soft 1, agree 2, agree+role 2, cue-alone-loose+role 4; other routes never vetoed. Policy: practice +193 -> +215; **untouched +315 -> +344** (590 right / 82 wrong).
+
+## T08 result -- PASS (small)
+Two-word in-group choice on the adapted network: alone **7.5234** (R25-co's B 7.5306), chosen a3 30, m3 100 (the top of both grids). In the bucketed EM mix replacing B: 7.1506 (7.1524); in the learned gate: **7.1433** (T12 7.1449) -- best next-word score so far.
+
+## T07 registration (copy memories keyed by 4 and 5 words)
+r25_bicopy.py with keys of 4 and 5 previous words (decay 0.9999), added to the gate (T12 with T08's B). PASS if the gate falls below 7.1433.

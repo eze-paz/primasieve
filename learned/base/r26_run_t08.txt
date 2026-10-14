@@ -1,0 +1,18 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (35 s)
+T08 2,388,489 pairs, 7,310,451 triples (174 s)
+  a3 3 m3 0: 0-499 8.1037, 500-999 7.5336
+  a3 3 m3 30: 0-499 8.0920, 500-999 7.5307
+  a3 3 m3 100: 0-499 8.0929, 500-999 7.5325
+  a3 10 m3 0: 0-499 8.0890, 500-999 7.5254
+  a3 10 m3 30: 0-499 8.0794, 500-999 7.5230
+  a3 10 m3 100: 0-499 8.0797, 500-999 7.5244
+  a3 30 m3 0: 0-499 8.0836, 500-999 7.5245
+  a3 30 m3 30: 0-499 8.0762, 500-999 7.5227
+  a3 30 m3 100: 0-499 8.0755, 500-999 7.5234
+T08 chosen (30, 100): 500-999 7.5234 (R25-co B 7.5306; network alone 7.6238)
+bucketed EM, B = T08:
+R25-cl EM by orders (16 buckets): 7.1506 bits/word
+bucketed EM, B = T08 and old B both:
+R25-cl EM by orders (16 buckets): 7.1518 bits/word
+gate, B replaced by T08:
+T12 gate: fit 7.5272, early-stop slice 7.2567, paragraphs 500-999 7.1433 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U'])
