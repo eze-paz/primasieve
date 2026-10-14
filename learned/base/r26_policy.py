@@ -54,9 +54,14 @@ ORD = json.load(open('r26_order_answers.json', encoding='utf-8')) if os.path.exi
 if "--order" in sys.argv:
     f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i: ORD[i]); fu = fit([i for i in UN if not spoke(i) and not T22[i]], lambda i: ORD[i]); print("ORDER on silent practice:", f, "untouched:", fu)
     if f[0] > 0: extra["order"] = lambda i: ORD[i]
+DOA = json.load(open('r26_do_answers.json', encoding='utf-8')) if os.path.exists('r26_do_answers.json') else [None] * len(items)
+if "--do" in sys.argv:
+    f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i: DOA[i]); fu = fit([i for i in UN if not spoke(i) and not T22[i]], lambda i: DOA[i]); print("DO on silent practice:", f, "untouched:", fu)
+    if f[0] > 0: extra["do"] = lambda i: DOA[i]
 def other(i):
     x = T22[i] or (O[i][1] if O[i][0] in ("COUNT", "WHOSE") else None)
     if x is None and "order" in extra: x = extra["order"](i)
+    if x is None and "do" in extra: x = extra["do"](i)
     if x is None and "why" in extra: x = extra["why"](i)
     return x
 SMA = json.load(open('r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}

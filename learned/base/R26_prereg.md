@@ -134,3 +134,9 @@ Gate + live per-length counts on the larger text (KP): 7.1347; + self-searched c
 
 ## T11 registration (EVOLVE: genetic search over count-model context shapes)
 r26_evo.py. Genome: for each of the previous 4 positions, one view of the word (word, learned group, dictionary-split group, dictionary class, last two letters, skip). Count rules learned by the learner (R25-ca). Fitness: bits on 6,000 predictions of a held-out training slice, with models built on 3M training tokens. Population 12 (four seeded: all words, words then groups, all dictionary classes, all groups; eight random), elite 4, eight children by uniform crossover and one-position mutation (0.7), up to 6 generations within 20 minutes. The two best genomes other than all-words are rebuilt on all training text and scored on the usual predictions, then added to the best gate (T33). PASS if the gate falls below 7.1308.
+
+## T34 registration (WHAT-DO operator)
+r26_do.py: 'What did X do (rest)?' -> sentences where X (the name or noun after 'did', or he / she when X was the last named person) is directly followed by a verb; if the rest of the question has content words, the sentence must hold them; exactly one such sentence -> the answer is the verb and following words up to the clause end (max 8 words). Route for silent questions, trusted by practice fitness; added to the best policy. PASS if untouched beats +362.
+
+## T34 result -- FAIL
+WHAT-DO answers 37 questions; on silent ones practice 4 right / 2 wrong (-2), untouched 14 / 9 -- not trusted. Predicates are found, but gold answers are often a shorter or different phrasing of the action than the clause read here.
