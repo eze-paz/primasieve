@@ -828,3 +828,6 @@ To avoid clashes with the first session's R25-cr (dictionary lookup) and R25-cs 
 
 ## R25-cs result (the language model on exactly the mix's test)
 RWKV-7 0.4B, state carried through the 1,000 held-out paragraphs, same text and the same 50,114 predictions: **6.7001** on paragraphs 500-999 (all 1,000: 6.0261). Our best mix on 500-999: 7.3418. **Gap 0.64 bits/word** in the language model's favour. Per paragraph, the counter trails the language model by a median 2.1 bits; in 17 paragraphs the language model is under 3 bits/word, which suggests it saw those passages in pre-training (Gutenberg texts are common in web corpora), so part of its lead may be memory of these books rather than skill. Earlier comparisons (7.67) used sentence scope on other text and understated it.
+
+## R25-cr2-t result -- FAIL
+Normalised per type, the typed memory is now slightly better alone than the single power law (8.606 vs 8.622 bits where nonzero), but in the R25-co mix it adds nothing: 7.1527 (gate 7.1495; R25-co 7.1524). Reading: word types do recur on different curves (rarer words return more slowly, with heavier tails), but the mix's fast and slow exponential memories already cover that range of shapes.

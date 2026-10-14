@@ -1,0 +1,7 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (53 s)
+R25-cr sample: 5677 predictions whose word occurred before (11 s)
+R25-cr function (3508 predictions): power -6.667 (1.1, 100); stretched exp -6.669 (1, 0.2); log decay -6.670 (8, 100); two exponentials -6.695 (0.99, 0.9999, 0.9); exponential -6.712 (0.9995,)
+R25-cr frequent (1382 predictions): power -11.774 (0.7, 10); stretched exp -11.796 (10, 0.2); log decay -11.848 (4, 10); two exponentials -11.879 (0.99, 0.99995, 0.9); exponential -11.970 (0.99995,)
+R25-cr middle (728 predictions): power -13.834 (0.7, 10); stretched exp -13.917 (10, 0.2); log decay -13.935 (8, 100); two exponentials -14.506 (0.99, 0.99995, 0.9); exponential -14.648 (0.99995,)
+R25-cr rare (59 predictions): log decay -12.798 (8, 100); power -12.818 (1.1, 30); stretched exp -13.082 (1, 0.2); two exponentials -14.043 (0.99, 0.99995, 0.9); exponential -14.697 (0.99995,)
+R25-cr held-out typed copy memory: nonzero 0.867, mean bits where nonzero (500-999) 8.606 (600 s)
