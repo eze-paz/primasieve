@@ -758,3 +758,6 @@ Replace the 0.1 weight grid by EM-fitted mixture weights per depth (deterministi
 
 ## R25-cn registration (every saved component, EM weights)
 With EM the weight search no longer limits the number of components: all saved components (networks W, G, X, B; count models C, K-static o5mxa, KN o4/o4m/o5m/o6m/o5mx/o5ma, skip counts, self-searched counters 13M and 21M, live counters strong / gentle / per-length; copy memories 0.97/0.99/0.999/0.9999; triggers), EM weights per depth on 0-499, reported on 500-999. Compared with 7.3541.
+
+## R25-cn result (all 26 saved components, EM weights) -- small
+**7.3487** (7.3541). EM gives almost all weight to six components (book-scope network 0.41, per-length live counter 0.24, self-searched counter 0.11, strong live counter 0.09, copy memories about 0.08, an earlier network 0.04); the rest are redundant. Adding more of the same kinds is saturated; the next gain needs new information or a richer mixing context.
