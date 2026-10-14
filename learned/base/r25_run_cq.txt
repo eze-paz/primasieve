@@ -1,0 +1,12 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (49 s)
+R25-cq plain pow: best ('pow', 0.9, 30) mean log2 P (when seen before) -8.9144 (34 s)
+R25-cq plain exp: best ('exp', 0.9999, None) mean log2 P (when seen before) -9.2917 (39 s)
+R25-  700 paragraphs (2357 s)
+', 0.9, 30): nonzero 0.867, mean bits where nonzero (500-999) 8.622 -> r25_recur_plain_pow_probs.npz
+R25-cq held-out plain exp ('exp', 0.9999, None): nonzero 0.867, mean bits where nonzero (500-999) 8.765 -> r25_recur_plain_exp_probs.npz
+R25-cq keyed pow: best ('pow', 0.5, 10) mean log2 P (when seen before) -45.2546 (88 s)
+C:\Users\aezequiel\Desktop\AI_Projects\primasieve\learned\base\r25_recur.py:48: RuntimeWarning: invalid value encountered in divide
+  return n / d
+R25-cq keyed exp: best ('exp', 0.97, None) mean log2 P (when seen before) nan (93 s)
+R25-cq held-out keyed pow ('pow', 0.5, 10): nonzero 0.401, mean bits where nonzero (500-999) 4.872 -> r25_recur_keyed_pow_probs.npz
+R25-cq held-out keyed exp ('exp', 0.97, None): nonzero 0.386, mean bits where nonzero (500-999) 145.032 -> r25_recur_keyed_exp_probs.npz
