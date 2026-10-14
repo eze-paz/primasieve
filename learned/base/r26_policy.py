@@ -58,8 +58,9 @@ DOA = json.load(open('r26_do_answers.json', encoding='utf-8')) if os.path.exists
 if "--do" in sys.argv:
     f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i: DOA[i]); fu = fit([i for i in UN if not spoke(i) and not T22[i]], lambda i: DOA[i]); print("DO on silent practice:", f, "untouched:", fu)
     if f[0] > 0: extra["do"] = lambda i: DOA[i]
+T22D = json.load(open('r26_t22d_policy.json', encoding='utf-8')) if os.path.exists('r26_t22d_policy.json') else [None] * len(items)
 def other(i):
-    x = T22[i] or (O[i][1] if O[i][0] in ("COUNT", "WHOSE") else None)
+    x = T22[i] or (T22D[i] if "--relax" in sys.argv else None) or (O[i][1] if O[i][0] in ("COUNT", "WHOSE") else None)
     if x is None and "order" in extra: x = extra["order"](i)
     if x is None and "do" in extra: x = extra["do"](i)
     if x is None and "why" in extra: x = extra["why"](i)

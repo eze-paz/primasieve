@@ -42,7 +42,7 @@ def np_before(toks, k):
     return " ".join(out) if out else None
 
 
-def answer(text, q):
+def answer(text, q, relax=False):
     qw = [w for w in TOK.findall(q) if w[0].isalnum()]
     if len(qw) < 2: return None
     wh = qw[0].lower(); rest = qw[1:]
@@ -57,8 +57,18 @@ def answer(text, q):
         toks = TOK.findall(s); nt = [norm(t) for t in toks]
         pos = [next((i for i, x in enumerate(nt) if x == c), None) for c in content]
         if all(p is not None for p in pos): hits.append((toks, nt, pos))
+    if not hits and relax:                                                               # T22d: all but one content word (not a name)
+        for s in sents:
+            toks = TOK.findall(s); nt = [norm(t) for t in toks]
+            pos = [next((i for i, x in enumerate(nt) if x == c), None) for c in content]
+            miss = [c for c, p in zip(content, pos) if p is None]
+            if len(miss) == 1 and len(content) >= 2 and not any(w[0].isupper() and norm(w) == miss[0] for w in rest):
+                hits.append((toks, nt, [p for p in pos if p is not None]))
+        content = [c for c in content]
     if len(hits) != 1: return None
-    toks, nt, pos = hits[0]; qset = {w.lower() for w in qw}
+    toks, nt, pos = hits[0]
+    if len(pos) < len(content): content = [c for c in content if c in nt]
+    qset = {w.lower() for w in qw}
     verb_i = next((p for c, p in zip(content, pos) if Dct.verb_base(toks[p]) and toks[p].lower() not in DET), None)
     if wh == "who" and not obj_q:
         if verb_i is None: return None
@@ -86,7 +96,8 @@ def answer(text, q):
 
 def main():
     st = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; items = [(s["text"], q, g) for s in st for q, g in s["qs"]]
-    A = [answer(t, q) for t, q, g in items]; json.dump(A, open("r26_stmatch_answers.json", "w", encoding="utf-8"))
+    RELAX = "--relax" in sys.argv
+    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
     gold = [g for _, _, g in items]
     L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")]
     route = [l.split("| route ")[1].split(" |")[0] for l in L]; ans = [l.split("| ans ")[1].split(" |")[0] for l in L]; ans = [None if a == "None" else a for a in ans]

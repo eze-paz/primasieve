@@ -182,3 +182,12 @@ Single additions to the T02b gate (test 500-999 / slice 400-499): dictionary-spl
 
 ## T35 registration (gate components chosen by forward selection on the validation slice)
 r26_select.py: start from the T12 base set (the R25-co components with B, D from T02b); candidates: KP, QM, S1, S2, G1, G2, X1 (dictionary-split-group key), X2 (dictionary-class key), X3 (word two back + group), E1, E2 (evolved shapes), T08's B as B2. Each round adds the candidate that most lowers the 400-499 slice bits (gate refitted on 0-399), stopping when no candidate gains 0.001. The chosen set is reported once on 500-999. PASS if below 7.1199 (T02b, the last gate accepted before the correction).
+
+## T11 result (evolution over count shapes)
+Six generations, 20 minutes. Generation 0 best: all words (9.0606 on the fitness slice, 3M-token models). From generation 2 the search kept (learned group, word, word, word) -- the previous word seen only as its group, earlier words exact -- 9.0038 (-0.057); runners-up (group, word, word, dictionary-split group) 9.0039 and (group, word, word, group) 9.0041. Rebuilt on all training text: 8.4887 and 8.4888 alone on 500-999 (the models use 90% of the training paragraphs; the all-words counter on all text is 8.36-8.40): the gain found at 3M tokens does not carry to 13M as a single counter. The finding itself transferred: it suggested the group-keyed book memory (T07c), which did help. Their value in the gate is decided by T35.
+
+## T22d registration (statement match with one missing content word)
+r26_stmatch.py --relax: when no story sentence holds all of the question's content words, a sentence holding all but one (the one missing must not be a name) is used if it is the only such sentence. Answers added for silent questions, checked by the rival score with margins chosen per question word on practice as T22c, then into the best policy (r26_policy.py --why-because). PASS if untouched beats +362.
+
+## T22d result -- FAIL
+Relaxed match (all but one content word): alone untouched 635 right / 268 wrong (strict 540 / 186). Checked by the rival score where strict match found nothing (margins chosen on practice: who 0, what 2; where and when not kept). Policy: practice +219 -> +227, untouched +362 -> **+348** (630 / 94). The practice gain does not transfer.
