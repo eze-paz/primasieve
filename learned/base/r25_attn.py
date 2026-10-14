@@ -30,6 +30,12 @@ def paras_of(paras):
 
 t0 = time.time()
 tr_b, te_b = D0.books(); tep = paras_of(B.paragraphs(te_b, 20000))
+if os.environ.get("R26_RANGE"):                                                             # R26 T39: another range of held-out paragraphs; outputs to R26_OUTDIR
+    _a, _b = map(int, os.environ["R26_RANGE"].split(":")); tep = tep[_a:_b]; _od = os.environ.get("R26_OUTDIR")
+    if _od:
+        os.makedirs(_od, exist_ok=True); _sv = np.savez
+        def _savez(f, *a, **k): return _sv(f if (os.path.isabs(str(f)) or os.path.dirname(str(f))) else os.path.join(_od, f), *a, **k)
+        np.savez = _savez
 trp = paras_of([dict(text=p.replace(chr(8217), "'")) for b in tr_b for p in D0.read(b).split(chr(10)) if p.strip()] if "--all-text" in ARGV else B.paragraphs(tr_b, 1000000))   # R25-av: every paragraph of the training books
 z = np.load("r25_vectors_all.npz"); vocab = z["vocab"].tolist()[:20000]; vi = {w: i + 1 for i, w in enumerate(vocab)}   # 0 = unknown
 uni = collections.Counter(x for p in trp for s in p for x in s); N = sum(uni.values())
