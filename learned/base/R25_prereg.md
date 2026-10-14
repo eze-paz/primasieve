@@ -740,3 +740,9 @@ r25_ingroup.py on the dynamic network's probabilities (m up to 100), and r25_dyn
 ## R25-co result -- PASS
 Wider step sizes: 0.5 gives 8.2475 / 7.7197, 1.0 gives 8.3899 / 7.9998 (0-499 / 500-999): 0.3 stays best. In-group choice on the adapted network (a 10, m 100, chosen on 0-499): alone **7.5306** (adapted 7.6238, static 8.0096). In the mix in place of B: 7.1685; with the adapted network and the static in-group variant beside it: **7.1524** (R25-ch 7.5430: -0.39 today, all of it from learning on the book being read).
 Next (corner 3 of R25_corners.md, not yet registered): a log-domain combiner, which needs full distributions from each component.
+
+## R25-ck result
+beta 512 alone **8.0630** on 500-999 (static 8.3580) but in the mix 7.4429; with both live counters and the static one, 7.3745. The strong version (beta 16, R25-cj, 7.3701) mixes better: the mixer wants the book's own phrase counts nearly raw, as a separate opinion.
+
+## R25-cl registration (one strength per context length)
+beta_L = b1 / f^(L-1) for context length L = 1..4 (short contexts trust the book's counts less, long ones more), b1 in {64, 256, 1024, 4096}, f in {2, 4, 8, 16}, chosen by bits alone on paragraphs 0-499; then mixed as N with the R25-cj components. Compared with 7.3701.
