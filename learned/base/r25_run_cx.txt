@@ -1,0 +1,14 @@
+R25-cx-t fit: 323 books, 9515 events (20 s)
+R25-cx-t dev: 36 books, 1180 events (23 s)
+R25-cx-t test: 41 books, 1134 events (25 s)
+R25-cx-t 64 verbs with 30+ events
+R25-cx-t K=2: dev 1.4310 bits (prior 1.4276, per verb 1.4371)
+R25-cx-t K=3: dev 1.4302 bits (prior 1.4276, per verb 1.4371)
+R25-cx-t K=4: dev 1.4345 bits (prior 1.4276, per verb 1.4371)
+R25-cx-t K=5: dev 1.4324 bits (prior 1.4276, per verb 1.4371)
+R25-cx-t chosen K=3. Held-out books (1134 events): no verb 1.4222, learned classes 1.4275, per verb 1.4392; classes recover -532171448.5% of the per-verb gain
+  class 0: agent named near the next mention 0.123, 19 verbs: say, give, leave, call, lay, send, go, receive, stand, live, follow, cross, watch, lie, read, lose, speak, spend, continue
+  class 1: agent named near the next mention 0.189, 20 verbs: take, find, enter, reach, get, hear, turn, think, pass, draw, like, bring, come, seize, approach, let, bear, remember, set, show
+  class 2: agent named near the next mention 0.216, 25 verbs: see, make, put, know, hold, tell, keep, feel, raise, meet, ask, throw, lead, sit, lift, shake, cry, become, write, carry, catch, wear, look, believe, strike
+R25-cx-t lexicon check: 17 / 35 acquire x release pairs ordered as the hand lists say (9 in the same class); acquire [('take', 1), ('find', 1), ('catch', 2), ('get', 1), ('receive', 0)], release [('put', 2), ('leave', 0), ('give', 0), ('set', 1), ('lay', 0), ('throw', 2), ('lose', 0)]
+R25-cx-t per-verb agent-near share, acquire: [('take', 0.193), ('find', 0.169), ('catch', 0.31), ('get', 0.181), ('receive', 0.017)]; release: [('put', 0.21), ('leave', 0.125), ('give', 0.16), ('set', 0.194), ('lay', 0.158), ('throw', 0.273), ('lose', 0.062)]

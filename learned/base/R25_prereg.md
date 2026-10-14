@@ -901,3 +901,9 @@ Events 9,515 / 1,180 / 1,134 (fit / dev / held-out), 64 verbs. Held-out: no verb
 
 ## R25-cx-t registration (emergence, iteration 4: pronouns on the judge side)
 r25_emerge4.py = R25-cw-t, but at the thing's next mention a person is 'referred to' by a name within 8 words or by he / she / him / his / her / they / them / their within 6 words, a pronoun resolved to the most recent name before it (same or previous paragraph). Judge: agent referred to (A) / another person referred to (O) / none (N). Gate and check unchanged.
+
+## R25-cx-t result -- FAIL
+Held-out: no verb 1.4222, classes (K=3) 1.4275, per verb 1.4392; lexicon pairs 17 / 35. With pronouns resolved, the agent is referred to near the next mention 12-22% of the time in every class: whether the holder is mentioned near the thing hardly depends on the verb.
+
+## R25-cy-t registration (emergence, iteration 5: who acts on the thing next)
+r25_emerge5.py: same events as R25-cw-t (pronoun agents resolved by recency). Judge: the NEXT event in the books whose thing is the same word (same or next two paragraphs): its agent is the same person (S) or a different person (D). Rule shape searched: verbs grouped into K classes by P(S | class); K from {2, 3, 4, 5} on dev. Expected if holding emerges: acquire verbs give S more often than release verbs, and 'give' gives D. Gate: classes beat no verb on held-out books; lexicon pairs >= 75% ordered by S-share.
