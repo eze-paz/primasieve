@@ -13,6 +13,9 @@ PLACEP = {"in", "on", "at", "into", "onto", "near", "under", "behind", "by", "in
 STOP = AUX | DET | {"who", "what", "where", "when", "whom", "of", "for", "with", "and", "or", "but", "it", "he", "she", "they", "him", "them", "there", "then", "so"} | PREP
 TIMEW = set("morning evening night noon dawn dusk midnight afternoon day days week weeks month months year years winter summer spring autumn monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december yesterday today tomorrow tonight hour hours minute minutes later o clock christmas birthday holiday".split())
 CLAUSE_END = {"and", "but", "because", "while", "when", "so", "then", "who", "which", "that", "after", "before", "until"}
+FIX = "--fix" in sys.argv
+NUMW = set("one two three four five six seven eight nine ten eleven twelve twenty thirty a few several".split())
+PRONS = {"he", "she", "it", "they", "him", "her", "them", "his", "its", "their"}
 TOK = re.compile(r"[A-Za-z0-9]+(?:'[a-z]+)?|[,.;:!?]")
 nb = {}
 def norm(w):
@@ -70,9 +73,13 @@ def answer(text, q, relax=False):
     if len(pos) < len(content): content = [c for c in content if c in nt]
     qset = {w.lower() for w in qw}
     verb_i = next((p for c, p in zip(content, pos) if Dct.verb_base(toks[p]) and toks[p].lower() not in DET), None)
-    if wh == "who" and not obj_q:
+    subj_q = (wh == "who" and not obj_q) or (FIX and wh == "what" and not obj_q)       # T22e (3): 'what' + non-auxiliary verb asks for the subject
+    if subj_q:
         if verb_i is None: return None
         a = np_before(toks, verb_i)
+        if FIX and a:                                                                     # T22e (5): a capitalised word, or a phrase after a determiner
+            k0 = verb_i - len(a.split())
+            if not any(w[0].isupper() for w in a.split()) and not (k0 >= 1 and toks[k0 - 1].lower() in DET): a = None
     elif wh in ("what", "who", "whom"):
         if verb_i is None: return None
         k = max(pos) + 1 if max(pos) > verb_i else verb_i + 1
@@ -82,14 +89,25 @@ def answer(text, q, relax=False):
         for i, t in enumerate(toks):
             if t.lower() in PLACEP and i + 1 < len(toks):
                 cand = np_after(toks, i + 1)
+                if FIX and cand:                                                          # T22e (2): no time phrases; stop at a capital or a time word
+                    ws = cand.split(); cut = next((j for j, w in enumerate(ws) if j > 0 and (w[0].isupper() or w.lower() in TIMEW)), len(ws)); cand = " ".join(ws[:cut])
+                    if any(w.lower() in TIMEW for w in cand.split()): cand = None
                 if cand and not set(cand.lower().split()) <= qset: a = t.lower() + " " + cand; break
     else:
         a = None
         for i, t in enumerate(toks):
             if t.lower() in TIMEW or (t.lower() in ("at", "on", "in") and i + 1 < len(toks) and (toks[i + 1].lower() in TIMEW or toks[i + 1].isdigit())):
                 j = i
-                while j > 0 and toks[j - 1].lower() in DET | {"in", "on", "at", "the", "next", "last", "every", "one", "that"}: j -= 1
-                a = " ".join(toks[j:i + 1] if toks[i].lower() in TIMEW else toks[i:i + 3]); break
+                while j > 0 and toks[j - 1].lower() in DET | {"in", "on", "at", "the", "next", "last", "every", "one", "that"} | (NUMW if FIX else set()): j -= 1
+                e = i + 1
+                if FIX and e < len(toks) and toks[e].lower() in ("later", "ago", "earlier"): e += 1   # T22e (4)
+                a = " ".join(toks[j:e] if toks[i].lower() in TIMEW else toks[i:i + 3]); break
+    if FIX and a and a.lower() in PRONS:                                                  # T22e (1): pronoun answers
+        if a.lower() in ("he", "she"):
+            before = text[:text.find(" ".join(toks[:3]))] if " ".join(toks[:3]) in text else ""
+            names = [w for w in TOK.findall(before) if w[0].isupper() and w.lower() not in STOP and w.lower() not in PRONS]
+            a = names[-1] if names else None
+        else: a = None
     if not a or set(a.lower().split()) <= qset: return None
     return a
 
@@ -97,7 +115,7 @@ def answer(text, q, relax=False):
 def main():
     st = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; items = [(s["text"], q, g) for s in st for q, g in s["qs"]]
     RELAX = "--relax" in sys.argv
-    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
+    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
     gold = [g for _, _, g in items]
     L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")]
     route = [l.split("| route ")[1].split(" |")[0] for l in L]; ans = [l.split("| ans ")[1].split(" |")[0] for l in L]; ans = [None if a == "None" else a for a in ans]

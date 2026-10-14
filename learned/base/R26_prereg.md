@@ -191,3 +191,15 @@ r26_stmatch.py --relax: when no story sentence holds all of the question's conte
 
 ## T22d result -- FAIL
 Relaxed match (all but one content word): alone untouched 635 right / 268 wrong (strict 540 / 186). Checked by the rival score where strict match found nothing (margins chosen on practice: who 0, what 2; where and when not kept). Policy: practice +219 -> +227, untouched +362 -> **+348** (630 / 94). The practice gain does not transfer.
+
+## T36 registration (agreement of an untrusted reader route with statement match)
+A question with no answer from the best policy, where an untrusted reader route answered and the strict statement match gives an answer that matches it (either contains the other), takes that answer; kept if its practice fitness is positive. PASS if untouched beats +362.
+
+## T36 result -- FAIL
+Agreement answers on unanswered questions: practice 2 right / 3 wrong (not kept); untouched would have been 7 / 1. Policy unchanged (+362).
+
+## T22e registration (statement match: extraction fixes from practice errors)
+Practice-only error review of strict statement match (25 wrong answers read) found five systematic faults, fixed in r26_stmatch.py --fix: (1) pronoun answers: he / she resolved to the most recently named person before the sentence, other pronouns rejected; (2) where-answers skip phrases whose words include a time word and stop at a capitalised word or a time word; (3) 'what' + non-auxiliary verb is a subject question (answer before the verb, as 'who'); (4) when-answers keep a number word before and 'later' / 'ago' / 'earlier' after; (5) who / subject answers must hold a capitalised word or follow a determiner in the sentence. Then the T22c pipeline (rival check, margins per question word chosen on practice) on the fixed answers replaces T22c in the best policy. PASS if untouched beats +362.
+
+## T22e result -- PASS (large)
+Fixed statement match alone: practice 217 right / 40 wrong (was 197 / 56), untouched 606 / 139 (was 540 / 186; fitness -18 -> +189). Rival-check margins chosen on practice: who 0, what 8, when 8 (where not kept). Best policy (r26_policy.py --why-because --fix): practice +219 -> +237; **untouched +362 -> +463 (715 right / 84 wrong)**. Five extraction faults read off 25 practice errors account for a 100-point gain on 1,800 untouched questions.

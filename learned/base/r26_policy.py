@@ -4,7 +4,7 @@ import json, sys, collections, re, os
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE))
 from b6_rwkv import hit
 st = json.load(open('val_all13.json', encoding='utf-8'))['stories']; items = [(s['text'], q, g) for s in st for q, g in s['qs']]; gold = [g for _, _, g in items]
-SC = json.load(open('r25_steelman2_scores.json', encoding='utf-8')); T22 = json.load(open('r26_t22c_policy.json', encoding='utf-8')); O = json.load(open('r26_ops_answers.json', encoding='utf-8'))
+SC = json.load(open('r25_steelman2_scores.json', encoding='utf-8')); T22 = json.load(open('r26_t22e_policy.json' if '--fix' in sys.argv else 'r26_t22c_policy.json', encoding='utf-8')); O = json.load(open('r26_ops_answers.json', encoding='utf-8'))
 L = [l for l in open('r24_diag_asA.txt', encoding='utf-8', errors='replace') if l.startswith('VAL |')]
 route = [l.split('| route ')[1].split(' |')[0] for l in L]; ans = [l.split('| ans ')[1].split(' |')[0] for l in L]; ans = [None if a == 'None' else a for a in ans]
 PR = list(range(310)) + list(range(510, 910)); UN = list(range(310, 510)) + list(range(910, 2510))
@@ -65,7 +65,7 @@ def other(i):
     if x is None and "do" in extra: x = extra["do"](i)
     if x is None and "why" in extra: x = extra["why"](i)
     return x
-SMA = json.load(open('r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
+SMA = json.load(open('r26_stmatch_fix_answers.json' if '--fix' in sys.argv else 'r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
 def sm_checked(i):
     a = SMA[i]; k = items[i][1].split()[0].lower()
     if a is None or k not in TMW: return None
@@ -75,10 +75,21 @@ def sm_checked(i):
     mine = max((s for x, s in c if same(x)), default=None); rival = max((s for x, s in c if not same(x)), default=None)
     if mine is None: return None
     return None if (rival is not None and rival - mine > TMW[k]) else a
+def agree(i):
+    a, b = ans[i], SMA[i]
+    if not a or not b or spoke(i): return None
+    return a if (hit(a, [nrm(b)]) or hit(b, [nrm(a)])) else None
+if "--agree" in sys.argv:
+    base_pol = lambda i: reader(i) or (None if spoke(i) else other(i))
+    f = fit([i for i in PR if base_pol(i) is None], agree); fu = fit([i for i in UN if base_pol(i) is None], agree); print("AGREE on unanswered practice:", f, "untouched:", fu)
+    if f[0] <= 0: sys.argv.remove("--agree")
 def pol(i):
     r = reader(i)
     if r is not None: return r
     if spoke(i) and "--fallback2" in sys.argv: return sm_checked(i)
+    if "--agree" in sys.argv and not spoke(i):
+        o = other(i)
+        return o if o is not None else agree(i)
     if spoke(i) and "--fallback" not in sys.argv: return None
     return other(i)
 print(f"policy {[a for a in sys.argv[1:]]}: practice {fit(PR, pol)}, untouched {fit(UN, pol)}")
