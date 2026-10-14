@@ -75,7 +75,7 @@ def answer(story, q):
     def near(cands):
         return min(cands, key=lambda i: min(abs(i - h) for h in hits)) if cands else None
     if wh == "who":
-        c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or (not NAMEONLY and (w in PERSONW or (w in PERSONX and i > 0 and ws[i - 1] in DET)))))]
+        c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or (not NAMEONLY and (w in PERSONW or (w in PERSONX and i > 0 and ws[i - 1] in DET))))]
         i = near(c); return None if i is None else phrase_at(ws, i, raw)
     if wh == "where":
         c = [i for i, w in enumerate(ws) if w in PLACE and i + 1 < len(ws)]
