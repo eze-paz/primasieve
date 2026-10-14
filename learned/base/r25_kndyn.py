@@ -24,18 +24,20 @@ for pi, pg in enumerate(tep):
                 rows.append((len(seq), pi, q, d, rare_share(s[i]) if w == RARE else 1.0))
             seq.append(w)
 print(f"R25-cj static probabilities for {len(rows)} predictions ({time.time() - t0:.0f} s)", flush=True)
+BML = []
 def run(beta):
-    cnt = collections.Counter(); ctx = collections.Counter(); out = []; j = 0
+    cnt = collections.Counter(); ctx = collections.Counter(); out = []; j = 0; BML.clear()
     for t in range(len(seq)):
         while j < len(rows) and rows[j][0] == t:                                                  # predict seq[t] before counting it
-            _, _, q, _, rs = rows[j]; w = seq[t]; p = q
+            _, _, q, _, rs = rows[j]; w = seq[t]; p = q; m = 0
             for L in range(1, NMAX):
                 if t - L < 0: break
                 h = tuple(seq[t - L:t]); n = ctx[h]
                 if n == 0: break
+                m = L
                 bL = beta[L - 1] if isinstance(beta, tuple) else beta
                 p = (cnt[h + (w,)] * rs + bL * p) / (n + bL)
-            out.append(p); j += 1
+            out.append(p); BML.append(m); j += 1
         for L in range(1, NMAX):                                                                  # then count the phrases ending at t
             if t - L < 0: break
             h = tuple(seq[t - L:t]); ctx[h] += 1; cnt[h + (seq[t],)] += 1
@@ -46,5 +48,5 @@ for beta in BETAS:
     P = run(beta); b = -np.log2(P[tr]).mean(); print(f"  beta {beta}: paragraphs 0-499 {b:.4f}", flush=True)
     if best is None or b < best[0]: best = (b, beta, P)
 _, beta, P = best; stat = np.array([r[2] for r in rows])
-np.savez("r25_kndyn_perlen_probs.npz" if "--perlen" in ARGV0 else "r25_kndyn_wide_probs.npz" if "--wide" in ARGV0 else "r25_kndyn_probs.npz", p=P, para=para, deep=np.array([r[3] for r in rows]))
+np.savez("r25_kndyn_perlen_probs.npz" if "--perlen" in ARGV0 else "r25_kndyn_wide_probs.npz" if "--wide" in ARGV0 else "r25_kndyn_probs.npz", p=P, para=para, deep=np.array([r[3] for r in rows]), bml=np.array(BML))
 print(f"R25-cj live phrase counting (beta {beta}): paragraphs 500-999 {-np.log2(P[te]).mean():.4f} bits/word (static o5mxa {-np.log2(stat[te]).mean():.4f}) ({time.time() - t0:.0f} s)", flush=True)

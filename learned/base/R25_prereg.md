@@ -761,3 +761,6 @@ With EM the weight search no longer limits the number of components: all saved c
 
 ## R25-cn result (all 26 saved components, EM weights) -- small
 **7.3487** (7.3541). EM gives almost all weight to six components (book-scope network 0.41, per-length live counter 0.24, self-searched counter 0.11, strong live counter 0.09, copy memories about 0.08, an earlier network 0.04); the rest are redundant. Adding more of the same kinds is saturated; the next gain needs new information or a richer mixing context.
+
+## R25-co registration (richer mixing context)
+PAQ's mixers choose weights by richer contexts. Mixing context = static Kneser-Ney depth (0-4) x the longest phrase of the book read so far that matches the current context (0-4): up to 25 weight sets, EM-fitted on 0-499 (sets with under 200 predictions fall back to all of 0-499). Components as R25-cm. Compared with 7.3541 (R25-cm) and 7.3487 (R25-cn).

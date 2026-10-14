@@ -19,6 +19,7 @@ for nm, f in EXTRA:
     z_ = np.load(f); assert (z_["para"] == para).all(), f; cols[nm] = z_["p"]
 for d_ in DROP: cols.pop(d_)
 names = list(cols); X = np.stack([cols[k] for k in names], 1); deep = kn["deep"]
+if os.environ.get("R25_CTX2"): deep = deep * 5 + np.load(os.environ["R25_CTX2"])["bml"]   # R25-co: mixing context = static depth x how long a phrase of this book matched
 tr, te = para < 500, para >= 500
 NOGRID = bool(os.environ.get("R25_NOGRID"))
 grid = None if NOGRID else np.array([w for w in itertools.product(range(11), repeat=len(names)) if sum(w) == 10], dtype=float) / 10
