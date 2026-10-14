@@ -939,3 +939,13 @@ Before writing, the engine ranks the prompt's words by rarity (training counts) 
 
 ## R25-da stopped (owner: finish now or discard)
 Discarded before any result; no number recorded. Best standing results: next-word mix 7.3177 bits/word on paragraphs 500-999 (language model 6.7001 on the same test).
+
+## R25-db (rare-word graph reader for story questions; owner's design) -- development on practice A+B only
+r25_rwg.py, standalone: rarity of every word against the training books, the story's rare words linked within sentences with the common words as glue, the question's rare words select the best-covering sentence (rarity-weighted, word forms matched through the dictionary's base forms), the wh-word picks the answer kind (name or person word; phrase after a place word; time phrase; phrase after or before the matched verb), weak matches stay silent. Iterations on practice A+B (400 questions):
+| version | right | wrong | silent | precision |
+|---|---|---|---|---|
+| first | 73 | 184 | 143 | 0.284 |
+| answer spans tightened (names alone, 'what ... do' left silent) | 117 | 98 | 185 | 0.544 |
+| place phrase after the matched verb, subject for 'what <verb>', time phrases keep 'that' | 131 | 86 | 183 | 0.604 |
+| word forms matched by dictionary base form (built -> build) | **143** | **83** | 174 | **0.633** |
+By kind (last version): who 60 right / 11 wrong (0.85); where 41 / 31; what 35 / 31; when 7 / 10; how / why / whose silent. Development numbers only; no untouched set has been scored with it. Next: let the learner's trust layer decide per kind and route (it would keep 'who' and drop weak kinds), then score once on a fresh set.
