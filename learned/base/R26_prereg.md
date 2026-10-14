@@ -341,3 +341,6 @@ As T22o, versions {fix, fix2, fix3, fix4, fix5, fix3sim}. PASS if the policy bea
 
 ## T22p result -- PASS
 Chosen per word over six matcher versions (both practice pools): who (fix2, 0), what (fix, 8), where (fix2, 8), when (fix5, 8). Policy: practice +258; **untouched +512 (833 right / 107 wrong)** (T22o +497). Best comprehension policy: r26_policy.py --why-because --fix3 --t22h r26_t22p_policy.json --ops2. From the morning's +288 (519 / 77): +224 points, 314 more right answers for 30 more wrong.
+
+## T41 result -- PASS (small)
+Two-word in-group choice on W2 (main range alone 7.8660 -> 7.7656) and W3 (7.7449 -> 7.6445). T40 gate with the two new components: slice 7.2171, **test 7.1090** (T40 7.1110). Best next-word result; gap to the language model 0.41.

@@ -1,0 +1,13 @@
+== main r26_t13_ingroup_probs.npz 23:26:31
+T08 chosen (30, 100, 1.0): 500-999 7.7656 (R25-co B 7.5306; network alone 7.8660)
+== range1 r26_t13_ingroup_probs.npz 23:27:54
+T08 chosen (10, 30, 1.0): 500-999 7.7749 (R25-co B 7.5306; network alone 7.8458)
+== range2 r26_t13_ingroup_probs.npz 23:29:02
+T08 chosen (30, 30, 1.0): 500-999 8.6359 (R25-co B 7.5306; network alone 8.7303)
+== main r26_t13c_ingroup_probs.npz 23:30:11
+T08 chosen (30, 100, 1.0): 500-999 7.6445 (R25-co B 7.5306; network alone 7.7449)
+== range1 r26_t13c_ingroup_probs.npz 23:31:16
+T08 chosen (10, 30, 1.0): 500-999 7.6347 (R25-co B 7.5306; network alone 7.7056)
+== range2 r26_t13c_ingroup_probs.npz 23:32:23
+T08 chosen (30, 30, 1.0): 500-999 8.4914 (R25-co B 7.5306; network alone 8.5858)
+== done
