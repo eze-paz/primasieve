@@ -136,9 +136,10 @@ if os.environ.get("R25_TRUST2"):                                                
                 a = answer(st["text"], q); key = (q.split()[0].lower(), FULL[0], NEAR[0])
                 if a is not None: pk[key]["right" if norm(a) in {norm(x) for x in gold} else "wrong"] += 1
     keep = {k for k, c in pk.items() if c["right"] - 3 * c["wrong"] > 0}
+    if os.environ.get("R25_FINAL"): keep = {k for k in keep if k[0] == "who"}                     # R25-dl: the R25-df configuration (who-only trust)
     print(f"R25-dd (kind, full cover) kept: {sorted(keep)}", flush=True)
     t2 = collections.Counter()
-    for f in ("val_practice_c.json", "val_practice_d.json"):
+    for f in ([os.environ["R25_FINAL"]] if os.environ.get("R25_FINAL") else ("val_practice_c.json", "val_practice_d.json")):
         for st in json.load(open(f, encoding="utf-8"))["stories"]:
             for q, gold in st["qs"]:
                 a = answer(st["text"], q); a = a if (q.split()[0].lower(), FULL[0], NEAR[0]) in keep else None
