@@ -53,7 +53,7 @@ def phrase_at(ws, i, raw=None):
         while j + 1 < len(ws) and raw[j + 1][0].isupper(): j += 1
         return " ".join(ws[i:j + 1])
     return ws[i]
-FULL = [False]; NEAR = [True]
+FULL = [False]; NEAR = [True]; NAMEONLY = bool(os.environ.get("R25_NAMEONLY"))   # R25-dq: who-answers only names
 def answer(story, q):
     qw = [w.lower() for w in toks(q)]; wh = qw[0] if qw else ""
     qrare = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
@@ -75,7 +75,7 @@ def answer(story, q):
     def near(cands):
         return min(cands, key=lambda i: min(abs(i - h) for h in hits)) if cands else None
     if wh == "who":
-        c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or w in PERSONW or (w in PERSONX and i > 0 and ws[i - 1] in DET))]
+        c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or (not NAMEONLY and (w in PERSONW or (w in PERSONX and i > 0 and ws[i - 1] in DET)))))]
         i = near(c); return None if i is None else phrase_at(ws, i, raw)
     if wh == "where":
         c = [i for i, w in enumerate(ws) if w in PLACE and i + 1 < len(ws)]
