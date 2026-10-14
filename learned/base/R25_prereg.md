@@ -776,3 +776,10 @@ Alone 9.0523; EM gives it weight 0 (7.3426 vs 7.3418). How the book moves betwee
 
 ## R25-cq registration (the language model on exactly the mix's test)
 r25_llm_book.py: RWKV-7 0.4B on the first 1,000 held-out paragraphs, state carried across paragraphs, same text and the same 50,114 predictions; measurement only. Compared with the mix's 7.3418 on paragraphs 500-999 -- the first like-for-like head-to-head.
+
+## R25-cp registration (try several answers; argue the best against its strongest rival) -- owner, 2026-10-14
+r25_steelman.py. For each question, candidates are the story's own word spans (1-4 words, not made only of function words, not inside the question; a leading preposition allowed for where/when). Each candidate is put into the question as a statement (who/what-subject: the wh-word replaced; did-questions: subject verb candidate rest; where/when: subject (verb) rest candidate); why/whose/how are not handled. Score = bits of the statement without the story minus bits with the story (how much the story supports it), from the R25-ch network with its state carried through the story, mixed with copy memories of the story keyed by 0-2 previous words (fixed weights). Margin = best score minus best rival's.
+Uses, on top of the R25-as A run (r24_diag_asA.txt; all 2,510 questions):
+- Verifier: a reader's answer is withdrawn when a rival beats it by more than t1.
+- Answerer: a silent question is answered with the best candidate when its margin exceeds t2.
+t1, t2 and the route trust are chosen on the 710 practice questions only (positions 0-310 and 510-910). Reported once on the nine hand-written sets nothing here was chosen on (val_fresh2 to val_fresh10: positions 310-510 and 910-2510, 1,600 questions), against the same trust rule without the new step. PASS if fitness (+1 / -3 / 0) rises there. Caveat: each of these sets has been scored before by the readers, but this method and its thresholds are chosen on practice only.
