@@ -62,3 +62,17 @@ move sets), so 'ordered', 'woke', 'filled' produce no state, and the questions t
 events. Reading: the translation layer is learnable and generalises somewhat; the knowledge-acquisition bottleneck
 has moved to the symbolic rules, which is where GOFAI met it. The path is not viable as 'symbols first' unless the
 rules too are learned from a world broad enough to cover English verbs, which again is the cost of paradigm path A.
+
+## AG1b result (verbs never seen; reported, no gate)
+Trained on the 624 stories without the six held-out verbs, 2 epochs (so the in-distribution score also drops:
+test event F1 0.44, a data-and-epochs confound). On test events whose verb was never seen: verb detection recall
+0.17, argument F1 given the verb 0.655, event F1 0.0. The translator can place arguments around a verb it has
+never seen about two thirds of the time, but it rarely recognises that an unseen word is an event verb at all.
+Composition past the synthetic verb list is partial, consistent with the AG2 diagnostic.
+
+## Verdict
+AlphaGeometry path discarded as a separate path (kill rule met). What survives: a gradient-trained translator over
+synthetic gold plus book vectors reads real prose into structure about as well as the readers built by hand over
+weeks, in 50 minutes of training, which is evidence for the learned-translation half of paradigm path A/B, not for
+"symbols first". The bottleneck is now the breadth of the symbolic world (its verbs and their effects), which can
+only be bought with a far broader synthetic corpus.
