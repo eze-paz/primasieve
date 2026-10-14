@@ -371,3 +371,6 @@ r26_ncache.py: the static network r25_ch reads the held-out stream (state carrie
 
 ## T45 result -- PASS
 Neural cache (N 2000, theta 10 chosen on 0-499): alone 13.88 on 500-999 (it covers 73% of predictions). In the T43 gate on all ranges: slice 7.1942, **test 7.0890** (T43 7.1022): the largest single-component gain since T39. Matching earlier contexts by the network's state finds repeats the exact-word memories miss. Gap to the language model 0.39.
+
+## T44 result -- not run within the cap
+r25_discover2.py --all-text --more on range 1 rebuilt its shape search from scratch and reached only three of six shapes in 30 minutes (words-x 8.1605, groups-x 8.6381, dictgroups-x 8.3796 on its slice); stopped by the cap, no component. Would need the shape choice saved and only the chosen models rebuilt.

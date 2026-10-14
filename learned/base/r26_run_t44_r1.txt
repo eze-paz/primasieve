@@ -1,0 +1,5 @@
+== range1 00:14:52
+  shape words-x      : held-out training slice 8.1605 bits/word (513 s)
+  shape groups-x     : held-out training slice 8.6381 bits/word (983 s)
+  shape dictgroups-x : held-out training slice 8.3796 bits/word (1458 s)
+== end 00:44:06
