@@ -1,0 +1,15 @@
+== w4 range0 23:43:50
+== w4 range1 23:43:50
+T08 chosen (10, 30, 1.0): 500-999 7.5445 (R25-co B 7.5306; network alone 7.6154)
+== w4 range2 23:45:08
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 8.5033 bits/word
+T08 chosen (30, 30, 1.0): 500-999 8.4089 (R25-co B 7.5306; network alone 8.5033)
+== w5 range0 23:47:26
+T08 chosen (30, 100, 1.0): 500-999 7.5178 (R25-co B 7.5306; network alone 7.6182)
+== w5 range1 23:48:33
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 7.5585 bits/word
+T08 chosen (10, 30, 1.0): 500-999 7.4876 (R25-co B 7.5306; network alone 7.5585)
+== w5 range2 23:50:51
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 8.4505 bits/word
+T08 chosen (30, 30, 1.0): 500-999 8.3562 (R25-co B 7.5306; network alone 8.4505)
+== done

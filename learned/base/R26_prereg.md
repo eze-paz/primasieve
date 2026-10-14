@@ -344,3 +344,9 @@ Chosen per word over six matcher versions (both practice pools): who (fix2, 0), 
 
 ## T41 result -- PASS (small)
 Two-word in-group choice on W2 (main range alone 7.8660 -> 7.7656) and W3 (7.7449 -> 7.6445). T40 gate with the two new components: slice 7.2171, **test 7.1090** (T40 7.1110). Best next-word result; gap to the language model 0.41.
+
+## T42 registration (the remaining checkpoints, adapted with in-group choice, in the gate)
+r25_bu.pt and r25_cg.pt adapted (SGD 0.3, decay 0.001) and given two-word in-group choice, on the main range and ranges 1 and 2 -> W4, W4I, W5, W5I; the T41 gate with these four added. PASS if the test falls below 7.1090.
+
+## T42 result -- FAIL
+W4 / W5 adapted (main range 7.6656 / 7.6182 alone) with in-group (7.5652 / 7.5178). Gate with 21 components: slice 7.2182, test **7.1149** (T41 7.1090): more components of the same kind make the gate worse.
