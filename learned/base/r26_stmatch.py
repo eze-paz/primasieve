@@ -1,0 +1,120 @@
+"""R26 T22: wh-to-statement match (R26_prereg.md). The question's content words (verbs by base form) must all occur in
+exactly one story sentence; the gap is filled from that sentence by the question word's slot: who-subject -> the noun
+phrase before the matched verb; what / who-object -> the phrase after it; where -> a place phrase; when -> a time phrase.
+Run: py -3.12 r26_stmatch.py"""
+import os, sys, re, json, collections
+HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
+import r24_dict as Dct
+from b6_rwkv import hit
+AUX = {"did", "does", "do", "was", "were", "is", "are", "had", "has", "have", "will", "would", "could", "can"}
+DET = {"the", "a", "an", "his", "her", "their", "its", "my", "your", "our", "this", "that", "these", "those"}
+PREP = {"in", "on", "at", "to", "into", "onto", "near", "under", "behind", "by", "inside", "outside", "beside", "across", "over", "through", "from", "up", "down"}
+PLACEP = {"in", "on", "at", "into", "onto", "near", "under", "behind", "by", "inside", "outside", "beside", "across", "to", "over", "through"}
+STOP = AUX | DET | {"who", "what", "where", "when", "whom", "of", "for", "with", "and", "or", "but", "it", "he", "she", "they", "him", "them", "there", "then", "so"} | PREP
+TIMEW = set("morning evening night noon dawn dusk midnight afternoon day days week weeks month months year years winter summer spring autumn monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december yesterday today tomorrow tonight hour hours minute minutes later o clock christmas birthday holiday".split())
+CLAUSE_END = {"and", "but", "because", "while", "when", "so", "then", "who", "which", "that", "after", "before", "until"}
+TOK = re.compile(r"[A-Za-z0-9]+(?:'[a-z]+)?|[,.;:!?]")
+nb = {}
+def norm(w):
+    w = w.lower()
+    if w not in nb: nb[w] = (Dct.verb_base(w) if Dct.mainly_verb(w) else None) or w
+    return nb[w]
+
+
+def np_after(toks, k, stop_at_prep=True):
+    out = []
+    for t in toks[k:k + 7]:
+        tl = t.lower()
+        if not t[0].isalnum() or tl in CLAUSE_END or (stop_at_prep and tl in PREP and out): break
+        if tl in AUX and out: break
+        out.append(t)
+    while out and out[0].lower() in DET: out = out[1:]
+    return " ".join(out) if out else None
+
+
+def np_before(toks, k):
+    out = []
+    for t in reversed(toks[max(0, k - 5):k]):
+        tl = t.lower()
+        if not t[0].isalnum() or tl in CLAUSE_END or tl in PREP or tl in AUX: break
+        out.insert(0, t)
+    while out and out[0].lower() in DET: out = out[1:]
+    return " ".join(out) if out else None
+
+
+def answer(text, q):
+    qw = [w for w in TOK.findall(q) if w[0].isalnum()]
+    if len(qw) < 2: return None
+    wh = qw[0].lower(); rest = qw[1:]
+    if wh not in ("who", "what", "where", "when", "whom"): return None
+    obj_q = rest[0].lower() in AUX
+    if obj_q: rest = rest[1:]
+    content = [norm(w) for w in rest if w.lower() not in STOP]
+    if not content: return None
+    sents = [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    hits = []
+    for s in sents:
+        toks = TOK.findall(s); nt = [norm(t) for t in toks]
+        pos = [next((i for i, x in enumerate(nt) if x == c), None) for c in content]
+        if all(p is not None for p in pos): hits.append((toks, nt, pos))
+    if len(hits) != 1: return None
+    toks, nt, pos = hits[0]; qset = {w.lower() for w in qw}
+    verb_i = next((p for c, p in zip(content, pos) if Dct.verb_base(toks[p]) and toks[p].lower() not in DET), None)
+    if wh == "who" and not obj_q:
+        if verb_i is None: return None
+        a = np_before(toks, verb_i)
+    elif wh in ("what", "who", "whom"):
+        if verb_i is None: return None
+        k = max(pos) + 1 if max(pos) > verb_i else verb_i + 1
+        a = np_after(toks, k)
+    elif wh == "where":
+        a = None
+        for i, t in enumerate(toks):
+            if t.lower() in PLACEP and i + 1 < len(toks):
+                cand = np_after(toks, i + 1)
+                if cand and not set(cand.lower().split()) <= qset: a = t.lower() + " " + cand; break
+    else:
+        a = None
+        for i, t in enumerate(toks):
+            if t.lower() in TIMEW or (t.lower() in ("at", "on", "in") and i + 1 < len(toks) and (toks[i + 1].lower() in TIMEW or toks[i + 1].isdigit())):
+                j = i
+                while j > 0 and toks[j - 1].lower() in DET | {"in", "on", "at", "the", "next", "last", "every", "one", "that"}: j -= 1
+                a = " ".join(toks[j:i + 1] if toks[i].lower() in TIMEW else toks[i:i + 3]); break
+    if not a or set(a.lower().split()) <= qset: return None
+    return a
+
+
+def main():
+    st = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; items = [(s["text"], q, g) for s in st for q, g in s["qs"]]
+    A = [answer(t, q) for t, q, g in items]; json.dump(A, open("r26_stmatch_answers.json", "w", encoding="utf-8"))
+    gold = [g for _, _, g in items]
+    L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")]
+    route = [l.split("| route ")[1].split(" |")[0] for l in L]; ans = [l.split("| ans ")[1].split(" |")[0] for l in L]; ans = [None if a == "None" else a for a in ans]
+    PR = list(range(310)) + list(range(510, 910)); UN = list(range(310, 510)) + list(range(910, 2510))
+    fr = collections.defaultdict(lambda: [0, 0])
+    for i in PR:
+        if ans[i]: fr[route[i]][0 if hit(ans[i], gold[i]) else 1] += 1
+    trust = {r for r, (a, w) in fr.items() if a - 3 * w > 0}
+    def fit(idx, f):
+        r = w = 0
+        for i in idx:
+            x = f(i)
+            if x is None: continue
+            if hit(x, gold[i]): r += 1
+            else: w += 1
+        return r - 3 * w, r, w
+    base = lambda i: ans[i] if (ans[i] and route[i] in trust) else None
+    alone = lambda i: A[i]
+    silent_only = lambda i: A[i] if base(i) is None else None
+    use = fit(PR, silent_only)[0] > 0
+    pol = lambda i: base(i) if base(i) is not None else (A[i] if use else None)
+    print(f"T22 statement match alone: practice {fit(PR, alone)}, untouched {fit(UN, alone)}  (fitness, right, wrong)")
+    print(f"T22 on silent questions: practice {fit(PR, silent_only)}, untouched {fit(UN, silent_only)}; trusted on practice: {use}")
+    print(f"T22 policy: practice {fit(PR, pol)}, untouched {fit(UN, pol)} (baseline practice {fit(PR, base)}, untouched {fit(UN, base)})")
+    for wh in ("who", "what", "where", "when"):
+        idx = [i for i in PR if items[i][1].lower().startswith(wh) and base(i) is None]
+        print(f"  practice silent {wh}: {fit(idx, alone)}")
+
+
+if __name__ == "__main__":
+    main()

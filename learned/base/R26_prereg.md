@@ -47,3 +47,15 @@ Reading: 349 of the 476 silent questions are plain role questions -- reach, not 
 
 ## T22 registration (wh-to-statement match)
 r26_stmatch.py: the question is rewritten to the statement it presupposes with a gap (who V X -> '_ V X'; what did S V -> 'S V _'; where did S V X -> 'S V X (prep) _'; when ... -> time phrase), verbs compared by base form (dictionary), determiners and auxiliaries dropped; the gap is filled with the story span (1-5 words) found in the story sentence that contains all the statement's content words in order (allowing up to 2 extra words between them); answers only when exactly one sentence matches. As a route for silent questions, trusted only if its practice fitness is positive. PASS if the untouched policy beats +288.
+
+## T22 result -- FAIL as a single route, but large reach
+Statement match alone: practice 197 right / 56 wrong, untouched **540 right** / 186 wrong (the reader policy has 519 / 77). On silent questions: practice 92 / 39 (-25) -> not trusted; policy unchanged (+288). Practice silent by question word: who 19 / 12, what 36 / 10, where 26 / 14, when 11 / 3.
+
+## T22b registration (statement match trusted per question word)
+Same answers; the route is split by question word (who / what / where / when) and each sub-route is trusted for silent questions when its practice fitness is positive. PASS if the untouched policy beats +288.
+
+## T22b result -- PASS
+Kept on practice: what (36 / 10) and when (11 / 3); dropped who and where. Policy: practice +160 -> +168; **untouched +288 -> +299, right answers 519 -> 662** (wrong 77 -> 121).
+
+## T22c registration (statement match checked by the rival score)
+Statement-match answers for silent questions are kept only when no rival candidate beats them by more than t bits in the R25-cp2 support scores; t from {0, 1, 2, 4, 8, never} chosen on practice separately per question word (who / what / where / when), a sub-route used only if its practice fitness after the check is positive. PASS if untouched beats +299.

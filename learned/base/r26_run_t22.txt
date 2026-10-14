@@ -1,0 +1,7 @@
+T22 statement match alone: practice (29, 197, 56), untouched (-18, 540, 186)  (fitness, right, wrong)
+T22 on silent questions: practice (-25, 92, 39), untouched (-106, 263, 123); trusted on practice: False
+T22 policy: practice (160, 226, 22), untouched (288, 519, 77) (baseline practice (160, 226, 22), untouched (288, 519, 77))
+  practice silent who: (-17, 19, 12)
+  practice silent what: (6, 36, 10)
+  practice silent where: (-16, 26, 14)
+  practice silent when: (2, 11, 3)
