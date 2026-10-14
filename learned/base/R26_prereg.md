@@ -302,3 +302,9 @@ r25_attn.py gains R26_RANGE / R26_OUTDIR (other held-out paragraphs, outputs to 
 
 ## T38 result -- PASS
 Five-fold cross-validation on 0-499, base set cv 7.5350: + QM (self-searched counts on the larger text) 7.4944; + W3 (adapted 6,000-step network) 7.4933; the next (G2) gained 0.0008 and selection stopped. **Test 500-999: 7.1276** (T13c 7.1352). This is the reportable next-word result of R26 (chosen without the test half): gap to the language model 0.43. Cross-validation reversed two single-slice verdicts: QM, rejected by the slice, is the largest gain; the copy keys G2 / X1, chosen by the slice, are not needed once QM is in.
+
+## T22n registration (fourth round: time-phrase extension and 'X and Y' objects)
+Fix3's 20 errors on the extra practice read. Under --fix5 (implies fix3): (a) a clock or weekday time phrase is extended by a following 'in the morning / afternoon / evening' or 'morning / afternoon / evening / night'; (b) a what / who object answer of one or two words followed by 'and' plus one or two words before punctuation or a preposition keeps the 'and' part. Margins by the T22i protocol; the rest of the best policy (ops2) unchanged. PASS if the policy beats +486.
+
+## T22n result -- FAIL (no gain)
+Fix5 alone: untouched 535 / 72 (+319; fix3 535 / 74, +313). Policy +485 (776 / 97) vs +486. Extraction fixes have reached diminishing returns; the remaining statement-match errors are scattered (wrong place phrase chosen among several, paraphrased answers).

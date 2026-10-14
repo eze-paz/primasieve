@@ -13,7 +13,7 @@ PLACEP = {"in", "on", "at", "into", "onto", "near", "under", "behind", "by", "in
 STOP = AUX | DET | {"who", "what", "where", "when", "whom", "of", "for", "with", "and", "or", "but", "it", "he", "she", "they", "him", "them", "there", "then", "so"} | PREP
 TIMEW = set("morning evening night noon dawn dusk midnight afternoon day days week weeks month months year years winter summer spring autumn monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december yesterday today tomorrow tonight hour hours minute minutes later o clock christmas birthday holiday".split())
 CLAUSE_END = {"and", "but", "because", "while", "when", "so", "then", "who", "which", "that", "after", "before", "until"}
-SIM = "--sim" in sys.argv; FIX4 = "--fix4" in sys.argv; FIX3 = "--fix3" in sys.argv or FIX4; FIX2 = "--fix2" in sys.argv or FIX3; FIX = "--fix" in sys.argv or FIX2
+SIM = "--sim" in sys.argv; FIX5 = "--fix5" in sys.argv; FIX4 = "--fix4" in sys.argv; FIX3 = "--fix3" in sys.argv or FIX4 or FIX5; FIX2 = "--fix2" in sys.argv or FIX3; FIX = "--fix" in sys.argv or FIX2
 WEEKMONTH = set("monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december".split())
 NUMW = set("one two three four five six seven eight nine ten eleven twelve twenty thirty a few several".split())
 PRONS = {"he", "she", "it", "they", "him", "her", "them", "his", "its", "their"}
@@ -115,6 +115,11 @@ def answer(text, q, relax=False):
         if verb_i is None: return None
         k = max(pos) + 1 if max(pos) > verb_i else verb_i + 1
         a = np_after(toks, k)
+        if FIX5 and a and len(a.split()) <= 2:                                            # T22n (b): 'bread and cheese'
+            e = next((j for j in range(k, min(k + 6, len(toks))) if toks[j] == a.split()[-1]), None)
+            if e is not None and e + 2 < len(toks) and toks[e + 1].lower() == "and" and toks[e + 2][0].isalpha() and toks[e + 2].lower() not in PRONS | DET | PREP:
+                tail = [toks[e + 2]] + ([toks[e + 3]] if e + 3 < len(toks) and toks[e + 3][0].isalpha() and toks[e + 3].lower() not in PREP | AUX | CLAUSE_END else [])
+                a = a + " and " + " ".join(tail)
         if FIX2 and a and a.split()[0].lower() in PREP | {"of", "for", "with", "from", "about"}: a = None   # T22f (f): an object is not a prepositional phrase
     elif wh == "where":
         a = None
@@ -145,6 +150,12 @@ def answer(text, q, relax=False):
             if a is None:
                 for i, t in enumerate(low):
                     if t in WEEKMONTH: a = phrase(i, i + 1); break
+            if FIX5 and a:                                                                # T22n (a): '... in the morning', 'Friday morning'
+                ws = a.split(); e = next((k for k in range(len(low)) if " ".join(low[k:k + len(ws)]) == a.lower()), None)
+                if e is not None:
+                    e += len(ws)
+                    if low[e:e + 3] in (["in", "the", "morning"], ["in", "the", "afternoon"], ["in", "the", "evening"]): a = a + " " + " ".join(toks[e:e + 3])
+                    elif e < len(low) and low[e] in ("morning", "afternoon", "evening", "night"): a = a + " " + toks[e]
         for i, t in enumerate(toks if a is None else []):
             if t.lower() in TIMEW or (t.lower() in ("at", "on", "in") and i + 1 < len(toks) and (toks[i + 1].lower() in TIMEW or toks[i + 1].isdigit())):
                 j = i
@@ -172,7 +183,7 @@ def main():
     if SF != "val_all13.json":
         A = [answer(t, q, False) for t, q, g in items]; json.dump(A, open(sys.argv[sys.argv.index("--out") + 1], "w", encoding="utf-8")); print("answers", sum(a is not None for a in A)); return
     RELAX = "--relax" in sys.argv
-    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_sim_answers.json" if SIM else "r26_stmatch_fix4_answers.json" if FIX4 else "r26_stmatch_fix3_answers.json" if FIX3 else "r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
+    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix5_answers.json" if FIX5 else "r26_stmatch_sim_answers.json" if SIM else "r26_stmatch_fix4_answers.json" if FIX4 else "r26_stmatch_fix3_answers.json" if FIX3 else "r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
     gold = [g for _, _, g in items]
     L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")]
     route = [l.split("| route ")[1].split(" |")[0] for l in L]; ans = [l.split("| ans ")[1].split(" |")[0] for l in L]; ans = [None if a == "None" else a for a in ans]
