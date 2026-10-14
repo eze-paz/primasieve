@@ -805,10 +805,10 @@ Fit on training text (every 50th of the first 300,000 positions, to keep it to m
 ## Cost note (owner asked, 2026-10-14)
 Training cost of the 7.1524 mix on this laptop's CPU: network 36,000 steps = 4,686 + 3,313 + 3,065 s (about 3.1 h, 3.06M parameters); word counts 128 s; self-searched counts 634 s; at reading time dynamic evaluation about 80-130 s and copy memories about 30 s each per 50,000 words. Measured today on 500-999: counts + book memories only (no network, about 13 min of CPU) **7.5733**; with the 6,000-step network (about 35 min) **7.3489**; full 7.1524.
 
-## R25-cr registration (curve shapes per word type for recurrence)
+## R25-cr-t registration (curve shapes per word type for recurrence)
 r25_recur2.py. Families: power (d + c)^-b, exponential r^d, log decay ln(d + c)^-b, stretched exponential exp(-(d / tau)^beta), two exponentials summed. Word types by training frequency rank: function (top 150), frequent (150-2,000), middle (2,000-20,000), rare (beyond). Fitted on the same training sample as R25-cq, per type (positions whose next word is of that type). Reported: best shape and parameters per type. Then a type-split copy memory: each earlier word weighted by its own type's best curve, P(w) = sum over occurrences of w of k_type(w)(d) / sum over all earlier words j of k_type(j)(d) (normalised; denominator by convolution). Added to the R25-co mix; PASS if below 7.1524 by more than the plain power-law addition (7.1495).
 
-## R25-cs registration (log-domain and other combining operators)
+## R25-cs-t registration (log-domain and other combining operators)
 r25_logmix.py. Components that can give a full distribution over the 65,535 most frequent words plus one rare bucket: Kneser-Ney o5mxa, the static network, the adapted network (dynamic evaluation run inside), and the copy memories (plain 0.99 / 0.9999, keyed by 1-3 words). Combining operators, each with weights fit on a sample of paragraphs 0-499 and scored exactly (normaliser summed over the whole vocabulary) on 500-999: linear (power 1), power mean with exponent 0.5 (square root) and 0.25, and geometric / log-linear (exponent 0, i.e. exp of a weighted sum of natural logs). Compared with the linear mix of the same components. PASS if any non-linear operator beats linear on 500-999.
 
 ## Naming note (two sessions writing to this file)
@@ -817,8 +817,11 @@ A second working session registered its own R25-cp, R25-cp2 and R25-cq (rival ch
 ## R25-cr result (dictionary and thesaurus lookup for unknown context words) -- no effect
 Only 429 context positions held a word outside the counter's list (0.9% of predictions); 79 resolved by base form, 51 by synonym, 44 by broader word, 255 not found. Paragraphs 500-999: 8.3589 (without lookup 8.3580). With a 65,534-word list, unknown words are too rare in context for a lookup to matter here; it would matter for a small vocabulary or for question answering, where one unknown word can decide the answer.
 
-## R25-cr result -- FAIL as registered (design flaw found)
+## R25-cr-t result -- FAIL as registered (design flaw found)
 Best shape per word type (training sample, mean log2 per seen word): function words power (d + 100)^-1.1 (-6.667; stretched exponential -6.669, log decay -6.670, two exponentials -6.695, exponential -6.712); frequent power (d + 10)^-0.7 (-11.774 vs exponential -11.970); middle power (d + 10)^-0.7 (-13.834 vs exponential -14.648); rare (59 cases only) log decay ln(d + 100)^-8 (-12.798; power -12.818). Shapes do differ by type: the rarer the word, the slower and heavier-tailed its return (exponential falls furthest behind for rarer words: 0.05, 0.20, 0.81, 1.90 bits). The typed memory itself: 10.62 bits where nonzero (single power law 8.62); mix 7.1543 (R25-co 7.1524) -- FAIL. Cause: each type's curve was fitted with its own scale, and in one shared denominator the scales are not comparable, so some types crowd out others.
 
-## R25-cr2 registration (typed memory, normalised per type)
+## R25-cr2-t registration (typed memory, normalised per type)
 P(w) = P(type of w) x [sum over occurrences of w of k_type(d) / sum over earlier words of that type of k_type(d)], with P(type) the recency share of each type among earlier words (decay 0.99). Same curves as R25-cr, nothing refitted. Added to the R25-co mix; PASS if below 7.1495.
+
+## Naming note from the second session
+To avoid clashes with the first session's R25-cr (dictionary lookup) and R25-cs (language model on the mix's test), this session's per-type curve test, its fix and its combiner test are R25-cr-t, R25-cr2-t and R25-cs-t. From here this session suffixes its entries with -t.
