@@ -964,3 +964,9 @@ Coverage did not change what passes: only 'who' (both cover kinds) kept; C+D 68 
 
 ## R25-de registration ('where ... at the end' reads the last mention)
 For where-questions asking about the end ('end', 'finally', 'last', 'now'), the reader takes the last sentence that matches at least 60% as well as the best one, instead of the best one. Dev on A+B, then the R25-dd trust on C+D once.
+
+## R25-de result
+No change (A+B where 41 / 31; C+D 68 / 18): the last-mention rule rarely applies.
+
+## R25-df registration (the question's names must be in the chosen sentence)
+When a question names someone (capitalised words), only sentences containing all those names are candidates (if any do). Dev on A+B, trust as R25-dd, C+D once.

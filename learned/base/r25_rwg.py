@@ -50,6 +50,10 @@ def answer(story, q):
     qrare = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
     if not qrare or wh not in ("who", "where", "when", "what"): return None
     cands = [match_score(qrare, s) + (s,) for s in sentences(story)]
+    names = [w.lower() for w in toks(q)[1:] if w[0].isupper()]                                   # R25-df: a sentence must contain the question's names
+    if names:
+        named = [c for c in cands if all(stem(n) in {stem(x) for x in c[1]} for n in names)]
+        if named: cands = named
     if wh == "where" and ({"end", "finally", "last", "now"} & set(qw)):                          # R25-de: 'where ... at the end' -> the last sentence that mentions the thing
         top = max(c[0] for c in cands); best = [c for c in cands if c[0] >= 0.6 * top][-1]
     else: best = max(cands, key=lambda x: x[0])
