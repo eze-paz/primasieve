@@ -816,3 +816,9 @@ A second working session registered its own R25-cp, R25-cp2 and R25-cq (rival ch
 
 ## R25-cr result (dictionary and thesaurus lookup for unknown context words) -- no effect
 Only 429 context positions held a word outside the counter's list (0.9% of predictions); 79 resolved by base form, 51 by synonym, 44 by broader word, 255 not found. Paragraphs 500-999: 8.3589 (without lookup 8.3580). With a 65,534-word list, unknown words are too rare in context for a lookup to matter here; it would matter for a small vocabulary or for question answering, where one unknown word can decide the answer.
+
+## R25-cr result -- FAIL as registered (design flaw found)
+Best shape per word type (training sample, mean log2 per seen word): function words power (d + 100)^-1.1 (-6.667; stretched exponential -6.669, log decay -6.670, two exponentials -6.695, exponential -6.712); frequent power (d + 10)^-0.7 (-11.774 vs exponential -11.970); middle power (d + 10)^-0.7 (-13.834 vs exponential -14.648); rare (59 cases only) log decay ln(d + 100)^-8 (-12.798; power -12.818). Shapes do differ by type: the rarer the word, the slower and heavier-tailed its return (exponential falls furthest behind for rarer words: 0.05, 0.20, 0.81, 1.90 bits). The typed memory itself: 10.62 bits where nonzero (single power law 8.62); mix 7.1543 (R25-co 7.1524) -- FAIL. Cause: each type's curve was fitted with its own scale, and in one shared denominator the scales are not comparable, so some types crowd out others.
+
+## R25-cr2 registration (typed memory, normalised per type)
+P(w) = P(type of w) x [sum over occurrences of w of k_type(d) / sum over earlier words of that type of k_type(d)], with P(type) the recency share of each type among earlier words (decay 0.99). Same curves as R25-cr, nothing refitted. Added to the R25-co mix; PASS if below 7.1495.

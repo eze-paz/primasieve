@@ -42,14 +42,17 @@ def positions(of):
     ok = np.ones(len(T) - n + 1, dtype=bool)
     for j in range(1, n): ok &= ~start[j:len(T) - n + 1 + j]
     return np.nonzero(ok)[0]
-C, H, Dn = {}, {}, {}
+C, H, Dn, IDX = {}, {}, {}, {}
 for n in range(1, NMAX + 1):
     if n == NMAX:
         of = offs(n); pos = positions(of); codes, first, cnt = np.unique(hseq(pos, of), return_index=True, return_counts=True); ctx = hseq(pos[first], of[:-1]) if n > 1 else None
+        wd = T[pos[first] + of[-1]]
     else:                                                                                          # continuation counts: distinct one-word-longer left extensions
         of1 = offs(n + 1); pos = positions(of1); _, first = np.unique(hseq(pos, of1), return_index=True); sp = pos[first]
         codes, f2, cnt = np.unique(hseq(sp, of1[1:]), return_index=True, return_counts=True); ctx = hseq(sp[f2], of1[1:-1]) if n > 1 else None
+        wd = T[sp[f2] + of1[-1]]
     C[n] = (codes, cnt)
+    if "--save-index" in ARGV: IDX[n] = (ctx, wd, cnt)                                     # R25-cs: continuation lists by context, for full distributions
     nk = [(cnt == k).sum() for k in (1, 2, 3, 4)]; Y = nk[0] / (nk[0] + 2 * nk[1])
     Dn[n] = (1 - 2 * Y * nk[1] / nk[0], 2 - 3 * Y * nk[2] / nk[1], 3 - 4 * Y * nk[3] / nk[2]) if MKN else (Y, Y, Y)
     if n > 1:
@@ -118,3 +121,13 @@ if LOOKUP: print(f"R25-cr unknown context words looked up: {HOW}", flush=True)
 P = np.array(P); A = np.array(A)
 np.savez(f"r25_kn2_{TAG}.npz", p=P, para=A, deep=np.array(Dp)); b = -np.log2(P)
 print(f"R25-bw {TAG}: all 1,000 paragraphs {b.mean():.4f}; paragraphs 500-999 {b[A >= 500].mean():.4f} bits/word over {len(P)} predictions ({time.time() - t0:.0f} s)", flush=True)
+if "--save-index" in ARGV:                                                                         # R25-cs
+    out = dict(words=np.array(top), C1disc=C1disc, TOT1=TOT1, rare_mass=rare_mass, n_rare=n_rare, nmax=NMAX)
+    for n in IDX:
+        ctx, wd, cnt = IDX[n]
+        if n > 1:
+            o = np.argsort(ctx, kind="stable"); out[f"ctx{n}"] = ctx[o]; out[f"wd{n}"] = wd[o].astype(np.uint32); out[f"cnt{n}"] = cnt[o].astype(np.int32)
+            out[f"hu{n}"], out[f"tot{n}"], out[f"dm{n}"] = H[n]
+        else: out["wd1"] = wd.astype(np.uint32); out["cnt1"] = cnt.astype(np.int32)
+        out[f"D{n}"] = np.array(Dn[n])
+    np.savez(f"r25_kn2_{TAG}_index.npz", **out); print("R25-cs index saved", flush=True)
