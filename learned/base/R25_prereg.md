@@ -770,3 +770,6 @@ EM per context: **7.3418** (7.3541 with depth alone). The mixer trusts the live 
 
 ## R25-cp registration (live counting of the book's word-group sequences)
 r25_kndyn_group.py: the R25-cj update applied to learned x dictionary group patterns (1-5 groups) of the text read so far, times the word's training share in its group; beta chosen on 0-499. Added to the R25-co mix as component V. Compared with 7.3418.
+
+## R25-cp result (live group counting) -- FAIL
+Alone 9.0523; EM gives it weight 0 (7.3426 vs 7.3418). How the book moves between kinds of words is already covered by the networks and counters.
