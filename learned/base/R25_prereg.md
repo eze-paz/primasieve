@@ -930,3 +930,9 @@ W4's answer is kept only when no rival candidate beats it by more than t bits in
 ## R25-db-t result -- FAIL
 Practice chose t = 2: checked W4 practice 23 right / 5 wrong (+8), untouched 36 / 26 (-42). Policy: practice +160 -> +166, untouched +288 -> **+270**. Same pattern as R25-ct-t and R25-cz-t: every state route is ~0.8 precise on practice and ~0.55-0.58 on the untouched sets, and at +1 / -3 a route needs 0.75 to pay. The practice sets were the ones the readers and the R19 world state were built against; their precision does not transfer to new writers' prose.
 Summary of the emergence line today: state rules do emerge from the next-word game where text states results (R24-f, reused in R25-cz-t at hand-rule quality); books give no usable signal for them (R25-cu-t to R25-cy-t); the learned role reader reads 50% more events than the hand reader (R25-da-t); the limit is reading precision on unfamiliar prose, not the rules.
+
+## R25-cz result -- FAIL
+Inside word groups the topic signal no longer breaks grammar (judge 6.854 -> 6.912 / 6.897 / 6.951) but no longer moves the topic either (0.410 -> 0.391 / 0.413 / 0.436). A diffuse 'what the passage is about' vector is too weak a plan. (The log file also holds another session's lines; the R25-cy lines in it are this run.)
+
+## R25-da registration (rung 2, owner's idea: rarest words first, then the glue)
+Before writing, the engine ranks the prompt's words by rarity (training counts) and takes its 5 rarest content words; from them it plans the next words to say: content words most strongly associated with them in training text (the R25-ce pair counts, summed over the 5), 6 planned words per 40-word continuation. While writing, a planned word's probability is multiplied by exp(gamma) inside its group (grammar keeps the slot); once used, it is dropped from the plan. gamma in {0, 1, 2, 3}. Same judges, prompts, seeds. PASS if some gamma > 0 improves both judges over gamma = 0.
