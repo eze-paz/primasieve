@@ -1034,3 +1034,6 @@ Main alone 50 right / 6 wrong (fitness +32); reader alone 34 / 7 (+13); **togeth
 
 ## R25-dq registration (a sharper fallback, and a new untouched set)
 (a) Development on practice: the reader's fallback limited to answers that are names (capitalised words in the story); reported on A+B and C+D. (b) A writer agent writes val_fresh12 (same brief as val_fresh11) for the next once-only score of the combination.
+
+## R25-dq (a) result (name-only who-answers, development)
+A+B who: 46 right / 9 wrong (0.836) against 54 / 12 (0.818) with person words; practice fitness 19 vs 18 -- about equal, fewer answers, slightly cleaner. Registered choice for the val_fresh12 combination (fixed now, before the set exists): main system's trusted answer, else the reader's who-answer limited to names, else silent; the main system's answers on val_fresh12 come from one run of its adopted configuration.
