@@ -949,3 +949,6 @@ r25_rwg.py, standalone: rarity of every word against the training books, the sto
 | place phrase after the matched verb, subject for 'what <verb>', time phrases keep 'that' | 131 | 86 | 183 | 0.604 |
 | word forms matched by dictionary base form (built -> build) | **143** | **83** | 174 | **0.633** |
 By kind (last version): who 60 right / 11 wrong (0.85); where 41 / 31; what 35 / 31; when 7 / 10; how / why / whose silent. Development numbers only; no untouched set has been scored with it. Next: let the learner's trust layer decide per kind and route (it would keep 'who' and drop weak kinds), then score once on a fresh set.
+
+## R25-dc registration (trust for the rare-word graph reader)
+Per question kind, keep the reader only if right - 3 x wrong > 0 on practice A+B (the learner's trust rule); then score once on practice C+D, which were not used in the reader's development. Reported as right / wrong / silent and precision.

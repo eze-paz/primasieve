@@ -103,3 +103,13 @@ for f in FILES:
 n = sum(tot.values())
 print(f"R25-db rare-word graph reader on {', '.join(FILES)}: {n} questions -- right {tot['right']}, wrong {tot['wrong']}, silent {tot['silent']}; precision {tot['right'] / max(1, tot['right'] + tot['wrong']):.3f}")
 for wh, c in sorted(per.items(), key=lambda x: -sum(x[1].values())): print(f"   {wh:6s} right {c['right']:3d} wrong {c['wrong']:3d} silent {c['silent']:3d}")
+if os.environ.get("R25_TRUST"):                                                                  # R25-dc: per-kind trust from practice A+B (+1 right, -3 wrong, 0 silent), applied once to C+D
+    keep = {wh for wh, c in per.items() if c["right"] - 3 * c["wrong"] > 0}
+    print(f"R25-dc kinds kept by the trust rule on {', '.join(FILES)}: {sorted(keep)}", flush=True)
+    t2 = collections.Counter()
+    for f in ("val_practice_c.json", "val_practice_d.json"):
+        for st in json.load(open(f, encoding="utf-8"))["stories"]:
+            for q, gold in st["qs"]:
+                wh = q.split()[0].lower(); a = answer(st["text"], q) if wh in keep else None; gs = {norm(x) for x in gold}
+                t2["silent" if a is None else ("right" if norm(a) in gs else "wrong")] += 1
+    print(f"R25-dc trusted reader on practice C+D (not used in development): right {t2['right']}, wrong {t2['wrong']}, silent {t2['silent']}; precision {t2['right'] / max(1, t2['right'] + t2['wrong']):.3f}", flush=True)
