@@ -32,7 +32,7 @@ for line in open(os.path.join(os.path.dirname(os.path.dirname(HERE)), "_nldata",
         q_ = line.split()
         if q_[1] == "18":
             for k_ in range(int(q_[3], 16)): PERSON_WN.add(q_[4 + 2 * k_].lower())
-if os.environ.get("R25_PERSONWN"): PERSONW = PERSONW | {w for w in PERSON_WN if "_" not in w and uni[w] < 20000}
+PERSONX = {w for w in PERSON_WN if "_" not in w and uni[w] < 20000} if os.environ.get("R25_PERSONWN") else set()   # R25-dk: dictionary persons only right after a determiner
 def toks(s): return re.findall(r"[A-Za-z][A-Za-z']*|\d+", s)
 EXC = {}
 for f_ in ("verb.exc", "noun.exc", "adj.exc"):
@@ -73,7 +73,7 @@ def answer(story, q):
     def near(cands):
         return min(cands, key=lambda i: min(abs(i - h) for h in hits)) if cands else None
     if wh == "who":
-        c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or w in PERSONW)]
+        c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or w in PERSONW or (w in PERSONX and i > 0 and ws[i - 1] in DET))]
         i = near(c); return None if i is None else phrase_at(ws, i, raw)
     if wh == "where":
         c = [i for i, w in enumerate(ws) if w in PLACE and i + 1 < len(ws)]

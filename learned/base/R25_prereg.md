@@ -993,3 +993,9 @@ Trust kept (where, full, near) and (who, full, near); C+D 91 right / 28 wrong, f
 
 ## R25-dj registration (person words from the dictionary)
 Who-answers may be any word WordNet files as a person (noun.person; multi-word entries and the very commonest words excluded), not only the hand list of 26. Dev on A+B, trust as R25-di, C+D once. Compared with +23.
+
+## R25-dj result -- FAIL
+Dictionary person words widen who-answers too far (A+B who 66 right / 43 wrong); the trust rule drops 'who' and C+D falls to 29 / 15.
+
+## R25-dk registration (dictionary persons only after a determiner)
+A dictionary person word counts as a who-candidate only right after a determiner ('the pharmacist', 'her grandmother'); names and the hand list as before. Same procedure; C+D once; compared with +23.
