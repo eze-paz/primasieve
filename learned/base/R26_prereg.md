@@ -122,3 +122,6 @@ r26_order.py: questions with 'after X' / 'before X' / 'first' / 'last' / 'at the
 
 ## T25 result -- FAIL
 The ORDER operator answers 47 of 2,510; on silent questions practice 5 right / 13 wrong, untouched 5 / 11 -- not trusted; policy unchanged (+362). Sentence-level matching of the main clause picks the wrong sentence in most order questions (the main clause's content words, e.g. 'the roll', occur in many sentences, and the first match after the anchor is often not the event asked about).
+
+## T19 registration (rival check with the story-adapted network)
+r25_steelman.py --v2 --adapt: before scoring a story's questions, the network takes one SGD step (0.3, the R25-cm setting) on the story's own next-group loss (reset to the trained weights for every story); scores saved as r26_steelman3_scores.json. The T22c / T18 / T24b policy is then rebuilt with these scores (all margins re-chosen on practice). PASS if untouched beats +362.

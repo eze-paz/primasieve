@@ -7,7 +7,7 @@ Phase 2: thresholds chosen on the 710 practice questions; reported once on the 1
 Run: py -3.12 r25_steelman.py"""
 import os, sys, math, json, time, re, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
-V2 = "--v2" in sys.argv; CACHE = "r25_steelman2_scores.json" if V2 else "r25_steelman_scores.json"
+V2 = "--v2" in sys.argv; ADAPT = "--adapt" in sys.argv; CACHE = "r26_steelman3_scores.json" if ADAPT else "r25_steelman2_scores.json" if V2 else "r25_steelman_scores.json"
 FUNC = set("the a an his her their its my your our this that these those of to in on at by for with from into onto as and or but "
            "was were is are be been had has have did does do not no he she it they we i you him them me us who what where when why "
            "how which whose then so very there here up out off over under near behind after before about".split())
@@ -54,7 +54,16 @@ def phase1():
     torch, gw, unk2, _uni, _cnt, UNKG, vi = (R[k] for k in "torch gw unk2 _uni _cnt UNKG vi".split())
     import r24_dict as Dct
     verbs = Dct.verb_forms()
-    net = R["RNet"](); net.load_state_dict(torch.load("r25_ch.pt")); net.eval(); rnn = net.rnn
+    net = R["RNet"](); BASE_SD = torch.load("r25_ch.pt"); net.load_state_dict(BASE_SD); net.eval(); rnn = net.rnn
+    LAST = [None]
+    def adapt(text):                                                                       # R26 T19: one SGD step on the story itself
+        if LAST[0] == text: return
+        LAST[0] = text; net.load_state_dict(BASE_SD); ws = words_of(text)
+        if len(ws) < 3: return
+        ids = torch.tensor([[vi.get(w, 0) for w in ws]]); tg = torch.tensor([gw(w) for w in ws[1:]])
+        opt = torch.optim.SGD(net.parameters(), lr=0.3); hs, _ = rnn(net.inp(net.emb(ids)), None)
+        loss = torch.nn.functional.cross_entropy(net.out(net.out_ln(hs[0, :-1])), tg); opt.zero_grad(); loss.backward()
+        torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0); opt.step()
     share = lambda w, g: (_uni[w] + 0.5) / _cnt[g]
     def wordp(lp_row, w):                                                                  # network probability of word w from a group log-prob row
         g = gw(w); lp = lp_row[g].item()
@@ -109,6 +118,7 @@ def phase1():
         st = statements(q, cs, verbs) if cs else None
         if not st: res.append(dict(route=route, ans=ans, c=[])); continue
         pre = words_of(text) + words_of(q)
+        if ADAPT: adapt(text)
         if V2:                                                                             # R25-cp2: support the candidate gives the question's words
             b_st = bits(pre, st); b_c = bits(pre, cs)
             res.append(dict(route=route, ans=ans, c=[[" ".join(c), round(bc - bs, 4)] for c, bs, bc in zip(cs, b_st, b_c)]))
