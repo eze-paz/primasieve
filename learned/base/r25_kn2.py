@@ -10,7 +10,7 @@ ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
 NMAX = int(ARGV[ARGV.index("--order") + 1]) if "--order" in ARGV else 4; MKN = "--mkn" in ARGV; CROSS = "--cross" in ARGV
 SKIP = "--skip" in ARGV                                                                            # R25-bz: the word just before the target is left out of the context
-TAG = f"o{NMAX}{'m' if MKN else ''}{'x' if CROSS else ''}{'a' if '--all-text' in ARGV else ''}{'s' if SKIP else ''}"
+TAG = f"o{NMAX}{'m' if MKN else ''}{'x' if CROSS else ''}{'a' if '--all-text' in ARGV else ''}{'s' if SKIP else ''}{'L' if '--lookup' in ARGV else ''}"
 def offs(n): return list(range(n)) if (not SKIP or n == 1) else list(range(n - 1)) + [n]          # token offsets of an order-n pattern (context offsets, then the target)
 sys.argv = ["r25_attn.py", "--minutes", "0"] + (["--all-text"] if "--all-text" in ARGV else [])
 src = open("r25_attn.py", encoding="utf-8").read(); src = src[:src.index("class Net(nn.Module)")]
@@ -71,6 +71,37 @@ def prob(ctx, w):
         codes, cnt = C[n]; c = look(codes, cnt, hlist(cw + [w]))
         p = (max(c - Dn[n][min(c, 3) - 1], 0) if c else 0) / tot[i] + dm[i] / tot[i] * p; deep = n - 1
     return p, deep
+LOOKUP = "--lookup" in ARGV; HOW = {"base form": 0, "synonym": 0, "broader word": 0, "none": 0}
+if LOOKUP:                                                                                         # R25-cr: an unknown context word is looked up in the dictionary (base form) and thesaurus (synonyms, then broader words)
+    WN = os.path.join(os.path.dirname(os.path.dirname(HERE)), "_nldata", "dict"); EXC = {}; SYN = {}; HYP = {}
+    for f in ("noun.exc", "verb.exc", "adj.exc", "adv.exc"):
+        for line in open(os.path.join(WN, f), encoding="utf-8", errors="replace"):
+            q_ = line.split()
+            if len(q_) >= 2: EXC.setdefault(q_[0], q_[1])
+    for f in ("noun", "verb", "adj", "adv"):
+        syn_words = {}; ptrs = {}
+        for line in open(os.path.join(WN, "data." + f), encoding="utf-8", errors="replace"):
+            if not line[:1].isdigit(): continue
+            q_ = line.split(" | ")[0].split(); off = q_[0]; nw = int(q_[3], 16)
+            ws = [q_[4 + 2 * k].lower() for k in range(nw)]; syn_words[off] = ws
+            j = 4 + 2 * nw; npt = int(q_[j]); ptrs[off] = [q_[j + 1 + 4 * k + 1] for k in range(npt) if q_[j + 1 + 4 * k] in ("@", "@i")]
+        for off, ws in syn_words.items():
+            for w_ in ws:
+                SYN.setdefault(w_, set()).update(x for x in ws if x != w_)
+                for h_ in ptrs[off]: HYP.setdefault(w_, set()).update(syn_words.get(h_, []))
+    SUF = [("ies", "y"), ("es", "e"), ("es", ""), ("ed", "e"), ("ed", ""), ("ing", "e"), ("ing", ""), ("s", ""), ("er", ""), ("est", ""), ("ly", "")]
+    def best_known(cands): ks = [c for c in cands if c in wid]; return max(ks, key=lambda c: uni[c]) if ks else None
+    def remap(x):
+        bases = ([EXC[x]] if x in EXC else []) + [x[:-len(a)] + b for a, b in SUF if x.endswith(a) and len(x) - len(a) + len(b) >= 3]
+        k = best_known(bases)
+        if k: HOW["base form"] += 1; return wid[k]
+        for x2 in [x] + bases:
+            k = best_known(SYN.get(x2, ()))
+            if k: HOW["synonym"] += 1; return wid[k]
+        for x2 in [x] + bases:
+            k = best_known(HYP.get(x2, ()))
+            if k: HOW["broader word"] += 1; return wid[k]
+        HOW["none"] += 1; return RARE
 P, A, Dp = [], [], []
 for pi, pg in enumerate(g["tep"][:1000]):
     prev = [0]
@@ -82,7 +113,8 @@ for pi, pg in enumerate(g["tep"][:1000]):
                 q, d = prob(prev[-NMAX:], ids[i])
                 if ids[i] == RARE: q *= rare_share(s[i])
                 P.append(q); A.append(pi); Dp.append(d)
-            prev.append(ids[i])
+            prev.append(remap(s[i]) if (LOOKUP and ids[i] == RARE) else ids[i])
+if LOOKUP: print(f"R25-cr unknown context words looked up: {HOW}", flush=True)
 P = np.array(P); A = np.array(A)
 np.savez(f"r25_kn2_{TAG}.npz", p=P, para=A, deep=np.array(Dp)); b = -np.log2(P)
 print(f"R25-bw {TAG}: all 1,000 paragraphs {b.mean():.4f}; paragraphs 500-999 {b[A >= 500].mean():.4f} bits/word over {len(P)} predictions ({time.time() - t0:.0f} s)", flush=True)
