@@ -323,3 +323,6 @@ r26_gate39.py --mlp: mixing weights from a 64-unit ReLU layer over the same feat
 
 ## T39b result
 (a) Linear gate, ranges 1 + 2 (118,881 extra predictions): test **7.1171** vs 7.1163 (range 1 only) -- FAIL: the linear gate is saturated. (b) With previous-word features: test **7.1127** -- PASS against 7.1163 (registered bar), though above the range-1-only interim 7.1084 (that number was not the registered configuration).
+
+## T40 result -- PASS (small)
+One-hidden-layer gate (64 units) with previous-word features, fitted on 0-399 + ranges 1 and 2: slice 7.2198, **test 7.1110** (best linear T39b 7.1127; on 0-399 only the same gate gives 7.1341). Best next-word result of R26 with a fixed component set and no choice on the test half; gap to the language model (6.7001) 0.41. Gate gains are now small; further progress needs better components rather than better mixing.
