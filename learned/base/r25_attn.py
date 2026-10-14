@@ -34,7 +34,7 @@ if os.environ.get("R26_RANGE"):                                                 
     _a, _b = map(int, os.environ["R26_RANGE"].split(":")); tep = tep[_a:_b]; _od = os.environ.get("R26_OUTDIR")
     if _od:
         os.makedirs(_od, exist_ok=True); _sv = np.savez
-        def _savez(f, *a, **k): return _sv(f if (os.path.isabs(str(f)) or os.path.dirname(str(f))) else os.path.join(_od, f), *a, **k)
+        def _savez(_file, *a, **k): return _sv(_file if (os.path.isabs(str(_file)) or os.path.dirname(str(_file))) else os.path.join(_od, _file), *a, **k)
         np.savez = _savez
 trp = paras_of([dict(text=p.replace(chr(8217), "'")) for b in tr_b for p in D0.read(b).split(chr(10)) if p.strip()] if "--all-text" in ARGV else B.paragraphs(tr_b, 1000000))   # R25-av: every paragraph of the training books
 z = np.load("r25_vectors_all.npz"); vocab = z["vocab"].tolist()[:20000]; vi = {w: i + 1 for i, w in enumerate(vocab)}   # 0 = unknown

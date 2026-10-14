@@ -314,3 +314,6 @@ Components rebuilt on held-out paragraphs 1,000-1,999 (59,824 predictions; read 
 
 ## T39b registration (another 1,000 paragraphs, and richer gate features)
 (a) Components rebuilt on paragraphs 2,000-2,999 (r26_range2/), gate fitted on 0-399 + 1,000-2,999. (b) With that data, the gate also gets the previous-word features of T12b (frequency band, top-50 group, position). PASS for each if the test falls below 7.1163.
+
+## T39b interim (range 1 only)
+Previous-word features with range 1 in the fit: fit on 0-399 only 7.1427 (overfits, as T12b); fit on 0-399 + 1,000-1,999 **7.1084** (T39 7.1163). With five times more fitting data the richer gate pays. The registered T39b uses ranges 1 and 2 (running).

@@ -15,10 +15,13 @@ def load(d, files):
         r = np.zeros((n, c)); cur = np.full(c, -10.0)
         for i in range(n): r[i] = cur; cur = dec * cur + (1 - dec) * L[i]
         rec.append(r / 10)
-    F = np.concatenate([np.eye(5)[np.minimum(deep, 4)], np.stack(sn, 1), rec[0], rec[1], np.ones((n, 1))], 1).astype(np.float32)
+    PF = [np.load(os.path.join(d, "r26_prevfeat.npz"))["f"]] if PREV else []
+    F = np.concatenate(PF + [np.eye(5)[np.minimum(deep, 4)], np.stack(sn, 1), rec[0], rec[1], np.ones((n, 1))], 1).astype(np.float32)
     return X.astype(np.float32), F, para
-Xm, Fm, pm = load(".", MAIN); Xr, Fr, pr = load("r26_range1", C)
-print("main", Xm.shape, "range1", Xr.shape, flush=True)
+import sys
+PREV = "--prev" in sys.argv; RANGES = [a for a in sys.argv[1:] if a.startswith("r26_range")] or ["r26_range1"]
+Xm, Fm, pm = load(".", MAIN); RR = [load(r, C) for r in RANGES]; Xr = np.concatenate([r[0] for r in RR]); Fr = np.concatenate([r[1] for r in RR])
+print("main", Xm.shape, "ranges", RANGES, Xr.shape, "previous-word features" if PREV else "", flush=True)
 def fit(Xf, Ff, Xv, Fv):
     Xf, Ff, Xv, Fv = map(torch.tensor, (Xf, Ff, Xv, Fv))
     def nll(W, X, F): lw = torch.log_softmax(F @ W, 1); return -(torch.logsumexp(lw + torch.log(X), 1)).mean() / np.log(2)
@@ -30,6 +33,6 @@ def fit(Xf, Ff, Xv, Fv):
             if v < best[0]: best = (v, W.detach().clone())
     return best[1], nll
 fm, vm, tm = pm < 400, (pm >= 400) & (pm < 500), pm >= 500
-for name, (Xf, Ff) in (("fit on 0-399 only", (Xm[fm], Fm[fm])), ("fit on 0-399 + 1,000-1,999", (np.concatenate([Xm[fm], Xr]), np.concatenate([Fm[fm], Fr])))):
+for name, (Xf, Ff) in (("fit on 0-399 only", (Xm[fm], Fm[fm])), (f"fit on 0-399 + {RANGES}", (np.concatenate([Xm[fm], Xr]), np.concatenate([Fm[fm], Fr])))):
     W, nll = fit(Xf, Ff, Xm[vm], Fm[vm])
     with torch.no_grad(): print(f"T39 {name}: early-stop slice {nll(W, torch.tensor(Xm[vm]), torch.tensor(Fm[vm])).item():.4f}, paragraphs 500-999 {nll(W, torch.tensor(Xm[tm]), torch.tensor(Fm[tm])).item():.4f}", flush=True)
