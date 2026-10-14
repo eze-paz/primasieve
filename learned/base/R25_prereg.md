@@ -855,3 +855,6 @@ r25_discover2.py --all-text --more: the R25-cb shape search over training text p
 
 ## R25-cw result
 Self-searched counter with the extra books: alone **8.2096** (8.2933), kept the same shapes; in the mix 7.3189 (R25-cv 7.3177): no further gain. Count-side improvements now mostly overlap inside the mix; the book-scope network (weight about 0.45) carries the rest.
+
+## R25-cx samples (r25_generate.py)
+Three held-out paragraph openings continued for 60 words by our engine (book-scope group network + fast counter, top-p 0.9) and by the language model checkpoint (same prompt, top-p 0.9). Ours: locally grammatical phrases, no sustained meaning. The language model checkpoint (ckpt_read1b, fine-tuned earlier in this project for reading and abstaining) drifts into modern text and in one sample loops on 'unknown', a side effect of that fine-tuning; it is not a fair picture of a stock language model's writing.
