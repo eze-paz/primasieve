@@ -1,0 +1,14 @@
+all components: 7.1364
+without K: 7.1365
+without Q: 7.1364
+without N2: 7.1477
+without N3: 7.1376
+without B: 7.1605
+without D: 7.1362
+without I: 7.1479
+without Y: 7.1466
+without Z: 7.1416
+without V: 7.1369
+without U: 7.1480
+without KP: 7.1363
+without QM: 7.1456

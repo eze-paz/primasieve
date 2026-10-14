@@ -140,3 +140,9 @@ r26_do.py: 'What did X do (rest)?' -> sentences where X (the name or noun after 
 
 ## T34 result -- FAIL
 WHAT-DO answers 37 questions; on silent ones practice 4 right / 2 wrong (-2), untouched 14 / 9 -- not trusted. Predicates are found, but gold answers are often a shorter or different phrasing of the action than the clause read here.
+
+## T30 registration (leave-one-out value of each component; measurement)
+Bucketed EM mix (16 order buckets) over the T33 component set with B = T08; each component dropped in turn; the rise in bits on 500-999 is its value.
+
+## T30 result (leave-one-out values, bucketed EM, all 13 components 7.1364)
+Rise in bits when dropped: B (adapted network + two-word in-group) +0.024; U (keyed copy 0.999) +0.012; I (static network in-group with book pairs) +0.011; N2 (2-word keyed copy) +0.011; Y (copy 0.99) +0.010; QM (self-searched counts, larger text) +0.009; Z (copy 0.9999) +0.005; N3 +0.001; V +0.0005; K, Q, D, KP: 0.000 (covered by the others). Reading: the book-reading parts (adapted network, keyed and plain copies) carry the mix; the static count models are interchangeable.
