@@ -203,3 +203,15 @@ Practice-only error review of strict statement match (25 wrong answers read) fou
 
 ## T22e result -- PASS (large)
 Fixed statement match alone: practice 217 right / 40 wrong (was 197 / 56), untouched 606 / 139 (was 540 / 186; fitness -18 -> +189). Rival-check margins chosen on practice: who 0, what 8, when 8 (where not kept). Best policy (r26_policy.py --why-because --fix): practice +219 -> +237; **untouched +362 -> +463 (715 right / 84 wrong)**. Five extraction faults read off 25 practice errors account for a 100-point gain on 1,800 untouched questions.
+
+## T22f registration (second round of extraction fixes, practice errors only)
+30 more practice errors of the fixed match read; faults fixed under --fix2 (implies --fix): (a) where-answers keep their determiner ('behind the clinic'); (b) a capitalised word stops a where-answer only if the word before it is lower-case (keeps 'Mercer Road'); (c) the place phrase is searched from the first matched content word onward, then before it; 'at' + number word is a time, not a place; a span that starts with a preposition ('checked in at') is skipped; (d) copular who-questions ('Who was the cook?') answer with the phrase before the copula; (e) answers that start with a pronoun are rejected; (f) what / who object answers that start with a preposition are rejected. Then the T22e pipeline. PASS if untouched beats +463.
+
+## T22f result -- FAIL in the policy (better alone)
+Fix2 statement match alone: practice 204 / 18 (+150), untouched 558 / 83 (**+309 alone**, fix 1 +189). Margins chosen on practice: who 4, what 8, where 4, when 8 -- 'where' now admitted. Policy: practice +255, untouched **+448** (748 / 100) vs +463: the practice margins over-admit.
+
+## T22g registration (trust by a precision bound instead of the best practice fitness)
+For each question word, the rival-check margin is the loosest t in {0, 1, 2, 4, 8, never} whose practice answers on silent questions have a Wilson 95% lower bound on precision of at least 0.75 (the break-even precision under +1 / -3); a word with no such t is not used. Applied to the fix and fix2 answers. PASS if either policy beats +463.
+
+## T22g result -- FAIL
+Wilson rule (loosest margin with lower bound >= 0.75): fix -> {what: never-veto}, policy untouched +432 (636 / 68); fix2 -> {who: never, what: never, where: 4}, untouched +436 (703 / 89). Both below +463: taking the loosest admissible margin admits too much. The best policy stays T22e (r26_policy.py --why-because --fix, +463).

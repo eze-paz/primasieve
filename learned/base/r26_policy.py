@@ -4,7 +4,8 @@ import json, sys, collections, re, os
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE))
 from b6_rwkv import hit
 st = json.load(open('val_all13.json', encoding='utf-8'))['stories']; items = [(s['text'], q, g) for s in st for q, g in s['qs']]; gold = [g for _, _, g in items]
-SC = json.load(open('r25_steelman2_scores.json', encoding='utf-8')); T22 = json.load(open('r26_t22e_policy.json' if '--fix' in sys.argv else 'r26_t22c_policy.json', encoding='utf-8')); O = json.load(open('r26_ops_answers.json', encoding='utf-8'))
+SC = json.load(open('r25_steelman2_scores.json', encoding='utf-8')); W_ = 'w' if '--wilson' in sys.argv else ''
+T22 = json.load(open(f'r26_t22f{W_}_policy.json' if '--fix2' in sys.argv else f'r26_t22e{W_}_policy.json' if '--fix' in sys.argv else 'r26_t22c_policy.json', encoding='utf-8')); O = json.load(open('r26_ops_answers.json', encoding='utf-8'))
 L = [l for l in open('r24_diag_asA.txt', encoding='utf-8', errors='replace') if l.startswith('VAL |')]
 route = [l.split('| route ')[1].split(' |')[0] for l in L]; ans = [l.split('| ans ')[1].split(' |')[0] for l in L]; ans = [None if a == 'None' else a for a in ans]
 PR = list(range(310)) + list(range(510, 910)); UN = list(range(310, 510)) + list(range(910, 2510))
@@ -65,7 +66,7 @@ def other(i):
     if x is None and "do" in extra: x = extra["do"](i)
     if x is None and "why" in extra: x = extra["why"](i)
     return x
-SMA = json.load(open('r26_stmatch_fix_answers.json' if '--fix' in sys.argv else 'r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
+SMA = json.load(open('r26_stmatch_fix2_answers.json' if '--fix2' in sys.argv else 'r26_stmatch_fix_answers.json' if '--fix' in sys.argv else 'r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
 def sm_checked(i):
     a = SMA[i]; k = items[i][1].split()[0].lower()
     if a is None or k not in TMW: return None

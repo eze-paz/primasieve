@@ -1,0 +1,6 @@
+T22e margins {'what': None}; policy practice (188, 272, 28), untouched (379, 658, 93)
+T22f margins {'who': None, 'what': None, 'where': 4}; policy practice (217, 304, 29), untouched (383, 725, 114)
+WHY-because practice on silent: (4, 4, 0)
+policy ['--why-because', '--fix', '--wilson']: practice (220, 265, 15), untouched (432, 636, 68)
+WHY-because practice on silent: (4, 4, 0)
+policy ['--why-because', '--fix2', '--wilson']: practice (249, 297, 16), untouched (436, 703, 89)
