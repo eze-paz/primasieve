@@ -278,3 +278,9 @@ Diagnosis on the extra practice: of 554 who / what / where / when questions, 364
 
 ## T22k result -- FAIL in the policy (better alone)
 Fix4 alone: main practice 193 / 23, untouched 575 / 83 (+326; fix3 +313). Margins (both pools): who 0, what never-veto, where 2, when 8. Policy: practice +235, untouched **+475** (754 / 93) vs +485. The pronoun-aware matching reaches more answers, but with the looser 'what' margin it brings in more wrong ones than right.
+
+## T22l registration (fix3 first, fix4 only where fix3 has no answer)
+Answers = fix3's, else fix4's (main and extra practice alike); margins by the T22i protocol. PASS if the policy beats +485.
+
+## T22l result -- FAIL
+Fix3 with fix4 as fallback: margins who 0, what never-veto, where 2, when 8; policy practice +236, untouched +477 (756 / 93) vs +485. Whenever the fix4 answers are in the pool, both practice pools choose no veto for 'what', which costs on the untouched sets. Best stays T22j (+485).

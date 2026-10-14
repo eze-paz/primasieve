@@ -66,7 +66,7 @@ def other(i):
     if x is None and "do" in extra: x = extra["do"](i)
     if x is None and "why" in extra: x = extra["why"](i)
     return x
-SMA = json.load(open('r26_stmatch_fix4_answers.json' if '--fix4' in sys.argv else 'r26_stmatch_fix3_answers.json' if '--fix3' in sys.argv else 'r26_stmatch_fix2_answers.json' if '--fix2' in sys.argv else 'r26_stmatch_fix_answers.json' if '--fix' in sys.argv else 'r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
+SMA = json.load(open('r26_stmatch_fix34_answers.json' if '--fix34' in sys.argv else 'r26_stmatch_fix4_answers.json' if '--fix4' in sys.argv else 'r26_stmatch_fix3_answers.json' if '--fix3' in sys.argv else 'r26_stmatch_fix2_answers.json' if '--fix2' in sys.argv else 'r26_stmatch_fix_answers.json' if '--fix' in sys.argv else 'r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
 def sm_checked(i):
     a = SMA[i]; k = items[i][1].split()[0].lower()
     if a is None or k not in TMW: return None
