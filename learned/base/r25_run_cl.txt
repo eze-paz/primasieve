@@ -1,0 +1,3 @@
+R25-cl EM by depth (4 buckets): 7.5291 bits/word
+R25-cl EM global {'K': np.float64(0.109), 'B': np.float64(0.495), 'Y': np.float64(0.056), 'Z': np.float64(0.025), 'Q': np.float64(0.216), 'V': np.float64(0.013), 'U': np.float64(0.068), 'N2': np.float64(0.017), 'N3': np.float64(0.001)}: 7.3235
+R25-cl EM by orders (16 buckets): 7.2803 bits/word

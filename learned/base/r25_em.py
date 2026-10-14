@@ -1,4 +1,4 @@
-"""R25-cj: exact mixing weights by EM (no 0.1 grid) and richer mixing contexts, from saved per-prediction probabilities.
+"""R25-cl: exact mixing weights by EM (no 0.1 grid) and richer mixing contexts, from saved per-prediction probabilities.
 Components are NAME=file.npz (p, para). Context buckets: Kneser-Ney match depth, optionally x 'previous word seen
 before in this book' (from the bigram copy memory) x 'target-agnostic' features only. Weights fit on paragraphs 0-499,
 reported on 500-999. Run: py -3.12 r25_em.py K=... B=... [--ctx depth|depth_seen|none]"""
@@ -20,5 +20,5 @@ wall = em(X[tr]); W = {}
 for c in np.unique(ctx): m = tr & (ctx == c); W[c] = em(X[m]) if m.sum() > 300 else wall
 p = np.array([X[i] @ W[ctx[i]] for i in np.nonzero(te)[0]])
 for k, nm in enumerate(names): print(f"  alone {nm}: {-np.log2(X[te, k]).mean():.4f}")
-print(f"R25-cj EM global {dict(zip(names, wall.round(3)))}: {-np.log2(X[te] @ wall).mean():.4f}")
-print(f"R25-cj EM by {CTX} ({len(W)} buckets): {-np.log2(p).mean():.4f} bits/word")
+print(f"R25-cl EM global {dict(zip(names, wall.round(3)))}: {-np.log2(X[te] @ wall).mean():.4f}")
+print(f"R25-cl EM by {CTX} ({len(W)} buckets): {-np.log2(p).mean():.4f} bits/word")

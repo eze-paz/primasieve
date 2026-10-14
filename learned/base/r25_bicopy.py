@@ -1,4 +1,4 @@
-"""R25-cj: a context-conditioned copy memory (a book-level bigram cache). The copy memories so far ignore context:
+"""R25-cl: a context-conditioned copy memory (a book-level bigram cache). The copy memories so far ignore context:
 P_copy(w) is the recency-weighted share of w among all earlier words of the book. Here the memory is keyed by the
 previous word: P(w | prev) = weighted count of the pair (prev, w) seen earlier in the book / weighted count of prev
 as a context so far; zero when prev has not been seen as a context (the mixer covers it). Decay per word as before.
@@ -28,5 +28,5 @@ for pi, p in enumerate(g["tep"][:1000]):
             hist.append(w)                                                       # default: pairs run across sentence boundaries inside the book
 np.savez((f"r25_bicopy_{DEC}_probs.npz" if NC == 1 else f"r25_ncopy{NC}_{DEC}_probs.npz"), p=np.array(P), para=np.array(A), seen=np.array(SEEN))
 P = np.array(P); A = np.array(A); te = A >= 500
-print(f"R25-cj bigram copy memory (decay {DEC}): {len(P)} predictions; previous word seen as a context before: {np.mean(np.array(SEEN)[te]):.3f}; "
+print(f"R25-cl bigram copy memory (decay {DEC}): {len(P)} predictions; previous word seen as a context before: {np.mean(np.array(SEEN)[te]):.3f}; "
       f"target has nonzero copy probability: {np.mean(P[te] > 0):.3f}; mean bits where nonzero: {-np.log2(P[te][P[te] > 0]).mean():.3f}", flush=True)

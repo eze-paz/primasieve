@@ -724,3 +724,6 @@ r25_dyneval.py r25_ch.pt: the network reads held-out paragraphs in order, state 
 
 ## R25-cn registration (context-conditioned word choice inside the group)
 The networks give a group, then the word by its unigram share inside the group (about 60% of the bits, R25-bc/bd). r25_ingroup.py replaces that share in B's probabilities by P(w | group, previous word) counted on the training text (interpolated with the share, weight chosen on 0-499) and, as a second variant, also by the held-out text read so far. Alone against B, then in the mix.
+
+## R25-cl result (context-keyed copy memories, exact weights) -- PASS
+EM weights by Kneser-Ney depth, same components as R25-ch: 7.5291 (grid 7.5430). Adding copy memories keyed by the previous 1-3 words, with the bucket also saying which orders have seen their key: **7.2803** (-0.26). Coverage on 500-999: the previous word had been seen before 94% of the time and the target followed it before 50%; the 3-word key fires on 2% of predictions and is then nearly certain (0.58 bits). The book being read is the largest unused source of evidence.
