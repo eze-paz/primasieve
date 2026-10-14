@@ -26,6 +26,13 @@ TIME = {"morning", "evening", "night", "noon", "midnight", "afternoon", "monday"
         "saturday", "sunday", "o'clock", "dawn", "dusk", "week", "day", "year", "month", "spring", "summer", "autumn", "winter", "hour", "minutes"}
 PERSONW = {"man", "woman", "boy", "girl", "mother", "father", "grandmother", "grandfather", "sister", "brother", "aunt", "uncle",
            "teacher", "friend", "baker", "doctor", "king", "queen", "farmer", "child", "children", "wife", "husband", "neighbour", "neighbor"}
+PERSON_WN = set()                                                                                # R25-dj: person words from the dictionary (WordNet noun.person, lexicographer file 18)
+for line in open(os.path.join(os.path.dirname(os.path.dirname(HERE)), "_nldata", "dict", "data.noun"), encoding="utf-8", errors="replace"):
+    if line[:1].isdigit():
+        q_ = line.split()
+        if q_[1] == "18":
+            for k_ in range(int(q_[3], 16)): PERSON_WN.add(q_[4 + 2 * k_].lower())
+if os.environ.get("R25_PERSONWN"): PERSONW = PERSONW | {w for w in PERSON_WN if "_" not in w and uni[w] < 20000}
 def toks(s): return re.findall(r"[A-Za-z][A-Za-z']*|\d+", s)
 EXC = {}
 for f_ in ("verb.exc", "noun.exc", "adj.exc"):

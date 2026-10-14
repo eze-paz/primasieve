@@ -987,3 +987,9 @@ A+B dev 142 right / 88 wrong (what 40 / 39, where 41 / 27). Trust now also keeps
 
 ## R25-di registration (trust also by distance)
 Trust key adds whether the answer's place word lies within 3 words of the matched question words. Same procedure; C+D once. Compared with +23.
+
+## R25-di result
+Trust kept (where, full, near) and (who, full, near); C+D 91 right / 28 wrong, fitness +7. Distance does not separate good from bad where-answers. Best stays R25-df (who only, +23).
+
+## R25-dj registration (person words from the dictionary)
+Who-answers may be any word WordNet files as a person (noun.person; multi-word entries and the very commonest words excluded), not only the hand list of 26. Dev on A+B, trust as R25-di, C+D once. Compared with +23.
