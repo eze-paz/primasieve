@@ -852,3 +852,6 @@ Live counters on the bigger counter: strong 8.9078 alone, per-length **7.9252** 
 
 ## R25-cw registration (self-searched counter on the extra books too)
 r25_discover2.py --all-text --more: the R25-cb shape search over training text plus the 400 new books; replaces Q in the R25-cv mix. Compared with 7.3177.
+
+## R25-cw result
+Self-searched counter with the extra books: alone **8.2096** (8.2933), kept the same shapes; in the mix 7.3189 (R25-cv 7.3177): no further gain. Count-side improvements now mostly overlap inside the mix; the book-scope network (weight about 0.45) carries the rest.
