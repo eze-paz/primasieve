@@ -71,3 +71,28 @@ Audits (cheap, they decide what to build):
 ## Order of work
 Highest expected value first: T01, T03, T32, T30, T08, T06, T11, T12, T18, T29, then the rest. Every result is
 committed when recorded; a failure is recorded with its cause and the next variant registered.
+
+## Status (updated as tests finish; details in R26_prereg.md)
+Reportable numbers: next word **7.1110** bits/word on paragraphs 500-999 (T40; start 7.1524; language model 6.7001); comprehension **+512** on 1,800 untouched questions, 833 right / 107 wrong (T22p; start +288, 519 / 77).
+
+| test | what | result |
+|---|---|---|
+| T01 | RMS dynamic evaluation | FAIL 7.6791 vs 7.6238 |
+| T02 / T02b | SGD with decay back; in the mix | PASS 7.6067 alone |
+| T05, T06, T07 | group copy, topic memory, 4-5 word keys | FAIL |
+| T07b-d | skip / group / dictionary keys | small, superseded by cross-validated selection |
+| T08 | two-word in-group choice | PASS 7.5234 alone |
+| T09 | decay in book counts | FAIL |
+| T11 | evolution over count shapes | found (group, word, word, word); led to T07c |
+| T12 / T12b | learned gate; previous-word features | PASS / FAIL (too little data) |
+| T13, T13b-d | more adapted networks | PASS (W2, W3 kept) |
+| T18 / T18b / T18c | rival veto per route; fallbacks | PASS +344 / no effect / FAIL |
+| T19 | story-adapted rival scores | FAIL |
+| T22-T22p | statement match, extraction fixes, margin choice | PASS: +299 -> +309 -> +463 -> +467 -> +485 -> +497 -> +512 (several FAIL variants) |
+| T24 / T24b / T24c | count, whose, why-because, why/how v2 | PASS +315 / +362 / +486 |
+| T25, T34, T36 | order, what-do, agreement operators | FAIL |
+| T29, T30, T32 | operator audit, leave-one-out, headroom | measurements |
+| T33 | first session's live counters in the gate | test-selected; superseded |
+| T35 / T37 / T38 | slice selection (noisy) / cross-validated selection | T38 PASS 7.1276 |
+| T39 / T39b / T40 | gate fitted on 1,000-2,000 more held-out paragraphs; previous-word features; hidden layer | PASS 7.1163 / 7.1127 / 7.1110 |
+| T41 | in-group on the other adapted networks | running |
