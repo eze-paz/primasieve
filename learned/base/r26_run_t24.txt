@@ -1,0 +1,6 @@
+  COUNT: 11 practice questions; on silent ones practice (4, 4, 0), untouched (6, 9, 1)
+  WHOSE: 10 practice questions; on silent ones practice (2, 2, 0), untouched (0, 6, 2)
+  WHICH: 1 practice questions; on silent ones practice (0, 0, 0), untouched (0, 0, 0)
+  WHY: 17 practice questions; on silent ones practice (-2, 4, 2), untouched (-1, 20, 7)
+  HOW: 9 practice questions; on silent ones practice (-2, 1, 1), untouched (2, 2, 0)
+T24 kept ['COUNT', 'WHOSE']; policy practice (193, 274, 27), untouched (315, 645, 110) (T22c +309, base here (309, 630, 107))

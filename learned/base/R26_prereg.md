@@ -62,3 +62,9 @@ Statement-match answers for silent questions are kept only when no rival candida
 
 ## T22c result -- PASS
 Margins chosen on practice: who 0 (14 / 1), what 1 (16 / 1), where 0 (1 / 0), when never (11 / 3). Policy: practice +187; **untouched +309** (630 right / 107 wrong; T22b +299, readers +288). The rival check turns statement match into a high-precision route for every question word.
+
+## T24 registration (the missing operators: COUNT, WHOSE, WHICH, WHY, HOW)
+r26_ops.py, each answering only when its pattern finds exactly one answer: COUNT 'how many N' -> the number word or digits right before N (or N's singular) in the story; WHOSE 'whose N' -> 'NAME's N' in the story; WHICH 'which N V ...' -> the statement match (T22) with 'which N' read as the subject or object gap and the answer required to end in N or be a name; WHY 'why did X V ...' -> the sentence holding the question's content words, and in it (or the next sentence if it opens with 'because' / 'so') the clause after because / so that / to / since; HOW 'how did X V' -> in that sentence, a 'by ...' or 'with ...' phrase or the -ly adverb. Each is a route for silent questions trusted by its practice fitness. PASS if the untouched policy beats +309 (T22c).
+
+## T24 result -- PASS
+On silent questions (practice / untouched, fitness right wrong): COUNT 4 / 0 and 9 / 1; WHOSE 2 / 0 and 6 / 2; WHICH none; WHY 4 / 2 (-2, not kept) and 20 / 7; HOW 1 / 1 (not kept) and 2 / 0. Kept COUNT and WHOSE. Policy: practice +193; **untouched +315** (645 right / 110 wrong; T22c +309). WHY reaches 20 untouched answers but at 0.74 precision; it needs a check before it pays.
