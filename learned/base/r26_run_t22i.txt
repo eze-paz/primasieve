@@ -1,0 +1,6 @@
+fix margins {'who': 0, 'what': 8}
+fix2 margins {'who': 0, 'what': 8, 'where': 8}
+WHY-because practice on silent: (4, 4, 0)
+policy ['--why-because', '--fix', '--t22h', 'r26_t22i_fix_policy.json']: practice (231, 279, 16), untouched (454, 670, 72)
+WHY-because practice on silent: (4, 4, 0)
+policy ['--why-because', '--fix2', '--t22h', 'r26_t22i_fix2_policy.json']: practice (248, 299, 17), untouched (467, 725, 86)

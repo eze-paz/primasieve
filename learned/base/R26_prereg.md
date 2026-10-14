@@ -260,3 +260,9 @@ Kept by the rule: only KD (live phrase counts, slice 7.2437 -> 7.2425), whose te
 
 ## T38 registration (selection by 5-fold cross-validation on paragraphs 0-499)
 r26_select.py --cv: the gate is fitted on four fifths of paragraphs 0-499 (by paragraph blocks of 100) and scored on the fifth, five times; the mean held-out bits is the selection score. Forward selection from the base set (R25-co components with T02b's B, D) over all candidates (KP, QM, KD, S1, S2, G1, G2, X1, X2, X3, PK, W2, W3, W4, W5, B2), add while the mean falls by 0.001. The chosen set is fitted on 0-399 with early stop on 400-499 (as before) and reported once on 500-999. PASS if below 7.1352.
+
+## T22i registration (margins chosen on both practice pools)
+Per question word, the rival-check margin maximising fitness of statement match on the union of (main practice questions no trusted reader answered) and (all 600 extra practice questions); a word used only if positive. Applied to silent questions in the main policy; fix and fix2 answers. PASS if either beats +463.
+
+## T22i result -- PASS (narrow)
+Margins on both practice pools: fix {who 0, what 8} -> untouched +454 (670 / 72); fix2 {who 0, what 8, where 8} -> **+467 (725 right / 86 wrong)**, practice +248. Best comprehension policy: r26_policy.py --why-because --fix2 --t22h r26_t22i_fix2_policy.json. The larger choice set admits fix2's improved where-answers, which neither practice pool alone chose reliably.
