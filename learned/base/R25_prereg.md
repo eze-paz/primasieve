@@ -1016,3 +1016,9 @@ val_fresh11, scored once (the log line says 'practice C+D' but the set scored wa
 
 ## R25-dn registration (titles do not end sentences)
 A bug fix. val_fresh11 has now been used once and is development data from here; the fix is checked on A+B (dev) and C+D (trust as R25-dd), and a new untouched set is needed for the next clean score.
+
+## R25-dn result (titles fix)
+Practice unchanged (A+B 142 / 88; C+D trusted 91 / 28). val_fresh11 (now development): all kinds 59 / 53 (was 57 / 52), who 13 / 12 (was 11 / 13). Small.
+
+## R25-do registration (the reader on a set it never saw, against the main system on the same questions)
+The reader was developed only on practice A+B, so val_fresh10 is untouched for it; the main system scored val_fresh10 once in R25-as (trusted 50 right / 6 wrong, all routes 67 / 22). The reader's R25-df configuration (who-only trust from A+B) is scored once on val_fresh10, all kinds also reported. Reported as is.
