@@ -27,7 +27,8 @@ def run(names):
     with torch.no_grad(): return best[0], nll(best[1], mt).item()
 import sys
 if "--try" in sys.argv:                                                                        # T13b and later: a fixed set plus candidates, by the slice rule
-    FIXED = ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'G2', 'X1', 'W2']
+    FIXED = ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'G2', 'X1', 'W2', 'W3']
+    P['W3'] = np.clip(np.load('r26_t13c_bq_dyn_probs.npz')['p'], 1e-12, None)
     P['W2'] = np.clip(np.load('r26_t13_dyn_probs.npz')['p'], 1e-12, None)
     for a in sys.argv[sys.argv.index("--try") + 1:]:
         k, f = a.split("="); P[k] = np.clip(np.load(f)["p"], 1e-12, None)

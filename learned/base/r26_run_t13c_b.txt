@@ -1,0 +1,4 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (38 s)
+R25-cm lr (0.3, 0.001, 1.0): paragraphs 0-499 8.3633, 500-999 7.7449 (126 s)
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 7.7449 bits/word
+T-try W3: slice 7.2448 -> 7.2437; kept: True; test 7.1370 -> 7.1352 (reported only if kept)

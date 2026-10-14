@@ -245,3 +245,9 @@ Adding the adapted shuffled-paragraph network: slice 7.2475 -> 7.2448 (kept); **
 
 ## T22h result -- FAIL
 Margins chosen on the 600 extra practice questions: fix {who 0, what 4} -> untouched +444 (639 / 65); fix2 {who 0, what 4, where 2} -> +441 (669 / 76). Both more precise than T22e (715 / 84) but they drop 'when' (negative on the extra practice at every margin) and admit fewer 'what' answers; T22e (+463) stays the best policy.
+
+## T13c(b) result -- PASS (slice rule)
+r25_bq.pt adapted: alone 7.7449; slice 7.2448 -> 7.2437 (kept); **test 7.1370 -> 7.1352**. Fixed set + W3.
+
+## T13d registration (the remaining checkpoints)
+r25_bu.pt (12,000 steps) and r25_cg.pt (24,000 steps) adapted (SGD 0.3, decay 0.001) -> W4, W5; each tried on the fixed set by the slice rule, in that order.
