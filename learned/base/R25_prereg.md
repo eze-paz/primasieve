@@ -895,3 +895,9 @@ Events: see r25_run_cv.txt (374 held-out); 15 verbs with 30+ events. Held-out: n
 
 ## R25-cw-t registration (emergence, iteration 3: yield)
 r25_emerge3.py = R25-cv-t plus: the agent may be he / she / they, resolved to the most recently named person in the same or previous paragraph; one adverb (a word ending in -ly) may stand between agent and verb. Everything else, gate and check unchanged.
+
+## R25-cw-t result -- FAIL (judge too weak)
+Events 9,515 / 1,180 / 1,134 (fit / dev / held-out), 64 verbs. Held-out: no verb 1.1651, classes (K=3) 1.1643, per verb 1.1707 (worse than no verb, so the recovered-share figure is meaningless). Lexicon pairs 14 / 35 (chance). A name stands within 8 words of the thing's next mention only about 6% of the time: narrators refer to the holder by pronoun.
+
+## R25-cx-t registration (emergence, iteration 4: pronouns on the judge side)
+r25_emerge4.py = R25-cw-t, but at the thing's next mention a person is 'referred to' by a name within 8 words or by he / she / him / his / her / they / them / their within 6 words, a pronoun resolved to the most recent name before it (same or previous paragraph). Judge: agent referred to (A) / another person referred to (O) / none (N). Gate and check unchanged.

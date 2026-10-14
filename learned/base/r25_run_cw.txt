@@ -1,15 +1,14 @@
-R25-ar data: 354551 training paragraphs, 21168764 tokens; vocabulary 20000 + unknown (21 s)
-  shape words        : held-out training slice 8.1459 bits/word (152 s)
-  shape words-x      : held-out training slice 8.1605 bits/word (269 s)
-  shape groups-x     : held-out training slice 8.6381 bits/word (380 s)
-  shape dictgroups-x : held-out training slice 8.3796 bits/word (496 s)
-  shape endings-x    : held-out training slice 9.2699 bits/word (598 s)
-  shape dictclass-x  : held-out training slice 8.7689 bits/word (701 s)
-  learner considers adding dictclass-x: 8.0802 (now 8.1459)
-  learner considers adding groups-x: 8.0742 (now 8.0802)
-  learner considers adding words-x: 8.0742 (now 8.0742)
-R25-cb learner's choice: ['words', 'dictclass-x', 'groups-x'] with weights [0.7, 0.2, 0.1] (held-out training slice 8.0742)
-  words on paragraphs 500-999 alone: 8.3095 (805 s)
-  dictclass-x on paragraphs 500-999 alone: 8.5223 (910 s)
-  groups-x on paragraphs 500-999 alone: 8.4295 (1020 s)
-R25-cb self-searched count mixture: paragraphs 500-999 8.2096 bits/word (same-text words across sentences o5mx 8.4035) over 50114 predictions (1020 s)
+R25-cw-t fit: 323 books, 9515 events (23 s)
+R25-cw-t dev: 36 books, 1180 events (25 s)
+R25-cw-t test: 41 books, 1134 events (27 s)
+R25-cw-t 64 verbs with 30+ events
+R25-cw-t K=2: dev 1.1942 bits (prior 1.1895, per verb 1.2004)
+R25-cw-t K=3: dev 1.1876 bits (prior 1.1895, per verb 1.2004)
+R25-cw-t K=4: dev 1.1948 bits (prior 1.1895, per verb 1.2004)
+R25-cw-t K=5: dev 1.1982 bits (prior 1.1895, per verb 1.2004)
+R25-cw-t chosen K=3. Held-out books (1134 events): no verb 1.1651, learned classes 1.1643, per verb 1.1707; classes recover 77519636.3% of the per-verb gain
+  class 0: agent named near the next mention 0.040, 21 verbs: give, leave, know, think, pass, send, lead, go, receive, stand, live, become, write, cross, remember, look, read, speak, spend, strike, continue
+  class 1: agent named near the next mention 0.058, 24 verbs: see, find, put, reach, hear, turn, keep, feel, lay, raise, meet, ask, throw, sit, lift, cry, carry, seize, catch, approach, wear, watch, believe, show
+  class 2: agent named near the next mention 0.085, 19 verbs: take, say, make, enter, call, hold, get, tell, draw, like, bring, shake, come, follow, let, bear, lie, lose, set
+R25-cw-t lexicon check: 14 / 35 acquire x release pairs ordered as the hand lists say (12 in the same class); acquire [('take', 2), ('find', 1), ('catch', 1), ('get', 2), ('receive', 0)], release [('put', 1), ('leave', 0), ('give', 0), ('set', 2), ('lay', 1), ('throw', 1), ('lose', 2)]
+R25-cw-t per-verb agent-near share, acquire: [('take', 0.085), ('find', 0.058), ('catch', 0.119), ('get', 0.095), ('receive', 0.0)]; release: [('put', 0.031), ('leave', 0.056), ('give', 0.059), ('set', 0.097), ('lay', 0.039), ('throw', 0.091), ('lose', 0.062)]
