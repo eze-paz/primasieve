@@ -40,5 +40,5 @@ for a3, m3 in itertools.product((3, 10, 30), (0, 30, 100)):
     P = run(a3, m3); res[(a3, m3)] = P; b = -np.log2(P)
     print(f"  a3 {a3} m3 {m3}: 0-499 {b[PA < 500].mean():.4f}, 500-999 {b[PA >= 500].mean():.4f}", flush=True)
 best = min(res, key=lambda k: -np.log2(res[k][PA < 500]).mean()); P = res[best]
-np.savez("r26_ingroup2_probs.npz", p=P, para=PA)
+np.savez(ARGV[2] if len(ARGV) > 2 else "r26_ingroup2_probs.npz", p=P, para=PA)
 print(f"T08 chosen {best}: 500-999 {-np.log2(P[PA >= 500]).mean():.4f} (R25-co B 7.5306; network alone {-np.log2(PB[PA >= 500]).mean():.4f})", flush=True)

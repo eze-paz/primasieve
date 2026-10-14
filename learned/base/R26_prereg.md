@@ -158,3 +158,9 @@ Story-adapted rival scores (r26_steelman3_scores.json): best candidate right on 
 
 ## T02b registration (the decayed adapted network in the mix)
 r26_ingroup2.py on r26_t02_dyn_probs (two-word in-group choice, grid as T08), then the best gate (T33 set) with this B and D. PASS if the gate falls below 7.1308.
+
+## T07b registration (skip-keyed copy memory)
+Copy memory of the text read so far keyed by the word two back (the previous word skipped), decay 0.9999 and 0.999; added to the best gate (T33 set). PASS if the gate falls below 7.1308.
+
+## T07b result -- PASS (small)
+Skip key (word two back) seen before 90% of the time; target found 36%. Gate with both skip memories: **7.1289** (T33 7.1308). New best.
