@@ -76,7 +76,7 @@ def answer(story, q):
             while k < len(ws) and ws[k] in DET: k += 1
             j = k
             while j + 1 < len(ws) and ws[j + 1] not in COMMON and ws[j + 1] not in PLACE: j += 1
-            if k < len(ws) and ws[k] not in COMMON: return " ".join(ws[i + 1:j + 1])
+            if k < len(ws) and ws[k] not in COMMON and ws[k] not in TIME: return " ".join(ws[i + 1:extend_of(ws, j) + 1])
         return None
     if wh == "when":
         c = [i for i, w in enumerate(ws) if w in TIME or w.isdigit()]
@@ -95,11 +95,19 @@ def answer(story, q):
             if k - 1 >= 0 and ws[k - 1] in DET: k -= 1
             return " ".join(ws[k:j + 1]) if j >= 0 and ws[j] not in COMMON else None
         h = max(hits); k = h + 1
-        while k < len(ws) and ws[k] in DET | PLACE | {"with", "for", "of"}: k += 1
+        while k < len(ws) and (ws[k] in COMMON or stem(ws[k]) in qst): k += 1
         j = k
         while j + 1 < len(ws) and ws[j + 1] not in COMMON and ws[j + 1] not in PLACE: j += 1
-        if k < len(ws) and ws[k] not in COMMON: return " ".join(ws[(k - 1) if ws[k - 1] in DET else k:j + 1])
+        if k < len(ws): j = extend_of(ws, j); return " ".join(ws[(k - 1) if ws[k - 1] in DET else k:j + 1])
     return None
+def extend_of(ws, j):                                                                        # R25-dh: 'a jar' -> 'a jar of honey'
+    if j + 2 < len(ws) and ws[j + 1] == "of":
+        k = j + 2
+        while k < len(ws) and ws[k] in DET: k += 1
+        e = k
+        while e + 1 < len(ws) and ws[e + 1] not in COMMON and ws[e + 1] not in PLACE: e += 1
+        if k < len(ws) and ws[k] not in COMMON: return e
+    return j
 def norm(s): return " ".join(re.findall(r"[a-z0-9']+", s.lower()))
 tot = collections.Counter(); per = collections.defaultdict(collections.Counter); shown = 0
 for f in FILES:

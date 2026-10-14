@@ -975,3 +975,9 @@ When a question names someone (capitalised words), only sentences containing all
 A+B dev: 135 right / 82 wrong (was 143 / 83). Trust kept (who, full cover). C+D once: **62 right, 13 wrong** (precision 0.827); trust fitness (+1 / -3) 62 - 39 = +23, against R25-dc's 68 - 54 = +14.
 
 ## R25-dg (analysis, no score): list the where- and what- mistakes on A+B with their chosen sentence, to design the next reader change.
+
+## R25-dg analysis (45 where/what mistakes on A+B)
+Three patterns: noun phrases cut before 'of' ('a jar' for 'a jar of honey'; 'a bundle', 'a slice', 'the edge'); 'what' answers returning the question's own verb ('packed', 'flew', 'loved', 'opened'); 'where' answers picking a day word ('thursday', 'tuesday') or the wrong sentence.
+
+## R25-dh registration (fix the three patterns)
+Noun phrases extend through 'of' + noun phrase; 'what' answers skip every common word and every form of a question word after the match; 'where' answers never start with a time word. Dev on A+B, trust as R25-dd (with the R25-df name rule), C+D once. Compared with R25-df (+23 trust fitness on C+D).
