@@ -709,3 +709,9 @@ r25_kndyn.py: phrase counts (1-5 words) of the held-out text read so far pull th
 
 ## R25-ci stopped (owner: rapid deterministic iteration, no long gradient training)
 The wider-state run was stopped before scoring; no result. From here components are count-based or closed-form; the trained networks stay as fixed mixing components.
+
+## R25-cj result (live phrase counting) -- PASS in the mix
+Alone it is worse than static (8.9794 vs 8.3580; beta chose the top of its range, 16, so the counts of the text read so far over-ride the static model too strongly), but replacing K with it in the mix: by depth **7.3701** (7.5430): -0.17 bits/word, a large gain from a component that builds in seconds. Past text only; weights chosen on 0-499.
+
+## R25-ck registration (live counting, wider beta range, kept alongside the static counter)
+beta from {16, 32, 64, 128, 256, 512}; then the mix with K = static o5mxa and the live counter as an extra component N. Compared with 7.3701.
