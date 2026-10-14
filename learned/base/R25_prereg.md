@@ -786,3 +786,9 @@ t1, t2 and the route trust are chosen on the 710 practice questions only (positi
 
 ## R25-cr registration (dictionary and thesaurus lookup for unknown words, in the moment)
 r25_kn2.py --lookup: when a word outside the counter's 65,534-word list appears in the context being read, it is looked up at that moment in WordNet: first its base form (irregular forms and suffix rules; 'gallopings' -> 'galloping'), then its synonyms, then its broader words (hypernyms); the most frequent known candidate stands in for it in the context of the following predictions. Targets are unchanged. Best counter configuration (o5mxa). Alone against o5mxa (8.3580), then in the R25-co mix in place of S. Compared with 7.3418.
+
+## R25-cp result -- FAIL
+Practice chose to switch both steps off (t1 = t2 = never): untouched fitness unchanged, +288 (519 right / 77 wrong). Correction: the untouched sets are 1,800 questions (nine sets), not 1,600. The model's best candidate was right on 19% of untouched questions. Practice-only diagnosis: the score rewards candidates that are themselves phrases copied from the story ('osip helped her mend' for 'What did Nadia keep?'), not candidates that fit the question; on practice the right candidate was first 125 times out of 710, and not in the top ten 265 times.
+
+## R25-cp2 registration (score what the candidate adds to the question, not its own copyability)
+Same candidates, statements, network and copy memories, both conditions read the story and the question first. Score = bits(candidate alone) - bits(statement) + bits(question words alone): how much likelier the question's own words become once the candidate is placed among them (the candidate's own probability cancels). Same thresholds grid, chosen on the same 710 practice questions; reported once on the 1,800 untouched. PASS if untouched fitness rises above +288.
