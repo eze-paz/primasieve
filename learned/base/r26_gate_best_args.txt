@@ -1,0 +1,1 @@
+B=r26_t02_ingroup2_probs.npz D=r26_t02_dyn_probs.npz KP=r25_kndyn_perlen_more_probs.npz QM=r25_discover2am_probs.npz S1=r26_skipcopy_0.9999_probs.npz S2=r26_skipcopy_0.999_probs.npz G1=r26_grpcopy_0.9999_probs.npz G2=r26_grpcopy_0.999_probs.npz

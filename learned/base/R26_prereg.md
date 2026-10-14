@@ -164,3 +164,12 @@ Copy memory of the text read so far keyed by the word two back (the previous wor
 
 ## T07b result -- PASS (small)
 Skip key (word two back) seen before 90% of the time; target found 36%. Gate with both skip memories: **7.1289** (T33 7.1308). New best.
+
+## T07c registration (group-keyed copy memory)
+Copy memory of the text read so far keyed by the previous word's learned group (r25_classes.json), decay 0.9999 and 0.999; added to the best gate (T07b set). PASS if the gate falls below 7.1289.
+
+## T07c result -- PASS
+Group-keyed copy (key seen always; target found 58.5%; 5.16 bits where nonzero at 0.9999): gate **7.1226** (T07b 7.1289). New best. The idea came from the evolutionary search (T11), which kept the previous word as its group.
+
+## T02b result -- PASS
+Two-word in-group choice on the decayed adapted network: alone **7.5063** (T08 7.5234). Gate with it as B and the decayed network as D: **7.1199** (T07c 7.1226). New best; gap to the language model 0.42. Best gate components listed in r26_gate_best_args.txt.
