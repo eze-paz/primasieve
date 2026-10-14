@@ -837,3 +837,6 @@ Removing the 15 test-half paragraphs where it scores under 3 bits/word: language
 
 ## R25-cu measurement (where the language model's lead comes from; 500-999)
 By word frequency: the 100 commonest words (55% of words) give 30% of the gap (4.66 vs 5.01 bits); words seen 100-999 times 23% (10.65 vs 11.81); rarer than 100: 23% (12.88 vs 15.08); 1,000-9,999: 20%; the rest 5%. Words already used earlier in the text: 84% of the gap (6.15 vs 6.73). The lead is spread evenly -- no single word kind to target; it is broad context understanding, strongest on rare words.
+
+## R25-cv registration (more books for the fast counter; owner's OK 2026-10-14)
+r25_fetch_more.py fetches about 400 more English public-domain books with the project's existing polite fetcher into a separate folder (_nldata/gutenberg_more), so the training / held-out split and all test sets are unchanged. Then the fast Kneser-Ney counter (o5mxa, the 26-second family) is rebuilt on the 21M training tokens plus the new books, scored on the same 50,114 predictions; alone against o5mxa (8.3580), and in the R25-co mix as K-static and in a live counter built on it. Compared with 7.3418 and the language model's 6.7001.
