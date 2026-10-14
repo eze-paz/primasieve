@@ -1,0 +1,20 @@
+﻿R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (23 s)
+  W scored (17 s)
+  G scored (30 s)
+  X scored (46 s)
+R25-ap counts built: 199531 training paragraphs, 5276 held-out paragraphs (144 s)
+  C scored (191 s)
+R25-bp alone X: 8.3084
+R25-bp alone C: 8.4211
+R25-bp alone K: 8.3580
+R25-bp alone B: 8.0096
+R25-bp alone Y: 16.0908
+R25-bp alone Z: 12.0227
+R25-bp alone Q: 8.2933
+R25-bp one global blend {'X': np.float64(0.0), 'C': np.float64(0.0), 'K': np.float64(0.1), 'B': np.float64(0.5), 'Y': np.float64(0.1), 'Z': np.float64(0.1), 'Q': np.float64(0.2)}: 7.5475 bits/word
+  depth 0: {'X': np.float64(0.0), 'C': np.float64(0.0), 'K': np.float64(0.1), 'B': np.float64(0.5), 'Y': np.float64(0.1), 'Z': np.float64(0.1), 'Q': np.float64(0.2)} (0 test predictions)
+  depth 1: {'X': np.float64(0.1), 'C': np.float64(0.0), 'K': np.float64(0.0), 'B': np.float64(0.5), 'Y': np.float64(0.1), 'Z': np.float64(0.1), 'Q': np.float64(0.2)} (1816 test predictions)
+  depth 2: {'X': np.float64(0.1), 'C': np.float64(0.0), 'K': np.float64(0.1), 'B': np.float64(0.5), 'Y': np.float64(0.1), 'Z': np.float64(0.0), 'Q': np.float64(0.2)} (4361 test predictions)
+  depth 3: {'X': np.float64(0.0), 'C': np.float64(0.0), 'K': np.float64(0.1), 'B': np.float64(0.4), 'Y': np.float64(0.1), 'Z': np.float64(0.1), 'Q': np.float64(0.3)} (3775 test predictions)
+  depth 4: {'X': np.float64(0.0), 'C': np.float64(0.0), 'K': np.float64(0.3), 'B': np.float64(0.4), 'Y': np.float64(0.1), 'Z': np.float64(0.1), 'Q': np.float64(0.1)} (1860 test predictions)
+R25-bp context mixing (weights by Kneser-Ney depth): 7.5430 bits/word

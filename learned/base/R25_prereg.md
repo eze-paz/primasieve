@@ -697,3 +697,9 @@ All 1,000 paragraphs **8.3189** (12,000 steps 8.3708); alone on 500-999 8.0246 (
 
 ## R25-ch registration (12,000 more steps: 36,000 in all)
 Same procedure from r25_cg.pt, saved as r25_ch, then the same mix. Compared with 8.3189 alone and 7.5509 mixed.
+
+## R25-ch result (36,000 steps)
+All 1,000 paragraphs **8.2963** (24,000: 8.3189); alone on 500-999 8.0096; mix **7.5430** (7.5509). Gains per 12,000 steps are shrinking (-0.08, -0.05, -0.02): the capacity limit diagnosed in R25-ba again.
+
+## R25-ci registration (wider running state in the best configuration)
+Book scope, learned x dictionary groups, group output, state 256 wide projected to 128 (--hidden 256), 6,000 steps from scratch, saved as r25_ci. Compared at equal steps with R25-bl (128 wide, 8.4507), time reported.
