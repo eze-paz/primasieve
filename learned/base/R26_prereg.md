@@ -230,3 +230,12 @@ Extra practice: val_practice_c + val_practice_d (written earlier, never in the 2
 
 ## T09 result -- FAIL
 Book-count decay (0-499 / 500-999): none 8.0733 / 7.5063; 0.9995 8.0836 / 7.5027; 0.998 8.0997 / 7.5140. Chosen on 0-499: no decay (= T02b). Fading the book's own pair counts does not help on the choice half.
+
+## T35 result -- FAIL against the registered bar, and the honest next-word number
+Forward selection on the 400-499 slice from the base set (R25-co components with T02b's B, D; slice 7.2556): + G2 (group-keyed copy 0.999) 7.2487, + X1 (dictionary-split-group key) 7.2475; the next best (X3) gained 0.0009 < 0.001, stop. KP, QM, S1, S2, evolved shapes and B2 never helped the slice. **Test 500-999: 7.1397.** The registered bar (7.1199) came from gate additions accepted on the test half since T07b; 7.1397 is the reportable next-word result of R26 (R25-co 7.1524; language model 6.7001; gap 0.44). Earlier test-selected numbers (7.1199-7.1308) are optimistic and are not claimed.
+
+## T13b registration (second adapted network, by the slice rule)
+r26_select.py --fixed (the T35 set) --try T13: the T35 set with and without r26_t13_dyn_probs as an extra component; kept if the slice falls by 0.001. Test reported once.
+
+## T13b result -- PASS (slice rule)
+Adding the adapted shuffled-paragraph network: slice 7.2475 -> 7.2448 (kept); **test 7.1397 -> 7.1370**. Two differently trained networks, both adapted while reading, complement each other. Fixed gate set now = T35 set + W2.

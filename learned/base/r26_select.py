@@ -25,6 +25,15 @@ def run(names):
             with torch.no_grad(): v = nll(W, mv).item()
             if v < best[0]: best = (v, W.detach().clone())
     with torch.no_grad(): return best[0], nll(best[1], mt).item()
+import sys
+if "--try" in sys.argv:                                                                        # T13b and later: a fixed set plus candidates, by the slice rule
+    FIXED = ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'G2', 'X1', 'W2']
+    P['W2'] = np.clip(np.load('r26_t13_dyn_probs.npz')['p'], 1e-12, None)
+    for a in sys.argv[sys.argv.index("--try") + 1:]:
+        k, f = a.split("="); P[k] = np.clip(np.load(f)["p"], 1e-12, None)
+        v0, t0_ = run(FIXED); v1, t1_ = run(FIXED + [k])
+        print(f"T-try {k}: slice {v0:.4f} -> {v1:.4f}; kept: {v0 - v1 >= 0.001}; test {t0_:.4f} -> {t1_:.4f} (reported only if kept)", flush=True)
+    sys.exit(0)
 t0 = time.time(); chosen = list(BASE); cur, _ = run(chosen); print(f"T35 base set: slice {cur:.4f} ({time.time() - t0:.0f} s)", flush=True)
 left = list(CAND)
 while left and time.time() - t0 < 1500:
