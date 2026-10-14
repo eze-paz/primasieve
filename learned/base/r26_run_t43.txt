@@ -1,0 +1,11 @@
+== range1 00:01:48
+  beta (4096.0, 256.0, 16.0, 1.0): paragraphs 0-499 8.0963
+R25-cj live phrase counting (beta (4096.0, 512.0, 64.0, 8.0)): paragraphs 500-999 7.8389 bits/word (static o5mxa 7.8958) (9 s)
+== range2 00:04:25
+  beta (4096.0, 256.0, 16.0, 1.0): paragraphs 0-499 7.7830
+R25-cj live phrase counting (beta (1024.0, 256.0, 64.0, 16.0)): paragraphs 500-999 8.5482 bits/word (static o5mxa 8.5649) (9 s)
+r26_range1/r25_kndyn_perlen_more_probs.npz
+r26_range2/r25_kndyn_perlen_more_probs.npz
+main (50114, 18) ranges ['r26_range1', 'r26_range2'] (118881, 18) previous-word features
+T39 fit on 0-399 only: early-stop slice 7.2412, paragraphs 500-999 7.1301
+T39 fit on 0-399 + ['r26_range1', 'r26_range2']: early-stop slice 7.2190, paragraphs 500-999 7.1022

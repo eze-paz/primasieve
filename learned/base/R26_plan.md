@@ -73,7 +73,7 @@ Highest expected value first: T01, T03, T32, T30, T08, T06, T11, T12, T18, T29, 
 committed when recorded; a failure is recorded with its cause and the next variant registered.
 
 ## Status (updated as tests finish; details in R26_prereg.md)
-Reportable numbers: next word **7.1090** bits/word on paragraphs 500-999 (T41; start 7.1524; language model 6.7001); comprehension **+512** on 1,800 untouched questions, 833 right / 107 wrong (T22p; start +288, 519 / 77).
+Reportable numbers: next word **7.1022** bits/word on paragraphs 500-999 (T43; start 7.1524; language model 6.7001); comprehension **+512** on 1,800 untouched questions, 833 right / 107 wrong (T22p; start +288, 519 / 77).
 
 | test | what | result |
 |---|---|---|
@@ -96,3 +96,5 @@ Reportable numbers: next word **7.1090** bits/word on paragraphs 500-999 (T41; s
 | T35 / T37 / T38 | slice selection (noisy) / cross-validated selection | T38 PASS 7.1276 |
 | T39 / T39b / T40 | gate fitted on 1,000-2,000 more held-out paragraphs; previous-word features; hidden layer | PASS 7.1163 / 7.1127 / 7.1110 |
 | T41 | in-group on the other adapted networks | PASS 7.1090 |
+| T42 | more adapted networks | FAIL 7.1149 |
+| T43 | larger-text live counter on all ranges | PASS 7.1022 |

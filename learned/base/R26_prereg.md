@@ -350,3 +350,9 @@ r25_bu.pt and r25_cg.pt adapted (SGD 0.3, decay 0.001) and given two-word in-gro
 
 ## T42 result -- FAIL
 W4 / W5 adapted (main range 7.6656 / 7.6182 alone) with in-group (7.5652 / 7.5178). Gate with 21 components: slice 7.2182, test **7.1149** (T41 7.1090): more components of the same kind make the gate worse.
+
+## T43 registration (the first session's live counter on the larger text, on all ranges)
+r25_kndyn.py --perlen --more (unchanged; the first session's R25 component KP, 7.9252 alone on the main range) rebuilt on ranges 1 and 2 with the range switch; the T41 gate with KP added. PASS if the test falls below 7.1090.
+
+## T43 result -- PASS
+Live per-length counts on the larger text (r25_kndyn.py --perlen --more) on range 1: 7.8389 alone (static 7.8958), range 2: 8.5482 (8.5649). T41 gate + KP: slice 7.2190, **test 7.1022** (T41 7.1090). Best next-word result; gap to the language model 0.40.
