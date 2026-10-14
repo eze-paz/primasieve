@@ -1,0 +1,6 @@
+R25-cp trust routes chosen on practice: ['agree', 'agree+role', 'agree+soft', 'agree+soft+role', 'cue-alone-loose+role', 'cue-alone-loose+soft', 'cue-alone-loose+soft+role', 'cue-alone-strict+role', 'cue-alone-strict+soft+role', 'learned-alone-exact+soft', 'learned-alone-exact+soft+role', 'learned-alone-noword+role', 'learned-alone-noword+soft', 'learned-alone-noword+soft+role', 'role-alone+soft', 'state-agree']
+R25-cp baseline (trust only): practice (160, 226, 22), untouched (288, 519, 77)  (fitness, right, wrong)
+R25-cp verifier t1 = 4 (practice): practice (164, 206, 14), untouched (291, 459, 56)
+R25-cp answerer t2 = 6 (practice): practice (160, 226, 22), untouched (288, 519, 77)
+R25-cp both: practice (164, 206, 14), untouched (291, 459, 56)
+R25-cp diagnostic, untouched: questions with a statement 1669 of 1800; best candidate right 634 (0.380)

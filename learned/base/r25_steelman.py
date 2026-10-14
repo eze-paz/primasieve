@@ -138,8 +138,8 @@ def phase2():
                 rival = max((s for x, s in c if x != " ".join(words_of(r["ans"])) and not hit(x, [" ".join(words_of(r["ans"]))]) and not hit(r["ans"], [x])), default=None)
                 if mine is not None and rival is not None and rival - mine > t1: return None
             return r["ans"]
-        if use_a and len(c) >= 2 and c[0][1] - c[1][1] > t2 and c[0][1] > 0: return c[0][0]
-        if use_a and len(c) == 1 and c[0][1] > t2: return c[0][0]
+        if use_a and len(c) >= 2 and c[0][1] - c[1][1] > t2: return c[0][0]
+        if use_a and len(c) == 1 and t2 == 0: return c[0][0]
         return None
     def fit(idx, *a):
         R_ = W_ = 0
