@@ -846,3 +846,9 @@ r25_fetch_more.py fetches about 400 more English public-domain books with the pr
 
 ## R25-cs-t result (combining operators over full distributions) -- PASS (square root)
 Same nine components (Kneser-Ney, static and adapted network, six book memories), one global set of weights per operator fit on 600 predictions of 0-499, normalised over the whole vocabulary, scored on all 11,812 predictions of 500-999: linear **7.3236**; square root (power 0.5) **7.2892** (-0.034); power 0.25 7.3277; geometric / log-linear 7.3884 (worst). The square-root mix was also best on the fitting sample (7.5303 vs linear 7.5488). Reading: a mild move toward multiplying beats adding, but going fully multiplicative over-trusts confident components. Not comparable with 7.1524: this run lacks the self-searched counts, the in-group choice and the per-bucket weights (those components do not yet give full distributions). Cost: fitting took 48 min (four operators); scoring 500 paragraphs about 4 min.
+
+## R25-cv mix result -- PASS
+Live counters on the bigger counter: strong 8.9078 alone, per-length **7.9252** alone (was 8.0052). Mix (EM, depth x book match): **7.3177** (7.3418). Language model 6.7001: gap now 0.62.
+
+## R25-cw registration (self-searched counter on the extra books too)
+r25_discover2.py --all-text --more: the R25-cb shape search over training text plus the 400 new books; replaces Q in the R25-cv mix. Compared with 7.3177.
