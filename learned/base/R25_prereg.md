@@ -999,3 +999,9 @@ Dictionary person words widen who-answers too far (A+B who 66 right / 43 wrong);
 
 ## R25-dk registration (dictionary persons only after a determiner)
 A dictionary person word counts as a who-candidate only right after a determiner ('the pharmacist', 'her grandmother'); names and the hand list as before. Same procedure; C+D once; compared with +23.
+
+## R25-dk result -- FAIL
+Determiner-restricted dictionary persons: A+B who 63 / 40; trust drops 'who'; C+D 29 / 15. Dictionary person words are not adopted; the reader stays at R25-df (who-only trust, C+D 62 / 13, fitness +23).
+
+## R25-dl registration (a fresh untouched question set for the reader)
+A separate writer agent (barred from tests/ and b6_ files, neutral brief that names no reader or question kind to favour) writes val_fresh11.json: 40 new short stories, 5 questions each, gold answers as text spans from the story, in the practice-set format. Then, once: the R25-df reader with its A+B trust on val_fresh11, reported right / wrong / silent.
