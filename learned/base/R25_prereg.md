@@ -831,3 +831,9 @@ RWKV-7 0.4B, state carried through the 1,000 held-out paragraphs, same text and 
 
 ## R25-cr2-t result -- FAIL
 Normalised per type, the typed memory is now slightly better alone than the single power law (8.606 vs 8.622 bits where nonzero), but in the R25-co mix it adds nothing: 7.1527 (gate 7.1495; R25-co 7.1524). Reading: word types do recur on different curves (rarer words return more slowly, with heavier tails), but the mix's fast and slow exponential memories already cover that range of shapes.
+
+## R25-ct result (is the language model's lead memory of these books?) -- no
+Removing the 15 test-half paragraphs where it scores under 3 bits/word: language model 6.7208, our mix 7.3571 -- the gap stays 0.64. Its lead is general skill, not recall of these passages.
+
+## R25-cu measurement (where the language model's lead comes from; 500-999)
+By word frequency: the 100 commonest words (55% of words) give 30% of the gap (4.66 vs 5.01 bits); words seen 100-999 times 23% (10.65 vs 11.81); rarer than 100: 23% (12.88 vs 15.08); 1,000-9,999: 20%; the rest 5%. Words already used earlier in the text: 84% of the gap (6.15 vs 6.73). The lead is spread evenly -- no single word kind to target; it is broad context understanding, strongest on rare words.

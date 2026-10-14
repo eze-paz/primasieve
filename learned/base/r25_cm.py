@@ -55,3 +55,5 @@ if os.environ.get("R25_EM"):                                                    
         return w
     wem = {d: em(tr & (deep == d)) if (tr & (deep == d)).sum() > 200 else em(tr) for d in range(int(deep.max()) + 1)}
     print(f"R25-cm EM weights by depth: {bits(lambda i: wem[int(deep[i])]):.4f} bits/word; depth 3 weights {dict(zip(names, np.round(wem[3], 3)))}", flush=True)
+if os.environ.get("R25_SAVE") and os.environ.get("R25_EM"):                                   # save the EM mix (overwrites the grid save above)
+    alli = np.arange(len(para)); np.savez(os.environ["R25_SAVE"], p=np.array([X[i] @ wem[int(deep[i])] for i in alli]), idx=alli, para=para)
