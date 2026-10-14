@@ -706,3 +706,6 @@ Book scope, learned x dictionary groups, group output, state 256 wide projected 
 
 ## R25-cj registration (count the text as you read it)
 r25_kndyn.py: phrase counts (1-5 words) of the held-out text read so far pull the static o5mxa probability toward the book's own phrases, p <- (count(context, w) + beta p) / (count(context) + beta) for each context length seen before; past text only; beta chosen on paragraphs 0-499. Alone on 500-999 against static o5mxa (8.3580), then in the R25-ch mix as K. Compared with 7.5430.
+
+## R25-ci stopped (owner: rapid deterministic iteration, no long gradient training)
+The wider-state run was stopped before scoring; no result. From here components are count-based or closed-form; the trained networks stay as fixed mixing components.
