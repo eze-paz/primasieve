@@ -1,0 +1,14 @@
+operator           silent right wrong  total
+ROLE-who              111   109     5    225
+ROLE-what             113    62     7    182
+ROLE-where             85    39     3    127
+ROLE-when              40     4     2     46
+ORDER                  21     6     3     30
+WHAT-DO (action)       21     2     2     25
+END-STATE              17     2     0     19
+WHY                    17     0     0     17
+COUNT                  13     0     0     13
+WHOSE/WHICH            11     0     0     11
+HOW                     9     0     0      9
+NEGATION                3     2     0      5
+YESNO                   1     0     0      1

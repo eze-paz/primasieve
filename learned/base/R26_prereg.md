@@ -21,3 +21,29 @@ Same gate plus features of the previous word: its frequency band (6 bands), its 
 
 ## T12b result -- FAIL
 With previous-word features: fit 7.5044 (better), early-stop slice 7.2514, test **7.1487** (T12 7.1449). The gate's training set (about 12,000 predictions in paragraphs 0-399) is too small for 140 more features per component; the extra features fit noise.
+
+## T08 registration (in-group choice by the two previous words)
+r26_ingroup2.py on the adapted network (r25_dyn_probs): q2 = the R25-co in-group estimate by the previous word (a 10, m 100: training + 100 x book pair counts); q3(w | g, prev2, prev1) = (c3(prev2, prev1, w) + a3 q2) / (c3_g(prev2, prev1) + a3), c3 = training triples + m3 x book triples read so far. (a3, m3) from {3, 10, 30} x {0, 30, 100} chosen on 0-499. Alone against 7.5306 (R25-co's B), then as B in the R25-co mix (bucketed EM). PASS if the mix is below 7.1524.
+
+## T29 registration (operator-sufficiency audit, practice only; measurement)
+Every practice question (710) labelled by the operator its form needs (by its wording): ORDER (after / before / first / last / then), END-STATE (at the end / finally / now), COUNT (how many / how much), YESNO (did / was / is / does ... ?), WHY, HOW, WHOSE / WHICH, NEGATION (not / never / no one), plain role (who / what / where / when). Counted: right, wrong, silent under the trusted reader policy. Operators with many silent or wrong questions are built first.
+
+## T29 result (operator audit, practice 710, trusted policy)
+| operator needed | silent | right | wrong |
+|---|---|---|---|
+| plain who | 111 | 109 | 5 |
+| plain what | 113 | 62 | 7 |
+| plain where | 85 | 39 | 3 |
+| plain when | 40 | 4 | 2 |
+| ORDER | 21 | 6 | 3 |
+| WHAT-DO (action) | 21 | 2 | 2 |
+| END-STATE | 17 | 2 | 0 |
+| WHY | 17 | 0 | 0 |
+| COUNT | 13 | 0 | 0 |
+| WHOSE / WHICH | 11 | 0 | 0 |
+| HOW | 9 | 0 | 0 |
+| NEGATION | 3 | 2 | 0 |
+Reading: 349 of the 476 silent questions are plain role questions -- reach, not missing operators, is the main loss; WHY, COUNT, WHOSE / WHICH and HOW have no working operator at all (50 questions, 0 answered). Order of comprehension work: T22 (statement match for plain roles), then COUNT, WHOSE / WHICH, WHY operators.
+
+## T22 registration (wh-to-statement match)
+r26_stmatch.py: the question is rewritten to the statement it presupposes with a gap (who V X -> '_ V X'; what did S V -> 'S V _'; where did S V X -> 'S V X (prep) _'; when ... -> time phrase), verbs compared by base form (dictionary), determiners and auxiliaries dropped; the gap is filled with the story span (1-5 words) found in the story sentence that contains all the statement's content words in order (allowing up to 2 extra words between them); answers only when exactly one sentence matches. As a route for silent questions, trusted only if its practice fitness is positive. PASS if the untouched policy beats +288.
