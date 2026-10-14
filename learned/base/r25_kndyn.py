@@ -8,7 +8,7 @@ Run: py -3.12 r25_kndyn.py"""
 import os, sys, math, time, collections
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
-ARGV0 = list(sys.argv); sys.argv = ["r25_kn2.py", "--order", "5", "--mkn", "--cross", "--all-text"]
+ARGV0 = list(sys.argv); sys.argv = ["r25_kn2.py", "--order", "5", "--mkn", "--cross", "--all-text"] + (["--more"] if "--more" in ARGV0 else [])
 src = open("r25_kn2.py", encoding="utf-8").read(); src = src[:src.index("P, A, Dp = [], [], []")]
 K = {"__name__": "r25_kn2_defs", "__file__": os.path.join(HERE, "r25_kn2.py")}; exec(compile(src, "r25_kn2.py", "exec"), K)
 prob, wid, RARE, rare_share, NMAX, tep = K["prob"], K["wid"], K["RARE"], K["rare_share"], K["NMAX"], K["g"]["tep"][:1000]
@@ -48,5 +48,5 @@ for beta in BETAS:
     P = run(beta); b = -np.log2(P[tr]).mean(); print(f"  beta {beta}: paragraphs 0-499 {b:.4f}", flush=True)
     if best is None or b < best[0]: best = (b, beta, P)
 _, beta, P = best; stat = np.array([r[2] for r in rows])
-np.savez("r25_kndyn_perlen_probs.npz" if "--perlen" in ARGV0 else "r25_kndyn_wide_probs.npz" if "--wide" in ARGV0 else "r25_kndyn_probs.npz", p=P, para=para, deep=np.array([r[3] for r in rows]), bml=np.array(BML))
+np.savez(("r25_kndyn_perlen" if "--perlen" in ARGV0 else "r25_kndyn_wide" if "--wide" in ARGV0 else "r25_kndyn") + ("_more" if "--more" in ARGV0 else "") + "_probs.npz", p=P, para=para, deep=np.array([r[3] for r in rows]), bml=np.array(BML))
 print(f"R25-cj live phrase counting (beta {beta}): paragraphs 500-999 {-np.log2(P[te]).mean():.4f} bits/word (static o5mxa {-np.log2(stat[te]).mean():.4f}) ({time.time() - t0:.0f} s)", flush=True)

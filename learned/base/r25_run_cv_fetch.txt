@@ -1,0 +1,421 @@
+  skip 2002: HTTPError
+  skip 1873: HTTPError
+  skip 2305: HTTPError
+  skip 1948: HTTPError
+  skip 402: HTTPError
+  skip 2194: HTTPError
+  skip 917: HTTPError
+  skip 561: HTTPError
+   401    2581    151863 words  The Origins of Contemporary France, Volume 5 (of 6)
+   402    2582    106707 words  The Origins of Contemporary France, Volume 6 (of 6)
+   403    2167     56632 words  The Miscellaneous Writings and Speeches of Lord Macaulay, Vo
+   404    2168    141292 words  The Miscellaneous Writings and Speeches of Lord Macaulay, Vo
+   405    2169     67381 words  The Miscellaneous Writings and Speeches of Lord Macaulay, Vo
+   406    2170    194829 words  The Miscellaneous Writings and Speeches of Lord Macaulay, Vo
+   407     206    139128 words  The Martin Luther King, Jr. Day, 1995, Memorial Issue
+   408     258     61185 words  Poems
+   409     275     14476 words  The Confession of Faith
+   410     287     80755 words  Remember the Alamo
+   411     292     85297 words  Beauty and The Beast, and Tales From Home
+   412     307     33624 words  Three Elephant Power
+   413     323     56543 words  Verses 1889-1896
+   414     368     43825 words  Acres of Diamonds
+   415      66     31111 words  The Dawn of Amateur Radio in the U.K. and Greece
+   416      67     77048 words  The Black Experience in America
+   417     234     48826 words  Child Christopher
+   418     259     18962 words  Ballads of a Cheechako
+   419     305    113439 words  The Count's Millions
+   420     311     30470 words  Bunner Sisters
+   421     313     12841 words  The Children of the Night
+   422     332     55117 words  The Burial of the Guns
+   423     356     39470 words  Beyond the City
+   424     547    117754 words  Baron Trigault's Vengeance
+   425     208     21334 words  Daisy Miller
+   426     214     28756 words  In the Days When the World Was Wide and Other Verses
+   427     261     13154 words  A Dome of Many-Coloured Glass
+   428     265     18139 words  The Life and Death of Cormac the Skald
+   429     270     38075 words  Dream Days
+   430     350     98817 words  Fanny Herself
+   431     629     12679 words  The Square Root of 5
+   432     630     12679 words  The Square Root of 6
+   433     631     12679 words  The Square Root of 7
+   434     635     12679 words  The Square Root of 10
+   435     260    110356 words  Introduction to Robert Browning
+   436     336     39733 words  Indian Heroes and Great Chieftains
+   437     337     54722 words  Indian Boyhood
+   438     338     18128 words  Old Indian Legends
+   439     339     48483 words  Old Indian Days
+   440     340     17163 words  The Soul of the Indian
+   441     347     70630 words  Grettir The Strong
+   442     348     90214 words  Hesiod, The Homeric Hymns, and Homerica
+   443     353     28980 words  In Flanders Fields and Other Poems
+   444    1551      8758 words  A Cathedral Courtship
+   445     168     36658 words  The History and Practice of the Art of Photography
+   446    2024     41574 words  Diary of a Pilgrimage
+   447    2431     21013 words  Is Shakespeare Dead?
+   448     210     26936 words  An International Episode
+   449     254      6216 words  The Second Story of Meno
+   450     264      7203 words  Main Street and Other Poems
+   451     285     97490 words  The Lost Continent
+   452     298    119021 words  The Market-Place
+   453     321     43777 words  Moran of the Lady Letty
+   454     324     20500 words  A Knight of the Cumberland
+   455     365     35405 words  The Land of Little Rain
+   456     377      6916 words  Kansas Women in Literature
+   457     268    195729 words  The Octopus
+   458     362     69487 words  Miss Billy's Decision
+   459     363     41814 words  The Oakdale Affair
+   460     367     42360 words  The Country of the Pointed Firs
+   461     216     10673 words  Tao Teh King
+  skip 223: HTTPError
+   462    2273     42906 words  Tom Swift and his Motor-boat
+   463     257     67404 words  Troilus and Criseyde
+   464     263      6334 words  Trees and Other Poems
+   465     267     26585 words  The Touchstone
+   466     283     96183 words  The Reef
+   467     295     42403 words  The Early Short Fiction of Edith Wharton, Part 1 (of 10)
+   468     299     56765 words  Tales From Two Hemispheres
+   469     306     43891 words  The Early Short Fiction of Edith Wharton,  Part 2 (of 10)
+   470     312     14436 words  Young Adventure
+   471     499     43560 words  Tom Swift in the Land of Wonders
+   472     950     42773 words  Tom Swift and his Electric Runabout
+   473     951     40686 words  Tom Swift and his Sky Racer
+   474     952     41722 words  Tom Swift and his Air Glider
+   475     953     45040 words  Tom Swift and his Big Tunnel
+   476     954     44618 words  Tom Swift and his War Tank
+   477     221    112444 words  The Return of Sherlock Holmes
+   478     262     25327 words  The Collected Poems of Rupert Brooke
+  skip 301: HTTPError
+   479     304     24125 words  Rio Grande's Last Race and Other Verses
+   480     309     23293 words  Rhymes of a Rolling Stone
+   481     315     25397 words  Rhymes of a Red Cross Man
+   482     360    153393 words  What is Property?
+   483     391     32391 words  The Song of Roland
+   484     397     11318 words  L'Allegro, Il Penseroso, Comus, and Lycidas
+   485     744     12545 words  The Golden Mean
+   486     207     13443 words  The Spell of the Yukon
+   487     213     24218 words  The Man from Snowy River
+   488     240     28118 words  Stories From the Old Attic
+   489     273     13351 words  The Smalcald Articles
+   490     290     77470 words  The Stark Munro Letters
+   491     341     44697 words  Myths and Legends of the Sioux
+   492     354     86497 words  The Story of a Pioneer
+   493     359     90459 words  Good Stories For Great Holidays
+   494     400     12265 words  Helen of Troy and Other Poems
+   495     410     12117 words  'Hell fer Sartain' and Other Stories
+   496     412      6522 words  John Jacob Astor
+   497     419     39359 words  The Magic of Oz
+  skip 420: HTTPError
+   498     424     12317 words  General William Booth enters into Heaven and other Poems
+   499     436     34981 words  The Master Key
+   500     439     28934 words  The Vital Message
+   501     442      6550 words  Love Songs
+  skip 485: HTTPError
+  skip 486: HTTPError
+   502     793     61163 words  Aeroplanes and Dirigibles of War
+   503     818     40662 words  The Aeroplane Speaks
+   504     830     62230 words  The Argonautica
+   505     841     40522 words  Men, Women and Ghosts
+   506     860     47305 words  Baby Mine
+   507     913     58953 words  A Hero of Our Time
+   508     977     26291 words  American Notes
+   509     995     40190 words  Ballads of a Bohemian
+   510     701     10026 words  The King of the Golden River
+   511     704      8738 words  The Mansion
+   512     721     11974 words  The Birds' Christmas Carol
+   513     724     12988 words  The Man of Letters as a Man of Business
+   514     726      7290 words  A Psychological Counter-current in Recent Fiction
+   515     759      7706 words  James Pethel
+   516     760     11188 words  Enoch Soames
+   517     761      8257 words  A. V. Laider
+   518     784     56098 words  Boyhood in Norway
+   519     853     15565 words  The Confutatio Pontificia
+   520     861     89806 words  The Dominion of the Air
+   521     930     45758 words  The Cook's Decameron: A Study in Taste:
+  skip 981: HTTPError
+   522     612      5067 words  The Constitution of Japan, 1946
+   523     626     24849 words  The Philobiblon of Richard de Bury
+   524     679     12512 words  Poems
+   525     688     26013 words  The Goodness of St. Rocque and Other Stories
+   526     697     15071 words  The Light Princess
+   527     907     51670 words  Flying Machines
+   528     942     88894 words  Green Mansions
+   529     945     48904 words  Dust
+   530     988     18241 words  The Education of the Child
+   531     814     19055 words  Hunting Sketches
+   532     838     81469 words  Jasmin: Barber, Poet, Philanthropist
+   533     845     37097 words  Poems of Henry Timrod
+   534     850     39022 words  Tom Grogan
+   535     874    136228 words  A History of Aeronautics
+   536     938     79566 words  Good Indian
+   537     941     27224 words  Just Folks
+   538     979     79619 words  Heroes of the Telegraph
+   539     504     21943 words  The Fifth String, The Conspirators
+  skip 517: HTTPError
+   540     518     37129 words  The Enchanted Island of Yew
+   541     533     25302 words  The Song of the Cardinal
+   542     545     49516 words  At the Earth's Core
+   543     548     10901 words  Project Trinity 1945-1946
+   544     553     35728 words  Out of Time's Abyss
+   545     574      6850 words  Poems of William Blake
+   546     591      7921 words  Flame and Shadow
+   547     595      8583 words  The Sisters' Tragedy
+   548     596     11845 words  Rivers to the Sea
+   549     856      6628 words  Dreams
+   550     857      5811 words  Evergreens
+   551     858     18986 words  Stage-Land
+   552     869      5814 words  The Soul of Nicholas Snyders
+   553     901     25848 words  The Jew of Malta
+   554     923     62587 words  A Sketch of the Life of Brig. Gen. Francis Marion
+   555     554     21866 words  The Contrast
+   556     606     29558 words  Indian Why Stories
+   557     609     57563 words  America Through the Spectacles of an Oriental Diplomat
+   558     657     94805 words  The Anglo-Saxon Chronicle
+   559     685     23222 words  The Atomic Bombings of Hiroshima and Nagasaki
+   560     747    395201 words  Anomalies and Curiosities of Medicine
+   561     783     57218 words  The Lost City
+   562     811     22361 words  Dr. Faustus
+   563     876     14719 words  Life in the Iron-Mills
+   564     881      6325 words  Lemorne Versus Huell
+   565     966     36051 words  Maid Marian
+   566     993     46838 words  Malbone
+   567     409     14688 words  Religious and Moral Poems
+   568     546     90509 words  Under the Andes
+   569     756     36927 words  Arizona Sketches
+   570    1384     49793 words  The Ayrshire Legatees
+   571     787     61766 words  The Man Between
+   572     842     23657 words  Memoirs of Carwin the Biloquist
+   573     880      7544 words  My Garden Acquaintance
+   574     943     32299 words  Misalliance
+   575     970     23643 words  Uncles Josh's Punkin Centre Stories
+   576     791     26708 words  The Princess
+   577     836     61533 words  The Phoenix and the Carpet
+   578     859     32265 words  Polly of the Circus
+   579     862     11270 words  Philosophy 4
+   580     896      8761 words  Orations
+   581     962     96418 words  The Poems of Henry Kendall
+   582     282     88361 words  Eothen
+   583     813     24917 words  Reminiscences of Tolstoy
+   584     994      5027 words  Riders to the Sea
+   585    1589     25572 words  Tamburlaine the Great, Part II.
+   586     319     64054 words  The Ways of Men
+   587     769     17996 words  The Book of Tea
+   588     819     54279 words  The History of the Telephone
+   589     823     15722 words  The Life of St. Declan of Ardmore
+   590     473     52202 words  Stories to Tell to Children
+   591     684      6764 words  Worldwide Effects of Nuclear War: Some Perspectives
+   592     716     59724 words  The Cruise of the Jasper B.
+   593     805     80899 words  This Side of Paradise
+   594     833    105386 words  The Theory of the Leisure Class
+   595     889     92300 words  Two Years in the Forbidden City
+   596     976     65507 words  Tanglewood Tales
+  skip 792: HTTPError
+  skip 903: HTTPError
+   597     936     42303 words  The Village Watch-Tower
+   598     604     70428 words  Gulliver of Mars
+   599     634      8843 words  Miscellaneous Mathematical Constants
+   600     686     61375 words  The Treaty of the European Union, Maastricht Treaty, 7th Feb
+   601     703     63553 words  Lucasta
+   602     717     25812 words  Chita: A Memory of Last Island
+   603     725    114609 words  Men of Invention and Industry
+   604     746    112662 words  Burning Daylight
+   605     749     82961 words  Barlaam and Ioasaph
+   606     750    158181 words  High History of the Holy Graal
+   607     762     42189 words  British Airships, Past, Present, and Future
+   608     765     97310 words  The Moon Pool
+   609     878      5684 words  Yankee Gypsies
+   610     899     50200 words  Wonderful Balloon Ascents
+   611     905     79724 words  Within the Law
+   612     978      7246 words  The Yates Pride
+   613     984     21689 words  Who Was Who: 5000 B. C. to Date
+   614    1571      9854 words  Critias
+   615    1580     21753 words  Charmides
+   616    1495     64767 words  The Golf Course Mystery
+   617    1577     67030 words  The Grey Room
+   618     329     49039 words  Island Nights? Entertainments
+   619    1574     44895 words  Historic Girls
+   620     428     30366 words  Frivolous Cupid
+   621     431     30133 words  The Fortune Hunter
+   622     443     36986 words  The Love Affairs of a Bibliomaniac
+   623     453     41761 words  Emma McChesney & Co.
+   624     549     37320 words  The Underdogs
+   625     618     38396 words  Codex Junius 11
+   626     658     78878 words  The Fall of Troy
+   627     680      8145 words  The Golden Threshold
+   628     681     25549 words  Creatures that once were Men
+   629    1584     12263 words  Laches
+   630    1579     12510 words  Lysis
+   631    1486     99172 words  The Unseen World and Other Essays
+   632    1496     11383 words  Massacre at Paris
+   633     455     38182 words  The University of Hard Knocks
+   634     458     17534 words  Dreams and Dust
+   635     461     51275 words  The Quest of the Golden Girl
+   636     468     62284 words  Manon Lescaut
+   637     481     53835 words  In the Bishop's Carriage
+   638     502    103940 words  Desert Gold
+   639     515     58217 words  Margret Howth, A Story of To-day
+   640     522     29932 words  The Chinese Boy and Girl
+   641     523     71986 words  Court Life in China
+   642     529     46840 words  Knights of Art
+   643     532     61108 words  At the Foot of the Rainbow
+   644     562     48044 words  Go Ahead Boys and the Racing Motorboat
+   645     592     15952 words  Chinese Nightingale
+   646    1487     41023 words  The Perfect Wagnerite
+   647    1643     22192 words  Meno
+   648    1644     67188 words  The Adventures of Gerard
+   649    1676     18642 words  Alcibiades I
+   650    1677      5967 words  Alcibiades II
+   651    1743     72818 words  Twelve Stories and a Dream
+   652    1937     63750 words  The Second Jungle Book
+   653    1601    113810 words  The Breaking Point
+   654    1603     52185 words  The Blue Flower, and Others
+   655    1759     46781 words  The Black-Bearded Barbarian (George Leslie Mackay)
+   656    1764      7592 words  Billy and the Big Stick
+   657    1815     56433 words  The Boys' Life of Abraham Lincoln
+   658    1888     60233 words  The Bittermeads Mystery
+   659    1919     10036 words  Ballads
+   660    1978      7751 words  Buttercup Gold and Other Stories
+   661    1990     17588 words  The Bedford-Row Conspiracy
+   662    1599     19080 words  Cinderella; or, The Little Glass Slipper and Other Stories
+   663    1613     56760 words  Count Bunker
+   664    1692    101438 words  1492
+   665    1836     14249 words  The Case of the Golden Bullet
+   666    1963     28980 words  The Confession
+   667    1969     67544 words  Catherine: A Story
+   668    1999     56890 words  Crome Yellow
+   669     385     53914 words  The Redheaded Outfield and Other Baseball Stories
+   670     403     77888 words  Soldiers of Fortune
+   671     433     93355 words  The Conflict
+   672     457     96699 words  The Price She Paid
+   673     467     61568 words  The Princess of Cleves
+   674     478     75509 words  The Cost
+   675     538     72375 words  Jean of the Lazy A
+  skip 560: HTTPError
+   676     563     22130 words  The Planet Mars and its Inhabitants
+   677     709     56030 words  The Princess and the Curdie
+   678     714     40350 words  The Bobbsey Twins in the Country
+   679     737     36330 words  The Bobbsey Twins at School
+   680     763     63725 words  The Round-up
+   681    1665     27510 words  Derrick Vaughan--Novelist
+   682    1693    119296 words  Dangerous Days
+   683    1953     21804 words  A Book of Strife in the Form of The Diary of an Old Soul
+   684     463     46224 words  The Red Badge of Courage
+   685     465     53312 words  The Mountains
+   686     472     69233 words  The House Behind the Cedars
+   687     483     82460 words  The Conquest of Canaan
+   688     484     47691 words  Poor and Proud
+   689     615    305574 words  Orlando Furioso
+   690     617     36196 words  Poems
+   691    1604     46899 words  The Ebb-Tide
+   692    1614     30463 words  The Golden Fleece
+   693    1625     28067 words  The Frozen Deep
+   694    1634     64997 words  The Foolish Virgin
+   695    1740     78746 words  The Flying U's Last Stand
+   696    1806      7786 words  The Frame Up
+   697    1814     24935 words  The Agony Column
+   698    1926     57228 words  Grandfather's Chair
+   699    1945     28975 words  Egmont
+   700     489     47897 words  One Basket
+   701     537     75132 words  Tales of Terror and Mystery
+   702     593     88530 words  Selected Writings of Guy de Maupassant
+  skip 1597: HTTPError
+   703    1635      6543 words  Ion
+   704    1679     65162 words  Hiram The Young Farmer
+   705    1808     11767 words  The Log of The "Jolly Polly"
+   706    1857     85010 words  Initials Only
+   707    1864     52468 words  Hero Tales From American History
+   708    1905     50689 words  The Governess
+   709    1908     33305 words  Her Prairie Knight
+   710    1913     85878 words  The Drums Of Jeopardy
+   711    1932     37485 words  Early Kings of Norway
+   712    1958     24000 words  Hermann and Dorothea
+   713    1622    139853 words  The Law and the Lady
+   714    1673      9410 words  Lesser Hippias
+   715    1807     19143 words  The Lost House
+   716    1852     68036 words  Lucile
+   717    1904     30160 words  The Life and Perambulations of a Mouse
+   718    1975    118695 words  The Legacy of Cain
+   719    2128     22888 words  Narratives of New Netherland, 1609-1664
+   720    2161      5500 words  Song Book of Quong Lee of Limehouse
+   721    1667     13422 words  My Aunt Margaret's Mirror
+   722    1682     10139 words  Menexenus
+   723    1742      5901 words  Miss Civilization
+   724    1758      7399 words  Marjorie Daw
+   725    1823     11047 words  The Make-Believe Man
+   726    1878     73849 words  A Millionaire of Yesterday
+   727    1985     65558 words  Men's Wives
+   728    2008     24964 words  Mazelli, and Other Poems
+   729    2157     15214 words  Female Suffrage
+   730    2164     11275 words  The Lumley Autograph
+   731    2274     12866 words  How to Live on 24 Hours a Day
+   732    2412     14493 words  The Categories
+   733    2343     11434 words  The Adventure of Wisteria Lodge
+   734    2344      8668 words  The Adventure of the Cardboard Box
+   735    2345      7315 words  The Adventure of the Red Circle
+   736    2347      5806 words  The Adventure of the Dying Detective
+   737    2348      7702 words  The Disappearance of Lady Frances Carfax
+   738    2349     10005 words  The Adventure of the Devil's Foot
+   739    2027     18250 words  Tartuffe
+   740    2039     15746 words  Evangeline
+   741    2050     14663 words  Old John Brown
+   742    2058     21237 words  Messer Marco Polo
+   743    2089      9180 words  The Reception of the 'Origin of Species'
+   744    2177     18780 words  Thankful Blossom
+   745    2178     40901 words  By Shore and Sedge
+   746    2179     56444 words  Drift from Two Shores
+   747    2180     39113 words  In a Hollow of the Hills
+   748    2185     41787 words  Maruja
+   749    2193     47363 words  A Ward of the Golden Gate
+   750    2278     29858 words  New Burlesques
+   751    2280     28164 words  A Millionaire of Rough-and-Ready
+   752    2281     48802 words  The Heritage of Dedlow Marsh and Other Tales
+   753    1839     65461 words  Other Things Being Equal
+   754    1636     38148 words  Phaedrus
+   755    1658     42788 words  Phaedo
+   756    1744     45427 words  Philebus
+   757    1750    238611 words  Laws
+   758    1834     15384 words  The Case of The Pocket Diary Found in the Snow
+   759    1835     18048 words  The Case of The Pool of Blood in the Pastor's Study
+   760    1891      7959 words  A Plea for Old Cap Collier
+   761    1977     14019 words  Phaedra
+   762    2315     16169 words  The Flag-raising
+   763    2325     15127 words  The Iceberg Express
+   764    2328      5290 words  The Lake Gun
+   765    2352     16902 words  Eurasia
+   766    2361      7777 words  Why go to College? an Address
+   767    2365     10875 words  The Princess of Montpensier
+   768    2382     14375 words  Memoir of the Proposed Territory of Arizona
+   769    2387     12364 words  The Voice
+   770    1591     27972 words  Protagoras
+   771    1858     71771 words  Plain Tales from the Hills
+   772    1875     16388 words  Painted Windows
+   773    1880    177307 words  The Pathfinder
+   774    1970    124344 words  A Poor Wise Man
+   775    1974     15198 words  Poetics
+   776    1681      7111 words  Eryxias
+   777    1733     66920 words  The Red Cross Girl
+   778    1747     55153 words  The Red Seal
+   779    1825     14848 words  The Adventures of Reddy Fox
+   780    1833     14857 words  The Case of the Registered Letter
+   781    1872     60394 words  The Red House Mystery
+   782    1874     59366 words  The Railway Children
+   783    1879    120024 words  Royalty Restored
+   784    1896     64174 words  Under the Red Robe
+   785    1907     23330 words  Rowdy of the Cross L
+   786    1976    117548 words  Peter Ruff and the Double Four
+   787    2011     66420 words  Rudder Grange
+   788    1600     32603 words  Symposium
+   789    1618      5363 words  In the Shadow of the Glen
+   790    1735     45264 words  Sophist
+   791    1738     40110 words  Statesman
+   792    1847      9455 words  Songs, Merry and Sad
+   793    1890     10293 words  "Speaking of Operations--"
+   794    1901     42775 words  Secret of the Woods
+   795    1947    124663 words  Scaramouche
+   796    1960     34381 words  Sight Unseen
+   797    2003      9462 words  Spirits in Bondage
+   798    1668      7899 words  The Tapestried Chamber, and Death of the Laird's Jock
+   799    1726     65760 words  Theaetetus
+   800    1832     42297 words  The Lamp That Went Out
+done: 800 books, 18244530 words
+R25-cv fetched: 400 new books

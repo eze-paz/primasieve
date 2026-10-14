@@ -840,3 +840,6 @@ By word frequency: the 100 commonest words (55% of words) give 30% of the gap (4
 
 ## R25-cv registration (more books for the fast counter; owner's OK 2026-10-14)
 r25_fetch_more.py fetches about 400 more English public-domain books with the project's existing polite fetcher into a separate folder (_nldata/gutenberg_more), so the training / held-out split and all test sets are unchanged. Then the fast Kneser-Ney counter (o5mxa, the 26-second family) is rebuilt on the 21M training tokens plus the new books, scored on the same 50,114 predictions; alone against o5mxa (8.3580), and in the R25-co mix as K-static and in a live counter built on it. Compared with 7.3418 and the language model's 6.7001.
+
+## R25-cv fetch and counter result
+400 new books (109 MB; 1,656,569 extra training paragraphs) fetched into _nldata/gutenberg_more (19 failed downloads skipped). Fast counter o5mxa + new books (o5mxap), built and scored in 277 s: **8.2657** on 500-999 (o5mxa 8.3580; -0.09 for about twice the text). Next in the same registration: live counters on it, then the mix.

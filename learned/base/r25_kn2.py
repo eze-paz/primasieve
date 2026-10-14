@@ -10,7 +10,7 @@ ARGV = list(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
 NMAX = int(ARGV[ARGV.index("--order") + 1]) if "--order" in ARGV else 4; MKN = "--mkn" in ARGV; CROSS = "--cross" in ARGV
 SKIP = "--skip" in ARGV                                                                            # R25-bz: the word just before the target is left out of the context
-TAG = f"o{NMAX}{'m' if MKN else ''}{'x' if CROSS else ''}{'a' if '--all-text' in ARGV else ''}{'s' if SKIP else ''}{'L' if '--lookup' in ARGV else ''}"
+TAG = f"o{NMAX}{'m' if MKN else ''}{'x' if CROSS else ''}{'a' if '--all-text' in ARGV else ''}{'s' if SKIP else ''}{'L' if '--lookup' in ARGV else ''}{'p' if '--more' in ARGV else ''}"
 def offs(n): return list(range(n)) if (not SKIP or n == 1) else list(range(n - 1)) + [n]          # token offsets of an order-n pattern (context offsets, then the target)
 sys.argv = ["r25_attn.py", "--minutes", "0"] + (["--all-text"] if "--all-text" in ARGV else [])
 src = open("r25_attn.py", encoding="utf-8").read(); src = src[:src.index("class Net(nn.Module)")]
@@ -20,7 +20,13 @@ top = [w for w, _ in uni.most_common(65534)]; wid = {w: i + 1 for i, w in enumer
 rare_mass = sum(c for w, c in uni.items() if w not in wid); n_rare = sum(1 for w in uni if w not in wid) + 1
 def rare_share(w): return (uni[w] + 0.5) / (rare_mass + 0.5 * n_rare)
 toks = []
-for p in g["trp"]:
+MORE = []
+if "--more" in ARGV:                                                                               # R25-cv: extra books from _nldata/gutenberg_more, counted as training text only
+    MD = os.path.join(os.path.dirname(os.path.dirname(HERE)), "_nldata", "gutenberg_more")
+    for f in sorted(os.listdir(MD)):
+        if f.endswith(".txt"): MORE += g["paras_of"]([dict(text=x.replace(chr(8217), "'")) for x in open(os.path.join(MD, f), encoding="utf-8", errors="replace").read().split("\n") if x.strip()])
+    print(f"R25-cv extra training paragraphs: {len(MORE):,}", flush=True)
+for p in g["trp"] + MORE:
     if CROSS: toks.append(0)
     for s in p:
         if not CROSS: toks.append(0)
