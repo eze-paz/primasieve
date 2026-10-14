@@ -335,3 +335,9 @@ Per question word, the pair (matcher version in {fix3, fix4}, margin) maximising
 
 ## T22o result -- PASS
 Chosen per word on both practice pools: who (fix3, margin 0), what (fix4, never-veto), where (fix3, 8), when (fix4, 8). Policy: practice +244; **untouched +497 (794 right / 99 wrong)** (T24c +486). Best comprehension policy: r26_policy.py --why-because --fix3 --t22h r26_t22o_policy.json --ops2.
+
+## T22p registration (per-word choice over all matcher versions)
+As T22o, versions {fix, fix2, fix3, fix4, fix5, fix3sim}. PASS if the policy beats +497.
+
+## T22p result -- PASS
+Chosen per word over six matcher versions (both practice pools): who (fix2, 0), what (fix, 8), where (fix2, 8), when (fix5, 8). Policy: practice +258; **untouched +512 (833 right / 107 wrong)** (T22o +497). Best comprehension policy: r26_policy.py --why-because --fix3 --t22h r26_t22p_policy.json --ops2. From the morning's +288 (519 / 77): +224 points, 314 more right answers for 30 more wrong.
