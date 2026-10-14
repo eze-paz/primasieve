@@ -703,3 +703,6 @@ All 1,000 paragraphs **8.2963** (24,000: 8.3189); alone on 500-999 8.0096; mix *
 
 ## R25-ci registration (wider running state in the best configuration)
 Book scope, learned x dictionary groups, group output, state 256 wide projected to 128 (--hidden 256), 6,000 steps from scratch, saved as r25_ci. Compared at equal steps with R25-bl (128 wide, 8.4507), time reported.
+
+## R25-cj registration (count the text as you read it)
+r25_kndyn.py: phrase counts (1-5 words) of the held-out text read so far pull the static o5mxa probability toward the book's own phrases, p <- (count(context, w) + beta p) / (count(context) + beta) for each context length seen before; past text only; beta chosen on paragraphs 0-499. Alone on 500-999 against static o5mxa (8.3580), then in the R25-ch mix as K. Compared with 7.5430.
