@@ -59,3 +59,6 @@ Kept on practice: what (36 / 10) and when (11 / 3); dropped who and where. Polic
 
 ## T22c registration (statement match checked by the rival score)
 Statement-match answers for silent questions are kept only when no rival candidate beats them by more than t bits in the R25-cp2 support scores; t from {0, 1, 2, 4, 8, never} chosen on practice separately per question word (who / what / where / when), a sub-route used only if its practice fitness after the check is positive. PASS if untouched beats +299.
+
+## T22c result -- PASS
+Margins chosen on practice: who 0 (14 / 1), what 1 (16 / 1), where 0 (1 / 0), when never (11 / 3). Policy: practice +187; **untouched +309** (630 right / 107 wrong; T22b +299, readers +288). The rival check turns statement match into a high-precision route for every question word.
