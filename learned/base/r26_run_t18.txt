@@ -1,0 +1,2 @@
+T18 margins: {'cue-alone-loose+soft': 0, 'role-alone+soft': 1, 'cue-alone-loose+role': 4, 'agree': 2, 'agree+role': 2, 'learned-alone-exact+soft': 1}
+T18 policy: practice (215, 257, 14), untouched (344, 590, 82) (T24 policy practice (193, 274, 27), untouched (315, 645, 110))

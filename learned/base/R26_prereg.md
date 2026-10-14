@@ -68,3 +68,9 @@ r26_ops.py, each answering only when its pattern finds exactly one answer: COUNT
 
 ## T24 result -- PASS
 On silent questions (practice / untouched, fitness right wrong): COUNT 4 / 0 and 9 / 1; WHOSE 2 / 0 and 6 / 2; WHICH none; WHY 4 / 2 (-2, not kept) and 20 / 7; HOW 1 / 1 (not kept) and 2 / 0. Kept COUNT and WHOSE. Policy: practice +193; **untouched +315** (645 right / 110 wrong; T22c +309). WHY reaches 20 untouched answers but at 0.74 precision; it needs a check before it pays.
+
+## T18 registration (rival-check veto per reader route)
+On top of the T24 policy: each trusted reader route gets its own veto margin t in {0, 1, 2, 4, 8, never} (a reader answer is withdrawn when a rival beats it by more than t bits in the R25-cp2 support scores), chosen on practice per route (routes with fewer than 5 practice answers keep 'never'). PASS if untouched beats +315.
+
+## T18 result -- PASS
+Per-route margins chosen on practice: cue-alone-loose+soft 0, role-alone+soft 1, learned-alone-exact+soft 1, agree 2, agree+role 2, cue-alone-loose+role 4; other routes never vetoed. Policy: practice +193 -> +215; **untouched +315 -> +344** (590 right / 82 wrong).
