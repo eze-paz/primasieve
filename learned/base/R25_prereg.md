@@ -1025,3 +1025,6 @@ The reader was developed only on practice A+B, so val_fresh10 is untouched for i
 
 ## R25-do result (reader vs main system on val_fresh10, untouched for the reader)
 Reader, who-only trust: **34 right, 7 wrong** (0.829; fitness +13). Main system's trusted routes on the same questions (R25-as): 50 right, 6 wrong (fitness +32). All kinds, no trust: reader **83 right / 47 wrong**, main system's all routes 67 / 22. The reader finds more right answers but with many more wrong ones; under trust the main system is stronger. They may be complementary.
+
+## R25-dp registration (main system + reader together on val_fresh10)
+r25_combo.py: the main system's trusted answer when it has one (its R25-as answers and routes, trust on the 710 practice questions), else the reader's trusted who-answer (trust from practice A+B), else silent. Scored once on val_fresh10; compared with the main system alone (50 / 6, fitness +32).
