@@ -98,3 +98,15 @@ Topic memory (tau 10): alone 12.56; gate 7.1481 (worse than 7.1433: the extra co
 
 ## T02 registration (plain SGD with decay back to the trained weights; two steps)
 r25_dyneval.py --decay lam [--steps 2]: plain SGD step 0.3 after each read paragraph, then theta <- theta + lam (theta0 - theta); settings (lam, steps) in {(0.001, 1), (0.01, 1), (0.03, 1), (0.01, 2)} with step 0.3 (two steps: step 0.15 each); chosen on 0-499. PASS if alone below 7.6238.
+
+## T18b registration (fallback after a veto)
+T18 policy, but a question whose reader answer was vetoed may be answered by the statement-match / COUNT / WHOSE routes (T22c, T24). PASS if untouched beats +344.
+
+## T24b registration (WHY by 'because' only)
+WHY operator restricted to a 'because' clause in the matched sentence or a next sentence opening with 'because'; trusted if its practice fitness on silent questions is positive; added to the best policy. PASS if untouched beats the best policy so far.
+
+## T18b result -- no effect
+The fallback changes nothing: statement-match answers were computed only for questions no trusted reader answered (r26_t22c_policy.json), so a vetoed question has no fallback candidate. +344.
+
+## T24b result -- PASS
+WHY by 'because' only: practice on silent questions 4 right / 0 wrong (kept). Policy (r26_policy.py --why-because): practice +219; **untouched +362** (608 right / 82 wrong; T18 +344).
