@@ -6,7 +6,7 @@ system's trusted answer when it has one; otherwise the reader's trusted answer; 
 Run: py -3.12 r25_combo.py"""
 import os, sys, json, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
-L = [l.rstrip("\n") for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL")]
+L = [l.rstrip("\n") for l in open(os.environ.get("R25_DIAG", "r24_diag_asA.txt"), encoding="utf-8", errors="replace") if l.startswith("VAL")]
 route = lambda l: l.split("| route ")[1].split(" |")[0]
 spoke = lambda l: "| ans None |" not in l and route(l) != "silent"
 right = lambda l: "hit True" in l                                                       # as r25_trust.py
@@ -23,8 +23,8 @@ for f in ("val_practice_a.json", "val_practice_b.json"):
             a = R["answer"](st["text"], q); key = (q.split()[0].lower(), R["FULL"][0], R["NEAR"][0])
             if a is not None: pk[key]["right" if R["norm"](a) in {R["norm"](x) for x in gold} else "wrong"] += 1
 rkeep = {k for k, c in pk.items() if c["right"] - 3 * c["wrong"] > 0 and k[0] == "who"}
-qs = [(st["text"], q, gold) for st in json.load(open("val_fresh10.json", encoding="utf-8"))["stories"] for q, gold in st["qs"]]
-F = L[2310:2510]; assert len(F) == len(qs) == 200
+qs = [(st["text"], q, gold) for st in json.load(open(os.environ.get("R25_SET", "val_fresh10.json"), encoding="utf-8"))["stories"] for q, gold in st["qs"]]
+OFF = int(os.environ.get("R25_OFF", "2310")); F = L[OFF:OFF + 200]; assert len(F) == len(qs) == 200
 assert all(q in l for (t, q, g), l in zip(qs, F)), "main-system lines and val_fresh10 questions do not line up"
 m = r = c = collections.Counter()
 m, r, c = collections.Counter(), collections.Counter(), collections.Counter()
