@@ -936,3 +936,6 @@ Inside word groups the topic signal no longer breaks grammar (judge 6.854 -> 6.9
 
 ## R25-da registration (rung 2, owner's idea: rarest words first, then the glue)
 Before writing, the engine ranks the prompt's words by rarity (training counts) and takes its 5 rarest content words; from them it plans the next words to say: content words most strongly associated with them in training text (the R25-ce pair counts, summed over the 5), 6 planned words per 40-word continuation. While writing, a planned word's probability is multiplied by exp(gamma) inside its group (grammar keeps the slot); once used, it is dropped from the plan. gamma in {0, 1, 2, 3}. Same judges, prompts, seeds. PASS if some gamma > 0 improves both judges over gamma = 0.
+
+## R25-da stopped (owner: finish now or discard)
+Discarded before any result; no number recorded. Best standing results: next-word mix 7.3177 bits/word on paragraphs 500-999 (language model 6.7001 on the same test).
