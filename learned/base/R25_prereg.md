@@ -907,3 +907,9 @@ Held-out: no verb 1.4222, classes (K=3) 1.4275, per verb 1.4392; lexicon pairs 1
 
 ## R25-cy-t registration (emergence, iteration 5: who acts on the thing next)
 r25_emerge5.py: same events as R25-cw-t (pronoun agents resolved by recency). Judge: the NEXT event in the books whose thing is the same word (same or next two paragraphs): its agent is the same person (S) or a different person (D). Rule shape searched: verbs grouped into K classes by P(S | class); K from {2, 3, 4, 5} on dev. Expected if holding emerges: acquire verbs give S more often than release verbs, and 'give' gives D. Gate: classes beat no verb on held-out books; lexicon pairs >= 75% ordered by S-share.
+
+## R25-cy-t result -- FAIL (no data)
+Two handling events on the same thing within three paragraphs are rare in the books: 63 held-out cases, 1 verb with 30+ events. Over five iterations (R25-cu-t to R25-cy-t) the books never gave a usable signal. This matches R24-f's lesson: a state rule emerges only from text that states the state right after the verb ('right after Rosa dropped it, no one was holding the key'); the generator stories do (R24-f run 3: 10 / 14 rules with their human meaning from the next-word game alone), fiction rarely does.
+
+## R25-cz-t registration (emerged rules in place of hand rules, on hand-written stories)
+r25_world3.py: the R25-ct-t world state (W1) with its hand verb lists for giving, taking and releasing replaced by the rules R24-f's next-word game learned (r24_hold_results.json, by verb base: hold / release / give); movement rules unchanged. Scored on all 2,510 questions as R25-ct-t. Reported: world alone and as a route, W3 against W1. PASS if W3's untouched fitness (world alone, +1 / -3) is at least W1's.
