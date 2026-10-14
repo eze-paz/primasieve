@@ -41,7 +41,9 @@ for f_ in ("verb.exc", "noun.exc", "adj.exc"):
         if len(q_) >= 2: EXC.setdefault(q_[0], q_[1])
 def stem(w):                                                                                    # dictionary base form first (built -> build), then a 5-letter prefix
     w = EXC.get(w, w); return w[:5] if len(w) > 5 else w
-def sentences(text): return [t for t in re.split(r"(?<=[.!?])\s+", text) if t.strip()]
+def sentences(text):                                                                           # R25-dn: titles (Mr., Mrs., Dr., St.) do not end a sentence
+    text = re.sub(r"(Mr|Mrs|Ms|Dr|St|Prof)\.", r"", text)
+    return [t for t in re.split(r"(?<=[.!?])\s+", text) if t.strip()]
 def match_score(qrare, sent):
     ws = [w.lower() for w in toks(sent)]; st = {stem(w) for w in ws}
     return sum(rar(w) for w in qrare if stem(w) in st), ws

@@ -1010,3 +1010,9 @@ A separate writer agent (barred from tests/ and b6_ files, neutral brief that na
 val_fresh11, scored once (the log line says 'practice C+D' but the set scored was val_fresh11): **10 right, 10 wrong**, 180 silent; precision 0.500. On practice C+D the same configuration was 62 / 13. The hand-shaped answer rules fit the practice writers' style and do not carry over to a new writer's stories. Not adopted.
 
 ## R25-dm (analysis, no score): the who-mistakes on val_fresh11, to see what failed to carry over.
+
+## R25-dm analysis (fresh set, all kinds, no trust)
+57 right / 52 wrong: where 22 / 6 and what 23 / 27 carried over; who fell to 11 / 13. One cause found: the sentence splitter ended sentences at 'Mr.' / 'Mrs.' / 'Dr.', cutting names off ('Who is the baker?' -> 'street', gold 'Mr. Hollis'); the practice stories rarely use titles.
+
+## R25-dn registration (titles do not end sentences)
+A bug fix. val_fresh11 has now been used once and is development data from here; the fix is checked on A+B (dev) and C+D (trust as R25-dd), and a new untouched set is needed for the next clean score.
