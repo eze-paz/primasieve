@@ -38,7 +38,7 @@ def run(a, m):
         bp[(pv, w)] += 1; bg[(pv, gid)] += 1
     return out
 res = {}
-for a, m in itertools.product((1, 3, 10, 30, 100), (0, 3, 10, 30)):
+for a, m in itertools.product((3, 10, 30), (0, 30, 100, 300)):
     P = run(a, m); res[(a, m)] = P; b = -np.log2(P)
     print(f"  a {a} m {m}: 0-499 {b[PA < 500].mean():.4f}, 500-999 {b[PA >= 500].mean():.4f}", flush=True)
 for mm in (0, None):                                                                                # training-only best, and overall best
