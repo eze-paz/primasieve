@@ -125,7 +125,10 @@ def answer(text, q, relax=False):
 
 
 def main():
-    st = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; items = [(s["text"], q, g) for s in st for q, g in s["qs"]]
+    SF = sys.argv[sys.argv.index("--stories") + 1] if "--stories" in sys.argv else "val_all13.json"
+    st = json.load(open(SF, encoding="utf-8"))["stories"]; items = [(s["text"], q, g) for s in st for q, g in s["qs"]]
+    if SF != "val_all13.json":
+        A = [answer(t, q, False) for t, q, g in items]; json.dump(A, open(sys.argv[sys.argv.index("--out") + 1], "w", encoding="utf-8")); print("answers", sum(a is not None for a in A)); return
     RELAX = "--relax" in sys.argv
     A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
     gold = [g for _, _, g in items]

@@ -53,5 +53,5 @@ for lr in GRID:
     P, A = run_all(lr); res[lr] = (P, A); b = -np.log2(P)
     print(f"R25-cm lr {lr}: paragraphs 0-499 {b[A < 500].mean():.4f}, 500-999 {b[A >= 500].mean():.4f} ({time.time() - t0:.0f} s)", flush=True)
 best = min(GRID, key=lambda l: -np.log2(res[l][0][res[l][1] < 500]).mean())
-P, A = res[best]; np.savez("r26_t01_dyn_probs.npz" if RMS else "r26_t02_dyn_probs.npz" if DEC2 else "r25_dyn_probs.npz", p=P, para=A)
+P, A = res[best]; np.savez(ARGV[ARGV.index("--out") + 1] if "--out" in ARGV else "r26_t01_dyn_probs.npz" if RMS else "r26_t02_dyn_probs.npz" if DEC2 else "r25_dyn_probs.npz", p=P, para=A)
 print(f"R25-cm chosen lr {best} (on 0-499): paragraphs 500-999 {-np.log2(P[A >= 500]).mean():.4f} bits/word", flush=True)

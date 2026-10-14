@@ -215,3 +215,18 @@ For each question word, the rival-check margin is the loosest t in {0, 1, 2, 4, 
 
 ## T22g result -- FAIL
 Wilson rule (loosest margin with lower bound >= 0.75): fix -> {what: never-veto}, policy untouched +432 (636 / 68); fix2 -> {who: never, what: never, where: 4}, untouched +436 (703 / 89). Both below +463: taking the loosest admissible margin admits too much. The best policy stays T22e (r26_policy.py --why-because --fix, +463).
+
+## T09 registration (recency decay in the in-group book counts)
+r26_ingroup2.py --bookdecay d: the book pair and triple counts used by the in-group choice fade by d per word read (a 10, m 100, a3 30, m3 100 fixed from T02b); d in {1 (no decay, = T02b), 0.9995, 0.998}, chosen on 0-499, on the decayed adapted network. Then the gate with the T35-chosen set. PASS if alone below 7.5063 (T02b's B).
+
+## T13 registration (a second adapted network for diversity)
+r25_dyneval.py on r25_bg.pt (same learned x dictionary groups, trained 4,000 steps on shuffled paragraphs rather than the book stream), plain SGD 0.3 with decay 0.001 (T02's setting, not re-chosen); saved as r26_t13_dyn_probs.npz; offered to the gate by the validation-slice rule (added if the 400-499 slice falls by 0.001 over the T35 set). Reported alone and the gate on 500-999.
+
+## T13 result (alone)
+r25_bg.pt adapted (SGD 0.3, decay 0.001): 0-499 8.5231, 500-999 **7.8660** alone (the book-stream network: 7.6067). Offered to the gate after T35.
+
+## T22h registration (thresholds chosen on 600 extra practice questions)
+Extra practice: val_practice_c + val_practice_d (written earlier, never in the 2,510) + practice_c (written today by a separate agent barred from the test material) = 600 questions. On them, statement match (fix and fix2) and the rival scores are computed (readers are not run, so 'silent' is not known there); per question word the margin t in {0, 1, 2, 4, 8, never} maximising fitness of rival-checked statement match over all 600 is chosen; a word is used only if that fitness is positive. These margins are then applied unchanged to silent questions in the main policy (r26_policy.py --why-because with fix or fix2 answers). PASS if either beats +463 on the 1,800 untouched.
+
+## T09 result -- FAIL
+Book-count decay (0-499 / 500-999): none 8.0733 / 7.5063; 0.9995 8.0836 / 7.5027; 0.998 8.0997 / 7.5140. Chosen on 0-499: no decay (= T02b). Fading the book's own pair counts does not help on the choice half.

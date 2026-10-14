@@ -24,21 +24,30 @@ for pi, p in enumerate(g["tep"][:1000]):
         if not mask[k]: continue
         gid = gw(ws[k]); items.append((pi, ws[k - 2] if k >= 2 else None, ws[k - 1], ws[k], gid, (_uni[ws[k]] + 0.5) / _cnt[gid] if gid != UNKG else None, PB[j])); j += 1
 assert j == len(PB)
-def run(a3, m3, a=10, m=100):
-    bp = collections.Counter(); bg = collections.Counter(); bt = collections.Counter(); btg = collections.Counter(); out = np.empty(len(items))
+BD = float(ARGV[ARGV.index("--bookdecay") + 1]) if "--bookdecay" in ARGV else None
+def run(a3, m3, a=10, m=100, d=1.0):
+    bp = collections.Counter(); bg = collections.Counter(); bt = collections.Counter(); btg = collections.Counter(); out = np.empty(len(items)); sc = 1.0
     for i, (pi, p2, pv, w, gid, sh, pb) in enumerate(items):
+        if d < 1.0:
+            sc /= d
+            if sc > 1e100:
+                for C_ in (bp, bg, bt, btg):
+                    for k_ in C_: C_[k_] /= sc
+                sc = 1.0
+        m_, m3_ = m / sc, m3 / sc
         if sh is None: out[i] = pb
         else:
-            q2 = (pair[(pv, w)] + m * bp[(pv, w)] + a * sh) / (pg[(pv, gid)] + m * bg[(pv, gid)] + a)
-            if p2 is not None: q2 = (tri[(p2, pv, w)] + m3 * bt[(p2, pv, w)] + a3 * q2) / (tg[(p2, pv, gid)] + m3 * btg[(p2, pv, gid)] + a3)
+            q2 = (pair[(pv, w)] + m_ * bp[(pv, w)] + a * sh) / (pg[(pv, gid)] + m_ * bg[(pv, gid)] + a)
+            if p2 is not None: q2 = (tri[(p2, pv, w)] + m3_ * bt[(p2, pv, w)] + a3 * q2) / (tg[(p2, pv, gid)] + m3_ * btg[(p2, pv, gid)] + a3)
             out[i] = pb / sh * q2
-        bp[(pv, w)] += 1; bg[(pv, gid)] += 1
-        if p2 is not None: bt[(p2, pv, w)] += 1; btg[(p2, pv, gid)] += 1
+        bp[(pv, w)] += sc; bg[(pv, gid)] += sc
+        if p2 is not None: bt[(p2, pv, w)] += sc; btg[(p2, pv, gid)] += sc
     return out
 res = {}
-for a3, m3 in itertools.product((3, 10, 30), (0, 30, 100)):
-    P = run(a3, m3); res[(a3, m3)] = P; b = -np.log2(P)
-    print(f"  a3 {a3} m3 {m3}: 0-499 {b[PA < 500].mean():.4f}, 500-999 {b[PA >= 500].mean():.4f}", flush=True)
+GRID_ = [(30, 100, d) for d in (1.0, 0.9995, 0.998)] if BD is not None else [(a3, m3, 1.0) for a3, m3 in itertools.product((3, 10, 30), (0, 30, 100))]
+for a3, m3, d in GRID_:
+    P = run(a3, m3, d=d); res[(a3, m3, d)] = P; b = -np.log2(P)
+    print(f"  a3 {a3} m3 {m3} d {d}: 0-499 {b[PA < 500].mean():.4f}, 500-999 {b[PA >= 500].mean():.4f}", flush=True)
 best = min(res, key=lambda k: -np.log2(res[k][PA < 500]).mean()); P = res[best]
 np.savez(ARGV[2] if len(ARGV) > 2 else "r26_ingroup2_probs.npz", p=P, para=PA)
 print(f"T08 chosen {best}: 500-999 {-np.log2(P[PA >= 500]).mean():.4f} (R25-co B 7.5306; network alone {-np.log2(PB[PA >= 500]).mean():.4f})", flush=True)
