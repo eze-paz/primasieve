@@ -125,3 +125,9 @@ The ORDER operator answers 47 of 2,510; on silent questions practice 5 right / 1
 
 ## T19 registration (rival check with the story-adapted network)
 r25_steelman.py --v2 --adapt: before scoring a story's questions, the network takes one SGD step (0.3, the R25-cm setting) on the story's own next-group loss (reset to the trained weights for every story); scores saved as r26_steelman3_scores.json. The T22c / T18 / T24b policy is then rebuilt with these scores (all margins re-chosen on practice). PASS if untouched beats +362.
+
+## T33 registration (the first session's live counters in the learned gate)
+The gate (T12 with T08's B) gains the first session's components saved on the same predictions: live phrase counts per length on the larger text (r25_kndyn_perlen_more, 7.9252 alone) and its self-searched counts on the larger text (r25_discover2am). PASS if the gate falls below 7.1433.
+
+## T33 result -- PASS
+Gate + live per-length counts on the larger text (KP): 7.1347; + self-searched counts on the larger text (QM, 8.2096 alone): **7.1308** (T08 gate 7.1433). The gate gives the old count models K, Q weight 0 and the new ones 0.10 / 0.16. Best next-word score so far (saved as r26_best_gate_probs.npz); gap to the language model 0.43.
