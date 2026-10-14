@@ -80,3 +80,21 @@ Two-word in-group choice on the adapted network: alone **7.5234** (R25-co's B 7.
 
 ## T07 registration (copy memories keyed by 4 and 5 words)
 r25_bicopy.py with keys of 4 and 5 previous words (decay 0.9999), added to the gate (T12 with T08's B). PASS if the gate falls below 7.1433.
+
+## T07 result -- FAIL
+4-word keys fire on 1.7% of predictions (target found 0.4%), 5-word keys 0.3% / 0.1%; gate 7.1434 (7.1433). Long exact repeats are too rare to matter.
+
+## T06 registration (TOPIC memory)
+r26_topic.py: topic = decayed sum (0.99 per word) of the learner's word vectors (r25_vectors_all.npz) of the text read so far; P(w) = softmax over the 20,000 vector words of tau x cos(vector(w), topic); tau from {5, 10, 20, 40} chosen on 0-499. Added to the gate. PASS if the gate falls below 7.1433.
+
+## T05 registration (group copy memory)
+r26_gcopy.py: recency memory over learned x dictionary groups (decay 0.99 and 0.999) times the word's training share in its group. Added to the gate. PASS if below 7.1433.
+
+## T01 result -- FAIL
+RMS-normalised dynamic evaluation (eta, lam; 0-499 / 500-999): (1e-4, 0) 8.2969 / 7.7990; (3e-4, 0) 8.2515 / 7.7475; (1e-3, 0) 8.2939 / 8.0682; (3e-3, 0) 8.6082 / 8.7355; (3e-4, 0.001) 8.2485 / 7.7066; (1e-3, 0.001) 8.2697 / 7.8741; (1e-3, 0.01) 8.2097 / 7.6791; (3e-3, 0.01) 8.3451 / 7.9274. Chosen (1e-3, 0.01): **7.6791** -- worse than plain SGD 0.3 (7.6238). Eight settings of the planned twelve were run to stay within 30 minutes. Decay toward the trained weights helps within the family.
+
+## T06 / T05 results -- FAIL
+Topic memory (tau 10): alone 12.56; gate 7.1481 (worse than 7.1433: the extra component costs more in fit noise than it adds). Group copy memories (0.99: 15.33, 0.999: 11.00 alone): gate 7.1434. Neither adds information the mix lacks.
+
+## T02 registration (plain SGD with decay back to the trained weights; two steps)
+r25_dyneval.py --decay lam [--steps 2]: plain SGD step 0.3 after each read paragraph, then theta <- theta + lam (theta0 - theta); settings (lam, steps) in {(0.001, 1), (0.01, 1), (0.03, 1), (0.01, 2)} with step 0.3 (two steps: step 0.15 each); chosen on 0-499. PASS if alone below 7.6238.

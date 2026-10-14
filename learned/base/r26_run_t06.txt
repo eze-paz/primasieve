@@ -1,0 +1,10 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (31 s)
+  T06 tau 5: 0-499 13.694, 500-999 13.389
+  T06 tau 10: 0-499 12.815, 500-999 12.563
+  T06 tau 20: 0-499 13.938, 500-999 14.341
+  T06 tau 40: 0-499 21.578, 500-999 23.356
+T06 chosen tau 10
+T05 group copy 0.99: 500-999 15.330
+T05 group copy 0.999: 500-999 11.000
+T12 gate: fit 7.5321, early-stop slice 7.2573, paragraphs 500-999 7.1481 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'T'])
+T12 gate: fit 7.5262, early-stop slice 7.2569, paragraphs 500-999 7.1434 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'G1', 'G2'])

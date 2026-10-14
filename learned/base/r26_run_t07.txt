@@ -1,0 +1,3 @@
+R25-cl bigram copy memory (decay 0.9999): 50114 predictions; previous word seen as a context before: 0.017; target has nonzero copy probability: 0.004; mean bits where nonzero: 0.159
+R25-cl bigram copy memory (decay 0.9999): 50114 predictions; previous word seen as a context before: 0.003; target has nonzero copy probability: 0.001; mean bits where nonzero: 0.145
+T12 gate: fit 7.5268, early-stop slice 7.2564, paragraphs 500-999 7.1434 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U', 'N4', 'N5'])
