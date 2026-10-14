@@ -251,3 +251,12 @@ r25_bq.pt adapted: alone 7.7449; slice 7.2448 -> 7.2437 (kept); **test 7.1370 ->
 
 ## T13d registration (the remaining checkpoints)
 r25_bu.pt (12,000 steps) and r25_cg.pt (24,000 steps) adapted (SGD 0.3, decay 0.001) -> W4, W5; each tried on the fixed set by the slice rule, in that order.
+
+## T37 registration (earlier components retried by the slice rule)
+Each tried alone on the fixed set (T35 + W2 + W3), kept if the slice falls by 0.001: topic memory (T06), power-law plain and keyed memories (R25-cq-t), typed memory (R25-cr2-t), live counters of the first session (kndyn, kndyn_group, kndyn_wide, kndyn_perlen_more), skip keys (T07b), dictionary-class key (T07d). Test reported for kept ones only.
+
+## T37 result -- the slice rule is too noisy
+Kept by the rule: only KD (live phrase counts, slice 7.2437 -> 7.2425), whose test is worse (7.1352 -> 7.1388). Rejected: KP (slice 7.2482, test would be 7.1282), PK (slice -0.0004, test 7.1329) and others. Slice and test disagree in sign on several candidates: 100 paragraphs (about 2,600 predictions) is too small a judge for differences of 0.001-0.005. KD is not adopted; selection moves to cross-validation (T38).
+
+## T38 registration (selection by 5-fold cross-validation on paragraphs 0-499)
+r26_select.py --cv: the gate is fitted on four fifths of paragraphs 0-499 (by paragraph blocks of 100) and scored on the fifth, five times; the mean held-out bits is the selection score. Forward selection from the base set (R25-co components with T02b's B, D) over all candidates (KP, QM, KD, S1, S2, G1, G2, X1, X2, X3, PK, W2, W3, W4, W5, B2), add while the mean falls by 0.001. The chosen set is fitted on 0-399 with early stop on 400-499 (as before) and reported once on 500-999. PASS if below 7.1352.
