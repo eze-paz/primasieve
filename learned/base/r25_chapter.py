@@ -15,6 +15,7 @@ R = {"__name__": "r25_rnn_defs", "__file__": os.path.join(HERE, "r25_rnn.py")}; 
 torch, nn, g, encode, gw, unk2, _uni, _cnt, UNKG = (R[k] for k in "torch nn g encode gw unk2 _uni _cnt UNKG".split())
 torch.manual_seed(0); random.seed(0)
 net = R["RNet"](); rnn = net.rnn
+if "--init" in ARGV: net.load_state_dict(torch.load(ARGV[ARGV.index("--init") + 1])); print("R25-cg continued from", ARGV[ARGV.index("--init") + 1], flush=True)
 def run(x, h):
     hs, hn = rnn(net.drop(net.inp(net.emb(x))), h)
     return net.out(net.out_ln(hs)), hn

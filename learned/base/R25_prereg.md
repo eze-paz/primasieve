@@ -685,3 +685,9 @@ r25_trigger.py: content-word pairs within 30 words in training paragraphs give P
 
 ## R25-cf registration (rung 2 on all 21M training tokens)
 r25_discover2.py --all-text: the same shape search and learned rules, counting all training paragraphs. Alone compared with R25-cb (8.3469) and o5mxa (8.3580); then in the R25-bu mix as Q. Compared with 7.5721.
+
+## R25-cf result (shape search on 21M tokens) -- PASS alone, small in the mix
+Learner kept words across sentences, dictionary classes, groups, words within sentences. Paragraphs 500-999 alone **8.2933** (13M: 8.3469; o5mxa 8.3580). Mix: by depth **7.5699** (7.5721), with Q taking weight 0.3 and K dropping to 0.1: the self-searched counter replaces the hand-built one.
+
+## R25-cg registration (best network, 12,000 more steps)
+r25_chapter.py --init r25_bu.pt: continue the 12,000-step book-scope network for 12,000 more (24,000 in all; fresh optimiser state, as at every resume), saved as r25_cg; then the R25-cf mix with it as B. About 70 minutes alone. Compared with R25-bu alone 8.3708 (all 1,000) and the mix 7.5699.
