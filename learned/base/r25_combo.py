@@ -9,7 +9,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
 L = [l.rstrip("\n") for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL")]
 route = lambda l: l.split("| route ")[1].split(" |")[0]
 spoke = lambda l: "| ans None |" not in l and route(l) != "silent"
-right = lambda l: l.rstrip().endswith("| hit 1") or "| hit 1 |" in l or l.rstrip().endswith("hit True")
+right = lambda l: "hit True" in l                                                       # as r25_trust.py
 fit = collections.defaultdict(lambda: [0, 0])
 for l in L[:310] + L[510:910]:
     if spoke(l): fit[route(l)][0 if right(l) else 1] += 1
