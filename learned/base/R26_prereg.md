@@ -110,3 +110,15 @@ The fallback changes nothing: statement-match answers were computed only for que
 
 ## T24b result -- PASS
 WHY by 'because' only: practice on silent questions 4 right / 0 wrong (kept). Policy (r26_policy.py --why-because): practice +219; **untouched +362** (608 right / 82 wrong; T18 +344).
+
+## T18c registration (fallback to checked statement match after a veto)
+A question whose reader answer was vetoed takes the statement-match answer checked with T22c's per-word margins (who 0, what 1, where 0, when 8), computed for every question. PASS if untouched beats +362.
+
+## T18c result -- FAIL
+Practice +216 (vs +219), untouched +354 (609 / 85) vs +362: answers that a reader gave and the rival check vetoed are hard questions; the statement match is wrong on them too.
+
+## T25 registration (ORDER operator = anchor x statement match)
+r26_order.py: questions with 'after X' / 'before X' / 'first' / 'last' / 'at the end' / 'finally'. The anchor sentence is the unique sentence holding X's content words; the main question (the rest) is matched sentence by sentence (T22 extraction on each single sentence): after -> the first match after the anchor; before -> the last match before it; first -> the first match in the story; last / at the end / finally -> the last match. Route for silent questions, trusted by practice fitness; added to the best policy. PASS if untouched beats +362.
+
+## T25 result -- FAIL
+The ORDER operator answers 47 of 2,510; on silent questions practice 5 right / 13 wrong, untouched 5 / 11 -- not trusted; policy unchanged (+362). Sentence-level matching of the main clause picks the wrong sentence in most order questions (the main clause's content words, e.g. 'the roll', occur in many sentences, and the first match after the anchor is often not the event asked about).

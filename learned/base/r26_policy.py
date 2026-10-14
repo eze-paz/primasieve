@@ -50,13 +50,29 @@ extra = {}
 if "--why-because" in sys.argv:
     f = fit([i for i in PR if not spoke(i)], why_because); print("WHY-because practice on silent:", f)
     if f[0] > 0: extra["why"] = why_because
+ORD = json.load(open('r26_order_answers.json', encoding='utf-8')) if os.path.exists('r26_order_answers.json') else [None] * len(items)
+if "--order" in sys.argv:
+    f = fit([i for i in PR if not spoke(i) and not T22[i]], lambda i: ORD[i]); fu = fit([i for i in UN if not spoke(i) and not T22[i]], lambda i: ORD[i]); print("ORDER on silent practice:", f, "untouched:", fu)
+    if f[0] > 0: extra["order"] = lambda i: ORD[i]
 def other(i):
     x = T22[i] or (O[i][1] if O[i][0] in ("COUNT", "WHOSE") else None)
+    if x is None and "order" in extra: x = extra["order"](i)
     if x is None and "why" in extra: x = extra["why"](i)
     return x
+SMA = json.load(open('r26_stmatch_answers.json', encoding='utf-8')); TMW = {'who': 0, 'what': 1, 'where': 0, 'when': 8}
+def sm_checked(i):
+    a = SMA[i]; k = items[i][1].split()[0].lower()
+    if a is None or k not in TMW: return None
+    c = SC[i]['c']
+    if not c: return a
+    same = lambda x: hit(x, [nrm(a)]) or hit(a, [x])
+    mine = max((s for x, s in c if same(x)), default=None); rival = max((s for x, s in c if not same(x)), default=None)
+    if mine is None: return None
+    return None if (rival is not None and rival - mine > TMW[k]) else a
 def pol(i):
     r = reader(i)
     if r is not None: return r
+    if spoke(i) and "--fallback2" in sys.argv: return sm_checked(i)
     if spoke(i) and "--fallback" not in sys.argv: return None
     return other(i)
 print(f"policy {[a for a in sys.argv[1:]]}: practice {fit(PR, pol)}, untouched {fit(UN, pol)}")
