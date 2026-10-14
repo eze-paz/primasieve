@@ -108,7 +108,7 @@ for f in FILES:
             a = answer(st["text"], q); wh = q.split()[0].lower(); gs = {norm(x) for x in gold}
             r = "silent" if a is None else ("right" if norm(a) in gs else "wrong")
             tot[r] += 1; per[wh][r] += 1
-            if r == "wrong" and shown < 12: print(f"   wrong: {q} -> {a!r} (gold {gold[:2]})"); shown += 1
+            if r == "wrong" and (shown < 12 or (os.environ.get("R25_DUMP") and wh in ("where", "what") and shown < 60)): print(f"   wrong: {q} -> {a!r} (gold {gold[:2]})"); shown += 1
 n = sum(tot.values())
 print(f"R25-db rare-word graph reader on {', '.join(FILES)}: {n} questions -- right {tot['right']}, wrong {tot['wrong']}, silent {tot['silent']}; precision {tot['right'] / max(1, tot['right'] + tot['wrong']):.3f}")
 for wh, c in sorted(per.items(), key=lambda x: -sum(x[1].values())): print(f"   {wh:6s} right {c['right']:3d} wrong {c['wrong']:3d} silent {c['silent']:3d}")

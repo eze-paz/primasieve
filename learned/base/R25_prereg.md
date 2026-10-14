@@ -970,3 +970,8 @@ No change (A+B where 41 / 31; C+D 68 / 18): the last-mention rule rarely applies
 
 ## R25-df registration (the question's names must be in the chosen sentence)
 When a question names someone (capitalised words), only sentences containing all those names are candidates (if any do). Dev on A+B, trust as R25-dd, C+D once.
+
+## R25-df result -- PASS on the trust score
+A+B dev: 135 right / 82 wrong (was 143 / 83). Trust kept (who, full cover). C+D once: **62 right, 13 wrong** (precision 0.827); trust fitness (+1 / -3) 62 - 39 = +23, against R25-dc's 68 - 54 = +14.
+
+## R25-dg (analysis, no score): list the where- and what- mistakes on A+B with their chosen sentence, to design the next reader change.
