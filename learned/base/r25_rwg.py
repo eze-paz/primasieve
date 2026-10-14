@@ -44,6 +44,7 @@ def phrase_at(ws, i, raw=None):
         while j + 1 < len(ws) and raw[j + 1][0].isupper(): j += 1
         return " ".join(ws[i:j + 1])
     return ws[i]
+FULL = [False]
 def answer(story, q):
     qw = [w.lower() for w in toks(q)]; wh = qw[0] if qw else ""
     qrare = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
@@ -51,6 +52,7 @@ def answer(story, q):
     best = max((match_score(qrare, s) + (s,) for s in sentences(story)), key=lambda x: x[0])
     sc, ws, sent = best
     if sc < 0.5 * sum(rar(w) for w in qrare): return None                                  # weak match: stay silent
+    FULL[0] = sc >= 0.999 * sum(rar(w) for w in qrare)                                         # R25-dd: did the sentence cover every rare word of the question?
     raw = toks(sent); qst = {stem(w) for w in qw}
     hits = [i for i, w in enumerate(ws) if stem(w) in qst and w not in COMMON]
     if not hits: return None
@@ -103,6 +105,22 @@ for f in FILES:
 n = sum(tot.values())
 print(f"R25-db rare-word graph reader on {', '.join(FILES)}: {n} questions -- right {tot['right']}, wrong {tot['wrong']}, silent {tot['silent']}; precision {tot['right'] / max(1, tot['right'] + tot['wrong']):.3f}")
 for wh, c in sorted(per.items(), key=lambda x: -sum(x[1].values())): print(f"   {wh:6s} right {c['right']:3d} wrong {c['wrong']:3d} silent {c['silent']:3d}")
+if os.environ.get("R25_TRUST2"):                                                                 # R25-dd: trust per (kind, full cover or not), from A+B, applied once to C+D
+    pk = collections.defaultdict(collections.Counter)
+    for f in FILES:
+        for st in json.load(open(f, encoding="utf-8"))["stories"]:
+            for q, gold in st["qs"]:
+                a = answer(st["text"], q); key = (q.split()[0].lower(), FULL[0])
+                if a is not None: pk[key]["right" if norm(a) in {norm(x) for x in gold} else "wrong"] += 1
+    keep = {k for k, c in pk.items() if c["right"] - 3 * c["wrong"] > 0}
+    print(f"R25-dd (kind, full cover) kept: {sorted(keep)}", flush=True)
+    t2 = collections.Counter()
+    for f in ("val_practice_c.json", "val_practice_d.json"):
+        for st in json.load(open(f, encoding="utf-8"))["stories"]:
+            for q, gold in st["qs"]:
+                a = answer(st["text"], q); a = a if (q.split()[0].lower(), FULL[0]) in keep else None
+                t2["silent" if a is None else ("right" if norm(a) in {norm(x) for x in gold} else "wrong")] += 1
+    print(f"R25-dd trusted reader on practice C+D: right {t2['right']}, wrong {t2['wrong']}, silent {t2['silent']}; precision {t2['right'] / max(1, t2['right'] + t2['wrong']):.3f}", flush=True)
 if os.environ.get("R25_TRUST"):                                                                  # R25-dc: per-kind trust from practice A+B (+1 right, -3 wrong, 0 silent), applied once to C+D
     keep = {wh for wh, c in per.items() if c["right"] - 3 * c["wrong"] > 0}
     print(f"R25-dc kinds kept by the trust rule on {', '.join(FILES)}: {sorted(keep)}", flush=True)

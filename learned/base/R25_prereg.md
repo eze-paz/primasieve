@@ -952,3 +952,9 @@ By kind (last version): who 60 right / 11 wrong (0.85); where 41 / 31; what 35 /
 
 ## R25-dc registration (trust for the rare-word graph reader)
 Per question kind, keep the reader only if right - 3 x wrong > 0 on practice A+B (the learner's trust rule); then score once on practice C+D, which were not used in the reader's development. Reported as right / wrong / silent and precision.
+
+## R25-dc result
+The trust rule kept only 'who' (where, what, when failed right - 3 wrong > 0 on A+B). On practice C+D, never used in development: **68 right, 18 wrong**, 314 silent; precision 0.791 (A+B: 0.85).
+
+## R25-dd registration (trust by kind and by how fully the sentence covers the question)
+Trust key = (question kind, whether the chosen sentence contains every rare word of the question); kept if right - 3 x wrong > 0 on A+B; scored once on C+D. Compared with R25-dc (68 / 18).
