@@ -284,3 +284,9 @@ Answers = fix3's, else fix4's (main and extra practice alike); margins by the T2
 
 ## T22l result -- FAIL
 Fix3 with fix4 as fallback: margins who 0, what never-veto, where 2, when 8; policy practice +236, untouched +477 (756 / 93) vs +485. Whenever the fix4 answers are in the pool, both practice pools choose no veto for 'what', which costs on the untouched sets. Best stays T22j (+485).
+
+## T22m registration (one content word matched by similarity)
+On fix3: when no sentence holds all content words, a sentence holding all but one, where the missing word has cosine >= 0.6 (learner's vectors, r25_vectors_all.npz) to some word of that sentence, is used if unique; the missing word's position is that sentence word's. Used only where fix3 has no answer; margins by the T22i protocol. PASS if the policy beats +485.
+
+## T22m result -- FAIL
+Similarity matching (fix3 + one word by cosine >= 0.6) alone: untouched 551 / 89 (+284; fix3 +313). As fallback to fix3, margins who 0, what 1, where 1, when 8; policy untouched **+432** (690 / 86). Synonym-level matching brings in wrong sentences; the stricter margins it forces cost more than its reach gains.
