@@ -1,0 +1,2 @@
+T12 gate: fit 7.5044, early-stop slice 7.2514, paragraphs 500-999 7.1487 bits/word (components ['K', 'Q', 'N2', 'N3', 'B', 'D', 'I', 'Y', 'Z', 'V', 'U'])
+  mean weights on 500-999: {'K': np.float32(0.095), 'Q': np.float32(0.142), 'N2': np.float32(0.038), 'N3': np.float32(0.01), 'B': np.float32(0.267), 'D': np.float32(0.161), 'I': np.float32(0.132), 'Y': np.float32(0.049), 'Z': np.float32(0.026), 'V': np.float32(0.015), 'U': np.float32(0.064)}
