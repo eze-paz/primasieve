@@ -981,3 +981,9 @@ Three patterns: noun phrases cut before 'of' ('a jar' for 'a jar of honey'; 'a b
 
 ## R25-dh registration (fix the three patterns)
 Noun phrases extend through 'of' + noun phrase; 'what' answers skip every common word and every form of a question word after the match; 'where' answers never start with a time word. Dev on A+B, trust as R25-dd (with the R25-df name rule), C+D once. Compared with R25-df (+23 trust fitness on C+D).
+
+## R25-dh result
+A+B dev 142 right / 88 wrong (what 40 / 39, where 41 / 27). Trust now also keeps (where, full cover). C+D once: 93 right, 29 wrong (0.762); trust fitness 93 - 87 = +6, below R25-df's +23: more answers, but where-answers on unseen stories are not yet precise enough. FAIL on fitness.
+
+## R25-di registration (trust also by distance)
+Trust key adds whether the answer's place word lies within 3 words of the matched question words. Same procedure; C+D once. Compared with +23.
