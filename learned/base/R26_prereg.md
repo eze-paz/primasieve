@@ -308,3 +308,9 @@ Fix3's 20 errors on the extra practice read. Under --fix5 (implies fix3): (a) a 
 
 ## T22n result -- FAIL (no gain)
 Fix5 alone: untouched 535 / 72 (+319; fix3 535 / 74, +313). Policy +485 (776 / 97) vs +486. Extraction fixes have reached diminishing returns; the remaining statement-match errors are scattered (wrong place phrase chosen among several, paraphrased answers).
+
+## T39 result -- PASS
+Components rebuilt on held-out paragraphs 1,000-1,999 (59,824 predictions; read in order with fresh memories). Same 15-component gate: fitted on 0-399 only -> slice 7.2419, **test 7.1342**; fitted on 0-399 + 1,000-1,999 -> slice 7.2289, **test 7.1163**. More fitting data for the gate is worth 0.018 bits; best next-word result so far, with a fixed component set and no choice made on the test half (gap to the language model 0.42).
+
+## T39b registration (another 1,000 paragraphs, and richer gate features)
+(a) Components rebuilt on paragraphs 2,000-2,999 (r26_range2/), gate fitted on 0-399 + 1,000-2,999. (b) With that data, the gate also gets the previous-word features of T12b (frequency band, top-50 group, position). PASS for each if the test falls below 7.1163.

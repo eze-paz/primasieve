@@ -1,0 +1,3 @@
+main (50114, 15) range1 (59824, 15)
+T39 fit on 0-399 only: early-stop slice 7.2419, paragraphs 500-999 7.1342
+T39 fit on 0-399 + 1,000-1,999: early-stop slice 7.2289, paragraphs 500-999 7.1163

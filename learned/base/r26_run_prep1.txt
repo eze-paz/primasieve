@@ -1,0 +1,40 @@
+== kn2 22:43:56
+R25-bw o5mxa: all 1,000 paragraphs 8.1509; paragraphs 500-999 8.0188 bits/word over 59824 predictions (111 s)
+== static 22:46:35
+R25-cm chosen lr 0.0 (on 0-499): paragraphs 500-999 7.6152 bits/word
+== D 22:47:35
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 7.5363 bits/word
+== W2 22:49:12
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 7.8458 bits/word
+== W3 22:50:26
+R25-cm chosen lr (0.3, 0.001, 1.0) (on 0-499): paragraphs 500-999 7.7056 bits/word
+== copies 22:51:38
+R25-br book copy memory: 59824 predictions, 0.874 of next words already seen in the book so far
+R25-br book copy memory: 59824 predictions, 0.874 of next words already seen in the book so far
+R25-cl bigram copy memory (decay 0.9999): 59824 predictions; previous word seen as a context before: 0.932; target has nonzero copy probability: 0.479; mean bits where nonzero: 5.388
+R25-cl bigram copy memory (decay 0.999): 59824 predictions; previous word seen as a context before: 0.932; target has nonzero copy probability: 0.479; mean bits where nonzero: 12.918
+R25-cl bigram copy memory (decay 0.9999): 59824 predictions; previous word seen as a context before: 0.465; target has nonzero copy probability: 0.091; mean bits where nonzero: 2.634
+R25-cl bigram copy memory (decay 0.9999): 59824 predictions; previous word seen as a context before: 0.087; target has nonzero copy probability: 0.010; mean bits where nonzero: 0.701
+R25-cl bigram copy memory (decay 0.999): 59824 predictions; previous word seen as a context before: 1.000; target has nonzero copy probability: 0.573; mean bits where nonzero: 13.781
+R25-cl bigram copy memory (decay 0.9999): 59824 predictions; previous word seen as a context before: 0.981; target has nonzero copy probability: 0.517; mean bits where nonzero: 5.392
+== B 22:54:08
+T08 chosen (10, 30, 1.0): 500-999 7.4654 (R25-co B 7.5306; network alone 7.5363)
+== I 22:55:17
+R25-cn book chosen (30, 100): 500-999 7.5456 (B alone 7.6152)
+== done 22:55:54
+r25_bicopy_0.9999_probs.npz
+r25_bicopy_0.999_probs.npz
+r25_bookcopy_0.999_probs.npz
+r25_bookcopy_0.99_probs.npz
+r25_dyn_probs.npz
+r25_ingroup_book_probs.npz
+r25_ingroup_train_probs.npz
+r25_kn2_o5mxa.npz
+r25_ncopy2_0.9999_probs.npz
+r25_ncopy3_0.9999_probs.npz
+r26_grpcopy_0.999_probs.npz
+r26_t02_dyn_probs.npz
+r26_t02_ingroup2_probs.npz
+r26_t13_dyn_probs.npz
+r26_t13c_bq_dyn_probs.npz
+r26_wnxcopy_0.9999_probs.npz
