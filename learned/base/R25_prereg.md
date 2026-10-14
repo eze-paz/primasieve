@@ -1005,3 +1005,8 @@ Determiner-restricted dictionary persons: A+B who 63 / 40; trust drops 'who'; C+
 
 ## R25-dl registration (a fresh untouched question set for the reader)
 A separate writer agent (barred from tests/ and b6_ files, neutral brief that names no reader or question kind to favour) writes val_fresh11.json: 40 new short stories, 5 questions each, gold answers as text spans from the story, in the practice-set format. Then, once: the R25-df reader with its A+B trust on val_fresh11, reported right / wrong / silent.
+
+## R25-dl result (rare-word graph reader on the fresh untouched set) -- FAIL
+val_fresh11, scored once (the log line says 'practice C+D' but the set scored was val_fresh11): **10 right, 10 wrong**, 180 silent; precision 0.500. On practice C+D the same configuration was 62 / 13. The hand-shaped answer rules fit the practice writers' style and do not carry over to a new writer's stories. Not adopted.
+
+## R25-dm (analysis, no score): the who-mistakes on val_fresh11, to see what failed to carry over.

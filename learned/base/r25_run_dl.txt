@@ -1,0 +1,23 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (49 s)
+   wrong: Where did Liang take the rest of the rolls? -> 'the school' (gold ['hospital on birch road', 'the hospital'])
+   wrong: Who signed for the rolls at the hospital? -> 'road' (gold ['mrs bello', 'bello'])
+   wrong: Where did the mouse and the mole live? -> 'a turnip field' (gold ['a burrow', 'burrow'])
+   wrong: What did the mouse gather all summer? -> 'the mole' (gold ['seeds'])
+   wrong: What did the mouse learn? -> 'that digging' (gold ['digging was work'])
+   wrong: Who repaired the pipe? -> 'monday' (gold ['city workers'])
+   wrong: Where does she keep a canoe? -> 'the clinic' (gold ['behind the clinic'])
+   wrong: What did the crow and the pig both want? -> 'wanted' (gold ['the last apple', 'last apple'])
+   wrong: What did Farid forget in the garden? -> 'fill' (gold ['the red kettle', 'red kettle'])
+   wrong: Where was the kettle at the end? -> 'the stove' (gold ['on the windowsill', 'the windowsill'])
+   wrong: When did the frogs bring the beaver a gift? -> 'the morning' (gold ['in the morning', 'morning'])
+   wrong: What did the frogs bring the beaver? -> 'a bundle of willow sticks' (gold ['bundle of willow sticks', 'willow sticks'])
+R25-db rare-word graph reader on val_practice_a.json, val_practice_b.json: 400 questions -- right 142, wrong 88, silent 170; precision 0.617
+   who    right  54 wrong  12 silent  69
+   what   right  40 wrong  39 silent  40
+   where  right  41 wrong  27 silent  18
+   when   right   7 wrong  10 silent  14
+   how    right   0 wrong   0 silent  12
+   why    right   0 wrong   0 silent  11
+   whose  right   0 wrong   0 silent   6
+R25-dd (kind, full cover) kept: [('who', True, True)]
+R25-dd trusted reader on practice C+D: right 10, wrong 10, silent 180; precision 0.500
