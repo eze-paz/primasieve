@@ -76,3 +76,19 @@ synthetic gold plus book vectors reads real prose into structure about as well a
 weeks, in 50 minutes of training, which is evidence for the learned-translation half of paradigm path A/B, not for
 "symbols first". The bottleneck is now the breadth of the symbolic world (its verbs and their effects), which can
 only be bought with a far broader synthetic corpus.
+
+## AG3 registration (owner's idea, 2026-10-15: converge each sentence onto canonical clauses that keep the signal)
+Smoke test first (ag3_rewrite.py, 5 stories, stock RWKV-7 0.4B, whole story at once): the free rewrite loops and
+swaps agents ('Ilse sold her roses' for Greta's sale), so a rewrite is worthless unless something checks the signal.
+AG3 (ag3_canon.py) makes the engine that check. Per sentence, with its predecessor as context, the model proposes
+numbered simple sentences; the engine keeps a clause only if (1) every content word is in the sentence, its predecessor
+or a name seen so far (no invention), (2) it has no pronoun, (3) the AG1 translator parses it to an event with an
+agent, and (4) its agent is not the original reading's patient for the same verb (no swap). No accepted clause:
+one retry with a stricter prompt, then the sentence stays as written. The canonical story is the accepted clauses.
+Measured on val_more (practice, stories 22-61) and val_fresh2 (untouched, stories 62-101), World3 world state alone
+with the hand reader and with the translator, reading the original text and the canonical text; plus the verifier's
+accept / reject counts and the share of the original reading's events recovered in the kept clauses.
+PASS if on val_fresh2, for either reader, the canonical text gives more right answers at no lower precision than the
+original. A PASS says a verified rewrite loop can make free prose more readable to a symbolic engine without an LLM
+judge; a FAIL with high rejection rates says the 0.4B model cannot propose faithful clauses (then the 1.5B model is
+the one more variant); a FAIL with high acceptance says the readers' limits are not sentence shape.
