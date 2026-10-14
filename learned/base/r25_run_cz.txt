@@ -1,0 +1,21 @@
+R25-cz-t emerged rules used: {'take': 'hold', 'find': 'hold', 'bring': 'give', 'give': 'give', 'have': 'release', 'borrow': 'release', 'see': 'release', 'return': 'give', 'carry': 'hold', 'drop': 'release', 'steal': 'hold', 'leave': 'release', 'put': 'release', 'keep': 'release', 'hear': 'hold', 'hang': 'release', 'set': 'release', 'fetch': 'hold'}
+  0 stories (0 s)
+  100 stories (1 s)
+  200 stories (2 s)
+  300 stories (3 s)
+  400 stories (5 s)
+  500 stories (6 s)
+--- columns: W0 (R19) and W3 (emerged rules) ---
+R25-ct-t baseline (trusted reader routes): practice (160, 226, 22), untouched (288, 519, 77)
+R25-ct-t W0 (R19) alone: practice 28 right / 8 wrong, untouched 24 / 23; trusted on practice: True
+R25-ct-t W0 (R19) policy: practice (157, 241, 28), untouched (266, 527, 87)
+R25-ct-t W1 (+3 rules) alone: practice 28 right / 7 wrong, untouched 26 / 22; trusted on practice: True
+R25-ct-t W1 (+3 rules) policy: practice (160, 241, 27), untouched (266, 527, 87)
+R25-ct-t questions where W1 differs from W0: 4 (practice 2)
+--- columns: W0 (R19) and W1 (hand rules, R25-ct-t) ---
+R25-ct-t baseline (trusted reader routes): practice (160, 226, 22), untouched (288, 519, 77)
+R25-ct-t W0 (R19) alone: practice 28 right / 8 wrong, untouched 24 / 23; trusted on practice: True
+R25-ct-t W0 (R19) policy: practice (157, 241, 28), untouched (266, 527, 87)
+R25-ct-t W1 (+3 rules) alone: practice 28 right / 8 wrong, untouched 25 / 22; trusted on practice: True
+R25-ct-t W1 (+3 rules) policy: practice (157, 241, 28), untouched (266, 527, 87)
+R25-ct-t questions where W1 differs from W0: 1 (practice 0)

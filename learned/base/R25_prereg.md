@@ -913,3 +913,7 @@ Two handling events on the same thing within three paragraphs are rare in the bo
 
 ## R25-cz-t registration (emerged rules in place of hand rules, on hand-written stories)
 r25_world3.py: the R25-ct-t world state (W1) with its hand verb lists for giving, taking and releasing replaced by the rules R24-f's next-word game learned (r24_hold_results.json, by verb base: hold / release / give); movement rules unchanged. Scored on all 2,510 questions as R25-ct-t. Reported: world alone and as a route, W3 against W1. PASS if W3's untouched fitness (world alone, +1 / -3) is at least W1's.
+
+## R25-cz-t result -- PASS (narrow): emerged rules do as well as hand rules on hand-written stories
+World state alone with the next-word game's rules (W3) vs the hand lists (W1): practice 28 right / 7 wrong vs 28 / 8; untouched 26 / 22 vs 25 / 22 (fitness -40 vs -41). Four answers differ from R19 (one with the hand lists). As a route for silent questions both still lower the untouched policy (+288 -> +266): the limit is unchanged -- events are not read from free prose. The emerged rules carry R24-f's quirks ('have', 'keep', 'see' = release; 'hear' = hold) without harm here, because those verbs rarely decide a state question.
+Next (to register): event reading from prose -- the learner's role reader in place of the hand reader as the world state's source of (agent, verb, thing, place).
