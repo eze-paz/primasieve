@@ -266,3 +266,9 @@ Per question word, the rival-check margin maximising fitness of statement match 
 
 ## T22i result -- PASS (narrow)
 Margins on both practice pools: fix {who 0, what 8} -> untouched +454 (670 / 72); fix2 {who 0, what 8, where 8} -> **+467 (725 right / 86 wrong)**, practice +248. Best comprehension policy: r26_policy.py --why-because --fix2 --t22h r26_t22i_fix2_policy.json. The larger choice set admits fix2's improved where-answers, which neither practice pool alone chose reliably.
+
+## T22j registration (third round of extraction fixes, read on the extra practice)
+30 wrong fix2 answers on the extra practice read (not the main practice). Fixes under --fix3 (implies fix2): (a) when-answers: among the sentence's time phrases prefer, in order, a clock time (number word or digits, optional "o'clock"), a weekday or month, then other time words; the phrase keeps a leading at / on / before / by / after; (b) who / what answers are rejected when they hold a pronoun, a time word, or are a single word ending in -ly or one of not / instead / than / then / also / too / very. Margins chosen as in T22i (both practice pools). PASS if the policy beats +467.
+
+## T22j result -- PASS
+Fix3 alone: main practice 180 / 16 (+132), untouched 535 / 74 (+313). Margins (both pools): who 0, what 8, where 8, when 8 -- all four question words now used. Policy: practice +243; **untouched +467 -> +485 (767 right / 94 wrong)**. Best comprehension policy: r26_policy.py --why-because --fix3 --t22h r26_t22i_fix3_policy.json.
