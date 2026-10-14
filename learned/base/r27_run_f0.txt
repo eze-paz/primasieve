@@ -1,0 +1,3 @@
+F0 human: {'judge': 6.215, 'rep': 0.02, 'form': 0.772} over 40 paragraphs
+F0 human, lower case no punctuation: {'judge': 6.446, 'rep': 0.02, 'form': 0.0} over 40 paragraphs
+F0 human words shuffled (floor): {'judge': 10.552, 'rep': 0.001, 'form': 0.0} over 40 paragraphs
