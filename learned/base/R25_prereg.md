@@ -691,3 +691,9 @@ Learner kept words across sentences, dictionary classes, groups, words within se
 
 ## R25-cg registration (best network, 12,000 more steps)
 r25_chapter.py --init r25_bu.pt: continue the 12,000-step book-scope network for 12,000 more (24,000 in all; fresh optimiser state, as at every resume), saved as r25_cg; then the R25-cf mix with it as B. About 70 minutes alone. Compared with R25-bu alone 8.3708 (all 1,000) and the mix 7.5699.
+
+## R25-cg result (best network, 24,000 steps) -- PASS
+All 1,000 paragraphs **8.3189** (12,000 steps 8.3708); alone on 500-999 8.0246 (8.0693). Mix by depth **7.5509** (7.5699). (Finished about 03:00; reported late.)
+
+## R25-ch registration (12,000 more steps: 36,000 in all)
+Same procedure from r25_cg.pt, saved as r25_ch, then the same mix. Compared with 8.3189 alone and 7.5509 mixed.
