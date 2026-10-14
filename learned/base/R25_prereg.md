@@ -752,3 +752,9 @@ Per-length strengths chose (1024, 128, 16, 2): alone **8.0052** (best single cou
 
 ## R25-cm registration (exact mixing weights)
 Replace the 0.1 weight grid by EM-fitted mixture weights per depth (deterministic, seconds), on the R25-cj components (K = strong live counter) plus the per-length counter as N. Compared with 7.3701.
+
+## R25-cm result (EM mixing weights) -- PASS
+**7.3541** (grid 7.3780 on the same components; previous best 7.3701). At depth 3 the weights are: book-scope network 0.45, per-length live counter 0.25, self-searched counter 0.13, strong live counter 0.09, copy memories 0.08.
+
+## R25-cn registration (every saved component, EM weights)
+With EM the weight search no longer limits the number of components: all saved components (networks W, G, X, B; count models C, K-static o5mxa, KN o4/o4m/o5m/o6m/o5mx/o5ma, skip counts, self-searched counters 13M and 21M, live counters strong / gentle / per-length; copy memories 0.97/0.99/0.999/0.9999; triggers), EM weights per depth on 0-499, reported on 500-999. Compared with 7.3541.

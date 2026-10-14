@@ -20,14 +20,16 @@ for nm, f in EXTRA:
 for d_ in DROP: cols.pop(d_)
 names = list(cols); X = np.stack([cols[k] for k in names], 1); deep = kn["deep"]
 tr, te = para < 500, para >= 500
-grid = np.array([w for w in itertools.product(range(11), repeat=len(names)) if sum(w) == 10], dtype=float) / 10
+NOGRID = bool(os.environ.get("R25_NOGRID"))
+grid = None if NOGRID else np.array([w for w in itertools.product(range(11), repeat=len(names)) if sum(w) == 10], dtype=float) / 10
 def best_w(mask):
     Xm = X[mask]; nll = np.concatenate([-np.log2(np.clip(Xm @ grid[j:j + 500].T, 1e-12, None)).mean(0) for j in range(0, len(grid), 500)]); return grid[nll.argmin()]
 def bits(wfun):
     p = np.array([X[i] @ wfun(i) for i in np.nonzero(te)[0]]); return -np.log2(np.clip(p, 1e-12, None)).mean()
 for k in names: print(f"R25-bp alone {k}: {-np.log2(np.clip(cols[k][te], 1e-12, None)).mean():.4f}", flush=True)
-wg = best_w(tr); print(f"R25-bp one global blend {dict(zip(names, wg))}: {bits(lambda i: wg):.4f} bits/word", flush=True)
-wd = {d: best_w(tr & (deep == d)) if (tr & (deep == d)).sum() > 200 else wg for d in range(int(deep.max()) + 1)}
+if NOGRID: wg = np.ones(len(names)) / len(names)
+else: wg = best_w(tr); print(f"R25-bp one global blend {dict(zip(names, wg))}: {bits(lambda i: wg):.4f} bits/word", flush=True)
+wd = {d: (wg if NOGRID else best_w(tr & (deep == d))) if (tr & (deep == d)).sum() > 200 else wg for d in range(int(deep.max()) + 1)}
 for d in range(int(deep.max()) + 1): print(f"  depth {d}: {dict(zip(names, wd[d]))} ({int((te & (deep == d)).sum())} test predictions)", flush=True)
 print(f"R25-bp context mixing (weights by Kneser-Ney depth): {bits(lambda i: wd[int(deep[i])]):.4f} bits/word", flush=True)
 if "-online" in " ".join(EXTRA_ARGS if "EXTRA_ARGS" in dir() else []) or os.environ.get("R25_ONLINE"):  # R25-bv: PAQ-style online weights
