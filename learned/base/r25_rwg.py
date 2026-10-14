@@ -49,7 +49,10 @@ def answer(story, q):
     qw = [w.lower() for w in toks(q)]; wh = qw[0] if qw else ""
     qrare = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
     if not qrare or wh not in ("who", "where", "when", "what"): return None
-    best = max((match_score(qrare, s) + (s,) for s in sentences(story)), key=lambda x: x[0])
+    cands = [match_score(qrare, s) + (s,) for s in sentences(story)]
+    if wh == "where" and ({"end", "finally", "last", "now"} & set(qw)):                          # R25-de: 'where ... at the end' -> the last sentence that mentions the thing
+        top = max(c[0] for c in cands); best = [c for c in cands if c[0] >= 0.6 * top][-1]
+    else: best = max(cands, key=lambda x: x[0])
     sc, ws, sent = best
     if sc < 0.5 * sum(rar(w) for w in qrare): return None                                  # weak match: stay silent
     FULL[0] = sc >= 0.999 * sum(rar(w) for w in qrare)                                         # R25-dd: did the sentence cover every rare word of the question?

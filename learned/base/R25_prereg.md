@@ -958,3 +958,9 @@ The trust rule kept only 'who' (where, what, when failed right - 3 wrong > 0 on 
 
 ## R25-dd registration (trust by kind and by how fully the sentence covers the question)
 Trust key = (question kind, whether the chosen sentence contains every rare word of the question); kept if right - 3 x wrong > 0 on A+B; scored once on C+D. Compared with R25-dc (68 / 18).
+
+## R25-dd result
+Coverage did not change what passes: only 'who' (both cover kinds) kept; C+D 68 / 18 again.
+
+## R25-de registration ('where ... at the end' reads the last mention)
+For where-questions asking about the end ('end', 'finally', 'last', 'now'), the reader takes the last sentence that matches at least 60% as well as the best one, instead of the best one. Dev on A+B, then the R25-dd trust on C+D once.
