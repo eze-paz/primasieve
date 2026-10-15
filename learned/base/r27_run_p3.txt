@@ -1,0 +1,7 @@
+
+Q: Where did Mrs Llewellyn sign for the parcel? 
+A: Mrs Llewellyn signed for the parcel at the gate. Before that, a parcel of rare seeds left a seed bank in the north. 
+
+gold kept: 263 / 263
+P3 reply paragraphs: judge 7.983, form 0.945, continuity 0.984 over 183
+P3 story first four sentences: judge 5.587, form 0.974, continuity 0.964 over 183

@@ -1,0 +1,22 @@
+P1 answers 951, sentences made 938; gold kept where the span had it: 824 / 824
+P1 realised sentences: {'judge': 10.768, 'form': 0.933} over 300
+P1 bare answer spans: {'judge': 15.903, 'form': 0.0} over 300
+P1 story's own sentence: {'judge': 7.507, 'form': 0.977} over 300
+gold kept: 266 / 266
+   What carried the kite into the pond? -> Wind carried the kite into the pond.
+   Where did Radoslaw follow her to? -> Radoslaw followed her to to the hospital car park.
+   Who was proud of his tunnels? -> Proud of his tunnels was Grummel.
+   When did Remedios leave the tulips? -> Remedios left the tulips Thursday.
+   What did the missed acorns grow into? -> The missed acorns grew into small oak trees into.
+   Who kept a garden of clover? -> Pudrick kept a garden of clover.
+   When did Soraya set out? -> Soraya set out at dawn Soraya.
+   Where was the van at dawn? -> The van was at dawn outside the bakery.
+   Who said the road was dangerous? -> The donkey said the road was dangerous.
+   Where did both of them have to walk? -> Both of them had to walk the river.
+   Where had the frogs gone to sleep? -> The frogs had gone to sleep in the reeds.
+   Who found the bell? -> Garnock found the bell.
+   Where was Hamisi at noon? -> Hamisi was at noon under his boat.
+   Where was the ox? -> The ox was in the meadow.
+   Why did the hens choose the goose? -> The hens chose the goose because she always warned them.
+
+[exited with code 0]

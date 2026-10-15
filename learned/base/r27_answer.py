@@ -19,6 +19,9 @@ def cap(s): s = s.strip(); return (s[0].upper() + s[1:]) if s else s
 def sentence(q, a, text=''):
     qw = q.strip().rstrip("?").split(); wh = qw[0].lower(); rest = qw[1:]
     if not rest: return None
+    if text:                                                                                  # P1d: the story's determiner before the answer
+        m0 = re.search(r"\b(the|a|an|his|her|their|its|my|our)\s+" + re.escape(a) + r"\b", text, re.I)
+        if m0 and a.split()[0].lower() not in ("the", "a", "an", "his", "her", "their", "its", "my", "our"): a = m0.group(1).lower() + m0.group(0)[len(m0.group(1)):]
     if a.split()[0].lower() in ("at", "on", "in", "by", "the", "a", "an", "near", "under", "behind", "before", "after", "every", "that", "this", "last", "next", "one", "early", "late"):
         a = a[0].lower() + a[1:]                                                              # P1b: no capital mid-sentence
     front = ""
@@ -36,12 +39,17 @@ def sentence(q, a, text=''):
         if vi is None: return None
         v = body[vi]; vf = past(v) if aux == "did" else (v + "s" if aux == "does" else v)
         subj, after = " ".join(body[:vi]), " ".join(body[vi + 1:])
+        PREPS = ("to", "at", "in", "on", "from", "with", "for", "into", "by", "near", "under", "behind", "after", "before", "over", "onto", "towards", "toward", "about")
+        if after.split() and after.split()[-1].lower() in PREPS and a.split()[0].lower() == after.split()[-1].lower(): after = " ".join(after.split()[:-1])   # P1c (a)
+        if after.lower() in PREPS: return fin(f"{subj} {vf} {after} {a}" if not a.lower().startswith(after.lower() + " ") else f"{subj} {vf} {a}")   # P1c (b)
         if wh in ("who", "what", "whom"):
             if after and after.split()[0].lower() not in ("to", "at", "in", "on", "from", "with", "for", "into", "by", "near", "under", "behind", "after", "before", "while", "when", "during", "about", "over"):
                 return fin(f"{subj} {vf} {after} {a}")                                          # P1b: 'gave Osip the pot of honey'
             return fin(f"{subj} {vf} {a} {after}")
         if wh == "why": return fin(f"{subj} {vf} {after} because {a}")
-        if wh in ("where", "when", "how"): return fin(f"{subj} {vf} {after} {a}")
+        if wh in ("where", "when", "how"):
+            if after.split() and a.split() and after.split()[-1].lower() == a.split()[0].lower(): after = " ".join(after.split()[:-1])   # P1c (a)
+            return fin(f"{subj} {vf} {after} {a}")
         return None
     if rest[0].lower() in ("had", "has") and wh == "who": return fin(f"{a} {rest[0].lower()} {' '.join(rest[1:])}")   # P1b
     if rest[0].lower() in ("was", "were", "is", "are", "had", "has"):
@@ -50,8 +58,12 @@ def sentence(q, a, text=''):
         if bw and bw[0].lower() in ("the", "a", "an", "his", "her", "their", "its", "my") : k = 2
         while k < len(bw) and bw[k][0].isupper(): k += 1
         k = max(k, 1)
+        if wh == "who": return fin(f"{a} {be} {' '.join(bw)}")                                # P1c (c)
         if k < len(bw) and wh in ("where", "when", "why"):                                   # P1b: copula after the subject phrase
             subj, pred = " ".join(bw[:k]), " ".join(bw[k:])
+            mt = re.match(r"^((?:at|by|in|on|during)\s+(?:the\s+)?(?:dawn|dusk|noon|midnight|night|lunchtime|morning|evening|afternoon|end|first|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)\b.*?)$", pred, re.I)
+            if mt and wh == "where":                                                         # P1c (d): 'At dawn, the van was outside the bakery'
+                return fin(f"{mt.group(1)[0].upper() + mt.group(1)[1:]}, {subj[0].lower() + subj[1:] if subj.split()[0].lower() in ('the', 'a', 'an', 'his', 'her', 'their', 'its', 'my') else subj} {be} {a}")
             if wh == "why": return fin(f"{subj} {be} {pred} because {a}")
             return fin(f"{subj} {be} {pred} {a}")
         body = " ".join(bw)
