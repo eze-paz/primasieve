@@ -14,6 +14,7 @@ def past(v):
     if v.endswith("y") and len(v) > 2 and v[-2] not in "aeiou": return v[:-1] + "ied"
     if len(v) <= 4 and len(v) >= 3 and v[-1] not in "aeiouwxy" and v[-2] in "aeiou" and v[-3] not in "aeiou": return v + v[-1] + "ed"
     return v + "ed"
+QUOTE = '--quote' in sys.argv or os.environ.get('R27_QUOTE') == '1'
 AUX_PAST = {"did": None, "does": None, "do": None}
 def cap(s): s = s.strip(); return (s[0].upper() + s[1:]) if s else s
 def sentence(q, a, text=''):
@@ -22,6 +23,9 @@ def sentence(q, a, text=''):
     if text:                                                                                  # P1d: the story's determiner before the answer
         m0 = re.search(r"\b(the|a|an|his|her|their|its|my|our)\s+" + re.escape(a) + r"\b", text, re.I)
         if m0 and a.split()[0].lower() not in ("the", "a", "an", "his", "her", "their", "its", "my", "our"): a = m0.group(1).lower() + m0.group(0)[len(m0.group(1)):]
+        if wh in ("where", "when") and a.split()[0].lower() not in ("in", "on", "at", "into", "onto", "under", "near", "behind", "by", "to", "from", "inside", "beside", "across", "over", "through", "outside", "before", "after", "during", "until"):
+            m1 = re.search(r"\b(in|on|at|into|onto|under|near|behind|by|to|from|inside|beside|across|over|through|outside|before|after|during|until)\s+" + re.escape(a) + r"\b", text, re.I)
+            if m1: a = m1.group(1).lower() + " " + a                                          # P1e (1): the story's preposition
     if a.split()[0].lower() in ("at", "on", "in", "by", "the", "a", "an", "near", "under", "behind", "before", "after", "every", "that", "this", "last", "next", "one", "early", "late"):
         a = a[0].lower() + a[1:]                                                              # P1b: no capital mid-sentence
     front = ""
@@ -37,6 +41,7 @@ def sentence(q, a, text=''):
         cands = [i for i, w in enumerate(body) if i > 0 and (Dct.mainly_verb(w) or Dct.verb_base(w.lower()))]
         vi = next((i for i in cands if past(body[i]) in story_words), next((i for i in cands if (body[i].lower() + "s") in story_words), cands[-1] if cands else None))   # P1b: a verb shows its past form in the story
         if vi is None: return None
+        if QUOTE and text and (body[-1].lower() == "do" or not (past(body[vi]) in story_words or (body[vi].lower() + "s") in story_words)): return "__QUOTE__"   # P1e (2)
         v = body[vi]; vf = past(v) if aux == "did" else (v + "s" if aux == "does" else v)
         subj, after = " ".join(body[:vi]), " ".join(body[vi + 1:])
         PREPS = ("to", "at", "in", "on", "from", "with", "for", "into", "by", "near", "under", "behind", "after", "before", "over", "onto", "towards", "toward", "about")
@@ -88,6 +93,7 @@ if __name__ == "__main__":
         if not a: continue
         text, q, g = items[i]; s = sentence(q, a, text)
         story_s = next((x for x in re.split(r"(?<=[.!?])\s+", text) if a.lower() in x.lower()), None)
+        if s == "__QUOTE__": s = story_s                                                       # P1e (2): quote the story
         rows.append(dict(i=i, q=q, a=a, s=s, story=story_s, gold_span=bool(hit(a, g)), gold_sent=bool(s and hit(s, g))))
     json.dump(rows, open("r27_p1_sentences.json", "w", encoding="utf-8"), indent=0)
     made = [r for r in rows if r["s"]]; print(f"P1 answers {len(rows)}, sentences made {len(made)}; gold kept where the span had it: {sum(r['gold_sent'] for r in made if r['gold_span'])} / {sum(r['gold_span'] for r in made)}", flush=True)

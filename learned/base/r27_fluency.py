@@ -66,3 +66,13 @@ def entity_continuity(text):
         if i > 0 and (w & seen or re.search(r"\b(he|she|they|it|him|her|them|his|their)\b", s, re.I)): hits += 1
         seen |= w
     return hits / (len(S) - 1)
+
+
+def judge_ctx(prefix, text):
+    """F2: judge bits/word of text given a prefix (the story and the question)"""
+    m, tok = _model(); p = tok.encode(prefix); t = tok.encode(text)
+    if not t: return float("nan")
+    p = p[-3000:]
+    with torch.no_grad(): lp = torch.log_softmax(m(torch.tensor([p + t]), m.new_state())[0].float(), -1)
+    bits = -sum(lp[len(p) + j - 1, x].item() for j, x in enumerate(t)) / math.log(2)
+    return bits / max(1, len(re.findall(r"[A-Za-z']+", text)))

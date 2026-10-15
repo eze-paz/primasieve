@@ -1,0 +1,6 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (53 s)
+P5 changed 49 of 300 sentences; judge P1c 10.452 -> own-model choice 10.517; form 0.953 -> 0.953
+   The van took the beds from on Wrexton Road. => The van took the beds from Wrexton Road.
+   Leocadia left her red scarf on the ferry. => Leocadia left on the ferry her red scarf.
+   Zephra caught that night more flies than ever. => Zephra caught more flies than ever that night.
+   One night the mice chewed through every sack. => chewed through every sack One night the mice.

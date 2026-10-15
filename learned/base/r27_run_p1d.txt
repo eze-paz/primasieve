@@ -1,0 +1,5 @@
+P1 realised sentences: {'judge': 10.115, 'form': 0.963} over 300
+P1 bare answer spans: {'judge': 15.752, 'form': 0.0} over 300
+P1 story's own sentence: {'judge': 7.467, 'form': 0.98} over 300
+gold kept: 278 / 278
+   What woke Zulfiya at two? -> The ship's horn woke Zulfiya at two.

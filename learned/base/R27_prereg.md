@@ -57,3 +57,24 @@ Same 300-answer protocol (now on the best policy's answers): realised 10.452 bit
 ## P1d registration (restore the story's determiner)
 When the story text has a determiner (the / a / an / his / her / their / its / my / our) right before the answer span, the sentence uses it; the answer string itself is unchanged for scoring the gold. Same protocol. PASS as P1.
 P3 story reference (first four sentences of the same stories): judge 5.587, form 0.974, continuity 0.964. **P3 verdict: FAIL on the judge** (7.983 vs 5.587, gap 2.4 > 1); PASS on gold kept (263 / 263), form (0.945) and continuity (0.984 >= 0.964). The supporting sentences are the story's own wording; most of the gap is the answer sentence (P1's problem) and the bare 'Before that / After that' links.
+
+## P5 result -- FAIL
+The network changed 49 of 300 sentences; judge 10.452 -> 10.517 (worse), form unchanged. Some choices are improvements ('took the beds from Wrexton Road', 'caught more flies than ever that night'), others clearly worse ('left on the ferry her red scarf', 'chewed through every sack One night the mice'): the network, reading a lower-cased sentence alone, does not judge word order reliably.
+
+## P5b registration (the word-count model chooses)
+Same candidates; the chooser is the Kneser-Ney counter (o5mxa, 5-word phrases, from its saved index) scoring each candidate with sentence boundaries (bits/word), keeping the current P1c sentence unless a candidate is cheaper by at least 0.5 bits/word. Same evaluation. PASS if the judge falls below P1c's 10.452.
+
+## P1d result -- FAIL (judge), PASS (form, gold)
+Restored determiners: realised 10.115 bits/word (P1c 10.452), form 0.963; story sentences 7.467; gold 278 / 278. Gap 2.65 bits.
+
+## Practice diagnosis of the judge gap (150 practice answers)
+Mean judge: ours 10.080, story sentences 7.379. The largest gaps are short sentences led by a name ('Halvard repaired bicycles.' 21.8 vs 9.8): judged without context, a name costs many bits and a short sentence cannot spread that cost, while the story's sentence carries many cheap words. A reply is read after the story, where the names are known -- so the context-free judge is unfair to short replies. Real faults also seen: where-answers missing their preposition ('Jack fell the mud.'), invented verb forms on unusual questions ('wassed', 'frogged do').
+
+## F2 registration (the judge in context)
+judge bits/word of a reply given the story and the question as a prefix ('<story>\n\nQuestion: <q>\nAnswer:'), against the story's own sentence holding the answer under the same prefix (the extractive reply). This is the primary fluency measure for replies from here; the context-free judge stays as a secondary number.
+
+## P1e registration (preposition from the story; quote when unsure)
+(1) a where / when answer without a preposition takes the preposition the story has right before it ('fell in the mud'); (2) when no verb of a did-question can be checked in the story (its past or -s form absent), the reply is the story's own sentence holding the answer instead of a rewrite. Scored with F2 on the same 300 untouched answers; PASS if within 1 bit of the extractive reply under F2, form >= 0.9, gold kept.
+
+## P5b result -- FAIL
+The counter changed 30 of 300 sentences; judge 10.452 -> 10.572 (worse). It prefers moving an unknown name away from the sentence start ('wheeled the crate up the slipway Teague.') and base verb forms ('The bear eat the honey.'): with sentence-initial names costly and no notion of agreement, our count model is not a usable judge of whole-sentence word order either. Word-order choice stays with the rules for now; an own-model chooser needs the story as context (names known) and a model of agreement.

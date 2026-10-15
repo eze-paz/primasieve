@@ -1,0 +1,26 @@
+practice mean judge: ours 10.080 story 7.379
+21.8 vs 9.8 | Halvard repaired bicycles. | story: Halvard repaired bicycles in a shed beside the railway station.
+21.4 vs 10.0 | Nnamdi repairs bicycles. | story: Nnamdi repairs bicycles in a garage behind his uncle's bakery.
+16.2 vs 5.6 | The oldest frogged do noticed. | story: A family of frogs swam closer to look at her, but the oldest frog noticed that one of her eyes was open.
+16.8 vs 7.8 | Saoirse sells honey. | story: Every Friday, Saoirse sells honey from her bees at the market square.
+14.7 vs 5.8 | Mbeki stayed behind. | story: On the first day of the trip, Professor Mbeki's class took the train from Durban to the mountains.
+16.2 vs 7.3 | Paloma fixed the heel afternoon. | story: Paloma fixed the heel the same afternoon, and her brother Santiago delivered the boots to the town hall before the eveni
+11.8 vs 4.4 | Siddharth heard the noise the stone gallery. | story: At two in the morning he heard a noise in the stone gallery and went to look with his torch.
+12.1 vs 5.1 | Jack fell the mud. | story: He slipped and fell in the mud.
+12.2 vs 5.4 | Leon left his cap the bus. | story: Then the bus took them to the science museum, and they ate their sandwiches on its steps.
+13.2 vs 6.5 | Ozturk drove the bus. | story: The school bus left the depot at half past seven with the driver, Mr Ozturk, and no passengers.
+14.6 vs 7.9 | Ferreira collected the parcel. | story: Ferreira collected it there and carried it to his flat.
+13.9 vs 7.4 | Arjun counted the seedlings. | story: Meera planted his rows as well as her own, while Arjun sat on the bank and counted the seedlings.
+13.0 vs 6.4 | Pia handed Yoshiro a card. | story: A schoolgirl named Pia handed him a card that everyone had signed, and an old woman gave him a tin of biscuits.
+15.6 vs 9.2 | Lorcan sold honey cakes. | story: Every Sunday a widower named Lorcan sold honey cakes at the harbour market.
+14.9 vs 8.5 | Hakim sells newspapers. | story: Hakim sells newspapers from a green kiosk outside the cinema.
+13.0 vs 6.6 | Nils left the lantern the fork. | story: He set the lantern down at the fork and went left.
+13.0 vs 6.9 | Marisol cleaned the painting. | story: Then it was taken down and driven to a workshop in Braga, where a restorer named Marisol cleaned it for six weeks.
+12.3 vs 6.6 | Inside the parcel was from Ulrike's aunt left Vienna. | story: The parcel from Ulrike's aunt left Vienna on Monday and reached the sorting office in Graz on Tuesday.
+12.9 vs 7.4 | Year Arjun sprained his ankle. | story: This year Arjun sprained his ankle on the first day.
+9.7 vs 4.5 | Farida left the umbrella at her office the kitchen. | story: She took it on the bus to her office, where she left it in the kitchen.
+12.2 vs 7.0 | The frog think the button wassed the moon. | story: The frog boasted that his voice could call down the moon.
+10.8 vs 5.7 | The hens showed him him the bright sky. | story: He hid in the henhouse, sure that the day would stay dark, but the hens woke him and showed him the bright sky.
+13.8 vs 8.8 | Benedek owned the clock. | story: Old Benedek owned the only clock in the village.
+11.6 vs 6.6 | The parcel left from in Graz. | story: The parcel from Ulrike's aunt left Vienna on Monday and reached the sorting office in Graz on Tuesday.
+12.6 vs 7.7 | The florist gave Rosalind tulips Friday. | story: The terrier's owner, a florist, felt so bad that she gave Rosalind a bunch of tulips every Friday.

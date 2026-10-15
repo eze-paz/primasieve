@@ -1,0 +1,6 @@
+P5b changed 30 of 300; judge P1c 10.452 -> counter's choice 10.572
+   Teague wheeled the crate up the slipway. => wheeled the crate up the slipway Teague.
+   Vikram sold umbrellas the umbrellas. => Vikram sold the umbrellas umbrellas.
+   Michiko painted it the sign. => Michiko painted the sign it.
+   The bear ate the honey. => The bear eat the honey.
+   Maren left her ice axe the door. => Maren left the door her ice axe.
