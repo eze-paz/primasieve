@@ -1090,3 +1090,8 @@ Model on practice E+F: 262 / 400. Trust on 710 + val_fresh11 + E + F: val_fresh1
 
 ## R25-dy registration (answers in the story's own words)
 The main system sometimes rewrites an answer's article or drops a title ('the newspaper' where the story says 'a newspaper'; 'Kowalski' for 'Mrs. Kowalski'). --story-span: after answering, the answer's core (without a leading article) is found in the story and returned with the story's own preceding article, possessive or title. Main system re-run with --story-span; combination on val_fresh12 and val_fresh10 with the five-writer trust; strict and article-free scorers.
+
+## R25-dy result (answers in the story's own words) -- PASS, adopted
+val_fresh12 strict: main system **27 right / 13 wrong** (was 16 / 24; fitness -12, was -56); together **34 / 15** (-11, was -55). Article/title-free: main 28 / 12, together 37 / 12 (+1). val_fresh10 unchanged (main 50 / 6, together 70 / 7). Most of the main system's val_fresh12 'collapse' was the answer form, not comprehension.
+
+## R25-dz (analysis): the main system's remaining trusted mistakes on val_fresh12.
