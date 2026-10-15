@@ -151,3 +151,21 @@ Sentence-level summary: judge 5.318, form 0.988, order gain 0.626, continuity 0.
 
 ## P10 result -- PASS (with a length caveat)
 15 long passages, human summaries as reference (coverage of their content words; judge; form): P9 selection (k = 5) coverage **0.326**, 115 words, judge **6.124**, form 0.679; lead-5 coverage 0.221, 73 words, judge 6.621, form 0.696; clause retelling coverage 0.119, 37 words, judge 8.090, form 0.830; human summaries 128 words, judge 5.769, form 0.693 (novel sentences are long, so form is low for all). P9 beats lead-5 on coverage and is within 0.36 bits of the human judge -- PASS. Caveat: selecting by clause count favours long sentences (115 vs 73 words), which inflates coverage; a length-matched comparison is the next check. The clause-level retelling does not scale to long passages (coverage 0.12, judge 8.09): whole story sentences are the right content unit.
+
+## P10b registration (length-matched baseline)
+Lead-N: the passage's first sentences up to at least as many words as P9's summary of that passage. Coverage only. PASS if P9's coverage still beats it.
+
+## P10b result -- FAIL: the selection is not better than position
+At matched length the first sentences cover more of the human summaries: lead 0.367 (127 words) vs P9 0.326 (115 words). P10's win came from choosing longer sentences, not better ones.
+
+## P10c registration (centrality: Luhn 1958)
+Sentence score = sum over its content words of their frequency in the passage, divided by sqrt(sentence length); sentences taken in score order until the summary reaches P9's word count, then put in passage order. Coverage against the length-matched lead (0.367) and P9 (0.326); judge on the summaries. PASS if coverage beats the length-matched lead.
+
+## P10c result -- FAIL
+Centrality: coverage 0.344 (125 words) vs length-matched lead 0.367.
+
+## P10d registration (cover the whole arc)
+The passage is split into 5 equal stretches of sentences; from each, the most central sentence (P10c score) is taken; passage order. Coverage vs the length-matched lead built to the same word count as this summary. PASS if it beats that lead.
+
+## P10d result -- FAIL
+Arc coverage 0.289 (102 words) vs length-matched lead 0.329 (112 words). Three selection rules (clause count, centrality, arc spread) all lose to 'the first sentences' at equal length -- the lead baseline, famously hard to beat in summarisation research, holds here too (these human summaries open with the passage's setting and people, which the first sentences carry). A selection that beats it would have to be learned from (passage, summary) pairs; 15 pairs are too few to learn from. The realisation side is sound (judge of selected human sentences within 0.4 bits of human summaries); content selection for long text is the open problem.

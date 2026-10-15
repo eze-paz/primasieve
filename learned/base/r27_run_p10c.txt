@@ -1,0 +1,1 @@
+P10c centrality coverage 0.344 (125 words); length-matched lead 0.367; P9 0.326
