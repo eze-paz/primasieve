@@ -15,24 +15,12 @@ ALL = "--all" in ARGV; STORIES = list(range(502)) if ALL else list(range(62, 102
 WITH_SENT = "--with-sentence" in ARGV
 OUT = "ag13_lines.json" if (FROM_CANON and WITH_SENT) else "ag12all_lines.json" if (FROM_CANON and ALL) else "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
 S_PROMPT3 = ("Instruction: Describe the clause as one line of slots. Take WHEN and WHY from the sentence when the sentence gives them. "
-             "Use only words from the clause or the sentence. Write - for an empty slot.
-
-"
-             "Sentence: In the morning Rosa took the key to the well because the bucket was lost.
-Clause: Rosa took the key to the well.
-"
-             "WHO: Rosa | DID: took | WHAT: the key | WHERE: to the well | WHEN: in the morning | WHY: because the bucket was lost
-
-"
-             "Sentence: The jar was full of flour.
-Clause: The jar was full of flour.
-"
-             "WHO: The jar | DID: was | WHAT: full of flour | WHERE: - | WHEN: - | WHY: -
-
-"
-             "Sentence: {sent}
-Clause: {clause}
-")
+             "Use only words from the clause or the sentence. Write - for an empty slot.\n\n"
+             "Sentence: In the morning Rosa took the key to the well because the bucket was lost.\nClause: Rosa took the key to the well.\n"
+             "WHO: Rosa | DID: took | WHAT: the key | WHERE: to the well | WHEN: in the morning | WHY: because the bucket was lost\n\n"
+             "Sentence: The jar was full of flour.\nClause: The jar was full of flour.\n"
+             "WHO: The jar | DID: was | WHAT: full of flour | WHERE: - | WHEN: - | WHY: -\n\n"
+             "Sentence: {sent}\nClause: {clause}\n")
 SLOTS = ["WHO", "DID", "WHAT", "WHERE", "WHEN", "WHY"]
 LINE = re.compile(r"WHO:\s*(.*?)\s*\|\s*DID:\s*(.*?)\s*\|\s*WHAT:\s*(.*?)\s*\|\s*WHERE:\s*(.*?)\s*\|\s*WHEN:\s*(.*?)\s*\|\s*WHY:\s*(.*?)\s*$")
 PRON = {"he", "she", "they", "it", "him", "her", "them", "his", "their", "its"}
