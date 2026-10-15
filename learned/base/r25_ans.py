@@ -97,3 +97,10 @@ for k in {x[0] for x in TR}:
     if best[1] is not None: th[k] = best[1]
 a = sum(1 for k, c, h in TE if k in th and c is not None and c >= th[k] and h); w = sum(1 for k, c, h in TE if k in th and c is not None and c >= th[k] and not h)
 print(f"R25-eo confident answers only (thresholds per kind from training: {len(th)} kinds): test {a} right / {w} wrong (fitness {a - 3 * w})", flush=True)
+# R25-ep: candidate recall -- is a gold answer among the candidates, and among the top 3 by score?
+inc = top3 = n = 0
+for text, q, g in test:
+    cs = candidates(text, q); n += 1
+    if any(gold_hit(c[0], g) for c in cs): inc += 1
+    if any(gold_hit(c[0], g) for c in sorted(cs, key=lambda c: -score(c[1]))[:3]): top3 += 1
+print(f"R25-ep test: gold among candidates {inc}/{n} = {inc / n:.2f}; among the top 3 {top3}/{n} = {top3 / n:.2f}", flush=True)

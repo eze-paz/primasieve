@@ -1197,3 +1197,8 @@ r25_ans.py: candidates = content-word runs (with optional article / title, and a
 
 ## R25-eo registration (answer only when confident)
 Per kind, a threshold on the top candidate's margin over the second, chosen on training to maximise right - 3 x wrong; test E-F reported.
+
+## R25-eo result -- FAIL
+Confidence thresholds per kind (from training): test 19 right / 23 wrong (fitness -50). The counted features do not separate right from wrong answers well enough on new stories.
+
+## R25-ep (analysis): is the bottleneck finding the answer or choosing it? On E-F, how often is a gold answer among the candidates at all, and among the top 3.
