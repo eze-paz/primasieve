@@ -45,6 +45,14 @@ def gen(m, tok, prompt, n=140):
     return tok.decode(out).split("\n\n")[0]
 
 
+def load_canon():
+    """the AG4 clause file is being written by another process; retry a torn read"""
+    for _ in range(10):
+        try: return json.load(open("ag4_canon.json", encoding="utf-8"))
+        except json.JSONDecodeError: time.sleep(3)
+    return {}
+
+
 def parse(text):
     out = []
     for line in text.split("\n"):
@@ -73,12 +81,12 @@ def main():
     for k in STORIES:
         s = S[k]
         if s["id"] in done and done[s["id"]].get("qs"): continue
-        if FROM_CANON and s["id"] not in json.load(open("ag4_canon.json", encoding="utf-8")): stats["story:canon not ready"] += 1; continue
+        if FROM_CANON and s["id"] not in load_canon(): stats["story:canon not ready"] += 1; continue
         rec = done.get(s["id"]) or {}
         if "lines" not in rec:
             sents = [x.strip() for x in A.SENT.split(s["text"]) if x.strip()]; names = set(); prev = ""; lines = []; last_who = None
             if FROM_CANON:                                                            # AG12: units are the AG4 canonical clauses
-                CAN = json.load(open("ag4_canon.json", encoding="utf-8")); sents = [x.strip() for x in A.SENT.split(CAN[s["id"]]["canon"]) if x.strip()]
+                CAN = load_canon(); sents = [x.strip() for x in A.SENT.split(CAN[s["id"]]["canon"]) if x.strip()]
             for sent in sents:
                 tk = toks(sent); names |= {t.lower() for t in tk[1:] if t[0].isupper()} | ({tk[0].lower()} if tk and tk[0][0].isupper() and tk[0].lower() not in STOP else set())
                 allowed = set(content(sent)) | {A.lemma(w) for w in content(sent)} | set(content(prev)) | names | {"the", "a", "an"}
