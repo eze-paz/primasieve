@@ -212,3 +212,18 @@ answers, precision 0.65 -> 0.66); thresholded (-0.11) prose 64 / 13, canonical *
 rewrite loses 7-9% of what a competent reader could answer from the prose and gains a little precision; the loss sits
 in 'who' and 'when' (dropped clauses, time phrases cut). The canonical text is a near-lossless simplification: the
 engine can take it as its input without giving up much of the signal.
+
+## AG9 result -- FAIL (attributed to the proposer)
+Stage 1 (6,392 s): 155 of 400 questions converged to a canonical statement with one blank; rejections: the model
+filled the blank with a guess 440 times (over three prompts), passive 79, no event with the blank 214, invented 25.
+Stage 2, untouched val_fresh2: canonical **11 right / 3 wrong** (original 8 / 2); practice 14 / 5 (11 / 3). Far
+below AG3's hand-parsed 25 / 3. Wrong answers come from the translator's cut spans ('his brother's' for 'his
+brother's camera', 'against a' for 'against a pine'), a weakness the hand parser shares. Reading: the loop's
+question side needs a proposer that can leave a blank; the 0.4B model mostly cannot. The sentence side (AG3, AG6)
+stands; the question side is unproven, not refuted.
+
+## AG9b registration (the 1.5B model as the question-side proposer)
+ag9_qcanon.py --ckpt rwkv7/RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth --out ag9b_qstatements.json, untouched
+val_fresh2 only (stories 62-101, 200 questions; no choices are made on it, the pipeline is fixed). Reported: stage-1
+yield against 0.4B's 39%, and stage-2 right / wrong on canonical and original text. PASS if untouched right > 25 at
+precision >= 0.89 on canonical. About 4x the 0.4B cost per question.
