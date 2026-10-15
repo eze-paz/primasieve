@@ -92,3 +92,20 @@ PASS if on val_fresh2, for either reader, the canonical text gives more right an
 original. A PASS says a verified rewrite loop can make free prose more readable to a symbolic engine without an LLM
 judge; a FAIL with high rejection rates says the 0.4B model cannot propose faithful clauses (then the 1.5B model is
 the one more variant); a FAIL with high acceptance says the readers' limits are not sentence shape.
+
+## AG3 result -- PASS (on the question-answering instrument; the world-state instrument was too sparse)
+Rewriting (stock RWKV-7 0.4B proposing, engine verifying; 80 stories, 10,456 s under CPU contention): 238 of 307
+sentences rewritten, 69 kept as written; 361 clauses accepted; rejected: no event 294, fragment 97, invented words
+42, copies context 25, agent swap 1. Signal: 240 of 266 events of the original reading reappear in the kept clauses.
+World3 world alone answered under 10 questions per cell on these stories (state questions are rare in val_more and
+val_fresh2): hand reader untouched 3 / 2 original -> 4 / 4 canonical, translator 2 / 5 -> 4 / 3; inconclusive.
+Symbolic question answerer over the translator's events (ag3_qa.py; who / what / where shapes; same reader on both
+texts), untouched val_fresh2 (200 questions): original **17 right / 4 wrong (+5, precision 0.81)**, canonical
+**25 right / 3 wrong (+16, precision 0.89)**; practice val_more: 18 / 4 -> 25 / 4. Nineteen questions changed
+outcome, 15 of them from silent or wrong to right ('Who planted Arjun's rows?' silent -> Meera; 'Who hired a fishing
+boat?' winds -> Sefa; 'What did Keiko paint?' 'a new' -> 'a new sign'); 2 went the other way (a dropped clause).
+Reading: the owner's loop works at this scale. A small model proposes, a symbolic verifier keeps only clauses whose
+words, event structure and roles survive, and the canonical text is more readable to a symbolic engine than the
+prose, at higher precision. The model's own errors (loops, agent swaps, inventions) were caught, not trusted.
+Limits: 14% of questions reached; the largest rejection class ('no event', 294) is the translator's narrow idea of an
+event (no copular or existential clauses); the 0.4B model costs ~2 min per story on this CPU.

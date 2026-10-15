@@ -34,11 +34,10 @@ def ent(x):
 
 
 PROMPT = ("Instruction: Rewrite the sentence as a numbered list of short, simple sentences. One fact per sentence. "
-          "Use only words from the sentence. Keep every name, object, place and time. Use no pronouns.\n\n"
-          "Context: {prev}\nSentence: {sent}\n\nSimple sentences:\n1.")
-PROMPT2 = ("Instruction: Split the sentence into very short sentences of the form NAME VERB OBJECT PLACE. Use only words that "
-           "appear in the sentence. Replace he, she, it, they by the name they stand for.\n\n"
-           "Context: {prev}\nSentence: {sent}\n\nShort sentences:\n1.")
+          "Use only words from the sentence. Keep every name, object, place and time.\n\n"
+          "Sentence: {sent}\n\nSimple sentences:\n1.")
+PROMPT2 = ("Instruction: Split the sentence into very short sentences of the form WHO DID WHAT WHERE. Use only words that "
+           "appear in the sentence.\n\nSentence: {sent}\n\nShort sentences:\n1.")
 
 
 @torch.no_grad()
@@ -63,7 +62,9 @@ def verify(T, clause, sent, prev, names, orig_events, stats):
     allowed = content(sent) | content(prev) | {n.lower() for n in names}
     extra = content(clause) - allowed
     if extra: stats["reject:invented " + ",".join(sorted(extra))[:40]] += 1; stats["reject:invented"] += 1; return None
-    if re.search(r"\b(he|she|it|they|him|them|his|her|their)\b", clause.lower()): stats["reject:pronoun"] += 1; return None
+    own = content(clause) & (content(sent) - content(prev))
+    if not own and content(sent) - content(prev): stats["reject:copies context"] += 1; return None
+    if toks(clause)[-1].lower() in STOP or len(content(clause)) < 2: stats["reject:fragment"] += 1; return None
     evs = T.read(clause)
     if not evs: stats["reject:no event"] += 1; return None
     for e in evs:
@@ -111,10 +112,11 @@ def main():
 def read():
     import r25_world3 as W3, battery
     from b6_rwkv import hit
+    H = battery.door().events.reader; os.chdir(HERE)
     data = [s for s in json.load(open("stories_train_v2.json", encoding="utf-8")) if s.get("events")]
     random.Random(0).shuffle(data); F = A.Feats([tk for st in data[:2240] for tk, _ in A.gold_examples(st)])
     vm = A.Tagger(F, 2, False); am = A.Tagger(F, len(A.ATAGS), True); sd = torch.load("ag1_translator.pt"); vm.load_state_dict(sd["vm"]); am.load_state_dict(sd["am"]); vm.eval(); am.eval()
-    T = A.Translator(F, vm, am); H = battery.door().events.reader; os.chdir(HERE)
+    T = A.Translator(F, vm, am)
     S = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; C = json.load(open("ag3_canon.json", encoding="utf-8"))
     print("AG3 verifier stats:", C.get("_stats"))
     res = collections.defaultdict(lambda: [0, 0])

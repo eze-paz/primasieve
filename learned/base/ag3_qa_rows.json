@@ -1,0 +1,4049 @@
+[
+ {
+  "id": "m1",
+  "q": "Who repaired bicycles?",
+  "gold": [
+   "halvard"
+  ],
+  "original": "Halvard",
+  "canonical": "Halvard"
+ },
+ {
+  "id": "m1",
+  "q": "What did Halvard refuse to take?",
+  "gold": [
+   "her money",
+   "money"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m1",
+  "q": "Who brought a wheel with a broken spoke?",
+  "gold": [
+   "keiko",
+   "the schoolgirl"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m1",
+  "q": "What did Keiko paint?",
+  "gold": [
+   "a new sign",
+   "sign"
+  ],
+  "original": "a new",
+  "canonical": "a new sign"
+ },
+ {
+  "id": "m1",
+  "q": "When did Keiko bring the wheel?",
+  "gold": [
+   "on monday",
+   "monday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m2",
+  "q": "Who boasted about his voice?",
+  "gold": [
+   "the frog",
+   "frog"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m2",
+  "q": "What did the magpie do one evening?",
+  "gold": [
+   "dropped a shiny button",
+   "dropped a button",
+   "dropped"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m2",
+  "q": "What did the magpie drop?",
+  "gold": [
+   "a shiny button",
+   "button"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m2",
+  "q": "What did the frog think the button was?",
+  "gold": [
+   "the moon",
+   "moon"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m2",
+  "q": "How did the frog sing afterwards?",
+  "gold": [
+   "more quietly",
+   "quietly"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m3",
+  "q": "Where was the umbrella at seven o'clock?",
+  "gold": [
+   "by the front door",
+   "front door"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m3",
+  "q": "Where did Farida leave the umbrella at her office?",
+  "gold": [
+   "in the kitchen",
+   "kitchen"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m3",
+  "q": "Who borrowed the umbrella?",
+  "gold": [
+   "bruno",
+   "her colleague"
+  ],
+  "original": "Bruno",
+  "canonical": "Bruno"
+ },
+ {
+  "id": "m3",
+  "q": "Where was the umbrella at the end?",
+  "gold": [
+   "at the bakery",
+   "bakery"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m3",
+  "q": "Who came back soaked?",
+  "gold": [
+   "bruno"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m4",
+  "q": "Who ran the corner shop?",
+  "gold": [
+   "mrs adeyemi",
+   "adeyemi"
+  ],
+  "original": "Adeyemi",
+  "canonical": "Adeyemi"
+ },
+ {
+  "id": "m4",
+  "q": "Who stacked the shelves?",
+  "gold": [
+   "tobias",
+   "her nephew"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m4",
+  "q": "What flooded the boxes of rice?",
+  "gold": [
+   "a pipe",
+   "the pipe",
+   "pipe"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m4",
+  "q": "Where did Tobias carry the boxes?",
+  "gold": [
+   "into the yard",
+   "the yard",
+   "yard"
+  ],
+  "original": "into the yard",
+  "canonical": "into the yard"
+ },
+ {
+  "id": "m4",
+  "q": "How much did Mrs. Adeyemi pay him that week?",
+  "gold": [
+   "double",
+   "twice"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m5",
+  "q": "Who was jealous?",
+  "gold": [
+   "the goat",
+   "goat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m5",
+  "q": "Where was the field?",
+  "gold": [
+   "behind a monastery",
+   "behind the monastery",
+   "monastery"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m5",
+  "q": "What did the monks feed the donkey?",
+  "gold": [
+   "oats"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m5",
+  "q": "Who gave the donkey a bitter medicine?",
+  "gold": [
+   "the vet",
+   "a vet",
+   "vet"
+  ],
+  "original": "who",
+  "canonical": "who"
+ },
+ {
+  "id": "m5",
+  "q": "What did the goat tell the donkey to do?",
+  "gold": [
+   "pretend to be lame",
+   "pretend",
+   "lame"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m6",
+  "q": "Where were the glasses after breakfast?",
+  "gold": [
+   "on the porch",
+   "porch"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m6",
+  "q": "Who carried the glasses inside?",
+  "gold": [
+   "zuri",
+   "his granddaughter"
+  ],
+  "original": "Zuri",
+  "canonical": "Zuri"
+ },
+ {
+  "id": "m6",
+  "q": "Where were the glasses at noon?",
+  "gold": [
+   "on the piano",
+   "piano"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m6",
+  "q": "Who moved the glasses to the windowsill?",
+  "gold": [
+   "the piano tuner",
+   "tuner"
+  ],
+  "original": "tuner",
+  "canonical": "tuner"
+ },
+ {
+  "id": "m6",
+  "q": "Where were the glasses at the end?",
+  "gold": [
+   "on the windowsill",
+   "windowsill"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m7",
+  "q": "Who was the only dentist on the island?",
+  "gold": [
+   "dr lindqvist",
+   "lindqvist"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m7",
+  "q": "Who had a toothache?",
+  "gold": [
+   "kwame",
+   "the fisherman"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m7",
+  "q": "Whose radio did the dentist borrow?",
+  "gold": [
+   "the harbour master's",
+   "harbour master"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m7",
+  "q": "What did Kwame bring?",
+  "gold": [
+   "a basket of crabs",
+   "crabs"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m7",
+  "q": "When did Kwame bring the crabs?",
+  "gold": [
+   "when the sea calmed",
+   "sea calmed"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m8",
+  "q": "Who kept the keys to the library?",
+  "gold": [
+   "the owl",
+   "owl"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m8",
+  "q": "Who chewed the book of maps?",
+  "gold": [
+   "pip",
+   "the squirrel"
+  ],
+  "original": null,
+  "canonical": "Pip"
+ },
+ {
+  "id": "m8",
+  "q": "What did the squirrels hide between the pages?",
+  "gold": [
+   "acorns"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m8",
+  "q": "What did Pip copy the maps onto?",
+  "gold": [
+   "birch bark",
+   "bark"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m8",
+  "q": "When did Pip finish copying?",
+  "gold": [
+   "the first snow",
+   "first snow"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m9",
+  "q": "What did they stop for?",
+  "gold": [
+   "strawberries"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m9",
+  "q": "Where were they at sunset on Friday?",
+  "gold": [
+   "the beach hut",
+   "beach hut",
+   "hut"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m9",
+  "q": "Where was Ximena's father on Saturday?",
+  "gold": [
+   "on the pier",
+   "pier"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m9",
+  "q": "Who swam out to the buoy?",
+  "gold": [
+   "ximena"
+  ],
+  "original": "Ximena",
+  "canonical": "Ximena"
+ },
+ {
+  "id": "m9",
+  "q": "What did they bring home?",
+  "gold": [
+   "a cooler full of mackerel",
+   "mackerel"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m10",
+  "q": "Who heard a crash?",
+  "gold": [
+   "mr haddad",
+   "haddad",
+   "the night guard"
+  ],
+  "original": "Haddad",
+  "canonical": "Haddad"
+ },
+ {
+  "id": "m10",
+  "q": "What knocked the jar off its stand?",
+  "gold": [
+   "a cat",
+   "the cat",
+   "cat"
+  ],
+  "original": null,
+  "canonical": "had"
+ },
+ {
+  "id": "m10",
+  "q": "What did the jar land on?",
+  "gold": [
+   "a cushion",
+   "cushion"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m10",
+  "q": "What did Mr. Haddad write?",
+  "gold": [
+   "a report",
+   "report"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m10",
+  "q": "What did the curator do the next day?",
+  "gold": [
+   "moved every jar behind glass",
+   "behind glass"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m11",
+  "q": "Who refused to share the shade?",
+  "gold": [
+   "the peacock",
+   "peacock"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m11",
+  "q": "What circled overhead?",
+  "gold": [
+   "a hawk",
+   "the hawk",
+   "hawk"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m11",
+  "q": "Who shrieked a warning?",
+  "gold": [
+   "the sparrow",
+   "sparrow"
+  ],
+  "original": null,
+  "canonical": "The sparrow"
+ },
+ {
+  "id": "m11",
+  "q": "When did the hawk circle?",
+  "gold": [
+   "at midday",
+   "midday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m11",
+  "q": "What shone in the sun?",
+  "gold": [
+   "the peacock's bright tail",
+   "bright tail",
+   "tail"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m12",
+  "q": "Where was the parcel on Tuesday morning?",
+  "gold": [
+   "the warehouse",
+   "warehouse",
+   "ghent"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m12",
+  "q": "What carried the parcel from Ghent?",
+  "gold": [
+   "a lorry",
+   "lorry"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m12",
+  "q": "Who took the parcel to the post office?",
+  "gold": [
+   "agnieszka",
+   "the driver"
+  ],
+  "original": "Agnieszka",
+  "canonical": "Agnieszka"
+ },
+ {
+  "id": "m12",
+  "q": "Who collected the parcel?",
+  "gold": [
+   "mr ferreira",
+   "ferreira"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m12",
+  "q": "Where was the parcel at the end?",
+  "gold": [
+   "his flat",
+   "ferreira's flat",
+   "flat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m13",
+  "q": "Who sprained his ankle?",
+  "gold": [
+   "arjun"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m13",
+  "q": "Who planted Arjun's rows?",
+  "gold": [
+   "meera"
+  ],
+  "original": null,
+  "canonical": "Meera"
+ },
+ {
+  "id": "m13",
+  "q": "What did the twins help plant?",
+  "gold": [
+   "rice"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m13",
+  "q": "What did Arjun count?",
+  "gold": [
+   "the seedlings",
+   "seedlings"
+  ],
+  "original": null,
+  "canonical": "the seedlings"
+ },
+ {
+  "id": "m13",
+  "q": "What did the aunt cook?",
+  "gold": [
+   "a feast",
+   "feast"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m14",
+  "q": "Who complained about the sand?",
+  "gold": [
+   "the rooster",
+   "rooster"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m14",
+  "q": "Where did the rooster ride?",
+  "gold": [
+   "on the camel's hump",
+   "its hump",
+   "hump"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m14",
+  "q": "Who did the rooster wake?",
+  "gold": [
+   "the traders",
+   "traders"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m14",
+  "q": "When did the rooster wake them?",
+  "gold": [
+   "each dawn",
+   "dawn"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m14",
+  "q": "What did the camel do when the sandstorm came?",
+  "gold": [
+   "knelt",
+   "kneel"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m15",
+  "q": "What did Yusuf put in his bag?",
+  "gold": [
+   "his football",
+   "football"
+  ],
+  "original": "his football",
+  "canonical": "his football"
+ },
+ {
+  "id": "m15",
+  "q": "Who kicked the ball over the fence?",
+  "gold": [
+   "dario"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m15",
+  "q": "Whose garden did the ball land in?",
+  "gold": [
+   "mrs kowalczyk's",
+   "kowalczyk"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m15",
+  "q": "Where did Mrs. Kowalczyk keep the ball?",
+  "gold": [
+   "in her shed",
+   "her shed",
+   "shed"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m15",
+  "q": "Who had the ball at the end?",
+  "gold": [
+   "yusuf"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m16",
+  "q": "Who was sent to the pumpkin show?",
+  "gold": [
+   "sione",
+   "the reporter"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m16",
+  "q": "Who grew the biggest pumpkin?",
+  "gold": [
+   "a retired teacher",
+   "retired teacher",
+   "the teacher"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m16",
+  "q": "Where had the pumpkin been grown?",
+  "gold": [
+   "in a bathtub",
+   "bathtub"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m16",
+  "q": "How many farmers lifted the pumpkin?",
+  "gold": [
+   "six",
+   "6"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m16",
+  "q": "What made the front page?",
+  "gold": [
+   "sione's picture",
+   "picture"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m17",
+  "q": "Who lent the hedgehog a lantern?",
+  "gold": [
+   "the mole",
+   "mole"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m17",
+  "q": "Who was crying for its mother?",
+  "gold": [
+   "the rabbit kit",
+   "rabbit kit",
+   "the kit"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m17",
+  "q": "Who had the lantern after the hedgehog met the kit?",
+  "gold": [
+   "the rabbit kit",
+   "rabbit kit",
+   "the kit"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m17",
+  "q": "What did the rabbits bring the hedgehog?",
+  "gold": [
+   "a basket of clover",
+   "clover"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m17",
+  "q": "What did the rabbits bring the mole?",
+  "gold": [
+   "a new lantern",
+   "lantern"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m18",
+  "q": "When was the painting taken down?",
+  "gold": [
+   "on monday",
+   "monday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m18",
+  "q": "Where was the painting during the week?",
+  "gold": [
+   "in the restorer's workshop",
+   "restorer's workshop",
+   "workshop"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m18",
+  "q": "Who carried the painting to the east gallery?",
+  "gold": [
+   "two porters",
+   "the porters",
+   "porters"
+  ],
+  "original": "two",
+  "canonical": "two"
+ },
+ {
+  "id": "m18",
+  "q": "Why did the painting not stay in the east gallery?",
+  "gold": [
+   "it was too wide",
+   "too wide"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m18",
+  "q": "Where was the painting on Sunday evening?",
+  "gold": [
+   "in the hall",
+   "its old place",
+   "hall"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m19",
+  "q": "Who owned the bakery?",
+  "gold": [
+   "chiara"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m19",
+  "q": "Who let Chiara use his oven?",
+  "gold": [
+   "mehmet",
+   "the pizza maker"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m19",
+  "q": "When did Mehmet open?",
+  "gold": [
+   "at eleven",
+   "eleven",
+   "11"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m19",
+  "q": "What did Chiara give Mehmet?",
+  "gold": [
+   "a cake shaped like a pizza",
+   "a cake",
+   "cake"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m19",
+  "q": "What broke?",
+  "gold": [
+   "the bakery's oven",
+   "the oven",
+   "oven"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m20",
+  "q": "Who said the water was too deep?",
+  "gold": [
+   "the crocodile",
+   "crocodile"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m20",
+  "q": "Who walked straight into the river?",
+  "gold": [
+   "the grandmother",
+   "grandmother"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m20",
+  "q": "How deep was the water?",
+  "gold": [
+   "up to her knees",
+   "knee"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m20",
+  "q": "Why did the crocodile slide away?",
+  "gold": [
+   "ashamed of his lie",
+   "ashamed"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m20",
+  "q": "What did the young elephant want to cross?",
+  "gold": [
+   "the river",
+   "river"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m21",
+  "q": "Where was the boat in the morning?",
+  "gold": [
+   "in the harbour",
+   "harbour",
+   "skerry"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m21",
+  "q": "Where was the boat at noon?",
+  "gold": [
+   "at the reef",
+   "the reef",
+   "reef"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m21",
+  "q": "Who was the skipper?",
+  "gold": [
+   "oona"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m21",
+  "q": "What pushed the boat north?",
+  "gold": [
+   "a gale",
+   "the gale",
+   "gale"
+  ],
+  "original": null,
+  "canonical": "A gale"
+ },
+ {
+  "id": "m21",
+  "q": "What did Oona sail back with?",
+  "gold": [
+   "an empty hold",
+   "empty hold"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m22",
+  "q": "Who drove the school bus?",
+  "gold": [
+   "mr varga",
+   "varga"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m22",
+  "q": "When did Mr. Varga ask Elias to help?",
+  "gold": [
+   "on monday",
+   "monday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m22",
+  "q": "What did Mr. Varga ask Elias to do?",
+  "gold": [
+   "count the children",
+   "count"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m22",
+  "q": "Where did Elias sit by Friday?",
+  "gold": [
+   "in the middle",
+   "middle"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m22",
+  "q": "How many new friends did Elias have?",
+  "gold": [
+   "three",
+   "3"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m23",
+  "q": "Who built the dam?",
+  "gold": [
+   "the beaver",
+   "beaver"
+  ],
+  "original": "A beaver",
+  "canonical": "A beaver"
+ },
+ {
+  "id": "m23",
+  "q": "Who complained to the turtle?",
+  "gold": [
+   "the heron",
+   "heron"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m23",
+  "q": "What did the beaver's dam flood?",
+  "gold": [
+   "a heron's favourite fishing spot",
+   "fishing spot"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m23",
+  "q": "What must the beaver leave in the dam?",
+  "gold": [
+   "a gap",
+   "gap"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m23",
+  "q": "Where does the heron fish now?",
+  "gold": [
+   "by the gap",
+   "the gap",
+   "gap"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m24",
+  "q": "Whose camera did Kenji borrow?",
+  "gold": [
+   "his brother's",
+   "hiro's",
+   "hiro"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m24",
+  "q": "What did Kenji borrow?",
+  "gold": [
+   "his brother's camera",
+   "camera"
+  ],
+  "original": "his brother's",
+  "canonical": "his brother's"
+ },
+ {
+  "id": "m24",
+  "q": "Who found the camera?",
+  "gold": [
+   "a keeper",
+   "the keeper",
+   "keeper"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m24",
+  "q": "Where was the camera on Saturday night?",
+  "gold": [
+   "lost-property office",
+   "lost property office",
+   "lost-property",
+   "lost property"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m24",
+  "q": "Who collected the camera?",
+  "gold": [
+   "hiro",
+   "kenji's brother"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m25",
+  "q": "Who noticed the late book?",
+  "gold": [
+   "ms osei",
+   "osei",
+   "the librarian"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m25",
+  "q": "What was the book about?",
+  "gold": [
+   "volcanoes"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m25",
+  "q": "Who did Daria read to?",
+  "gold": [
+   "her grandfather",
+   "grandfather"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m25",
+  "q": "What did Ms. Osei order?",
+  "gold": [
+   "a large-print copy",
+   "large-print",
+   "large print"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m25",
+  "q": "What did Daria do with the book?",
+  "gold": [
+   "read it aloud",
+   "read it",
+   "read"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m26",
+  "q": "Where did the spider spin her web?",
+  "gold": [
+   "across the door of the barn",
+   "door of the barn",
+   "barn door",
+   "barn"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m26",
+  "q": "What swept the web away?",
+  "gold": [
+   "the farmer's broom",
+   "broom"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m26",
+  "q": "When did the spider spin it again?",
+  "gold": [
+   "every night",
+   "night"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m26",
+  "q": "What filled the barn?",
+  "gold": [
+   "flies"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m26",
+  "q": "Who was grateful?",
+  "gold": [
+   "the cows",
+   "cows"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m27",
+  "q": "Where were the sheep at dawn?",
+  "gold": [
+   "in the fold",
+   "the fold",
+   "fold"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m27",
+  "q": "When did Aurelio bring the flock down?",
+  "gold": [
+   "at dusk",
+   "dusk"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m27",
+  "q": "Where did Aurelio nap?",
+  "gold": [
+   "under an oak",
+   "oak"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m27",
+  "q": "Who kept the sheep away from the cliff edge?",
+  "gold": [
+   "lupa",
+   "the dog"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m27",
+  "q": "What did Aurelio do under the oak?",
+  "gold": [
+   "napped",
+   "nap",
+   "slept"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m28",
+  "q": "Where did Ingrid work?",
+  "gold": [
+   "at the garage",
+   "the garage",
+   "garage"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m28",
+  "q": "Who brought in the car?",
+  "gold": [
+   "tariq",
+   "the driver"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m28",
+  "q": "What was rolling around in the boot?",
+  "gold": [
+   "a tin of marbles",
+   "marbles"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m28",
+  "q": "What did Ingrid do with the tin?",
+  "gold": [
+   "handed it back",
+   "handed the tin back",
+   "handed"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m28",
+  "q": "How much did Ingrid charge Tariq?",
+  "gold": [
+   "nothing",
+   "not charge"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m29",
+  "q": "Who made a promise to the mice?",
+  "gold": [
+   "the cat",
+   "cat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m29",
+  "q": "What did the cat ask for?",
+  "gold": [
+   "one fish each week",
+   "a fish",
+   "fish"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m29",
+  "q": "Where did the mice steal the fish?",
+  "gold": [
+   "from the market",
+   "the market",
+   "market"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m29",
+  "q": "What chased the mice home?",
+  "gold": [
+   "the fishmonger's dog",
+   "the dog",
+   "dog"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m29",
+  "q": "When did the mice steal fish?",
+  "gold": [
+   "every friday",
+   "friday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m30",
+  "q": "What did Sana pack?",
+  "gold": [
+   "a picnic",
+   "picnic"
+  ],
+  "original": "a picnic",
+  "canonical": "a picnic"
+ },
+ {
+  "id": "m30",
+  "q": "Where did Sana leave her bicycle?",
+  "gold": [
+   "against a pine",
+   "pine"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m30",
+  "q": "Who moved the bicycle?",
+  "gold": [
+   "a ranger",
+   "the ranger",
+   "ranger"
+  ],
+  "original": "A ranger",
+  "canonical": "A ranger"
+ },
+ {
+  "id": "m30",
+  "q": "Where was the bicycle when Sana found it?",
+  "gold": [
+   "in the car park",
+   "car park"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m30",
+  "q": "Where was Sana at the end?",
+  "gold": [
+   "her flat",
+   "flat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m31",
+  "q": "Who left the cake on the train?",
+  "gold": [
+   "uncle bartholomew",
+   "bartholomew"
+  ],
+  "original": null,
+  "canonical": "Bartholomew"
+ },
+ {
+  "id": "m31",
+  "q": "Who found the cake?",
+  "gold": [
+   "a porter",
+   "the porter",
+   "porter"
+  ],
+  "original": "a porter",
+  "canonical": "The porter"
+ },
+ {
+  "id": "m31",
+  "q": "Where was the cake found?",
+  "gold": [
+   "on a luggage rack",
+   "luggage rack"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m31",
+  "q": "Who brought the cake back?",
+  "gold": [
+   "a taxi driver",
+   "taxi driver"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m31",
+  "q": "When did the cake arrive back?",
+  "gold": [
+   "as the speeches began",
+   "the speeches",
+   "speeches"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m32",
+  "q": "Who boasted?",
+  "gold": [
+   "the young wolf",
+   "the wolf",
+   "wolf"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m32",
+  "q": "What did the wolf say he could outrun?",
+  "gold": [
+   "the wind",
+   "wind"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m32",
+  "q": "Where did the wolf collapse?",
+  "gold": [
+   "by a well",
+   "well"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m32",
+  "q": "Who brought the wolf water?",
+  "gold": [
+   "an old badger",
+   "the badger",
+   "badger"
+  ],
+  "original": "badger",
+  "canonical": "badger"
+ },
+ {
+  "id": "m32",
+  "q": "What did the wind do?",
+  "gold": [
+   "blew so hard",
+   "blew hard",
+   "blew"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m33",
+  "q": "Where were the students on the second day?",
+  "gold": [
+   "at a research hut",
+   "research hut",
+   "hut"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m33",
+  "q": "What closed the road?",
+  "gold": [
+   "a landslide",
+   "landslide"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m33",
+  "q": "What flew the students back?",
+  "gold": [
+   "a helicopter",
+   "helicopter"
+  ],
+  "original": "a helicopter",
+  "canonical": "a helicopter"
+ },
+ {
+  "id": "m33",
+  "q": "Who stayed behind?",
+  "gold": [
+   "professor mbeki",
+   "mbeki"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m33",
+  "q": "Where were the students at the end?",
+  "gold": [
+   "durban"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m34",
+  "q": "What bit Rosalind?",
+  "gold": [
+   "a terrier",
+   "the terrier",
+   "terrier"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m34",
+  "q": "Who owned the terrier?",
+  "gold": [
+   "a florist",
+   "the florist",
+   "florist"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m34",
+  "q": "When did the florist give Rosalind tulips?",
+  "gold": [
+   "every friday",
+   "friday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m34",
+  "q": "What does the terrier carry now?",
+  "gold": [
+   "the letters",
+   "letters"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m34",
+  "q": "What did the florist give Rosalind?",
+  "gold": [
+   "a bunch of tulips",
+   "tulips"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m35",
+  "q": "Where did the swallows build a nest?",
+  "gold": [
+   "under the eaves",
+   "eaves"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m35",
+  "q": "Who wanted to knock the nest down?",
+  "gold": [
+   "the innkeeper's son",
+   "the son"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m35",
+  "q": "What did the swallows eat?",
+  "gold": [
+   "the mosquitoes",
+   "mosquitoes"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m35",
+  "q": "What did the son climb?",
+  "gold": [
+   "a ladder",
+   "ladder"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m35",
+  "q": "Why did the innkeeper keep the nest?",
+  "gold": [
+   "the birds brought luck",
+   "luck"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m36",
+  "q": "Where was the key at first?",
+  "gold": [
+   "under a flowerpot",
+   "flowerpot"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m36",
+  "q": "Who used the key on Monday?",
+  "gold": [
+   "fenna",
+   "his neighbour"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m36",
+  "q": "Where was the key on Tuesday?",
+  "gold": [
+   "on fenna's hook",
+   "her own hook",
+   "fenna's hook",
+   "hook"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m36",
+  "q": "Who could not get in?",
+  "gold": [
+   "the plumber",
+   "plumber"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m36",
+  "q": "Who had the key after Monday?",
+  "gold": [
+   "fenna"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m37",
+  "q": "Who flew small planes?",
+  "gold": [
+   "captain reyes",
+   "reyes"
+  ],
+  "original": "Reyes",
+  "canonical": "Reyes"
+ },
+ {
+  "id": "m37",
+  "q": "What struck the windscreen?",
+  "gold": [
+   "a seagull",
+   "seagull"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m37",
+  "q": "What did the children bring?",
+  "gold": [
+   "tape and a blanket",
+   "tape",
+   "blanket"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m37",
+  "q": "Who rowed out to the plane?",
+  "gold": [
+   "children",
+   "the children"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m37",
+  "q": "How late was the medicine?",
+  "gold": [
+   "three hours",
+   "3 hours"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m38",
+  "q": "What did the snail want to see?",
+  "gold": [
+   "the top of the garden wall",
+   "top of the wall",
+   "the wall",
+   "wall"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m38",
+  "q": "What washed the snail back down?",
+  "gold": [
+   "the dew",
+   "dew"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m38",
+  "q": "Who laughed at the snail?",
+  "gold": [
+   "a ladybird",
+   "the ladybird",
+   "ladybird"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m38",
+  "q": "Who told the snail to rest in the cracks?",
+  "gold": [
+   "a kind caterpillar",
+   "the caterpillar",
+   "caterpillar"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m38",
+  "q": "When did the snail reach the top?",
+  "gold": [
+   "by midsummer",
+   "midsummer"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m39",
+  "q": "Where was the ring at nine?",
+  "gold": [
+   "in a velvet box",
+   "velvet box",
+   "dresser"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m39",
+  "q": "Who had the ring before the church?",
+  "gold": [
+   "callum",
+   "the best man"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m39",
+  "q": "Where did Callum hang his jacket?",
+  "gold": [
+   "on a gate",
+   "gate"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m39",
+  "q": "What chewed the sleeve?",
+  "gold": [
+   "a goat",
+   "goat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m39",
+  "q": "Who asked for the ring?",
+  "gold": [
+   "the vicar",
+   "vicar"
+  ],
+  "original": "the vicar",
+  "canonical": "the vicar"
+ },
+ {
+  "id": "m40",
+  "q": "Who sold honey cakes?",
+  "gold": [
+   "lorcan",
+   "the widower"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m40",
+  "q": "Who ran the rival stall?",
+  "gold": [
+   "two brothers",
+   "the brothers",
+   "brothers"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m40",
+  "q": "What did Lorcan sell?",
+  "gold": [
+   "honey cakes",
+   "cakes"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m40",
+  "q": "Where was the market?",
+  "gold": [
+   "at the harbour",
+   "harbour"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "m40",
+  "q": "When did Lorcan sell cakes?",
+  "gold": [
+   "every sunday",
+   "sunday"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f1",
+  "q": "Who was the baker?",
+  "gold": [
+   "teodor"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f1",
+  "q": "Who did Teodor call when the oven would not light?",
+  "gold": [
+   "radu",
+   "his cousin"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f1",
+  "q": "What did Teodor sell while Radu worked?",
+  "gold": [
+   "yesterday's bread",
+   "bread"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f1",
+  "q": "When was the oven hot again?",
+  "gold": [
+   "by noon",
+   "noon"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f1",
+  "q": "Where was Teodor's shop?",
+  "gold": [
+   "on quay lane",
+   "quay lane"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f2",
+  "q": "What did the crow find?",
+  "gold": [
+   "a ring",
+   "ring"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f2",
+  "q": "Who asked to see the ring?",
+  "gold": [
+   "a squirrel",
+   "squirrel"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f2",
+  "q": "Who had the ring at the end?",
+  "gold": [
+   "the squirrel",
+   "squirrel"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f2",
+  "q": "Why did the ring fall?",
+  "gold": [
+   "opened her beak"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f2",
+  "q": "Where was the ring at the end?",
+  "gold": [
+   "under the roots",
+   "the roots",
+   "roots"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f3",
+  "q": "What did Wanjiru pack?",
+  "gold": [
+   "a basket of mangoes",
+   "mangoes"
+  ],
+  "original": "a basket of mangoes",
+  "canonical": "a basket of mangoes"
+ },
+ {
+  "id": "f3",
+  "q": "When did Wanjiru pack the basket?",
+  "gold": [
+   "at eight o'clock",
+   "eight o'clock"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f3",
+  "q": "Where were the rest of the mangoes in the afternoon?",
+  "gold": [
+   "her aunt's house",
+   "aunt's house"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f3",
+  "q": "Who made jam with the mangoes?",
+  "gold": [
+   "her aunt",
+   "aunt"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f3",
+  "q": "When did Wanjiru go home?",
+  "gold": [
+   "in the morning",
+   "the morning",
+   "morning"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f4",
+  "q": "Who ran the lending library?",
+  "gold": [
+   "mrs adebayo",
+   "adebayo"
+  ],
+  "original": "Adebayo",
+  "canonical": "Adebayo"
+ },
+ {
+  "id": "f4",
+  "q": "Where was the lending library?",
+  "gold": [
+   "in the village hall",
+   "the village hall",
+   "village hall"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f4",
+  "q": "Who returned a book with a torn cover?",
+  "gold": [
+   "kazuo",
+   "a boy"
+  ],
+  "original": "Kazuo",
+  "canonical": "Kazuo"
+ },
+ {
+  "id": "f4",
+  "q": "What did Mrs Adebayo use to mend the book?",
+  "gold": [
+   "tape and card",
+   "tape"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f4",
+  "q": "What does Kazuo do after school?",
+  "gold": [
+   "helps her repair books",
+   "repair books"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f5",
+  "q": "Who wanted the apples?",
+  "gold": [
+   "the goat",
+   "goat"
+  ],
+  "original": null,
+  "canonical": "A goat"
+ },
+ {
+  "id": "f5",
+  "q": "Who shook the trunk?",
+  "gold": [
+   "the horse",
+   "horse"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f5",
+  "q": "Why did the horse shake the trunk?",
+  "gold": [
+   "she promised him half",
+   "promised him half"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f5",
+  "q": "What did the goat leave?",
+  "gold": [
+   "only the cores",
+   "the cores",
+   "cores"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f5",
+  "q": "Whose tree was it?",
+  "gold": [
+   "the farmer's",
+   "farmer's"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f6",
+  "q": "Where were the boots before breakfast?",
+  "gold": [
+   "on the fence",
+   "the fence",
+   "fence"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f6",
+  "q": "Who moved the boots into the barn?",
+  "gold": [
+   "jovana",
+   "his sister"
+  ],
+  "original": null,
+  "canonical": "Jovana"
+ },
+ {
+  "id": "f6",
+  "q": "Who took the boots to the river?",
+  "gold": [
+   "their father",
+   "father"
+  ],
+  "original": "father",
+  "canonical": null
+ },
+ {
+  "id": "f6",
+  "q": "Where were the boots that evening?",
+  "gold": [
+   "beside the stove",
+   "the stove",
+   "stove"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f6",
+  "q": "When did their father take the boots?",
+  "gold": [
+   "at noon",
+   "noon"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f7",
+  "q": "Who was the new nurse?",
+  "gold": [
+   "fatou"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f7",
+  "q": "Who was shivering in the waiting room?",
+  "gold": [
+   "mr okonjo",
+   "okonjo",
+   "an old man"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f7",
+  "q": "What did Fatou bring along with the blanket?",
+  "gold": [
+   "a cup of tea",
+   "tea"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f7",
+  "q": "Who saw Mr Okonjo first?",
+  "gold": [
+   "dr lindgren",
+   "lindgren"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f7",
+  "q": "Why had Mr Okonjo walked from the hills?",
+  "gold": [
+   "bus had broken down",
+   "broken down"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f8",
+  "q": "What kept drumming on the owl's tree?",
+  "gold": [
+   "a woodpecker",
+   "woodpecker"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f8",
+  "q": "Who did the owl ask for advice?",
+  "gold": [
+   "the wise heron",
+   "heron"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f8",
+  "q": "Where did the owl sleep in the end?",
+  "gold": [
+   "in the old chimney",
+   "the old chimney",
+   "chimney"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f8",
+  "q": "When could the owl not sleep?",
+  "gold": [
+   "during the day",
+   "the day"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f8",
+  "q": "What did the owl do in the chimney?",
+  "gold": [
+   "slept soundly"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f9",
+  "q": "When did Ravi lose his hat?",
+  "gold": [
+   "the second day",
+   "second day"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f9",
+  "q": "Where were they on the second day?",
+  "gold": [
+   "in porto",
+   "porto"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f9",
+  "q": "What did Ravi lose?",
+  "gold": [
+   "his hat",
+   "hat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f9",
+  "q": "Who found the hat?",
+  "gold": [
+   "a driver",
+   "driver"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f9",
+  "q": "Where was the hat on the third day?",
+  "gold": [
+   "at the hotel desk",
+   "the hotel desk",
+   "hotel desk"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f10",
+  "q": "What took the roof off the school?",
+  "gold": [
+   "the storm",
+   "storm"
+  ],
+  "original": "the storm",
+  "canonical": "the storm"
+ },
+ {
+  "id": "f10",
+  "q": "Who was the headmistress?",
+  "gold": [
+   "ms mbatha",
+   "mbatha"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f10",
+  "q": "Who brought timber?",
+  "gold": [
+   "goran",
+   "a carpenter"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f10",
+  "q": "Where did the children have lessons?",
+  "gold": [
+   "in the church hall",
+   "the church hall",
+   "church hall"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f10",
+  "q": "How many parents spent the weekend nailing?",
+  "gold": [
+   "ten"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f11",
+  "q": "Who invited the rooster down?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f11",
+  "q": "Where was the rooster?",
+  "gold": [
+   "the wall",
+   "wall"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f11",
+  "q": "What did the rooster say he could see?",
+  "gold": [
+   "two dogs",
+   "dogs"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f11",
+  "q": "What did the fox do?",
+  "gold": [
+   "ran off at once",
+   "ran off"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f11",
+  "q": "What had all the animals made, according to the fox?",
+  "gold": [
+   "peace"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f12",
+  "q": "Where was the phone when Hamid went to work?",
+  "gold": [
+   "on the kitchen table",
+   "the kitchen table",
+   "kitchen table"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f12",
+  "q": "Who found the phone?",
+  "gold": [
+   "yusra",
+   "his daughter"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f12",
+  "q": "What did Yusra put the phone in?",
+  "gold": [
+   "her school bag",
+   "school bag"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f12",
+  "q": "Who had the phone at the end?",
+  "gold": [
+   "hamid"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f12",
+  "q": "When did Yusra hand the phone back?",
+  "gold": [
+   "that evening",
+   "evening"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f13",
+  "q": "What did Zeynep find?",
+  "gold": [
+   "a violin",
+   "violin"
+  ],
+  "original": "a violin",
+  "canonical": "a violin"
+ },
+ {
+  "id": "f13",
+  "q": "Who had left the violin in the taxi?",
+  "gold": [
+   "oskar",
+   "cellist"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f13",
+  "q": "Where did Zeynep drive?",
+  "gold": [
+   "to the concert hall",
+   "the concert hall",
+   "concert hall"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f13",
+  "q": "What was inside the violin case?",
+  "gold": [
+   "a ticket stub",
+   "ticket stub"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f13",
+  "q": "What did Oskar give Zeynep?",
+  "gold": [
+   "two seats",
+   "seats"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f14",
+  "q": "Where did the mouse fall?",
+  "gold": [
+   "a bucket of milk",
+   "bucket"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f14",
+  "q": "What turned the milk into butter?",
+  "gold": [
+   "her kicking",
+   "kicking"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f14",
+  "q": "When did the mouse jump out?",
+  "gold": [
+   "by morning",
+   "morning"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f14",
+  "q": "Who found the footprints?",
+  "gold": [
+   "the dairymaid",
+   "dairymaid"
+  ],
+  "original": "The dairymaid",
+  "canonical": "The dairymaid"
+ },
+ {
+  "id": "f14",
+  "q": "What did the dairymaid find in the butter?",
+  "gold": [
+   "tiny footprints",
+   "footprints"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f15",
+  "q": "When did the bus leave the depot?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f15",
+  "q": "Who got on at the bakery corner?",
+  "gold": [
+   "siobhan"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f15",
+  "q": "Who left a lunchbox on the seat?",
+  "gold": [
+   "malik"
+  ],
+  "original": "Malik",
+  "canonical": "Malik"
+ },
+ {
+  "id": "f15",
+  "q": "Where was the lunchbox at the end of the day?",
+  "gold": [
+   "the depot",
+   "depot"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f15",
+  "q": "Who drove the school bus?",
+  "gold": [
+   "mrs halloran",
+   "halloran"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f16",
+  "q": "Who sold umbrellas?",
+  "gold": [
+   "vikram"
+  ],
+  "original": "Vikram",
+  "canonical": "Vikram"
+ },
+ {
+  "id": "f16",
+  "q": "Where did Vikram sell umbrellas?",
+  "gold": [
+   "outside the train station",
+   "the train station",
+   "train station"
+  ],
+  "original": "outside the train station",
+  "canonical": "outside the train station"
+ },
+ {
+  "id": "f16",
+  "q": "What did Vikram start selling?",
+  "gold": [
+   "cold lemonade",
+   "lemonade"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f16",
+  "q": "What rolled in?",
+  "gold": [
+   "dark clouds",
+   "clouds"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f16",
+  "q": "What did Vikram do when the clouds came?",
+  "gold": [
+   "brought the umbrellas back",
+   "brought the umbrellas"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f17",
+  "q": "Where did the bear and the badger find the beehive?",
+  "gold": [
+   "in a hollow log",
+   "a hollow log",
+   "log"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f17",
+  "q": "Who kept watch?",
+  "gold": [
+   "the badger",
+   "badger"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f17",
+  "q": "Who ate the honey?",
+  "gold": [
+   "the bear",
+   "bear"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f17",
+  "q": "What did the bees sting?",
+  "gold": [
+   "his nose",
+   "nose"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f17",
+  "q": "When did the bees find the bear?",
+  "gold": [
+   "that night",
+   "night"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f18",
+  "q": "Who lent Lerato the ladder?",
+  "gold": [
+   "bashir",
+   "her neighbour"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f18",
+  "q": "Where was the ladder on Wednesday?",
+  "gold": [
+   "the school",
+   "school"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f18",
+  "q": "Who took the ladder to the school?",
+  "gold": [
+   "her son",
+   "son"
+  ],
+  "original": "son",
+  "canonical": "son"
+ },
+ {
+  "id": "f18",
+  "q": "Who brought the ladder back on Friday?",
+  "gold": [
+   "the caretaker",
+   "caretaker"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f18",
+  "q": "Who had the ladder at the end?",
+  "gold": [
+   "bashir"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f19",
+  "q": "Why was the ferry cancelled?",
+  "gold": [
+   "high winds",
+   "winds"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f19",
+  "q": "Who hired a fishing boat?",
+  "gold": [
+   "sefa",
+   "the postman"
+  ],
+  "original": "winds",
+  "canonical": "Sefa"
+ },
+ {
+  "id": "f19",
+  "q": "Who steered the boat?",
+  "gold": [
+   "akosua",
+   "an old woman"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f19",
+  "q": "What did Sefa hold?",
+  "gold": [
+   "the mail bags",
+   "mail bags"
+  ],
+  "original": null,
+  "canonical": "the mail bags"
+ },
+ {
+  "id": "f19",
+  "q": "When did they reach the island?",
+  "gold": [
+   "before dark"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f20",
+  "q": "Who laughed at the crane?",
+  "gold": [
+   "the peacock",
+   "peacock"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f20",
+  "q": "What colour were the crane's feathers?",
+  "gold": [
+   "plain grey",
+   "grey"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f20",
+  "q": "Where did the crane fly?",
+  "gold": [
+   "over the hills",
+   "the hills",
+   "hills"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f20",
+  "q": "Where could the peacock walk?",
+  "gold": [
+   "in the farmyard",
+   "the farmyard",
+   "farmyard"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f20",
+  "q": "What did the crane do after the peacock laughed?",
+  "gold": [
+   "spread her wings"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f21",
+  "q": "Where did the group gather at nine?",
+  "gold": [
+   "in the hotel lobby",
+   "the hotel lobby",
+   "lobby"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f21",
+  "q": "Who was the guide?",
+  "gold": [
+   "paulo"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f21",
+  "q": "Who dropped a map into the water?",
+  "gold": [
+   "tamsin"
+  ],
+  "original": null,
+  "canonical": "Tamsin"
+ },
+ {
+  "id": "f21",
+  "q": "Who had Paulo's map after the harbour?",
+  "gold": [
+   "tamsin"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f21",
+  "q": "What did Paulo hand each person?",
+  "gold": [
+   "a map",
+   "map"
+  ],
+  "original": null,
+  "canonical": "each"
+ },
+ {
+  "id": "f22",
+  "q": "Whose boat came back empty?",
+  "gold": [
+   "captain moreau's",
+   "moreau's"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f22",
+  "q": "Who suggested trying past the lighthouse?",
+  "gold": [
+   "idris",
+   "the cook"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f22",
+  "q": "What did they find past the lighthouse?",
+  "gold": [
+   "shoal of herring",
+   "herring"
+  ],
+  "original": "a huge shoal of",
+  "canonical": "a huge shoal of"
+ },
+ {
+  "id": "f22",
+  "q": "Who wanted to give up?",
+  "gold": [
+   "her crew",
+   "crew"
+  ],
+  "original": null,
+  "canonical": "The crew"
+ },
+ {
+  "id": "f22",
+  "q": "What did the market pay them?",
+  "gold": [
+   "twice the usual price",
+   "twice"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f23",
+  "q": "Where did the cat live at first?",
+  "gold": [
+   "in a grocer's shop",
+   "a grocer's shop",
+   "grocer's shop"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f23",
+  "q": "What was the cat supposed to catch?",
+  "gold": [
+   "mice"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f23",
+  "q": "What chewed through every sack?",
+  "gold": [
+   "the mice",
+   "mice"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f23",
+  "q": "Who put the cat out?",
+  "gold": [
+   "the grocer",
+   "grocer"
+  ],
+  "original": "the grocer",
+  "canonical": "The grocer"
+ },
+ {
+  "id": "f23",
+  "q": "Where did the cat catch mice at the end?",
+  "gold": [
+   "in the alley",
+   "the alley",
+   "alley"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f24",
+  "q": "Whose clock was it?",
+  "gold": [
+   "her grandmother's",
+   "grandmother's"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f24",
+  "q": "What did Elif take to the repair shop?",
+  "gold": [
+   "her grandmother's clock",
+   "clock"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f24",
+  "q": "Who kept the clock for a week?",
+  "gold": [
+   "mr varela",
+   "varela",
+   "the repairman"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f24",
+  "q": "Who collected the clock?",
+  "gold": [
+   "elif's uncle",
+   "uncle"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f24",
+  "q": "Where is the clock now?",
+  "gold": [
+   "above the fireplace",
+   "the fireplace",
+   "fireplace"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f25",
+  "q": "Why did Mr Dlamini carry the groceries up the stairs?",
+  "gold": [
+   "the lift was broken",
+   "lift was broken"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f25",
+  "q": "What did Mr Dlamini carry up the stairs?",
+  "gold": [
+   "his neighbour's groceries",
+   "groceries"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f25",
+  "q": "Who was the retired teacher?",
+  "gold": [
+   "ottilie"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f25",
+  "q": "What did Ottilie invite him in for?",
+  "gold": [
+   "soup"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f25",
+  "q": "Who had Ottilie once taught?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f26",
+  "q": "What did the donkey carry the first day?",
+  "gold": [
+   "salt"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f26",
+  "q": "Where did the donkey slip?",
+  "gold": [
+   "in a river",
+   "a river",
+   "river"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f26",
+  "q": "What soaked up the water?",
+  "gold": [
+   "the sponges",
+   "sponges"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f26",
+  "q": "What did the donkey do the next day?",
+  "gold": [
+   "lay down"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f26",
+  "q": "What melted in the river?",
+  "gold": [
+   "the salt",
+   "salt"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f27",
+  "q": "Where was the kite in the morning?",
+  "gold": [
+   "in the plum tree",
+   "the plum tree",
+   "plum tree"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f27",
+  "q": "Who freed the kite?",
+  "gold": [
+   "cosmin",
+   "her friend"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f27",
+  "q": "What carried the kite into the pond?",
+  "gold": [
+   "the wind",
+   "wind"
+  ],
+  "original": "the wind",
+  "canonical": "The wind"
+ },
+ {
+  "id": "f27",
+  "q": "Where was the kite at the end?",
+  "gold": [
+   "the farmer's pond",
+   "pond"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f27",
+  "q": "What snapped?",
+  "gold": [
+   "the string",
+   "string"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f28",
+  "q": "Who was the young chemist?",
+  "gold": [
+   "gulnara"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f28",
+  "q": "What did Gulnara notice?",
+  "gold": [
+   "a leak",
+   "leak"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f28",
+  "q": "Who ignored Gulnara?",
+  "gold": [
+   "the foreman",
+   "foreman"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f28",
+  "q": "What did Gulnara do after the foreman ignored her?",
+  "gold": [
+   "shut the valve herself",
+   "shut the valve"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f28",
+  "q": "Who promoted Gulnara?",
+  "gold": [
+   "mr ashworth",
+   "ashworth",
+   "the manager"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f29",
+  "q": "Where did the first two goats meet?",
+  "gold": [
+   "on a narrow bridge",
+   "a narrow bridge",
+   "bridge"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f29",
+  "q": "What did the first two goats do?",
+  "gold": [
+   "butted heads"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f29",
+  "q": "What did the first two goats fall into?",
+  "gold": [
+   "the water",
+   "water"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f29",
+  "q": "What did one of the other goats do?",
+  "gold": [
+   "knelt down",
+   "knelt"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f29",
+  "q": "What did the other goat step over?",
+  "gold": [
+   "her back"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f30",
+  "q": "Where was the van at dawn?",
+  "gold": [
+   "outside the bakery",
+   "the bakery",
+   "bakery"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f30",
+  "q": "Who delivered the loaves to the hospital kitchen?",
+  "gold": [
+   "umar"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f30",
+  "q": "What stole a sardine?",
+  "gold": [
+   "a gull",
+   "gull"
+  ],
+  "original": "a gull",
+  "canonical": "a gull"
+ },
+ {
+  "id": "f30",
+  "q": "How many loaves did Umar load?",
+  "gold": [
+   "forty"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f30",
+  "q": "What did Umar collect at the harbour?",
+  "gold": [
+   "fish"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f31",
+  "q": "Who led the choir?",
+  "gold": [
+   "orla"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f31",
+  "q": "What did the choir not have?",
+  "gold": [
+   "piano"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f31",
+  "q": "Who offered the piano?",
+  "gold": [
+   "mr castellanos",
+   "castellanos"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f31",
+  "q": "When did the choir sing?",
+  "gold": [
+   "at the spring festival",
+   "spring festival"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f31",
+  "q": "Who drove the piano up the mountain road?",
+  "gold": [
+   "six farmers",
+   "farmers"
+  ],
+  "original": "farmers",
+  "canonical": "farmers"
+ },
+ {
+  "id": "f32",
+  "q": "Who warned the other birds?",
+  "gold": [
+   "a sparrow",
+   "sparrow"
+  ],
+  "original": "A sparrow",
+  "canonical": "A sparrow"
+ },
+ {
+  "id": "f32",
+  "q": "What was the farmer sowing?",
+  "gold": [
+   "flax"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f32",
+  "q": "What would the flax become?",
+  "gold": [
+   "nets"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f32",
+  "q": "Where did the sparrow go to live?",
+  "gold": [
+   "near the houses",
+   "the houses"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f32",
+  "q": "What did the birds keep eating?",
+  "gold": [
+   "the seeds",
+   "seeds"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f33",
+  "q": "Where was the mask at midnight?",
+  "gold": [
+   "in the safe",
+   "the safe",
+   "safe"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f33",
+  "q": "Who locked the mask in the safe?",
+  "gold": [
+   "wiremu",
+   "the night guard"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f33",
+  "q": "What made the noise in the east hall?",
+  "gold": [
+   "a cat",
+   "cat"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f33",
+  "q": "Who moved the mask in the morning?",
+  "gold": [
+   "dr sandoval",
+   "sandoval",
+   "the director"
+  ],
+  "original": "exhibition",
+  "canonical": "the director"
+ },
+ {
+  "id": "f33",
+  "q": "Where was the mask at the end?",
+  "gold": [
+   "a glass case",
+   "glass case"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f34",
+  "q": "Who kept the cows overnight?",
+  "gold": [
+   "yaw",
+   "a boy"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f34",
+  "q": "Who paid Yaw?",
+  "gold": [
+   "svetlana",
+   "the farmer"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f34",
+  "q": "What did Svetlana pay Yaw with?",
+  "gold": [
+   "a wheel of cheese",
+   "cheese"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f34",
+  "q": "How far had the cows wandered?",
+  "gold": [
+   "three miles"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f34",
+  "q": "When did the cows wander downstream?",
+  "gold": [
+   "after the flood"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f35",
+  "q": "Who wanted to be as big as the ox?",
+  "gold": [
+   "a frog",
+   "frog"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f35",
+  "q": "Where was the ox?",
+  "gold": [
+   "in the meadow",
+   "the meadow",
+   "meadow"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f35",
+  "q": "Who did the frog ask?",
+  "gold": [
+   "her children",
+   "children"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f35",
+  "q": "What did the frog do to look bigger?",
+  "gold": [
+   "puffed herself up",
+   "puffed"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f35",
+  "q": "What happened to the frog in the end?",
+  "gold": [
+   "she burst",
+   "burst"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f36",
+  "q": "Where did Mateus leave his bicycle?",
+  "gold": [
+   "at the swimming pool",
+   "the swimming pool",
+   "pool"
+  ],
+  "original": null,
+  "canonical": "his bicycle at the swimming pool"
+ },
+ {
+  "id": "f36",
+  "q": "Who took the bicycle to the police station?",
+  "gold": [
+   "a cleaner",
+   "cleaner"
+  ],
+  "original": "already",
+  "canonical": "already"
+ },
+ {
+  "id": "f36",
+  "q": "Who drove Mateus back on Saturday?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f36",
+  "q": "What did Mateus leave at the swimming pool?",
+  "gold": [
+   "his bicycle",
+   "bicycle"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f36",
+  "q": "Where did Mateus ride the bicycle?",
+  "gold": [
+   "to his grandfather's farm",
+   "his grandfather's farm",
+   "grandfather's farm"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f37",
+  "q": "Who was the weather reporter?",
+  "gold": [
+   "kirra walsh",
+   "kirra"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f37",
+  "q": "Why was Kirra late?",
+  "gold": [
+   "stuck in traffic",
+   "traffic"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f37",
+  "q": "Who read the forecast instead?",
+  "gold": [
+   "emil",
+   "the sports presenter"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f37",
+  "q": "When was the forecast meant to be read?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f37",
+  "q": "Whose forecast was the funniest?",
+  "gold": [
+   "emil's"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f38",
+  "q": "Where was the dog chained?",
+  "gold": [
+   "in a yard",
+   "a yard",
+   "yard"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f38",
+  "q": "Who gave the dog meat?",
+  "gold": [
+   "his master",
+   "master"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f38",
+  "q": "What had worn a mark on the dog's neck?",
+  "gold": [
+   "the chain",
+   "chain"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f38",
+  "q": "Where did the wolf go at the end?",
+  "gold": [
+   "back to the forest",
+   "the forest",
+   "forest"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f38",
+  "q": "Who found the dog?",
+  "gold": [
+   "a hungry wolf",
+   "the wolf",
+   "wolf"
+  ],
+  "original": "wolf",
+  "canonical": "wolf"
+ },
+ {
+  "id": "f39",
+  "q": "Where was the suitcase at noon?",
+  "gold": [
+   "the airport in budapest",
+   "budapest"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f39",
+  "q": "Where did the suitcase spend the night?",
+  "gold": [
+   "in oslo",
+   "oslo"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f39",
+  "q": "Who sent the suitcase on to Madrid?",
+  "gold": [
+   "jun",
+   "an airline clerk"
+  ],
+  "original": null,
+  "canonical": "Jun"
+ },
+ {
+  "id": "f39",
+  "q": "When did Jun send the suitcase on?",
+  "gold": [
+   "the next morning",
+   "next morning"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f39",
+  "q": "Where was the suitcase by evening?",
+  "gold": [
+   "in ilona's hotel room",
+   "ilona's hotel room",
+   "hotel room"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f40",
+  "q": "Whose dog was Smoke?",
+  "gold": [
+   "the librarian's",
+   "librarian's"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f40",
+  "q": "What did Smoke steal?",
+  "gold": [
+   "a sausage",
+   "sausage"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f40",
+  "q": "Who was the butcher?",
+  "gold": [
+   "mr abara",
+   "abara"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f40",
+  "q": "When did Smoke escape?",
+  "gold": [
+   "on market day",
+   "market day"
+  ],
+  "original": null,
+  "canonical": null
+ },
+ {
+  "id": "f40",
+  "q": "Who caught Smoke?",
+  "gold": [
+   "luca and magnus",
+   "luca",
+   "magnus"
+  ],
+  "original": null,
+  "canonical": null
+ }
+]
