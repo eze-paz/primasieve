@@ -11,7 +11,7 @@ import ag1_translator as A
 from ag3_canon import STOP, ent, content, toks
 from b6_rwkv import hit
 CKPT = ARGV[ARGV.index("--ckpt") + 1] if "--ckpt" in ARGV else os.path.join("rwkv7", "RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth")
-STORIES = list(range(62, 102)); OUT = "ag10_lines.json"
+STORIES = list(range(62, 102)); FROM_CANON = "--from-canon" in ARGV; OUT = "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
 SLOTS = ["WHO", "DID", "WHAT", "WHERE", "WHEN", "WHY"]
 LINE = re.compile(r"WHO:\s*(.*?)\s*\|\s*DID:\s*(.*?)\s*\|\s*WHAT:\s*(.*?)\s*\|\s*WHERE:\s*(.*?)\s*\|\s*WHEN:\s*(.*?)\s*\|\s*WHY:\s*(.*?)\s*$")
 PRON = {"he", "she", "they", "it", "him", "her", "them", "his", "their", "its"}
@@ -75,6 +75,8 @@ def main():
         rec = done.get(s["id"]) or {}
         if "lines" not in rec:
             sents = [x.strip() for x in A.SENT.split(s["text"]) if x.strip()]; names = set(); prev = ""; lines = []; last_who = None
+            if FROM_CANON:                                                            # AG12: units are the AG4 canonical clauses
+                CAN = json.load(open("ag4_canon.json", encoding="utf-8")); sents = [x.strip() for x in A.SENT.split(CAN[s["id"]]["canon"]) if x.strip()]
             for sent in sents:
                 tk = toks(sent); names |= {t.lower() for t in tk[1:] if t[0].isupper()} | ({tk[0].lower()} if tk and tk[0][0].isupper() and tk[0].lower() not in STOP else set())
                 allowed = set(content(sent)) | {A.lemma(w) for w in content(sent)} | set(content(prev)) | names | {"the", "a", "an"}
@@ -88,6 +90,9 @@ def main():
                 prev = sent
             rec["lines"] = lines
         qs = []
+        if FROM_CANON and os.path.exists("ag10_lines.json"):                          # AG12: question lines reused from AG10
+            Q10 = json.load(open("ag10_lines.json", encoding="utf-8")).get(s["id"], {}).get("qs")
+            if Q10: rec["qs"] = Q10; done[s["id"]] = rec; done["_stats"] = dict(stats); json.dump(done, open(OUT, "w", encoding="utf-8"), indent=1); print(f"  story {k} {s['id']} ({time.time() - t0:.0f} s) {dict(stats)}".encode("ascii", "replace").decode(), flush=True); continue
         for q, g in s["qs"]:
             allowed = set(content(q)) | {A.lemma(w) for w in content(q)} | {"the", "a", "an"}
             ds = parse(gen(m, tok, Q_PROMPT.format(q=q), n=60)); qd = None
@@ -146,7 +151,7 @@ def score():
             elif hit(a, qq["gold"]): r += 1; byk[kind][0] += 1
             else: w += 1; byk[kind][1] += 1
             rows.append(dict(q=qq["q"], gold=qq["gold"], answer=a, qline=qq["qline"]))
-    json.dump(rows, open("ag10_rows.json", "w", encoding="utf-8"), indent=1)
+    json.dump(rows, open(OUT.replace("_lines", "_rows"), "w", encoding="utf-8"), indent=1)
     print(f"AG10 untouched val_fresh2: {r} right / {w} wrong / {sil} silent / fitness {r - 3 * w} / precision {r / max(1, r + w):.2f}")
     print("AG10 by kind (right, wrong, silent):", dict(byk))
     print("AG10 stats:", json.load(open(OUT, encoding="utf-8")).get("_stats"))

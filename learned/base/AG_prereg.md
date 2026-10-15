@@ -273,3 +273,16 @@ question lines were malformed; WHEN is rarely filled in the story lines.
 No model runs. AG3's canonical-clause reader (ag3_qa_rows.json, canonical answers, 25 / 3) first; where it is
 silent, AG10b's slot-line reader (ag10_rows.json with --grammar). Untouched val_fresh2 only, nothing chosen. PASS
 if right > 25 at precision >= 0.89. It measures whether the two canonical forms are complementary.
+
+## AG11 result -- narrow FAIL (reach PASS, precision 0.88 against 0.89)
+First computation used the wrong base (ag3_qa_rows.json had been overwritten by the AG8 run): AG8 + AG10b = 37 / 8
+(0.82), recorded for honesty. Registered union, AG3 base recomputed (25 / 3): **35 right / 5 wrong / 160 silent,
+fitness +20, precision 0.88** (AG10b added 12 answers, 10 right). Best fitness and reach of any symbolic reader in
+this line; one hundredth under the precision gate. The two canonical forms are complementary.
+
+## AG12 registration (the two loops chained: slot lines written from the canonical clauses)
+ag10_slots.py --from-canon: the 1.5B model writes slot lines from the AG4 canonical clauses (ag4_canon.json,
+stories 62-101) instead of the raw sentences, one prompt per clause (clauses are single-event, so one line each is
+the right yield); provenance checked against the clause, its sentence and names; question lines reused from
+ag10_lines.json with the AG10b syntax rule. Scored alone and in the AG11 union in place of AG10b. PASS if the union
+reaches right > 25 at precision >= 0.89, or the slot reader alone beats 21 / 2 at precision >= 0.89.
