@@ -11,7 +11,8 @@ route = lambda l: l.split("| route ")[1].split(" |")[0]
 spoke = lambda l: "| ans None |" not in l and route(l) != "silent"
 right = lambda l: "hit True" in l                                                       # as r25_trust.py
 fit = collections.defaultdict(lambda: [0, 0])
-for l in L[:310] + L[510:910]:
+_x = os.environ.get("R25_TRUSTX")                                                              # R25-dv: an extra block of development questions for choosing trust, "a:b"
+for l in L[:310] + L[510:910] + (L[int(_x.split(":")[0]):int(_x.split(":")[1])] if _x else []):
     if spoke(l): fit[route(l)][0 if right(l) else 1] += 1
 keep = {r for r, (a, w) in fit.items() if a - 3 * w > 0}
 src = open("r25_rwg.py", encoding="utf-8").read(); src = src[:src.index("tot = collections.Counter()")]
