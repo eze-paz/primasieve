@@ -5,6 +5,7 @@ Reader: the R25-df configuration (its trust learned on practice A+B: who-questio
 system's trusted answer when it has one; otherwise the reader's trusted answer; otherwise silent.
 Run: py -3.12 r25_combo.py"""
 import os, sys, json, collections
+HOWOK = bool(os.environ.get("R25_HOW"))   # R25-ed: the quantity reader is trusted (practice A-F: 52 right / 8 wrong, +28)
 HERE = os.path.dirname(os.path.abspath(__file__)); os.chdir(HERE)
 L = [l.rstrip("\n") for l in open(os.environ.get("R25_DIAG", "r24_diag_asA.txt"), encoding="utf-8", errors="replace") if l.startswith("VAL")]
 route = lambda l: l.split("| route ")[1].split(" |")[0]
@@ -32,7 +33,7 @@ m, r, c = collections.Counter(), collections.Counter(), collections.Counter()
 for (text, q, gold), l in zip(qs, F):
     main = (right(l) if spoke(l) and route(l) in keep else None)
     a = R["answer"](text, q); rd = None
-    if a is not None and (q.split()[0].lower(), R["FULL"][0], R["NEAR"][0]) in rkeep: rd = R["norm"](a) in {R["norm"](x) for x in gold}
+    if a is not None and ((q.split()[0].lower(), R["FULL"][0], R["NEAR"][0]) in rkeep or (HOWOK and q.lower().startswith("how "))): rd = R["norm"](a) in {R["norm"](x) for x in gold}
     for cnt, v in ((m, main), (r, rd), (c, main if main is not None else rd)):
         cnt["silent" if v is None else ("right" if v else "wrong")] += 1
 import re as _re
@@ -46,7 +47,7 @@ for (text, q, gold), l in zip(qs, F):
     mv = None
     if spoke(l) and route(l) in keep: mv = right(l) or soft_ok(l.split("| ans ")[1].split(" | hit")[0], gold)   # strict hit OR the article-free match
     a = R["answer"](text, q); rv = None
-    if a is not None and (q.split()[0].lower(), R["FULL"][0], R["NEAR"][0]) in rkeep: rv = (R["norm"](a) in {R["norm"](x) for x in gold}) or soft_ok(a, gold)
+    if a is not None and ((q.split()[0].lower(), R["FULL"][0], R["NEAR"][0]) in rkeep or (HOWOK and q.lower().startswith("how "))): rv = (R["norm"](a) in {R["norm"](x) for x in gold}) or soft_ok(a, gold)
     for cnt, v in ((m2, mv), (r2, rv), (c2, mv if mv is not None else rv)): cnt["silent" if v is None else ("right" if v else "wrong")] += 1
 for nm, cnt in (("main system, trusted [articles/titles ignored]", m2), ("reader, trusted [articles/titles ignored]", r2), ("together [articles/titles ignored]", c2)):
     print(f"R25-du {nm}: {cnt['right']} right / {cnt['wrong']} wrong / {cnt['silent']} silent (fitness {cnt['right'] - 3 * cnt['wrong']})", flush=True)
