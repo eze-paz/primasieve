@@ -1046,3 +1046,6 @@ Model on val_fresh12: 90 / 200. The main system stopped with an IndexError at va
 
 ## R25-dr bug fix (main system)
 r24_events.find: a question object whose entity form is empty ('her' in 'Who invited her to wait?') indexed an empty word list. Guarded (an empty form matches nothing); no other behaviour changes. Then run_dr.sh is repeated from the main-system step (the model's answers for val_fresh12 are already appended).
+
+## R25-dr result (val_fresh12, scored once) -- both systems do badly; the combination ties
+Main system trusted: **16 right / 25 wrong** (fitness -59); reader trusted: 10 / 6 (-8); together **23 / 27** (-58). Language model: 90 / 200. On val_fresh10 the main system was 50 / 6. Inspection of the main system's misses shows two things: real errors ('What did he plant?' -> 'Hamid'; cut phrases 'a book about', 'the own toy'), and strict scoring against gold lists that give titled names only ('mrs. adaeze okafor', 'mrs. okafor') so the bare surname 'Okafor' counts as wrong; this writer used titles heavily. As registered, the numbers stand; a lenient secondary scoring (a one-word answer equal to the last word of a gold form also counts) is reported next, labelled as secondary.

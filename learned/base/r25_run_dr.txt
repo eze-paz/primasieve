@@ -1,0 +1,4 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (54 s)
+R25-dp main system, trusted: 16 right / 25 wrong / 159 silent (fitness -59)
+R25-dp reader, trusted: 10 right / 6 wrong / 184 silent (fitness -8)
+R25-dp together: 23 right / 27 wrong / 150 silent (fitness -58)
