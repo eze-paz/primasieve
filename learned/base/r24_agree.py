@@ -27,6 +27,38 @@ def story_span(text, a):                                                        
     return text[m.start():m.end()] if m else a
 
 
+FUNC_W = set("the a an his her their its my our your this that these those and or but of to in on at by for with from into onto under over near behind beside inside across through after before while when where who whom which what why how was were is are be been being had has have did does do will would could should may might must can not no he she they we you i it him them us me there then so as than very too".split())
+PLACE_W = {"in", "on", "at", "under", "into", "onto", "near", "behind", "beside", "inside", "across", "over", "by", "from", "to"}
+VERBISH = []
+def nounish(w):                                                                              # a word that can continue a noun phrase: not a function word, not a verb form
+    if not VERBISH:
+        import r24_dict as _D
+        on = _D.ON; _D.ON = True; VERBISH.append(set(_D.verb_forms())); _D.ON = on
+    return w[:1].isalpha() and w not in FUNC_W and w not in VERBISH[0] and not w.endswith(("ed", "ing"))
+def story_span2(text, a, q):                                                                 # R25-ea: the full phrase from the story -- names with titles and first names, unfinished noun phrases, 'X and Y', the place word for where-questions
+    if not a: return a
+    import re as _re
+    toks = [(m.group(0), m.start(), m.end()) for m in _re.finditer(r"[A-Za-z0-9'.-]+|[,;:!?]", text)]
+    low = [t[0].lower().rstrip(".") for t in toks]
+    aw = [x.lower().rstrip(".") for x in _re.findall(r"[A-Za-z0-9'.-]+", a)]
+    while aw and aw[0] in {"the", "a", "an"}: aw = aw[1:]
+    if not aw: return a
+    for i in range(len(low) - len(aw) + 1):
+        if low[i:i + len(aw)] != aw: continue
+        b, e = i, i + len(aw) - 1
+        while b - 1 >= 0 and (low[b - 1] in {"the", "a", "an", "his", "her", "their", "its", "my", "our", "mr", "mrs", "ms", "dr"} or (toks[b - 1][0][:1].isupper() and toks[b][0][:1].isupper() and b - 1 > 0 and low[b - 2] not in {".", "!", "?"})): b -= 1
+        while e + 1 < len(low) and nounish(low[e + 1]) and toks[e + 1][0][:1].islower(): e += 1
+        if e + 2 < len(low) and low[e + 1] in {"and", "about", "of"}:
+            k = e + 2
+            while k < len(low) and low[k] in {"the", "a", "an", "her", "his", "their"}: k += 1
+            if k < len(low) and nounish(low[k]):
+                e = k
+                while e + 1 < len(low) and nounish(low[e + 1]) and toks[e + 1][0][:1].islower(): e += 1
+        if q.lower().startswith("where") and b - 1 >= 0 and low[b - 1] in PLACE_W: b -= 1
+        return text[toks[b][1]:toks[e][2]]
+    return a
+
+
 def main():
     data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
     import r24_books as B, data as D
@@ -234,7 +266,7 @@ def main():
     n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0]); valkk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
         for q, g in s["qs"]:
-            n += 1; a, how = answer(s["text"], q); a = story_span(s["text"], a) if "--story-span" in ARGV else a; by.setdefault(how, [0, 0])
+            n += 1; a, how = answer(s["text"], q); a = story_span2(s["text"], a, q) if "--story-span2" in ARGV else (story_span(s["text"], a) if "--story-span" in ARGV else a); by.setdefault(how, [0, 0])
             if DIAG and "--selpref" in ARGV and a is not None: role_ok(q, a)
             if DIAG: print(f"VAL | lift {LIFT[0] if (a is not None and '--selpref' in ARGV) else None} | {q} | gold {g} | cue {E.ask_conf(E.Log(names).read(s['text']), q)} | learned {QR.ask_learned(QRD, rd, s['text'], names, q) if LEARNED_Q else R.ask(rd, s['text'], names, q)} lvl {QR.LASTQ.get('level') if LEARNED_Q else '-'} | route {how} | ans {a} | hit {hit(a, g) if a is not None else '-'}", flush=True)
             if a is not None:

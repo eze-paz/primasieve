@@ -1095,3 +1095,9 @@ The main system sometimes rewrites an answer's article or drops a title ('the ne
 val_fresh12 strict: main system **27 right / 13 wrong** (was 16 / 24; fitness -12, was -56); together **34 / 15** (-11, was -55). Article/title-free: main 28 / 12, together 37 / 12 (+1). val_fresh10 unchanged (main 50 / 6, together 70 / 7). Most of the main system's val_fresh12 'collapse' was the answer form, not comprehension.
 
 ## R25-dz (analysis): the main system's remaining trusted mistakes on val_fresh12.
+
+## R25-dz analysis (13 remaining trusted mistakes on val_fresh12)
+Cut noun phrases ('a book about', 'an old pocket', 'a new copper', 'her own toy'); coordinations cut ('a shirt' for 'a shirt and a tie'); where-answers without the place word ('a pine tree' for 'under a pine tree'); titled full names ('Okafor' for 'Mrs. Adaeze Okafor'); two wrong readings.
+
+## R25-ea registration (the full phrase from the story)
+--story-span2: the answer is found in the story and widened to the full phrase: left over articles, possessives, titles and a preceding capitalised first name; right over following noun-like words (not function words, not verb forms by the dictionary, not -ed / -ing) and through 'and' / 'of' / 'about' + a noun phrase; where-questions keep the place word before it. Tested on the listed cases ('Okafor' -> 'Mrs. Adaeze Okafor', 'a book about' -> 'a book about dinosaurs', 'a shirt' -> 'a shirt and a tie', 'a pine tree' -> 'under a pine tree'; 'watch' stays cut because the dictionary lists it as a verb). val_fresh12 is now development data; the check for harm is practice (all 1,310 practice-type positions) and val_fresh10; a new untouched set gives the clean score.
