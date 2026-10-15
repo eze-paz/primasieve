@@ -1156,3 +1156,8 @@ After dropping 'to': why 16 right / 25 wrong. The reason usually sits in a diffe
 
 ## R25-eh registration (independent confirmation of the current best combination)
 Current best: main system (five-writer trust, full story phrases) + reader fallback (name-only who, quantity how). Scored once on val_fresh14, a new untouched set from a new writer agent, by the same pipeline as R25-eb (model answers appended, main system with --val-fresh14 at positions 3510-3710, combination with R25_HOW).
+
+## R25-eh result (independent confirmation on val_fresh14, scored once)
+Language model 116 / 200. Main system **33 right / 5 wrong** (0.87, +18). Reader fallback 22 / 14 strict (27 / 9 article/title-free). **Together 54 right / 11 wrong** (0.83, +21), 135 silent; article/title-free 56 / 9 (+29). Confirms R25-eb/ed: when the system answers it is right about 5 times in 6; it answers about a third of the questions, against the language model's 58% right overall.
+
+## R25-ei (analysis): silent questions on val_fresh14 by kind.
