@@ -1073,3 +1073,8 @@ The combination beats the main system alone on both sets. On val_fresh12 the mai
 
 ## R25-dv registration (trust chosen on more writers)
 Main system's route trust chosen on the 710 practice questions plus val_fresh11 (spent on the reader, so development data, a third writer), then val_fresh12 scored once with this trust (strict and article/title-free), alone and with the reader. Needs one more main-system run with val_fresh11 appended after val_fresh12 (positions 2710-2910) and the model's answers for val_fresh11 appended likewise.
+
+## R25-dv result (trust chosen on 710 practice + val_fresh11) -- small gain on val_fresh12
+Model on val_fresh11: 127 / 200 (on val_fresh12 only 90 / 200: val_fresh12 is a hard set for everyone). val_fresh12, strict: main 15 / 21 (-48; was -59), together 22 / 23 (-47; was -58). Article/title-free: main 22 / 14 (-20; was -23), together **31 / 14 (-11; was -14)**. A third writer in the trust choice helps a little; the main system's routes remain unreliable on this writer.
+
+## R25-dw (check): the same more-writers trust on val_fresh10 (positions 2310-2510 of the same run), to confirm it does not lose there.
