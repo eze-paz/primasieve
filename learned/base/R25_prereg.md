@@ -1166,3 +1166,8 @@ Language model 116 / 200. Main system **33 right / 5 wrong** (0.87, +18). Reader
 what: trusted 12 / 3, 50 silent or untrusted (language model 46 right of 65); where 7 / 1, 24 (14); how 0 / 0, 28 (21; the reader's quantity answers cover part); who 11 / 0, 12 (7); when 3 / 1, 14 (15); why 0 / 0, 15 (2); whose 9, which 9 untouched. 'what' is now the largest gap.
 
 ## R25-ej (analysis): the main system's what-answers by route on practice (A-F, the 710 and val_fresh11): which routes answer 'what' and how often they are right, trusted or not.
+
+## R25-ej result (main system's what-answers on practice)
+198 practice what-questions get no answer at all; the routes that do answer are reliable when trusted (agree 19 / 1, agree+soft 12 / 0, role-alone+soft 15 / 1 ...) and the untrusted ones are poor (role-alone 8 / 20, learned-alone-exact 3 / 10). The gap is coverage: a reader that answers more what-questions, not a trust change.
+
+## R25-ek (development): the rare-word reader's what-answers on practice A-F as they stand (after the R25-dh fixes), to see whether a fallback for 'what' could pass the trust rule.
