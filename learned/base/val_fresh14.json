@@ -1,0 +1,1630 @@
+{
+ "note": "R25-eh: fresh untouched set, written without access to tests or other question sets",
+ "stories": [
+  {
+   "id": "f14_1",
+   "text": "On Saturday morning, Mrs. Okafor opened her small bakery on Palm Street at six o'clock. Her son Emeka carried three trays of coconut bread from the kitchen to the front window. A tall man in a green coat bought two loaves because his daughter was having a birthday party. Later, the oven stopped working, so Mrs. Okafor called her neighbor, Mr. Bello, who fixed it with a small screwdriver. By noon, every loaf had been sold.",
+   "qs": [
+    [
+     "Who opened the bakery?",
+     [
+      "mrs. okafor"
+     ]
+    ],
+    [
+     "Where was the bakery?",
+     [
+      "palm street",
+      "on palm street"
+     ]
+    ],
+    [
+     "How many trays did Emeka carry?",
+     [
+      "three",
+      "three trays"
+     ]
+    ],
+    [
+     "Why did the man buy two loaves?",
+     [
+      "because his daughter was having a birthday party",
+      "his daughter was having a birthday party"
+     ]
+    ],
+    [
+     "What did Mr. Bello use to fix the oven?",
+     [
+      "a small screwdriver",
+      "screwdriver"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_2",
+   "text": "Hiroshi lost his grey cat, Mochi, on a rainy Tuesday evening. He searched the garden, the garage and the street behind his apartment. His friend Aiko suggested that he shake a bag of fish treats near the door. Twenty minutes later, Mochi crawled out from under the neighbor's car, wet and hungry. Hiroshi wrapped her in a blue towel and gave her a warm dinner.",
+   "qs": [
+    [
+     "What was the name of Hiroshi's cat?",
+     [
+      "mochi"
+     ]
+    ],
+    [
+     "When did Hiroshi lose his cat?",
+     [
+      "on a rainy tuesday evening",
+      "a rainy tuesday evening",
+      "tuesday evening"
+     ]
+    ],
+    [
+     "Who suggested shaking a bag of fish treats?",
+     [
+      "aiko",
+      "his friend aiko"
+     ]
+    ],
+    [
+     "Where did Mochi come out from?",
+     [
+      "under the neighbor's car",
+      "from under the neighbor's car",
+      "the neighbor's car"
+     ]
+    ],
+    [
+     "What did Hiroshi wrap the cat in?",
+     [
+      "a blue towel",
+      "blue towel"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_3",
+   "text": "Dr. Anjali Patel works at a clinic in the village of Rampur. Every Thursday she drives forty kilometres to visit patients who cannot travel. Last week, an old farmer named Mr. Singh showed her a deep cut on his hand. She cleaned the wound, closed it with four stitches and told him to keep it dry. Mr. Singh thanked her with a basket of fresh mangoes from his orchard.",
+   "qs": [
+    [
+     "Where does Dr. Patel work?",
+     [
+      "at a clinic in the village of rampur",
+      "a clinic in the village of rampur",
+      "rampur"
+     ]
+    ],
+    [
+     "How far does she drive every Thursday?",
+     [
+      "forty kilometres"
+     ]
+    ],
+    [
+     "Who showed her a cut on his hand?",
+     [
+      "mr. singh",
+      "an old farmer named mr. singh"
+     ]
+    ],
+    [
+     "How many stitches did she use?",
+     [
+      "four",
+      "four stitches"
+     ]
+    ],
+    [
+     "What did Mr. Singh give her to thank her?",
+     [
+      "a basket of fresh mangoes",
+      "fresh mangoes",
+      "mangoes"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_4",
+   "text": "Lucia Fernandez plays goalkeeper for the girls' football team in her town near Seville. Before the final match, she could not find her lucky gloves. Her younger brother Pablo had borrowed them to play in the park and left them in his backpack. He returned them ten minutes before kickoff. Lucia saved a penalty in the last minute, and her team won two goals to one.",
+   "qs": [
+    [
+     "What position does Lucia play?",
+     [
+      "goalkeeper"
+     ]
+    ],
+    [
+     "What could Lucia not find before the final match?",
+     [
+      "her lucky gloves",
+      "lucky gloves"
+     ]
+    ],
+    [
+     "Who had borrowed the gloves?",
+     [
+      "pablo",
+      "her younger brother pablo"
+     ]
+    ],
+    [
+     "Where had the gloves been left?",
+     [
+      "in his backpack",
+      "his backpack"
+     ]
+    ],
+    [
+     "What was the final score?",
+     [
+      "two goals to one"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_5",
+   "text": "Mr. Tomas Novak missed the 8:15 train to Prague because his alarm clock did not ring. He waited on the cold platform and drank a cup of tea from a small kiosk. The next train arrived at nine o'clock, and it was almost empty. Mr. Novak sat by the window and finished reading a mystery novel. When he reached his office, his manager, Ms. Dvorak, had already started the meeting.",
+   "qs": [
+    [
+     "Why did Mr. Novak miss the train?",
+     [
+      "because his alarm clock did not ring",
+      "his alarm clock did not ring"
+     ]
+    ],
+    [
+     "Where was the train going?",
+     [
+      "prague",
+      "to prague"
+     ]
+    ],
+    [
+     "What did he drink while waiting?",
+     [
+      "a cup of tea",
+      "tea"
+     ]
+    ],
+    [
+     "When did the next train arrive?",
+     [
+      "at nine o'clock",
+      "nine o'clock"
+     ]
+    ],
+    [
+     "Who had already started the meeting?",
+     [
+      "ms. dvorak",
+      "his manager, ms. dvorak"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_6",
+   "text": "Amara planted tomatoes, beans and sunflowers in the garden behind her grandmother's house in Accra. Each afternoon she carried water from the well in a yellow bucket. One morning she noticed that goats had eaten half of the beans. Her grandmother helped her build a fence from bamboo poles and old rope. By the end of the summer, the sunflowers were taller than Amara.",
+   "qs": [
+    [
+     "Whose house was the garden behind?",
+     [
+      "her grandmother's house",
+      "her grandmother's",
+      "grandmother's"
+     ]
+    ],
+    [
+     "What did Amara carry water in?",
+     [
+      "a yellow bucket",
+      "yellow bucket"
+     ]
+    ],
+    [
+     "What had eaten half of the beans?",
+     [
+      "goats"
+     ]
+    ],
+    [
+     "What was the fence made from?",
+     [
+      "bamboo poles and old rope",
+      "bamboo poles"
+     ]
+    ],
+    [
+     "Which plants grew taller than Amara?",
+     [
+      "the sunflowers",
+      "sunflowers"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_7",
+   "text": "Mrs. Helena Kowalski has been the librarian at the Maple Road library for twenty years. On Wednesday afternoons she reads stories to children in the corner room. This week a boy named Samir asked for a book about volcanoes, but every copy was checked out. Mrs. Kowalski ordered one from another library, and it arrived on Friday. Samir read it twice over the weekend.",
+   "qs": [
+    [
+     "How long has Mrs. Kowalski been the librarian?",
+     [
+      "for twenty years",
+      "twenty years"
+     ]
+    ],
+    [
+     "When does she read stories to children?",
+     [
+      "on wednesday afternoons",
+      "wednesday afternoons"
+     ]
+    ],
+    [
+     "What kind of book did Samir ask for?",
+     [
+      "a book about volcanoes",
+      "volcanoes"
+     ]
+    ],
+    [
+     "When did the book arrive?",
+     [
+      "on friday",
+      "friday"
+     ]
+    ],
+    [
+     "How many times did Samir read the book?",
+     [
+      "twice"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_8",
+   "text": "The Chen family made dumplings together on the night before the New Year festival. Grandpa Wei rolled the dough while Mei and her cousin Jun folded the edges. Mei hid a single coin inside one dumpling for good luck. At dinner, Uncle Li bit into the coin and laughed so loudly that the dog barked. Everyone agreed that he would have a lucky year.",
+   "qs": [
+    [
+     "When did the Chen family make dumplings?",
+     [
+      "on the night before the new year festival",
+      "the night before the new year festival"
+     ]
+    ],
+    [
+     "Who rolled the dough?",
+     [
+      "grandpa wei"
+     ]
+    ],
+    [
+     "What did Mei hide inside one dumpling?",
+     [
+      "a single coin",
+      "coin"
+     ]
+    ],
+    [
+     "Who bit into the coin?",
+     [
+      "uncle li"
+     ]
+    ],
+    [
+     "Why did the dog bark?",
+     [
+      "uncle li bit into the coin and laughed so loudly",
+      "laughed so loudly"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_9",
+   "text": "Ahmed's bicycle had a flat tyre, so he could not ride to school on Monday. After classes, he took it to a repair shop owned by an old man called Mr. Haddad. Mr. Haddad found a tiny nail in the tyre and replaced the inner tube. The repair cost five dollars, which Ahmed paid with money from his birthday. On Tuesday he rode to school faster than ever.",
+   "qs": [
+    [
+     "Why could Ahmed not ride to school on Monday?",
+     [
+      "bicycle had a flat tyre",
+      "a flat tyre"
+     ]
+    ],
+    [
+     "Who owned the repair shop?",
+     [
+      "mr. haddad",
+      "an old man called mr. haddad"
+     ]
+    ],
+    [
+     "What did Mr. Haddad find in the tyre?",
+     [
+      "a tiny nail",
+      "tiny nail",
+      "nail"
+     ]
+    ],
+    [
+     "How much did the repair cost?",
+     [
+      "five dollars"
+     ]
+    ],
+    [
+     "Whose bicycle had a flat tyre?",
+     [
+      "ahmed's",
+      "ahmed"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_10",
+   "text": "Early on a foggy Sunday, Ingrid and her father rowed a small boat onto the lake near their cabin in Norway. They used worms as bait and waited quietly for an hour. Ingrid caught a large trout, but her father caught only an old boot. They laughed about the boot all the way home. That evening, her mother cooked the trout with butter and lemon.",
+   "qs": [
+    [
+     "Who went fishing with Ingrid?",
+     [
+      "her father"
+     ]
+    ],
+    [
+     "Where was the lake?",
+     [
+      "near their cabin in norway",
+      "in norway",
+      "norway"
+     ]
+    ],
+    [
+     "What did they use as bait?",
+     [
+      "worms"
+     ]
+    ],
+    [
+     "What did Ingrid's father catch?",
+     [
+      "an old boot",
+      "old boot"
+     ]
+    ],
+    [
+     "How did her mother cook the trout?",
+     [
+      "with butter and lemon",
+      "butter and lemon"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_11",
+   "text": "Mr. Kunle Adeyemi drives a taxi in Lagos. On Friday night a young woman left a brown leather purse on the back seat. Inside he found a passport, a train ticket and a photograph of a baby. He drove back to the hotel where he had picked her up and gave the purse to the manager. The next day the woman, Ms. Grace Eze, called to thank him.",
+   "qs": [
+    [
+     "What does Mr. Adeyemi do for work?",
+     [
+      "drives a taxi"
+     ]
+    ],
+    [
+     "What did the young woman leave behind?",
+     [
+      "a brown leather purse",
+      "brown leather purse",
+      "purse"
+     ]
+    ],
+    [
+     "When did she leave it?",
+     [
+      "on friday night",
+      "friday night"
+     ]
+    ],
+    [
+     "Who did he give the purse to?",
+     [
+      "the manager"
+     ]
+    ],
+    [
+     "What was the woman's name?",
+     [
+      "ms. grace eze",
+      "grace eze"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_12",
+   "text": "Sofia practised the piano for two hours every day before her first concert. Her teacher, Mr. Romano, told her to play the slow part more gently. On the night of the concert, her hands shook as she walked onto the stage. She looked at her grandmother in the front row and took a deep breath. When she finished, the audience clapped for a long time.",
+   "qs": [
+    [
+     "How long did Sofia practise every day?",
+     [
+      "for two hours",
+      "two hours"
+     ]
+    ],
+    [
+     "Who was Sofia's teacher?",
+     [
+      "mr. romano"
+     ]
+    ],
+    [
+     "What did her teacher tell her to do?",
+     [
+      "to play the slow part more gently",
+      "play the slow part more gently"
+     ]
+    ],
+    [
+     "Where was her grandmother sitting?",
+     [
+      "in the front row",
+      "the front row"
+     ]
+    ],
+    [
+     "What did the audience do when she finished?",
+     [
+      "clapped for a long time",
+      "clapped"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_13",
+   "text": "Rajesh borrowed a red umbrella from his colleague Priya when it started to rain at the office. On his way home, a strong wind turned the umbrella inside out and broke two of its ribs. He felt terrible and bought her a new one at the market on Gandhi Road. The new umbrella was green, because the shop had no red ones left. Priya said she liked green better anyway.",
+   "qs": [
+    [
+     "Whose umbrella did Rajesh borrow?",
+     [
+      "priya",
+      "his colleague priya"
+     ]
+    ],
+    [
+     "What broke the umbrella?",
+     [
+      "a strong wind",
+      "strong wind"
+     ]
+    ],
+    [
+     "How many ribs broke?",
+     [
+      "two",
+      "two of its ribs"
+     ]
+    ],
+    [
+     "Where did he buy the new umbrella?",
+     [
+      "at the market on gandhi road",
+      "the market on gandhi road",
+      "gandhi road"
+     ]
+    ],
+    [
+     "Why was the new umbrella green?",
+     [
+      "because the shop had no red ones left",
+      "the shop had no red ones left"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_14",
+   "text": "Rex is an old brown dog who lives on a farm outside Cork with the Murphy family. Every morning he walks with Mr. Murphy to check on the sheep. One winter morning, Rex barked at the barn until Mr. Murphy opened the door. Inside, a newborn lamb was lying in the straw, too weak to stand. They carried the lamb into the warm kitchen, and by evening it was drinking milk.",
+   "qs": [
+    [
+     "What kind of animal is Rex?",
+     [
+      "an old brown dog",
+      "dog"
+     ]
+    ],
+    [
+     "Where is the farm?",
+     [
+      "outside cork",
+      "cork"
+     ]
+    ],
+    [
+     "Which family does Rex live with?",
+     [
+      "the murphy family",
+      "murphy"
+     ]
+    ],
+    [
+     "What was lying in the straw?",
+     [
+      "a newborn lamb",
+      "newborn lamb"
+     ]
+    ],
+    [
+     "Where did they carry the lamb?",
+     [
+      "into the warm kitchen",
+      "the warm kitchen"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_15",
+   "text": "Fatima is a tailor with a small shop in Marrakesh. Last month a customer named Mrs. Benali asked her to make a dress for her daughter's wedding. Fatima chose a soft blue silk and spent nine days sewing tiny beads onto the sleeves. On the morning of the wedding, the zip broke, and she fixed it in fifteen minutes. The bride said it was the most beautiful dress she had ever worn.",
+   "qs": [
+    [
+     "What is Fatima's job?",
+     [
+      "a tailor",
+      "tailor"
+     ]
+    ],
+    [
+     "Who asked Fatima to make a dress?",
+     [
+      "mrs. benali",
+      "a customer named mrs. benali"
+     ]
+    ],
+    [
+     "Which material did Fatima choose?",
+     [
+      "a soft blue silk",
+      "blue silk",
+      "silk"
+     ]
+    ],
+    [
+     "How many days did she spend sewing beads?",
+     [
+      "nine days",
+      "nine"
+     ]
+    ],
+    [
+     "What broke on the morning of the wedding?",
+     [
+      "the zip",
+      "zip"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_16",
+   "text": "Kofi was chosen to play the king in his school play. He had to learn forty lines and wear a golden paper crown. During the second scene, the crown fell off and rolled under a bench. Instead of stopping, Kofi picked it up and said, 'Even kings drop things.' The audience laughed, and his teacher, Mrs. Asante, said it was the best moment of the show.",
+   "qs": [
+    [
+     "What role did Kofi play?",
+     [
+      "the king",
+      "king"
+     ]
+    ],
+    [
+     "How many lines did he have to learn?",
+     [
+      "forty lines",
+      "forty"
+     ]
+    ],
+    [
+     "Where did the crown roll?",
+     [
+      "under a bench",
+      "a bench"
+     ]
+    ],
+    [
+     "When did the crown fall off?",
+     [
+      "during the second scene",
+      "the second scene"
+     ]
+    ],
+    [
+     "Who is Kofi's teacher?",
+     [
+      "mrs. asante"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_17",
+   "text": "Elena moved into a new apartment on the fourth floor of an old building in Lisbon. The lift was broken, so her friends Marco and Ines carried the boxes up the stairs. The heaviest box held her collection of cookbooks. After they finished, Elena ordered three pizzas to thank them. They ate on the floor because her table had not arrived yet.",
+   "qs": [
+    [
+     "Which floor is Elena's apartment on?",
+     [
+      "the fourth floor",
+      "fourth floor",
+      "fourth"
+     ]
+    ],
+    [
+     "Why did her friends carry the boxes up the stairs?",
+     [
+      "the lift was broken"
+     ]
+    ],
+    [
+     "What was in the heaviest box?",
+     [
+      "her collection of cookbooks",
+      "cookbooks"
+     ]
+    ],
+    [
+     "How many pizzas did Elena order?",
+     [
+      "three",
+      "three pizzas"
+     ]
+    ],
+    [
+     "Why did they eat on the floor?",
+     [
+      "because her table had not arrived yet",
+      "her table had not arrived yet"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_18",
+   "text": "Mr. Kim runs a hardware store on Second Avenue. On Monday a woman came in looking for a key to fit an old wooden chest. Mr. Kim searched through a drawer of hundreds of keys and found one that almost fit. He filed the edges for a few minutes until it turned smoothly. The woman opened the chest and found her grandfather's letters from the war.",
+   "qs": [
+    [
+     "Where is Mr. Kim's store?",
+     [
+      "on second avenue",
+      "second avenue"
+     ]
+    ],
+    [
+     "What was the woman looking for?",
+     [
+      "a key to fit an old wooden chest",
+      "a key"
+     ]
+    ],
+    [
+     "What did Mr. Kim search through?",
+     [
+      "a drawer of hundreds of keys",
+      "a drawer"
+     ]
+    ],
+    [
+     "How did he make the key fit?",
+     [
+      "he filed the edges",
+      "filed the edges"
+     ]
+    ],
+    [
+     "Whose letters were in the chest?",
+     [
+      "her grandfather's",
+      "her grandfather's letters from the war",
+      "grandfather's"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_19",
+   "text": "Leila found a small sparrow with a hurt wing in the schoolyard. She placed it gently in a shoebox lined with tissue paper. Her science teacher, Dr. Rahimi, showed her how to give it water with a dropper. For a week Leila fed the sparrow seeds and tiny pieces of apple. On Saturday the bird flew from her hand to the branch of a lemon tree.",
+   "qs": [
+    [
+     "What did Leila find in the schoolyard?",
+     [
+      "a small sparrow with a hurt wing",
+      "a small sparrow",
+      "sparrow"
+     ]
+    ],
+    [
+     "What did she put the bird in?",
+     [
+      "a shoebox lined with tissue paper",
+      "a shoebox"
+     ]
+    ],
+    [
+     "Who showed her how to give it water?",
+     [
+      "dr. rahimi",
+      "her science teacher, dr. rahimi"
+     ]
+    ],
+    [
+     "What did Leila feed the sparrow?",
+     [
+      "seeds and tiny pieces of apple",
+      "seeds"
+     ]
+    ],
+    [
+     "Where did the bird fly on Saturday?",
+     [
+      "to the branch of a lemon tree",
+      "the branch of a lemon tree",
+      "a lemon tree"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_20",
+   "text": "Every Sunday, Carlos and his wife Ana sell honey at the market in the main square of Oaxaca. They keep forty beehives on a hill behind their house. This Sunday a tourist asked why their honey was so dark. Carlos explained that the bees fed mostly on the flowers of avocado trees. The tourist bought six jars to take home to Canada.",
+   "qs": [
+    [
+     "What do Carlos and Ana sell?",
+     [
+      "honey"
+     ]
+    ],
+    [
+     "How many beehives do they keep?",
+     [
+      "forty",
+      "forty beehives"
+     ]
+    ],
+    [
+     "Where do they sell their honey?",
+     [
+      "at the market in the main square of oaxaca",
+      "the market in the main square of oaxaca",
+      "oaxaca"
+     ]
+    ],
+    [
+     "Why was their honey so dark?",
+     [
+      "the bees fed mostly on the flowers of avocado trees",
+      "the flowers of avocado trees"
+     ]
+    ],
+    [
+     "Where was the tourist taking the jars?",
+     [
+      "home to canada",
+      "canada"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_21",
+   "text": "During a thunderstorm on Thursday night, the power went out in Mrs. Johnson's house. Her twin boys, Eli and Noah, were frightened by the dark. She lit three candles and found a deck of cards in the kitchen drawer. They played cards at the table and told jokes until the lights came back at midnight. The boys later said it was the best night of the week.",
+   "qs": [
+    [
+     "When did the power go out?",
+     [
+      "during a thunderstorm on thursday night",
+      "on thursday night",
+      "thursday night"
+     ]
+    ],
+    [
+     "What are the names of Mrs. Johnson's boys?",
+     [
+      "eli and noah"
+     ]
+    ],
+    [
+     "How many candles did she light?",
+     [
+      "three",
+      "three candles"
+     ]
+    ],
+    [
+     "Where did she find the cards?",
+     [
+      "in the kitchen drawer",
+      "the kitchen drawer"
+     ]
+    ],
+    [
+     "When did the lights come back?",
+     [
+      "at midnight",
+      "midnight"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_22",
+   "text": "Yusuf works as a bus driver in Istanbul. One afternoon, an elderly man with a cane fell as he stepped onto the bus. Yusuf stopped the engine, helped him to a seat and checked that his knee was not hurt. The other passengers waited patiently, and a young student offered the man a bottle of water. At the last stop, the old man shook Yusuf's hand and gave him a bag of figs.",
+   "qs": [
+    [
+     "Where does Yusuf work?",
+     [
+      "in istanbul",
+      "istanbul"
+     ]
+    ],
+    [
+     "Who fell while stepping onto the bus?",
+     [
+      "an elderly man with a cane",
+      "an elderly man"
+     ]
+    ],
+    [
+     "What did a young student offer the man?",
+     [
+      "a bottle of water",
+      "water"
+     ]
+    ],
+    [
+     "Whose hand did the old man shake?",
+     [
+      "yusuf's",
+      "yusuf"
+     ]
+    ],
+    [
+     "What did the old man give Yusuf?",
+     [
+      "a bag of figs",
+      "figs"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_23",
+   "text": "Nadia entered a cake competition at the county fair in July. She baked a three-layer chocolate cake with raspberry filling. On the way to the fair, her car hit a bump and the top layer slid sideways. Nadia fixed it in the parking lot using a spoon and extra cream. The judges, led by Mrs. Whitfield, gave her cake the second prize.",
+   "qs": [
+    [
+     "When was the cake competition?",
+     [
+      "in july",
+      "july"
+     ]
+    ],
+    [
+     "What kind of cake did Nadia bake?",
+     [
+      "a three-layer chocolate cake with raspberry filling",
+      "a three-layer chocolate cake",
+      "chocolate cake"
+     ]
+    ],
+    [
+     "What happened when the car hit a bump?",
+     [
+      "the top layer slid sideways"
+     ]
+    ],
+    [
+     "How did Nadia fix the cake?",
+     [
+      "using a spoon and extra cream",
+      "a spoon and extra cream"
+     ]
+    ],
+    [
+     "Which prize did her cake win?",
+     [
+      "the second prize",
+      "second prize",
+      "second"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_24",
+   "text": "On a windy afternoon in Lahore, Tariq and his grandfather built a kite from sticks, string and old newspaper. Grandfather painted a large orange fish on it. They flew it from the flat roof of their house. The kite rose higher than all the others in the neighbourhood until the string snapped. It landed in the courtyard of the mosque, and a kind man returned it the next day.",
+   "qs": [
+    [
+     "In which city did Tariq fly the kite?",
+     [
+      "lahore",
+      "in lahore"
+     ]
+    ],
+    [
+     "What was the kite made from?",
+     [
+      "sticks, string and old newspaper"
+     ]
+    ],
+    [
+     "What did grandfather paint on the kite?",
+     [
+      "a large orange fish",
+      "orange fish"
+     ]
+    ],
+    [
+     "Where did they fly the kite from?",
+     [
+      "from the flat roof of their house",
+      "the flat roof of their house"
+     ]
+    ],
+    [
+     "Where did the kite land?",
+     [
+      "in the courtyard of the mosque",
+      "the courtyard of the mosque"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_25",
+   "text": "Dr. Karin Lindqvist is a vet in a small town in Sweden. On Monday a girl named Astrid brought in her rabbit, Pepper, who would not eat. Dr. Lindqvist discovered that one of Pepper's teeth had grown too long. She trimmed the tooth carefully while Astrid held the rabbit's paw. Two hours later, Pepper was happily eating carrots in her cage again.",
+   "qs": [
+    [
+     "What is Dr. Lindqvist's job?",
+     [
+      "a vet",
+      "vet"
+     ]
+    ],
+    [
+     "Whose rabbit was Pepper?",
+     [
+      "astrid",
+      "a girl named astrid"
+     ]
+    ],
+    [
+     "Why would Pepper not eat?",
+     [
+      "one of pepper's teeth had grown too long"
+     ]
+    ],
+    [
+     "What did Astrid hold?",
+     [
+      "the rabbit's paw"
+     ]
+    ],
+    [
+     "How long was it until Pepper ate again?",
+     [
+      "two hours later",
+      "two hours"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_26",
+   "text": "Mr. and Mrs. Silva celebrated their fiftieth wedding anniversary at a restaurant by the sea in Porto. Their three children and seven grandchildren travelled from different cities to be there. The youngest grandson, Tiago, played a song on his violin. Mrs. Silva cried when she saw an old photograph of their wedding day printed on the cake. They danced together until the restaurant closed.",
+   "qs": [
+    [
+     "Which anniversary did the Silvas celebrate?",
+     [
+      "their fiftieth wedding anniversary",
+      "fiftieth"
+     ]
+    ],
+    [
+     "Where did they celebrate?",
+     [
+      "at a restaurant by the sea in porto",
+      "a restaurant by the sea",
+      "porto"
+     ]
+    ],
+    [
+     "How many grandchildren travelled there?",
+     [
+      "seven",
+      "seven grandchildren"
+     ]
+    ],
+    [
+     "What instrument did Tiago play?",
+     [
+      "his violin",
+      "violin"
+     ]
+    ],
+    [
+     "Why did Mrs. Silva cry?",
+     [
+      "she saw an old photograph of their wedding day printed on the cake",
+      "an old photograph of their wedding day"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_27",
+   "text": "Zara and her sister Hana spent a hot August day at the beach near Durban. While swimming, Zara lost a silver earring that had belonged to their mother. The sisters searched the sand for almost an hour. Finally, Hana spotted something shining beside a pile of seaweed. Zara put the earring safely in her pocket and promised never to wear it swimming again.",
+   "qs": [
+    [
+     "Who went to the beach with Zara?",
+     [
+      "her sister hana",
+      "hana"
+     ]
+    ],
+    [
+     "When did they go to the beach?",
+     [
+      "a hot august day",
+      "august"
+     ]
+    ],
+    [
+     "What did Zara lose?",
+     [
+      "a silver earring",
+      "silver earring"
+     ]
+    ],
+    [
+     "How long did the sisters search?",
+     [
+      "for almost an hour",
+      "almost an hour"
+     ]
+    ],
+    [
+     "Where did Hana spot the earring?",
+     [
+      "beside a pile of seaweed",
+      "a pile of seaweed"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_28",
+   "text": "Mr. Daniel Okonkwo started a chess club at his secondary school in Enugu. At first only four students came, and they shared one old chessboard. A local businesswoman, Mrs. Nwosu, heard about the club and donated twelve new sets. By the end of the year, thirty students were playing every Wednesday. The club's best player, Chiamaka, won a regional tournament in May.",
+   "qs": [
+    [
+     "Who started the chess club?",
+     [
+      "mr. daniel okonkwo",
+      "daniel okonkwo"
+     ]
+    ],
+    [
+     "How many students came at first?",
+     [
+      "four",
+      "only four students"
+     ]
+    ],
+    [
+     "What did Mrs. Nwosu donate?",
+     [
+      "twelve new sets"
+     ]
+    ],
+    [
+     "When do the students play?",
+     [
+      "every wednesday",
+      "wednesday"
+     ]
+    ],
+    [
+     "Who won a regional tournament?",
+     [
+      "chiamaka"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_29",
+   "text": "The first snow of the year fell on the small town of Banff during Thursday night. In the morning, Jack and his neighbour Olivia built a snowman in front of the post office. They used two black buttons for its eyes and a carrot for its nose. Mr. Grant, the postman, lent them his old wool scarf. By Saturday afternoon the sun had melted the snowman, but the scarf was still lying on the ground.",
+   "qs": [
+    [
+     "When did the first snow fall?",
+     [
+      "during thursday night",
+      "thursday night"
+     ]
+    ],
+    [
+     "Where did they build the snowman?",
+     [
+      "in front of the post office",
+      "the post office"
+     ]
+    ],
+    [
+     "What did they use for the snowman's eyes?",
+     [
+      "two black buttons",
+      "black buttons"
+     ]
+    ],
+    [
+     "Who lent them a scarf?",
+     [
+      "mr. grant",
+      "mr. grant, the postman"
+     ]
+    ],
+    [
+     "What melted the snowman?",
+     [
+      "the sun"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_30",
+   "text": "Every Sunday at noon, Mei Ling calls her grandmother in Penang on a video chat. Her grandmother cannot hear well, so Mei Ling writes messages on a small whiteboard and holds it up to the camera. Last Sunday she wrote that she had passed her driving test. Her grandmother clapped and held up a plate of pineapple tarts to celebrate. They both laughed because Mei Ling could not taste them through the screen.",
+   "qs": [
+    [
+     "When does Mei Ling call her grandmother?",
+     [
+      "every sunday at noon",
+      "sunday at noon"
+     ]
+    ],
+    [
+     "Where does her grandmother live?",
+     [
+      "in penang",
+      "penang"
+     ]
+    ],
+    [
+     "Why does Mei Ling write messages on a whiteboard?",
+     [
+      "her grandmother cannot hear well"
+     ]
+    ],
+    [
+     "Which test had Mei Ling passed?",
+     [
+      "her driving test",
+      "driving test"
+     ]
+    ],
+    [
+     "What did her grandmother hold up?",
+     [
+      "a plate of pineapple tarts",
+      "pineapple tarts"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_31",
+   "text": "Mr. Abebe roasts coffee beans in a pan over a charcoal fire at his cafe in Addis Ababa. Each morning the smell draws people in from the street. On Tuesday a young journalist named Selam came to write an article about the cafe. Mr. Abebe served her three small cups, as is the custom. Her article appeared in the newspaper the following week, and the cafe was full for days.",
+   "qs": [
+    [
+     "What does Mr. Abebe roast?",
+     [
+      "coffee beans"
+     ]
+    ],
+    [
+     "Where is his cafe?",
+     [
+      "in addis ababa",
+      "addis ababa"
+     ]
+    ],
+    [
+     "Who came to write an article?",
+     [
+      "selam",
+      "a young journalist named selam"
+     ]
+    ],
+    [
+     "How many cups did he serve her?",
+     [
+      "three",
+      "three small cups"
+     ]
+    ],
+    [
+     "When did the article appear?",
+     [
+      "the following week"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_32",
+   "text": "On a school trip to the natural history museum, Owen wandered away to look at a giant whale skeleton. When he turned around, his class had gone. He remembered his teacher's rule and walked to the information desk. A guard named Mrs. Lopez called his teacher, Mr. Hughes, on the radio. Ten minutes later Owen rejoined the class in the dinosaur hall.",
+   "qs": [
+    [
+     "Why did Owen wander away?",
+     [
+      "to look at a giant whale skeleton",
+      "a giant whale skeleton"
+     ]
+    ],
+    [
+     "Where did Owen walk after he lost his class?",
+     [
+      "to the information desk",
+      "the information desk"
+     ]
+    ],
+    [
+     "Who called his teacher on the radio?",
+     [
+      "mrs. lopez",
+      "a guard named mrs. lopez"
+     ]
+    ],
+    [
+     "What is the name of Owen's teacher?",
+     [
+      "mr. hughes"
+     ]
+    ],
+    [
+     "Where did Owen rejoin the class?",
+     [
+      "in the dinosaur hall",
+      "the dinosaur hall"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_33",
+   "text": "Mrs. Rosa Mendes owns a green parrot named Coco who can say twenty words. Every time the doorbell rings, Coco shouts, 'Come in, come in!' One afternoon a delivery man was so surprised that he dropped a parcel on the step. Inside the parcel was a new mirror for the bathroom, and luckily it did not break. Now the delivery man always waves at Coco through the window.",
+   "qs": [
+    [
+     "What colour is Coco?",
+     [
+      "green"
+     ]
+    ],
+    [
+     "How many words can Coco say?",
+     [
+      "twenty",
+      "twenty words"
+     ]
+    ],
+    [
+     "Whose parrot is Coco?",
+     [
+      "mrs. rosa mendes",
+      "rosa mendes"
+     ]
+    ],
+    [
+     "What did the delivery man drop?",
+     [
+      "a parcel",
+      "parcel"
+     ]
+    ],
+    [
+     "What was inside the parcel?",
+     [
+      "a new mirror for the bathroom",
+      "a new mirror",
+      "mirror"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_34",
+   "text": "Arjun and his best friend Dev were playing cricket in the lane behind their houses. Dev hit the ball so hard that it broke a window in Mrs. Iyer's kitchen. The boys knocked on her door and told her what had happened. Mrs. Iyer was not angry because they had been honest. She asked them to wash her car on Saturday to help pay for the new glass.",
+   "qs": [
+    [
+     "What game were the boys playing?",
+     [
+      "cricket"
+     ]
+    ],
+    [
+     "Who hit the ball?",
+     [
+      "dev"
+     ]
+    ],
+    [
+     "Whose window did the ball break?",
+     [
+      "mrs. iyer's",
+      "mrs. iyer"
+     ]
+    ],
+    [
+     "Why was Mrs. Iyer not angry?",
+     [
+      "because they had been honest",
+      "they had been honest"
+     ]
+    ],
+    [
+     "What did she ask the boys to do?",
+     [
+      "to wash her car on saturday",
+      "wash her car on saturday",
+      "wash her car"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_35",
+   "text": "Sven and Freya set out at dawn to climb a mountain near their village in the Alps. They packed bread, cheese and two bottles of water. Halfway up, thick clouds rolled in and they could not see the path. Freya used a compass to lead them back down to a wooden hut. They waited there for three hours until the sky cleared, then reached the top before sunset.",
+   "qs": [
+    [
+     "When did Sven and Freya set out?",
+     [
+      "at dawn",
+      "dawn"
+     ]
+    ],
+    [
+     "What did they pack?",
+     [
+      "bread, cheese and two bottles of water"
+     ]
+    ],
+    [
+     "Why could they not see the path?",
+     [
+      "thick clouds rolled in"
+     ]
+    ],
+    [
+     "What did Freya use to lead them?",
+     [
+      "a compass",
+      "compass"
+     ]
+    ],
+    [
+     "How long did they wait in the hut?",
+     [
+      "for three hours",
+      "three hours"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_36",
+   "text": "Mrs. Yuki Takahashi owns a flower shop near the railway station in Osaka. On Valentine's Day she sold more than two hundred red roses. A shy young man came in at closing time with only a few coins. Mrs. Takahashi gave him the last white tulip and told him to pay her next week. He came back seven days later with the money and a box of sweets.",
+   "qs": [
+    [
+     "Where is Mrs. Takahashi's flower shop?",
+     [
+      "near the railway station in osaka",
+      "near the railway station",
+      "osaka"
+     ]
+    ],
+    [
+     "How many roses did she sell on Valentine's Day?",
+     [
+      "more than two hundred",
+      "more than two hundred red roses"
+     ]
+    ],
+    [
+     "When did the shy young man come in?",
+     [
+      "at closing time",
+      "closing time"
+     ]
+    ],
+    [
+     "Which flower did she give him?",
+     [
+      "the last white tulip",
+      "white tulip"
+     ]
+    ],
+    [
+     "What did he bring back besides the money?",
+     [
+      "a box of sweets"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_37",
+   "text": "Liam found his late grandmother's recipe book in a cardboard box in the attic. The pages were yellow, and some were stained with flour. He chose her famous apple pie recipe and baked it for his mother's birthday. The crust came out a little burnt because he forgot to set a timer. His mother still ate two slices and said it tasted just like the pies from her childhood.",
+   "qs": [
+    [
+     "Where did Liam find the recipe book?",
+     [
+      "in a cardboard box in the attic",
+      "in the attic",
+      "the attic"
+     ]
+    ],
+    [
+     "Whose recipe book was it?",
+     [
+      "his late grandmother's",
+      "grandmother's"
+     ]
+    ],
+    [
+     "What did Liam bake?",
+     [
+      "her famous apple pie recipe",
+      "apple pie"
+     ]
+    ],
+    [
+     "Why was the crust burnt?",
+     [
+      "because he forgot to set a timer",
+      "he forgot to set a timer"
+     ]
+    ],
+    [
+     "How many slices did his mother eat?",
+     [
+      "two slices",
+      "two"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_38",
+   "text": "Ms. Halima Abdi is a nurse who works night shifts at a hospital in Nairobi. Last Friday, a power cut darkened the children's ward just after two in the morning. She calmed the frightened children by singing an old Somali song. Within five minutes the generator started, and the lights came back on. One little girl asked her to sing the song again before she fell asleep.",
+   "qs": [
+    [
+     "Where does Ms. Abdi work?",
+     [
+      "at a hospital in nairobi",
+      "a hospital in nairobi",
+      "nairobi"
+     ]
+    ],
+    [
+     "When did the power cut happen?",
+     [
+      "just after two in the morning",
+      "last friday"
+     ]
+    ],
+    [
+     "How did she calm the children?",
+     [
+      "by singing an old somali song",
+      "singing an old somali song"
+     ]
+    ],
+    [
+     "What started within five minutes?",
+     [
+      "the generator",
+      "generator"
+     ]
+    ],
+    [
+     "What did one little girl ask her to do?",
+     [
+      "to sing the song again",
+      "sing the song again"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_39",
+   "text": "Diego and his parents visited an animal shelter in Valencia on a Saturday morning. They had planned to adopt a small puppy. Instead, Diego fell in love with an old black dog called Bruno who had been at the shelter for two years. The staff said older dogs are often calm and gentle. Bruno slept on Diego's bed that very first night.",
+   "qs": [
+    [
+     "Where was the animal shelter?",
+     [
+      "in valencia",
+      "valencia"
+     ]
+    ],
+    [
+     "What had they planned to adopt?",
+     [
+      "a small puppy",
+      "puppy"
+     ]
+    ],
+    [
+     "What was the name of the dog Diego chose?",
+     [
+      "bruno"
+     ]
+    ],
+    [
+     "How long had Bruno been at the shelter?",
+     [
+      "for two years",
+      "two years"
+     ]
+    ],
+    [
+     "Where did Bruno sleep that first night?",
+     [
+      "on diego's bed",
+      "diego's bed"
+     ]
+    ]
+   ]
+  },
+  {
+   "id": "f14_40",
+   "text": "Mr. Ivan Petrov repairs clocks in a tiny workshop above a bakery. A woman named Mrs. Ellis brought him a tall clock that had stopped many years ago. He cleaned every gear and replaced a broken spring with one he made himself. It took him three weeks to finish the work. When the clock struck twelve for the first time, Mrs. Ellis said it sounded exactly as it had when she was a child.",
+   "qs": [
+    [
+     "Where is Mr. Petrov's workshop?",
+     [
+      "above a bakery",
+      "in a tiny workshop above a bakery"
+     ]
+    ],
+    [
+     "Who brought him the clock?",
+     [
+      "mrs. ellis",
+      "a woman named mrs. ellis"
+     ]
+    ],
+    [
+     "What did he replace?",
+     [
+      "a broken spring",
+      "broken spring"
+     ]
+    ],
+    [
+     "How long did the work take?",
+     [
+      "three weeks"
+     ]
+    ],
+    [
+     "Which hour did the clock strike for the first time?",
+     [
+      "twelve"
+     ]
+    ]
+   ]
+  }
+ ]
+}
