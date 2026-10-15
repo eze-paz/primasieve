@@ -1,0 +1,2 @@
+P11 weights: {'bias': np.float64(-0.0), 'position': np.float64(0.002), 'first': np.float64(0.003), 'last': np.float64(0.016), 'length': np.float64(0.043), 'centrality': np.float64(0.099), 'main name': np.float64(0.007), 'overlap first': np.float64(-0.004), 'overlap rest': np.float64(0.0)}
+P11 learned selector coverage 0.386 (130 words) vs length-matched lead 0.370 (121 words) on 15 test passages
