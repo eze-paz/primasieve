@@ -17,6 +17,16 @@ def same(a, b):
     return a == b or a.split()[-1] == b.split()[-1] or a in b or b in a
 
 
+def story_span(text, a):                                                                   # R25-dy: give the answer in the story's own words (its article, title or possessive)
+    if not a: return a
+    import re as _re
+    w = a.split(); arts = {"the", "a", "an"}
+    core = " ".join(w[1:]) if w and w[0].lower() in arts else a
+    if not core: return a
+    m = _re.search(r"(?i)\b(?:(?:the|a|an|his|her|their|its|my|our|mr\.?|mrs\.?|ms\.?|dr\.?)\s+)?" + _re.escape(core) + r"\b", text)
+    return text[m.start():m.end()] if m else a
+
+
 def main():
     data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
     import r24_books as B, data as D
@@ -224,7 +234,7 @@ def main():
     n = matched = right = 0; by = {}; valk = collections.defaultdict(lambda: [0, 0]); valkk = collections.defaultdict(lambda: [0, 0])
     for s in stories:
         for q, g in s["qs"]:
-            n += 1; a, how = answer(s["text"], q); by.setdefault(how, [0, 0])
+            n += 1; a, how = answer(s["text"], q); a = story_span(s["text"], a) if "--story-span" in ARGV else a; by.setdefault(how, [0, 0])
             if DIAG and "--selpref" in ARGV and a is not None: role_ok(q, a)
             if DIAG: print(f"VAL | lift {LIFT[0] if (a is not None and '--selpref' in ARGV) else None} | {q} | gold {g} | cue {E.ask_conf(E.Log(names).read(s['text']), q)} | learned {QR.ask_learned(QRD, rd, s['text'], names, q) if LEARNED_Q else R.ask(rd, s['text'], names, q)} lvl {QR.LASTQ.get('level') if LEARNED_Q else '-'} | route {how} | ans {a} | hit {hit(a, g) if a is not None else '-'}", flush=True)
             if a is not None:
