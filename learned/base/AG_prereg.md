@@ -247,3 +247,29 @@ first story line whose DID lemma equals the question's and whose other filled sl
 same last word); silent otherwise. Reported: yields of both stages, right / wrong / silent, precision, and the same
 on the original text's slot lines is not needed (there is no canonical text here; the slot lines are the canonical
 form). PASS if untouched right > 25 at precision >= 0.89 (AG3's symbolic reader: 25 / 3). Cost about 2 h.
+
+## AG10 result -- FAIL as run (15 right / 5 wrong / 180 silent, precision 0.75), cause found
+9,243 s on 40 untouched stories: 135 event lines kept (about one per sentence; the model often writes one line for a
+two-event sentence), 114 of 200 question lines kept (79 rejected for the wrong number of '?'). Answers: what 8 / 0,
+where 6 / 4, when 1 / 0, **who 0 / 1 with 69 silent**. The who-questions are silent because the proposer inverts
+them: 'Who shook the trunk?' -> 'WHO: the trunk | DID: shake | WHAT: ?' on nearly every who-question (44 question
+lines), so WHO never matches. The slot language and the exact parse work; the proposer's question lines break the
+formal language's own syntax.
+
+## AG10b registration (the formal language's question syntax enforced by the verifier)
+No new model runs; scored from ag10_lines.json. Rule of the formal question language: a question beginning 'Who'
+with no auxiliary ('Who V ...') asks WHO; 'Who did X V' asks WHAT; 'What / Where / When / Why (did|was|...) X ...'
+asks that slot and X is WHO. A question line whose '?' disagrees is corrected by swapping WHO and the '?' slot when
+that makes it agree, else rejected. Everything else unchanged. PASS if untouched right > 25 at precision >= 0.89;
+reported either way as right / wrong / silent by kind.
+
+## AG10b result -- FAIL on reach, PASS on precision
+With the question syntax enforced: untouched **21 right / 2 wrong / 177 silent, precision 0.91** (who 11 / 1, what
+8 / 0, where 2 / 1; when / why / whose / how all silent). Precision is the best of any symbolic reader in this line
+(AG3 0.89), reach is below AG3's 25 because the proposer writes about one event line per sentence and 79 of 200
+question lines were malformed; WHEN is rarely filled in the story lines.
+
+## AG11 registration (two symbolic readers of two canonical forms, union)
+No model runs. AG3's canonical-clause reader (ag3_qa_rows.json, canonical answers, 25 / 3) first; where it is
+silent, AG10b's slot-line reader (ag10_rows.json with --grammar). Untouched val_fresh2 only, nothing chosen. PASS
+if right > 25 at precision >= 0.89. It measures whether the two canonical forms are complementary.

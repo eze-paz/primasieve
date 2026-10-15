@@ -121,12 +121,27 @@ def answer(lines, qd):
     return None
 
 
+def grammar(q, qd):
+    """AG10b: the formal question language's syntax decides which slot is asked"""
+    if not qd: return None
+    w = q.lower().rstrip("?").split(); asked = next((k for k, v in qd.items() if v == "?"), None)
+    aux = len(w) > 1 and re.fullmatch(r"did|does|do|had|has|was|were|is|are", w[1]) is not None
+    want = {"who": "WHAT" if aux else "WHO", "what": "WHAT", "where": "WHERE", "when": "WHEN", "why": "WHY"}.get(w[0])
+    if want is None or asked == want: return qd
+    d = dict(qd)
+    if want == "WHO" and asked == "WHAT" and d.get("WHO"): d["WHO"], d["WHAT"] = "?", d["WHO"]; return d
+    if want == "WHAT" and asked == "WHO" and d.get("WHAT"): d["WHO"], d["WHAT"] = d["WHAT"], "?"; return d
+    if d.get(want) in (None, "-"): d[asked] = None; d[want] = "?"; return d
+    return None
+
+
 def score():
-    D = json.load(open(OUT, encoding="utf-8")); D.pop("_stats", None)
+    D = json.load(open(OUT, encoding="utf-8")); D.pop("_stats", None); G = "--grammar" in ARGV
     r = w = sil = 0; byk = collections.defaultdict(lambda: [0, 0, 0]); rows = []
     for sid, rec in D.items():
         for qq in rec.get("qs", []):
-            a = answer(rec["lines"], qq["qline"]) if qq["qline"] else None; kind = qq["q"].split()[0].lower()
+            qd = grammar(qq["q"], qq["qline"]) if G else qq["qline"]
+            a = answer(rec["lines"], qd) if qd else None; kind = qq["q"].split()[0].lower()
             if a is None: sil += 1; byk[kind][2] += 1
             elif hit(a, qq["gold"]): r += 1; byk[kind][0] += 1
             else: w += 1; byk[kind][1] += 1
