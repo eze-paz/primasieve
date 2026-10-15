@@ -1,0 +1,1 @@
+P11/P12 compressed learned selector coverage 0.372 (119 words) vs length-matched lead 0.370 (121 words) on 15 test passages

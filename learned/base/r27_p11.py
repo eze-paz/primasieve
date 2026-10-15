@@ -24,7 +24,17 @@ for p in TR:
 X = np.concatenate(Xs); y = np.concatenate(ys); w = np.linalg.lstsq(X, y, rcond=None)[0]
 print("P11 weights:", dict(zip(["bias", "position", "first", "last", "length", "centrality", "main name", "overlap first", "overlap rest"], w.round(3))))
 def cover(t, k): h = set(toks(HE[k])); return len(h & set(toks(t))) / max(1, len(h))
-cs, cl, ws = [], [], []
+COMP = "--compress" in sys.argv
+def compress(s):
+    if not COMP: return s
+    cut = len(s)
+    for pat in (";", ":", " -- ", "--", ", which", ", who", ", where", ", and then"):
+        k = s.find(pat)
+        if 0 < k < cut: cut = k
+    t = s[:cut].rstrip(" ,;:-")
+    if len(t.split()) >= 6 and any(Dct.mainly_verb(w) or Dct.verb_base(w.lower()) in ("be", "have") for w in t.split()): return t + ("" if t.endswith((".", "!", "?")) else ".")
+    return s
+cs, cl, ws, OUT = [], [], [], {}
 for p in TE:
     S, Xp, _ = passage_rows(p, HE); sc = Xp @ w; lead = []
     for s in S:
@@ -32,7 +42,9 @@ for p in TE:
         if len(" ".join(lead).split()) >= 110: break
     m = len(" ".join(lead).split()); pick = []
     for i in np.argsort(-sc):
+        if len(" ".join(compress(S[j]) for j in pick + [i]).split()) > m and pick: continue
         pick.append(i)
-        if len(" ".join(S[j] for j in pick).split()) >= m: break
-    out = " ".join(S[j] for j in sorted(pick)); cs.append(cover(out, p["k"])); cl.append(cover(" ".join(lead), p["k"])); ws.append((len(out.split()), m))
-print(f"P11 learned selector coverage {st.mean(cs):.3f} ({st.mean(a for a, _ in ws):.0f} words) vs length-matched lead {st.mean(cl):.3f} ({st.mean(b for _, b in ws):.0f} words) on {len(TE)} test passages")
+        if len(" ".join(compress(S[j]) for j in pick).split()) >= m - 5: break
+    out = " ".join(compress(S[j]) for j in sorted(pick)); OUT[p["k"]] = out; cs.append(cover(out, p["k"])); cl.append(cover(" ".join(lead), p["k"])); ws.append((len(out.split()), m))
+json.dump(OUT, open("r27_p12_outputs.json" if COMP else "r27_p11_outputs.json", "w", encoding="utf-8"), indent=0)
+print(f"P11{'/P12 compressed' if COMP else ''} learned selector coverage {st.mean(cs):.3f} ({st.mean(a for a, _ in ws):.0f} words) vs length-matched lead {st.mean(cl):.3f} ({st.mean(b for _, b in ws):.0f} words) on {len(TE)} test passages")

@@ -175,3 +175,12 @@ Training data: 60 further passages (r27_long_passages_train.json, never overlapp
 
 ## P11 result -- PASS as registered, but inconclusive
 Learned from 60 passage / summary pairs (least squares on 9 sentence features): weight mostly on centrality (0.099) and length (0.043), some on being the last sentence (0.016); position and first-sentence overlap near zero. 15 test passages: coverage **0.386** (130 words) vs length-matched lead 0.370 (121 words). The 9-word overshoot (sentences are added whole) is enough to explain the 0.016 gain: per word the lead is still level or ahead. Content selection learned from 60 pairs matches the lead baseline; beating it clearly would need finer units (clauses or compressed sentences) or more data.
+
+## P12 registration (sentence compression to the main clause)
+On P11's learned scores: each chosen sentence is cut at its first ';' / ':' / ' -- ' / '--', or before ', which' / ', who' / ', where' / ', and then' when what remains has at least 6 words and a verb, and ends with a full stop; sentences are added by score until the length-matched lead's word count. Coverage vs the lead at the same length; judge and form of the compressed summaries vs the human summaries. PASS if coverage beats the lead by more than 0.02 at equal or lower length and the judge stays within 0.5 bits of the human summaries.
+
+## P12 result -- FAIL (parity)
+With a hard word cap (no sentence may push the summary past the lead's length): P11 uncompressed 0.349 (119 words) vs lead 0.370 (121) -- confirms P11's edge was length; P12 compressed **0.372** (119) vs 0.370 -- parity, short of the +0.02 bar. Compression to main clauses recovers what the cap took but does not beat the lead. On 15 test passages differences of 0.02 are within noise.
+
+## R27 status
+Replies: answer sentences fluent in context (P1e), retellings and entity replies faithful and well-formed (~1.1 bits/word behind human summaries on the judge), long-passage summaries at parity with the lead baseline (content selection unsolved), realisation rules learnable from data (P4). Open: content selection beyond position; a stronger own model to choose wording (P5 / P5b failed); generation beyond the source text's wording.
