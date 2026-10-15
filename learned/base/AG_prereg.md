@@ -286,3 +286,22 @@ stories 62-101) instead of the raw sentences, one prompt per clause (clauses are
 the right yield); provenance checked against the clause, its sentence and names; question lines reused from
 ag10_lines.json with the AG10b syntax rule. Scored alone and in the AG11 union in place of AG10b. PASS if the union
 reaches right > 25 at precision >= 0.89, or the slot reader alone beats 21 / 2 at precision >= 0.89.
+
+## AG12 result -- PASS (both conditions)
+Slot lines from the AG4 canonical clauses (6,214 s): 210 lines kept (AG10 from raw sentences: 135), 45 pronoun WHOs
+resolved, 4 invented lines rejected. With the AG10b question syntax, untouched val_fresh2: **28 right / 2 wrong /
+170 silent, fitness +22, precision 0.93** (who 14 / 1, what 10 / 0, where 4 / 1; when / why / whose / how silent).
+Without the syntax rule 20 / 6 (the proposer's inverted who-lines again). Union, AG3 clause reader first then the
+slot reader: **41 right / 5 wrong / 154 silent, fitness +26, precision 0.89** (AG11 with AG10b: 35 / 5, 0.88).
+Reading: the chain prose -> verified clauses (0.4B loop) -> verified slot lines (1.5B) -> exact matching is the
+strongest symbolic reader this project has had on strangers' prose, at the precision the +1 / -3 rule needs. Reach
+is still 20-23% of questions; the whole 'when / why / whose / how' block (30 questions) is silent because the clause
+loop drops time and reason phrases and the question lines for them were malformed.
+
+## AG12-scale registration (the chain on all 502 stories, scored once on the 1,800 untouched questions)
+ag10_slots.py --from-canon --all: slot lines from the AG4 canonical clauses for every story present in
+ag4_canon.json (the AG4 run is still writing it; the scale run trails it and is resumable), question lines for
+every question (1.5B, as AG10), AG10b syntax. Scored once on the 1,800 untouched questions: the slot reader alone,
+the AG3 clause reader alone, and the union; reported as right / wrong / fitness / precision, beside the T22p policy
+(+512, 833 / 107) and the thresholded model (+321, 570 / 83) on the same questions. No gate beyond reporting: this
+is the number for the record. Cost: about a day of CPU at 1.5B; checkpoint per story.
