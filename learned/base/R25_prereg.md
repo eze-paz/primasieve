@@ -1202,3 +1202,8 @@ Per kind, a threshold on the top candidate's margin over the second, chosen on t
 Confidence thresholds per kind (from training): test 19 right / 23 wrong (fitness -50). The counted features do not separate right from wrong answers well enough on new stories.
 
 ## R25-ep (analysis): is the bottleneck finding the answer or choosing it? On E-F, how often is a gold answer among the candidates at all, and among the top 3.
+
+## R25-ep result (finding vs choosing)
+On E-F a gold answer is among the candidates for only 59% of questions, and among the top 3 for 47% (top 1: 34%). Both halves fail: candidate phrases miss the gold span 41% of the time (boundaries, sentence choice), and the counted features choose poorly among those that contain it.
+
+## R25-eq (development): candidate recall with wider candidates -- every sentence instead of the best two, and span variants extended through 'of' / 'and' + a noun phrase and with or without the leading article.

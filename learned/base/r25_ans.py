@@ -10,7 +10,7 @@ answer versus not, and scores a candidate by the summed log odds (naive Bayes wi
 candidate is the answer. Trust per kind: right - 3 x wrong > 0 on the training questions.
 Run: py -3.12 r25_ans.py --train A,B,C,D --test E,F   (letters = practice sets; or file names)"""
 import os, sys, re, json, math, collections
-ARGV = list(sys.argv)
+ARGV = list(sys.argv); WIDE = "--wide" in ARGV
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE)); os.chdir(HERE)
 sys.argv = ["r25_rwg.py"]
 src = open("r25_rwg.py", encoding="utf-8").read(); src = src[:src.index("tot = collections.Counter()")]
@@ -33,7 +33,7 @@ def candidates(story, q):
         raw = toks(s_); ws = [w.lower() for w in raw]; st = {stem(w) for w in ws}
         scored.append((sum(rar(w) for w in key if stem(w) in st), raw, ws))
     scored.sort(key=lambda x: -x[0]); out = []
-    for rank, (sc, raw, ws) in enumerate(scored[:2]):
+    for rank, (sc, raw, ws) in enumerate(scored[:(99 if WIDE else 2)]):
         if sc <= 0: continue
         hits = [i for i, w in enumerate(ws) if stem(w) in qst and w not in COMMON]
         i = 0
@@ -41,9 +41,18 @@ def candidates(story, q):
             if ws[i] in COMMON or stem(ws[i]) in qst: i += 1; continue
             j = i
             while j + 1 < len(ws) and ws[j + 1] not in COMMON and stem(ws[j + 1]) not in qst: j += 1
-            for b in {i, i - 1 if i > 0 and ws[i - 1] in ART else i}:
+            ends = {j}
+            if WIDE and j + 2 < len(ws) and ws[j + 1] in {"of", "and"}:                        # R25-eq: extend through 'of' / 'and' + a noun phrase
+                k = j + 2
+                while k < len(ws) and ws[k] in ART: k += 1
+                e = k
+                while e + 1 < len(ws) and ws[e + 1] not in COMMON: e += 1
+                if k < len(ws) and ws[k] not in COMMON: ends.add(e)
+            for jj in sorted(ends):
+              j_ = jj
+              for b in {i, i - 1 if i > 0 and ws[i - 1] in ART else i}:
                 for bb in {b, b - 1 if b > 0 and ws[b - 1] in PLACE else b}:
-                    text = " ".join(ws[bb:j + 1]); prev = ws[bb - 1] if bb > 0 else "<s>"
+                    text = " ".join(ws[bb:j_ + 1]); prev = ws[bb - 1] if bb > 0 else "<s>"
                     d = min([abs(i - h) for h in hits] or [99]); side = "L" if hits and i < min(hits) else "R"
                     db = "1" if d <= 1 else "2" if d <= 2 else "3" if d <= 4 else "4" if d <= 7 else "5"
                     f = [("k", kind(q)), ("kd", kind(q) + "|" + side + db), ("kp", kind(q) + "|" + (prev if prev in COMMON or prev == "<s>" else "C")),
