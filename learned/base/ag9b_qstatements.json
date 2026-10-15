@@ -1,0 +1,4583 @@
+{
+ "f1|Who was the baker?": {
+  "story": "f1",
+  "q": "Who was the baker?",
+  "gold": [
+   "teodor"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The baker was ___.",
+    "no event with blank"
+   ],
+   [
+    " The baker was ___.",
+    "no event with blank"
+   ],
+   [
+    " The baker was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f1|Who did Teodor call when the oven would not light?": {
+  "story": "f1",
+  "q": "Who did Teodor call when the oven would not light?",
+  "gold": [
+   "radu",
+   "his cousin"
+  ],
+  "qevent": {
+   "verb": "call",
+   "asked": "patient",
+   "agent": "Teodor",
+   "patient": null,
+   "place": null,
+   "statement": "Teodor called ___ when the oven would not light."
+  },
+  "log": [
+   [
+    " Teodor called ___ when the oven would not light.",
+    "ok"
+   ]
+  ]
+ },
+ "f1|What did Teodor sell while Radu worked?": {
+  "story": "f1",
+  "q": "What did Teodor sell while Radu worked?",
+  "gold": [
+   "yesterday's bread",
+   "bread"
+  ],
+  "qevent": {
+   "verb": "sell",
+   "asked": "patient",
+   "agent": "Teodor",
+   "patient": null,
+   "place": null,
+   "statement": "Teodor sold ___ while Radu worked."
+  },
+  "log": [
+   [
+    " Teodor sold ___ while Radu worked.",
+    "ok"
+   ]
+  ]
+ },
+ "f1|When was the oven hot again?": {
+  "story": "f1",
+  "q": "When was the oven hot again?",
+  "gold": [
+   "by noon",
+   "noon"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The oven was hot again ___.",
+    "no event with blank"
+   ],
+   [
+    " The oven was hot again ___.",
+    "no event with blank"
+   ],
+   [
+    " The oven was ___ again.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f1|Where was Teodor's shop?": {
+  "story": "f1",
+  "q": "Where was Teodor's shop?",
+  "gold": [
+   "on quay lane",
+   "quay lane"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Teodor's shop was ___.",
+    "no event with blank"
+   ],
+   [
+    " Teodor's shop was ___.",
+    "no event with blank"
+   ],
+   [
+    " Teodor's shop was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f2|What did the crow find?": {
+  "story": "f2",
+  "q": "What did the crow find?",
+  "gold": [
+   "a ring",
+   "ring"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The crow",
+   "patient": null,
+   "place": null,
+   "statement": "The crow found ___."
+  },
+  "log": [
+   [
+    " The crow found ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f2|Who asked to see the ring?": {
+  "story": "f2",
+  "q": "Who asked to see the ring?",
+  "gold": [
+   "a squirrel",
+   "squirrel"
+  ],
+  "qevent": {
+   "verb": "ask",
+   "asked": "agent",
+   "agent": null,
+   "patient": "to",
+   "place": "see the ring",
+   "statement": "___ asked to see the ring."
+  },
+  "log": [
+   [
+    " ___ asked to see the ring.",
+    "ok"
+   ]
+  ]
+ },
+ "f2|Who had the ring at the end?": {
+  "story": "f2",
+  "q": "Who had the ring at the end?",
+  "gold": [
+   "the squirrel",
+   "squirrel"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "The ring",
+   "patient": null,
+   "place": "at the end",
+   "statement": "The ring had the ___ at the end."
+  },
+  "log": [
+   [
+    " The ring had the ___ at the end.",
+    "ok"
+   ]
+  ]
+ },
+ "f2|Why did the ring fall?": {
+  "story": "f2",
+  "q": "Why did the ring fall?",
+  "gold": [
+   "opened her beak"
+  ],
+  "qevent": {
+   "verb": "fall",
+   "asked": "patient",
+   "agent": "The ring",
+   "patient": null,
+   "place": null,
+   "statement": "The ring fell ___."
+  },
+  "log": [
+   [
+    " The ring fell ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f2|Where was the ring at the end?": {
+  "story": "f2",
+  "q": "Where was the ring at the end?",
+  "gold": [
+   "under the roots",
+   "the roots",
+   "roots"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The ring was at the end ___.",
+    "no event with blank"
+   ],
+   [
+    " The ring was at the end.",
+    "blanks"
+   ],
+   [
+    " The ring was at the end ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f3|What did Wanjiru pack?": {
+  "story": "f3",
+  "q": "What did Wanjiru pack?",
+  "gold": [
+   "a basket of mangoes",
+   "mangoes"
+  ],
+  "qevent": {
+   "verb": "pack",
+   "asked": "patient",
+   "agent": "Wanjiru",
+   "patient": null,
+   "place": null,
+   "statement": "Wanjiru packed ___."
+  },
+  "log": [
+   [
+    " Wanjiru packed ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f3|When did Wanjiru pack the basket?": {
+  "story": "f3",
+  "q": "When did Wanjiru pack the basket?",
+  "gold": [
+   "at eight o'clock",
+   "eight o'clock"
+  ],
+  "qevent": {
+   "verb": "pack",
+   "asked": "place",
+   "agent": "Wanjiru",
+   "patient": "the basket",
+   "place": null,
+   "statement": "Wanjiru packed the basket ___."
+  },
+  "log": [
+   [
+    " Wanjiru packed the basket ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f3|Where were the rest of the mangoes in the afternoon?": {
+  "story": "f3",
+  "q": "Where were the rest of the mangoes in the afternoon?",
+  "gold": [
+   "her aunt's house",
+   "aunt's house"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The rest of the mangoes were ___ in the afternoon.",
+    "no event with blank"
+   ],
+   [
+    " The rest of the mangoes were in the ___.",
+    "no event with blank"
+   ],
+   [
+    " The rest of the mangoes were ___ in the afternoon.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f3|Who made jam with the mangoes?": {
+  "story": "f3",
+  "q": "Who made jam with the mangoes?",
+  "gold": [
+   "her aunt",
+   "aunt"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " ___ made jam with the mangoes.",
+    "no event with blank"
+   ],
+   [
+    " ___ made jam with the mangoes.",
+    "no event with blank"
+   ],
+   [
+    " ___ made jam with the mangoes.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f3|When did Wanjiru go home?": {
+  "story": "f3",
+  "q": "When did Wanjiru go home?",
+  "gold": [
+   "in the morning",
+   "the morning",
+   "morning"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Wanjiru went home ___.",
+    "no event with blank"
+   ],
+   [
+    " Wanjiru went home ___.",
+    "no event with blank"
+   ],
+   [
+    " Wanjiru went home ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f4|Who ran the lending library?": {
+  "story": "f4",
+  "q": "Who ran the lending library?",
+  "gold": [
+   "mrs adebayo",
+   "adebayo"
+  ],
+  "qevent": {
+   "verb": "run",
+   "asked": "patient",
+   "agent": "library",
+   "patient": null,
+   "place": null,
+   "statement": "The lending library ran ___."
+  },
+  "log": [
+   [
+    " The lending library ran ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f4|Where was the lending library?": {
+  "story": "f4",
+  "q": "Where was the lending library?",
+  "gold": [
+   "in the village hall",
+   "the village hall",
+   "village hall"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The lending library was ___.",
+    "no event with blank"
+   ],
+   [
+    " The lending library was ___.",
+    "no event with blank"
+   ],
+   [
+    " The lending library was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f4|Who returned a book with a torn cover?": {
+  "story": "f4",
+  "q": "Who returned a book with a torn cover?",
+  "gold": [
+   "kazuo",
+   "a boy"
+  ],
+  "qevent": {
+   "verb": "return",
+   "asked": "agent",
+   "agent": null,
+   "patient": "a book",
+   "place": null,
+   "statement": "A ___ returned a book with a torn cover."
+  },
+  "log": [
+   [
+    " A ___ returned a book with a torn cover.",
+    "ok"
+   ]
+  ]
+ },
+ "f4|What did Mrs Adebayo use to mend the book?": {
+  "story": "f4",
+  "q": "What did Mrs Adebayo use to mend the book?",
+  "gold": [
+   "tape and card",
+   "tape"
+  ],
+  "qevent": {
+   "verb": "use",
+   "asked": "patient",
+   "agent": "Adebayo",
+   "patient": null,
+   "place": "mend the book",
+   "statement": "Mrs Adebayo used ___ to mend the book."
+  },
+  "log": [
+   [
+    " Mrs Adebayo used ___ to mend the book.",
+    "ok"
+   ]
+  ]
+ },
+ "f4|What does Kazuo do after school?": {
+  "story": "f4",
+  "q": "What does Kazuo do after school?",
+  "gold": [
+   "helps her repair books",
+   "repair books"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Kazuo does ___ after school.",
+    "no event with blank"
+   ],
+   [
+    " Kazuo ___ after school.",
+    "no event with blank"
+   ],
+   [
+    " Kazuo does ___ after school.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f5|Who wanted the apples?": {
+  "story": "f5",
+  "q": "Who wanted the apples?",
+  "gold": [
+   "the goat",
+   "goat"
+  ],
+  "qevent": {
+   "verb": "want",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the apples",
+   "place": null,
+   "statement": "The ___ wanted the apples."
+  },
+  "log": [
+   [
+    " The ___ wanted the apples.",
+    "ok"
+   ]
+  ]
+ },
+ "f5|Who shook the trunk?": {
+  "story": "f5",
+  "q": "Who shook the trunk?",
+  "gold": [
+   "the horse",
+   "horse"
+  ],
+  "qevent": {
+   "verb": "shake",
+   "asked": "patient",
+   "agent": "The trunk",
+   "patient": null,
+   "place": null,
+   "statement": "The trunk shook ___."
+  },
+  "log": [
+   [
+    " The trunk shook ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f5|Why did the horse shake the trunk?": {
+  "story": "f5",
+  "q": "Why did the horse shake the trunk?",
+  "gold": [
+   "she promised him half",
+   "promised him half"
+  ],
+  "qevent": {
+   "verb": "shake",
+   "asked": "place",
+   "agent": "The horse",
+   "patient": "the trunk",
+   "place": null,
+   "statement": "The horse shook the trunk ___."
+  },
+  "log": [
+   [
+    " The horse shook the trunk ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f5|What did the goat leave?": {
+  "story": "f5",
+  "q": "What did the goat leave?",
+  "gold": [
+   "only the cores",
+   "the cores",
+   "cores"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "patient",
+   "agent": "The goat",
+   "patient": null,
+   "place": null,
+   "statement": "The goat left ___."
+  },
+  "log": [
+   [
+    " The goat left ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f5|Whose tree was it?": {
+  "story": "f5",
+  "q": "Whose tree was it?",
+  "gold": [
+   "the farmer's",
+   "farmer's"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " It was ___'s tree.",
+    "no event with blank"
+   ],
+   [
+    " It was ___'s tree.",
+    "no event with blank"
+   ],
+   [
+    " The tree was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "_stats": {
+  "stage1:no event with blank": 242,
+  "stage1:ok": 116,
+  "stage1:blanks": 10,
+  "stage1:invented": 9,
+  "stage1:passive": 13
+ },
+ "f6|Where were the boots before breakfast?": {
+  "story": "f6",
+  "q": "Where were the boots before breakfast?",
+  "gold": [
+   "on the fence",
+   "the fence",
+   "fence"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The boots were ___ before breakfast.",
+    "no event with blank"
+   ],
+   [
+    " The boots were ___ before breakfast.",
+    "no event with blank"
+   ],
+   [
+    " The boots were ___ before breakfast.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f6|Who moved the boots into the barn?": {
+  "story": "f6",
+  "q": "Who moved the boots into the barn?",
+  "gold": [
+   "jovana",
+   "his sister"
+  ],
+  "qevent": {
+   "verb": "move",
+   "asked": "patient",
+   "agent": "The boots",
+   "patient": null,
+   "place": "into the barn",
+   "statement": "The boots moved ___ into the barn."
+  },
+  "log": [
+   [
+    " The boots moved ___ into the barn.",
+    "ok"
+   ]
+  ]
+ },
+ "f6|Who took the boots to the river?": {
+  "story": "f6",
+  "q": "Who took the boots to the river?",
+  "gold": [
+   "their father",
+   "father"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the boots",
+   "place": "to the river",
+   "statement": "___ took the boots to the river."
+  },
+  "log": [
+   [
+    " The boots ___ to the river.",
+    "no event with blank"
+   ],
+   [
+    " ___ took the boots to the river.",
+    "ok"
+   ]
+  ]
+ },
+ "f6|Where were the boots that evening?": {
+  "story": "f6",
+  "q": "Where were the boots that evening?",
+  "gold": [
+   "beside the stove",
+   "the stove",
+   "stove"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The boots were ___ that evening.",
+    "no event with blank"
+   ],
+   [
+    " The boots were ___ that evening.",
+    "no event with blank"
+   ],
+   [
+    " The boots were ___ that evening.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f6|When did their father take the boots?": {
+  "story": "f6",
+  "q": "When did their father take the boots?",
+  "gold": [
+   "at noon",
+   "noon"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "place",
+   "agent": "father",
+   "patient": "the boots",
+   "place": null,
+   "statement": "Their father took the boots ___."
+  },
+  "log": [
+   [
+    " Their father took the boots ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f7|Who was the new nurse?": {
+  "story": "f7",
+  "q": "Who was the new nurse?",
+  "gold": [
+   "fatou"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The new nurse ___.",
+    "no event with blank"
+   ],
+   [
+    " The new nurse ___.",
+    "no event with blank"
+   ],
+   [
+    " The new nurse was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f7|Who was shivering in the waiting room?": {
+  "story": "f7",
+  "q": "Who was shivering in the waiting room?",
+  "gold": [
+   "mr okonjo",
+   "okonjo",
+   "an old man"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The person ___ was shivering in the waiting room.",
+    "invented"
+   ],
+   [
+    " The person who was shivering in the waiting room was ___.",
+    "invented"
+   ],
+   [
+    " The person who was shivering in the waiting room was ___.",
+    "invented"
+   ]
+  ]
+ },
+ "f7|What did Fatou bring along with the blanket?": {
+  "story": "f7",
+  "q": "What did Fatou bring along with the blanket?",
+  "gold": [
+   "a cup of tea",
+   "tea"
+  ],
+  "qevent": {
+   "verb": "bring",
+   "asked": "patient",
+   "agent": "Fatou",
+   "patient": null,
+   "place": "along",
+   "statement": "Fatou brought ___ along with the blanket."
+  },
+  "log": [
+   [
+    " Fatou brought along with the blanket ___.",
+    "no event with blank"
+   ],
+   [
+    " Fatou brought ___ along with the blanket.",
+    "ok"
+   ]
+  ]
+ },
+ "f7|Who saw Mr Okonjo first?": {
+  "story": "f7",
+  "q": "Who saw Mr Okonjo first?",
+  "gold": [
+   "dr lindgren",
+   "lindgren"
+  ],
+  "qevent": {
+   "verb": "see",
+   "asked": "patient",
+   "agent": "Okonjo",
+   "patient": null,
+   "place": null,
+   "statement": "Mr Okonjo saw ___ first."
+  },
+  "log": [
+   [
+    " Mr Okonjo saw ___ first.",
+    "ok"
+   ]
+  ]
+ },
+ "f7|Why had Mr Okonjo walked from the hills?": {
+  "story": "f7",
+  "q": "Why had Mr Okonjo walked from the hills?",
+  "gold": [
+   "bus had broken down",
+   "broken down"
+  ],
+  "qevent": {
+   "verb": "walk",
+   "asked": "place",
+   "agent": "had",
+   "patient": null,
+   "place": null,
+   "statement": "Mr Okonjo had walked from the hills ___."
+  },
+  "log": [
+   [
+    " Mr Okonjo had walked from the hills ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f8|What kept drumming on the owl's tree?": {
+  "story": "f8",
+  "q": "What kept drumming on the owl's tree?",
+  "gold": [
+   "a woodpecker",
+   "woodpecker"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The owl's tree kept ___ drumming.",
+    "no event with blank"
+   ],
+   [
+    " The drum kept ___ on the owl's tree.",
+    "no event with blank"
+   ],
+   [
+    " The owl's tree was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f8|Who did the owl ask for advice?": {
+  "story": "f8",
+  "q": "Who did the owl ask for advice?",
+  "gold": [
+   "the wise heron",
+   "heron"
+  ],
+  "qevent": {
+   "verb": "ask",
+   "asked": "patient",
+   "agent": "The owl",
+   "patient": null,
+   "place": null,
+   "statement": "The owl asked ___ for advice."
+  },
+  "log": [
+   [
+    " The owl asked ___ for advice.",
+    "ok"
+   ]
+  ]
+ },
+ "f8|Where did the owl sleep in the end?": {
+  "story": "f8",
+  "q": "Where did the owl sleep in the end?",
+  "gold": [
+   "in the old chimney",
+   "the old chimney",
+   "chimney"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The owl slept ___ in the end.",
+    "no event with blank"
+   ],
+   [
+    " The owl ___ in the end.",
+    "no event with blank"
+   ],
+   [
+    " The owl slept ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f8|When could the owl not sleep?": {
+  "story": "f8",
+  "q": "When could the owl not sleep?",
+  "gold": [
+   "during the day",
+   "the day"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The owl could not sleep ___.",
+    "no event with blank"
+   ],
+   [
+    " The owl could not sleep ___.",
+    "no event with blank"
+   ],
+   [
+    " The owl could not sleep ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f8|What did the owl do in the chimney?": {
+  "story": "f8",
+  "q": "What did the owl do in the chimney?",
+  "gold": [
+   "slept soundly"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The owl did ___ in the chimney.",
+    "no event with blank"
+   ],
+   [
+    " The owl did ___ in the chimney.",
+    "no event with blank"
+   ],
+   [
+    " The owl did ___ in the chimney.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f9|When did Ravi lose his hat?": {
+  "story": "f9",
+  "q": "When did Ravi lose his hat?",
+  "gold": [
+   "the second day",
+   "second day"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Ravi lost his hat ___.",
+    "no event with blank"
+   ],
+   [
+    " Ravi lost his hat ___.",
+    "no event with blank"
+   ],
+   [
+    " Ravi lost his hat ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f9|Where were they on the second day?": {
+  "story": "f9",
+  "q": "Where were they on the second day?",
+  "gold": [
+   "in porto",
+   "porto"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " They were on the second day ___.",
+    "no event with blank"
+   ],
+   [
+    " They were on the second day ___.",
+    "no event with blank"
+   ],
+   [
+    " They were ___ on the second day.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f9|What did Ravi lose?": {
+  "story": "f9",
+  "q": "What did Ravi lose?",
+  "gold": [
+   "his hat",
+   "hat"
+  ],
+  "qevent": {
+   "verb": "lose",
+   "asked": "patient",
+   "agent": "Ravi",
+   "patient": null,
+   "place": null,
+   "statement": "Ravi lost ___."
+  },
+  "log": [
+   [
+    " Ravi lost ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f9|Who found the hat?": {
+  "story": "f9",
+  "q": "Who found the hat?",
+  "gold": [
+   "a driver",
+   "driver"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the hat",
+   "place": null,
+   "statement": "___ found the hat."
+  },
+  "log": [
+   [
+    " ___ found the hat.",
+    "ok"
+   ]
+  ]
+ },
+ "f9|Where was the hat on the third day?": {
+  "story": "f9",
+  "q": "Where was the hat on the third day?",
+  "gold": [
+   "at the hotel desk",
+   "the hotel desk",
+   "hotel desk"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The hat was on the ___ day.",
+    "no event with blank"
+   ],
+   [
+    " The hat was on the ___ on the third day.",
+    "no event with blank"
+   ],
+   [
+    " The hat was ___ on the third day.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f10|What took the roof off the school?": {
+  "story": "f10",
+  "q": "What took the roof off the school?",
+  "gold": [
+   "the storm",
+   "storm"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The roof ___ the school.",
+    "no event with blank"
+   ],
+   [
+    " The roof ___ the school.",
+    "no event with blank"
+   ],
+   [
+    " The roof was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f10|Who was the headmistress?": {
+  "story": "f10",
+  "q": "Who was the headmistress?",
+  "gold": [
+   "ms mbatha",
+   "mbatha"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The headmistress was ___.",
+    "no event with blank"
+   ],
+   [
+    " The headmistress was ___.",
+    "no event with blank"
+   ],
+   [
+    " The headmistress was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f10|Who brought timber?": {
+  "story": "f10",
+  "q": "Who brought timber?",
+  "gold": [
+   "goran",
+   "a carpenter"
+  ],
+  "qevent": {
+   "verb": "bring",
+   "asked": "agent",
+   "agent": null,
+   "patient": "timber",
+   "place": null,
+   "statement": "___ brought timber."
+  },
+  "log": [
+   [
+    " Timber was brought ___.",
+    "no event with blank"
+   ],
+   [
+    " ___ brought timber.",
+    "ok"
+   ]
+  ]
+ },
+ "f10|Where did the children have lessons?": {
+  "story": "f10",
+  "q": "Where did the children have lessons?",
+  "gold": [
+   "in the church hall",
+   "the church hall",
+   "church hall"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The children",
+   "patient": "lessons",
+   "place": null,
+   "statement": "The children had lessons ___."
+  },
+  "log": [
+   [
+    " The children had lessons ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f10|How many parents spent the weekend nailing?": {
+  "story": "f10",
+  "q": "How many parents spent the weekend nailing?",
+  "gold": [
+   "ten"
+  ],
+  "qevent": {
+   "verb": "spend",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the weekend nailing",
+   "place": null,
+   "statement": "___ spent the weekend nailing."
+  },
+  "log": [
+   [
+    " ___ parents spent the weekend nailing.",
+    "no event with blank"
+   ],
+   [
+    " ___ spent the weekend nailing.",
+    "ok"
+   ]
+  ]
+ },
+ "f11|Who invited the rooster down?": {
+  "story": "f11",
+  "q": "Who invited the rooster down?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "qevent": {
+   "verb": "invite",
+   "asked": "patient",
+   "agent": "The rooster",
+   "patient": null,
+   "place": null,
+   "statement": "The rooster invited ___ down."
+  },
+  "log": [
+   [
+    " The rooster invited ___ down.",
+    "ok"
+   ]
+  ]
+ },
+ "f11|Where was the rooster?": {
+  "story": "f11",
+  "q": "Where was the rooster?",
+  "gold": [
+   "the wall",
+   "wall"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The rooster was ___.",
+    "no event with blank"
+   ],
+   [
+    " The rooster was ___.",
+    "no event with blank"
+   ],
+   [
+    " The rooster was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f11|What did the rooster say he could see?": {
+  "story": "f11",
+  "q": "What did the rooster say he could see?",
+  "gold": [
+   "two dogs",
+   "dogs"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The rooster said he could see ___.",
+    "no event with blank"
+   ],
+   [
+    " The rooster said he could see ___.",
+    "no event with blank"
+   ],
+   [
+    " The rooster said he could see ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f11|What did the fox do?": {
+  "story": "f11",
+  "q": "What did the fox do?",
+  "gold": [
+   "ran off at once",
+   "ran off"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The fox ___.",
+    "no event with blank"
+   ],
+   [
+    " The fox ___.",
+    "no event with blank"
+   ],
+   [
+    " The fox ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f11|What had all the animals made, according to the fox?": {
+  "story": "f11",
+  "q": "What had all the animals made, according to the fox?",
+  "gold": [
+   "peace"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The fox",
+   "patient": "the animals make",
+   "place": null,
+   "statement": "The fox had all the animals make ___."
+  },
+  "log": [
+   [
+    " The fox had all the animals make ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f12|Where was the phone when Hamid went to work?": {
+  "story": "f12",
+  "q": "Where was the phone when Hamid went to work?",
+  "gold": [
+   "on the kitchen table",
+   "the kitchen table",
+   "kitchen table"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The phone was ___ when Hamid went to work.",
+    "no event with blank"
+   ],
+   [
+    " Hamid went to work and the phone was ___.",
+    "no event with blank"
+   ],
+   [
+    " The phone was ___ when Hamid went to work.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f12|Who found the phone?": {
+  "story": "f12",
+  "q": "Who found the phone?",
+  "gold": [
+   "yusra",
+   "his daughter"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the phone",
+   "place": null,
+   "statement": "___ found the phone."
+  },
+  "log": [
+   [
+    " ___ found the phone.",
+    "ok"
+   ]
+  ]
+ },
+ "f12|What did Yusra put the phone in?": {
+  "story": "f12",
+  "q": "What did Yusra put the phone in?",
+  "gold": [
+   "her school bag",
+   "school bag"
+  ],
+  "qevent": {
+   "verb": "put",
+   "asked": "place",
+   "agent": "Yusra",
+   "patient": "the phone",
+   "place": null,
+   "statement": "Yusra put the phone ___."
+  },
+  "log": [
+   [
+    " Yusra put the phone ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f12|Who had the phone at the end?": {
+  "story": "f12",
+  "q": "Who had the phone at the end?",
+  "gold": [
+   "hamid"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "The phone",
+   "patient": null,
+   "place": "at the",
+   "statement": "The phone had ___ at the end."
+  },
+  "log": [
+   [
+    " The phone had ___ at the end.",
+    "ok"
+   ]
+  ]
+ },
+ "f12|When did Yusra hand the phone back?": {
+  "story": "f12",
+  "q": "When did Yusra hand the phone back?",
+  "gold": [
+   "that evening",
+   "evening"
+  ],
+  "qevent": {
+   "verb": "hand",
+   "asked": "place",
+   "agent": "Yusra",
+   "patient": "the phone",
+   "place": null,
+   "statement": "Yusra handed the phone back ___."
+  },
+  "log": [
+   [
+    " Yusra handed the phone back ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f13|What did Zeynep find?": {
+  "story": "f13",
+  "q": "What did Zeynep find?",
+  "gold": [
+   "a violin",
+   "violin"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "Zeynep",
+   "patient": null,
+   "place": null,
+   "statement": "Zeynep found ___."
+  },
+  "log": [
+   [
+    " Zeynep found ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f13|Who had left the violin in the taxi?": {
+  "story": "f13",
+  "q": "Who had left the violin in the taxi?",
+  "gold": [
+   "oskar",
+   "cellist"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The violin",
+   "patient": null,
+   "place": null,
+   "statement": "The violin had been left in the taxi ___."
+  },
+  "log": [
+   [
+    " The violin had been left in the taxi ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f13|Where did Zeynep drive?": {
+  "story": "f13",
+  "q": "Where did Zeynep drive?",
+  "gold": [
+   "to the concert hall",
+   "the concert hall",
+   "concert hall"
+  ],
+  "qevent": {
+   "verb": "drive",
+   "asked": "patient",
+   "agent": "Zeynep",
+   "patient": null,
+   "place": null,
+   "statement": "Zeynep drove ___."
+  },
+  "log": [
+   [
+    " Zeynep drove ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f13|What was inside the violin case?": {
+  "story": "f13",
+  "q": "What was inside the violin case?",
+  "gold": [
+   "a ticket stub",
+   "ticket stub"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The violin case contained ___.",
+    "invented"
+   ],
+   [
+    " The violin case was inside ___.",
+    "no event with blank"
+   ],
+   [
+    " The violin case was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f13|What did Oskar give Zeynep?": {
+  "story": "f13",
+  "q": "What did Oskar give Zeynep?",
+  "gold": [
+   "two seats",
+   "seats"
+  ],
+  "qevent": {
+   "verb": "give",
+   "asked": "patient",
+   "agent": "Oskar",
+   "patient": null,
+   "place": null,
+   "statement": "Oskar gave ___ to Zeynep."
+  },
+  "log": [
+   [
+    " Oskar gave ___ to Zeynep.",
+    "ok"
+   ]
+  ]
+ },
+ "f14|Where did the mouse fall?": {
+  "story": "f14",
+  "q": "Where did the mouse fall?",
+  "gold": [
+   "a bucket of milk",
+   "bucket"
+  ],
+  "qevent": {
+   "verb": "fall",
+   "asked": "patient",
+   "agent": "The mouse",
+   "patient": null,
+   "place": null,
+   "statement": "The mouse fell ___."
+  },
+  "log": [
+   [
+    " The mouse fell ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f14|What turned the milk into butter?": {
+  "story": "f14",
+  "q": "What turned the milk into butter?",
+  "gold": [
+   "her kicking",
+   "kicking"
+  ],
+  "qevent": {
+   "verb": "turn",
+   "asked": "patient",
+   "agent": "The milk",
+   "patient": null,
+   "place": null,
+   "statement": "The milk turned ___ into butter."
+  },
+  "log": [
+   [
+    " The milk turned ___ into butter.",
+    "ok"
+   ]
+  ]
+ },
+ "f14|When did the mouse jump out?": {
+  "story": "f14",
+  "q": "When did the mouse jump out?",
+  "gold": [
+   "by morning",
+   "morning"
+  ],
+  "qevent": {
+   "verb": "jump",
+   "asked": "patient",
+   "agent": "The mouse",
+   "patient": null,
+   "place": null,
+   "statement": "The mouse jumped out ___."
+  },
+  "log": [
+   [
+    " The mouse jumped out ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f14|Who found the footprints?": {
+  "story": "f14",
+  "q": "Who found the footprints?",
+  "gold": [
+   "the dairymaid",
+   "dairymaid"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the footprints",
+   "place": null,
+   "statement": "___ found the footprints."
+  },
+  "log": [
+   [
+    " ___ found the footprints.",
+    "ok"
+   ]
+  ]
+ },
+ "f14|What did the dairymaid find in the butter?": {
+  "story": "f14",
+  "q": "What did the dairymaid find in the butter?",
+  "gold": [
+   "tiny footprints",
+   "footprints"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The dairymaid",
+   "patient": null,
+   "place": "in the butter",
+   "statement": "The dairymaid found ___ in the butter."
+  },
+  "log": [
+   [
+    " The dairymaid found ___ in the butter.",
+    "ok"
+   ]
+  ]
+ },
+ "f15|When did the bus leave the depot?": {
+  "story": "f15",
+  "q": "When did the bus leave the depot?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "place",
+   "agent": "The bus",
+   "patient": "the depot",
+   "place": null,
+   "statement": "The bus left the depot ___."
+  },
+  "log": [
+   [
+    " The bus left the depot ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f15|Who got on at the bakery corner?": {
+  "story": "f15",
+  "q": "Who got on at the bakery corner?",
+  "gold": [
+   "siobhan"
+  ],
+  "qevent": {
+   "verb": "get",
+   "asked": "place",
+   "agent": "corner",
+   "patient": null,
+   "place": null,
+   "statement": "The bakery corner got on ___."
+  },
+  "log": [
+   [
+    " The bakery got on ___.",
+    "no event with blank"
+   ],
+   [
+    " ___ got on at the bakery corner.",
+    "no event with blank"
+   ],
+   [
+    " The bakery corner got on ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f15|Who left a lunchbox on the seat?": {
+  "story": "f15",
+  "q": "Who left a lunchbox on the seat?",
+  "gold": [
+   "malik"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "on the seat",
+   "statement": "A lunchbox ___ left on the seat."
+  },
+  "log": [
+   [
+    " A lunchbox ___ left on the seat.",
+    "ok"
+   ]
+  ]
+ },
+ "f15|Where was the lunchbox at the end of the day?": {
+  "story": "f15",
+  "q": "Where was the lunchbox at the end of the day?",
+  "gold": [
+   "the depot",
+   "depot"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The lunchbox was at the end of the day ___.",
+    "no event with blank"
+   ],
+   [
+    " The lunchbox was at the end of the day.",
+    "blanks"
+   ],
+   [
+    " The lunchbox was ___ at the end of the day.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f15|Who drove the school bus?": {
+  "story": "f15",
+  "q": "Who drove the school bus?",
+  "gold": [
+   "mrs halloran",
+   "halloran"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The school bus ___.",
+    "no event with blank"
+   ],
+   [
+    " The school bus ___.",
+    "no event with blank"
+   ],
+   [
+    " The school bus was driven by ___.",
+    "passive"
+   ]
+  ]
+ },
+ "f16|Who sold umbrellas?": {
+  "story": "f16",
+  "q": "Who sold umbrellas?",
+  "gold": [
+   "vikram"
+  ],
+  "qevent": {
+   "verb": "sell",
+   "asked": "patient",
+   "agent": "were",
+   "patient": null,
+   "place": null,
+   "statement": "Umbrellas were sold ___."
+  },
+  "log": [
+   [
+    " Umbrellas were sold ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f16|Where did Vikram sell umbrellas?": {
+  "story": "f16",
+  "q": "Where did Vikram sell umbrellas?",
+  "gold": [
+   "outside the train station",
+   "the train station",
+   "train station"
+  ],
+  "qevent": {
+   "verb": "sell",
+   "asked": "place",
+   "agent": "Vikram",
+   "patient": "umbrellas",
+   "place": null,
+   "statement": "Vikram sold umbrellas ___."
+  },
+  "log": [
+   [
+    " Vikram sold umbrellas ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f16|What did Vikram start selling?": {
+  "story": "f16",
+  "q": "What did Vikram start selling?",
+  "gold": [
+   "cold lemonade",
+   "lemonade"
+  ],
+  "qevent": {
+   "verb": "start",
+   "asked": "place",
+   "agent": "Vikram",
+   "patient": "selling",
+   "place": null,
+   "statement": "Vikram started selling ___."
+  },
+  "log": [
+   [
+    " Vikram started selling ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f16|What rolled in?": {
+  "story": "f16",
+  "q": "What rolled in?",
+  "gold": [
+   "dark clouds",
+   "clouds"
+  ],
+  "qevent": {
+   "verb": "roll",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "___ rolled in."
+  },
+  "log": [
+   [
+    " ___ rolled in.",
+    "ok"
+   ]
+  ]
+ },
+ "f16|What did Vikram do when the clouds came?": {
+  "story": "f16",
+  "q": "What did Vikram do when the clouds came?",
+  "gold": [
+   "brought the umbrellas back",
+   "brought the umbrellas"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Vikram did ___ when the clouds came.",
+    "no event with blank"
+   ],
+   [
+    " Vikram did ___ when the clouds came.",
+    "no event with blank"
+   ],
+   [
+    " Vikram did ___ when the clouds came.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f17|Where did the bear and the badger find the beehive?": {
+  "story": "f17",
+  "q": "Where did the bear and the badger find the beehive?",
+  "gold": [
+   "in a hollow log",
+   "a hollow log",
+   "log"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "place",
+   "agent": "the badger",
+   "patient": "the beehive",
+   "place": null,
+   "statement": "The bear and the badger found the beehive ___."
+  },
+  "log": [
+   [
+    " The bear and the badger found the beehive ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f17|Who kept watch?": {
+  "story": "f17",
+  "q": "Who kept watch?",
+  "gold": [
+   "the badger",
+   "badger"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " ___ kept watch.",
+    "no event with blank"
+   ],
+   [
+    " ___ kept watch.",
+    "no event with blank"
+   ],
+   [
+    " ___ kept watch.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f17|Who ate the honey?": {
+  "story": "f17",
+  "q": "Who ate the honey?",
+  "gold": [
+   "the bear",
+   "bear"
+  ],
+  "qevent": {
+   "verb": "eat",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the honey",
+   "place": null,
+   "statement": "The ___ ate the honey."
+  },
+  "log": [
+   [
+    " The ___ ate the honey.",
+    "ok"
+   ]
+  ]
+ },
+ "f17|What did the bees sting?": {
+  "story": "f17",
+  "q": "What did the bees sting?",
+  "gold": [
+   "his nose",
+   "nose"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The bees ___.",
+    "no event with blank"
+   ],
+   [
+    " The bees ___.",
+    "no event with blank"
+   ],
+   [
+    " The bees stung ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f17|When did the bees find the bear?": {
+  "story": "f17",
+  "q": "When did the bees find the bear?",
+  "gold": [
+   "that night",
+   "night"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The bees",
+   "patient": null,
+   "place": null,
+   "statement": "The bees found ___."
+  },
+  "log": [
+   [
+    " The bees found ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f18|Who lent Lerato the ladder?": {
+  "story": "f18",
+  "q": "Who lent Lerato the ladder?",
+  "gold": [
+   "bashir",
+   "her neighbour"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Lerato lent ___ the ladder.",
+    "no event with blank"
+   ],
+   [
+    " ___ lent Lerato the ladder.",
+    "no event with blank"
+   ],
+   [
+    " Lerato lent ___ the ladder.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f18|Where was the ladder on Wednesday?": {
+  "story": "f18",
+  "q": "Where was the ladder on Wednesday?",
+  "gold": [
+   "the school",
+   "school"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The ladder was on ___ on Wednesday.",
+    "no event with blank"
+   ],
+   [
+    " The ladder was on ___ on Wednesday.",
+    "no event with blank"
+   ],
+   [
+    " The ladder was ___ on Wednesday.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f18|Who took the ladder to the school?": {
+  "story": "f18",
+  "q": "Who took the ladder to the school?",
+  "gold": [
+   "her son",
+   "son"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "patient",
+   "agent": "The school",
+   "patient": null,
+   "place": "the",
+   "statement": "The school took ___ to the school."
+  },
+  "log": [
+   [
+    " The school took ___ to the school.",
+    "ok"
+   ]
+  ]
+ },
+ "f18|Who brought the ladder back on Friday?": {
+  "story": "f18",
+  "q": "Who brought the ladder back on Friday?",
+  "gold": [
+   "the caretaker",
+   "caretaker"
+  ],
+  "qevent": {
+   "verb": "bring",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the ladder",
+   "place": null,
+   "statement": "___ brought the ladder back on Friday."
+  },
+  "log": [
+   [
+    " The person who brought the ladder back on Friday was ___.",
+    "invented"
+   ],
+   [
+    " ___ brought the ladder back on Friday.",
+    "ok"
+   ]
+  ]
+ },
+ "f18|Who had the ladder at the end?": {
+  "story": "f18",
+  "q": "Who had the ladder at the end?",
+  "gold": [
+   "bashir"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "The ladder",
+   "patient": null,
+   "place": "at the end",
+   "statement": "The ladder had ___ at the end."
+  },
+  "log": [
+   [
+    " The ladder had ___ at the end.",
+    "ok"
+   ]
+  ]
+ },
+ "f19|Why was the ferry cancelled?": {
+  "story": "f19",
+  "q": "Why was the ferry cancelled?",
+  "gold": [
+   "high winds",
+   "winds"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The ferry was cancelled ___.",
+    "no event with blank"
+   ],
+   [
+    " The ferry was cancelled because ___.",
+    "no event with blank"
+   ],
+   [
+    " The ferry was cancelled because ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f19|Who hired a fishing boat?": {
+  "story": "f19",
+  "q": "Who hired a fishing boat?",
+  "gold": [
+   "sefa",
+   "the postman"
+  ],
+  "qevent": {
+   "verb": "hire",
+   "asked": "patient",
+   "agent": "boat",
+   "patient": null,
+   "place": null,
+   "statement": "A fishing boat hired ___."
+  },
+  "log": [
+   [
+    " A fishing boat hired ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f19|Who steered the boat?": {
+  "story": "f19",
+  "q": "Who steered the boat?",
+  "gold": [
+   "akosua",
+   "an old woman"
+  ],
+  "qevent": {
+   "verb": "steer",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the boat",
+   "place": null,
+   "statement": "___ steered the boat."
+  },
+  "log": [
+   [
+    " ___ steered the boat.",
+    "ok"
+   ]
+  ]
+ },
+ "f19|What did Sefa hold?": {
+  "story": "f19",
+  "q": "What did Sefa hold?",
+  "gold": [
+   "the mail bags",
+   "mail bags"
+  ],
+  "qevent": {
+   "verb": "hold",
+   "asked": "patient",
+   "agent": "Sefa",
+   "patient": null,
+   "place": null,
+   "statement": "Sefa held ___."
+  },
+  "log": [
+   [
+    " Sefa held ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f19|When did they reach the island?": {
+  "story": "f19",
+  "q": "When did they reach the island?",
+  "gold": [
+   "before dark"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " They reached the island ___.",
+    "no event with blank"
+   ],
+   [
+    " They reached the island ___.",
+    "no event with blank"
+   ],
+   [
+    " They reached the island ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f20|Who laughed at the crane?": {
+  "story": "f20",
+  "q": "Who laughed at the crane?",
+  "gold": [
+   "the peacock",
+   "peacock"
+  ],
+  "qevent": {
+   "verb": "laugh",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "at the crane",
+   "statement": "___ laughed at the crane."
+  },
+  "log": [
+   [
+    " The crane laughed at ___.",
+    "no event with blank"
+   ],
+   [
+    " ___ laughed at the crane.",
+    "ok"
+   ]
+  ]
+ },
+ "f20|What colour were the crane's feathers?": {
+  "story": "f20",
+  "q": "What colour were the crane's feathers?",
+  "gold": [
+   "plain grey",
+   "grey"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The crane's feathers were ___.",
+    "no event with blank"
+   ],
+   [
+    " The crane's feathers were ___.",
+    "no event with blank"
+   ],
+   [
+    " The crane's feathers were ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f20|Where did the crane fly?": {
+  "story": "f20",
+  "q": "Where did the crane fly?",
+  "gold": [
+   "over the hills",
+   "the hills",
+   "hills"
+  ],
+  "qevent": {
+   "verb": "fly",
+   "asked": "patient",
+   "agent": "fly",
+   "patient": null,
+   "place": null,
+   "statement": "The crane fly flew ___."
+  },
+  "log": [
+   [
+    " The crane fly ___.",
+    "no event with blank"
+   ],
+   [
+    " The crane fly ___.",
+    "no event with blank"
+   ],
+   [
+    " The crane fly flew ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f20|Where could the peacock walk?": {
+  "story": "f20",
+  "q": "Where could the peacock walk?",
+  "gold": [
+   "in the farmyard",
+   "the farmyard",
+   "farmyard"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The peacock could walk ___.",
+    "no event with blank"
+   ],
+   [
+    " The peacock could walk ___.",
+    "no event with blank"
+   ],
+   [
+    " The peacock could walk ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f20|What did the crane do after the peacock laughed?": {
+  "story": "f20",
+  "q": "What did the crane do after the peacock laughed?",
+  "gold": [
+   "spread her wings"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The crane did ___ after the peacock laughed.",
+    "no event with blank"
+   ],
+   [
+    " The crane did ___ after the peacock laughed.",
+    "no event with blank"
+   ],
+   [
+    " The crane did ___ after the peacock laughed.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f21|Where did the group gather at nine?": {
+  "story": "f21",
+  "q": "Where did the group gather at nine?",
+  "gold": [
+   "in the hotel lobby",
+   "the hotel lobby",
+   "lobby"
+  ],
+  "qevent": {
+   "verb": "gather",
+   "asked": "place",
+   "agent": "The group",
+   "patient": null,
+   "place": null,
+   "statement": "The group gathered at ___ at nine."
+  },
+  "log": [
+   [
+    " The group gathered at ___ at nine.",
+    "ok"
+   ]
+  ]
+ },
+ "f21|Who was the guide?": {
+  "story": "f21",
+  "q": "Who was the guide?",
+  "gold": [
+   "paulo"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The guide was ___.",
+    "no event with blank"
+   ],
+   [
+    " The guide was ___.",
+    "no event with blank"
+   ],
+   [
+    " The guide was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f21|Who dropped a map into the water?": {
+  "story": "f21",
+  "q": "Who dropped a map into the water?",
+  "gold": [
+   "tamsin"
+  ],
+  "qevent": {
+   "verb": "drop",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "the",
+   "statement": "A map ___ dropped into the water."
+  },
+  "log": [
+   [
+    " A map ___ dropped into the water.",
+    "ok"
+   ]
+  ]
+ },
+ "f21|Who had Paulo's map after the harbour?": {
+  "story": "f21",
+  "q": "Who had Paulo's map after the harbour?",
+  "gold": [
+   "tamsin"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "map",
+   "patient": null,
+   "place": "after the harbour",
+   "statement": "Paulo's map had ___ after the harbour."
+  },
+  "log": [
+   [
+    " Paulo's map had ___ after the harbour.",
+    "ok"
+   ]
+  ]
+ },
+ "f21|What did Paulo hand each person?": {
+  "story": "f21",
+  "q": "What did Paulo hand each person?",
+  "gold": [
+   "a map",
+   "map"
+  ],
+  "qevent": {
+   "verb": "hand",
+   "asked": "patient",
+   "agent": "Paulo",
+   "patient": null,
+   "place": null,
+   "statement": "Paulo handed ___ to each person."
+  },
+  "log": [
+   [
+    " Paulo handed ___ to each person.",
+    "ok"
+   ]
+  ]
+ },
+ "f22|Whose boat came back empty?": {
+  "story": "f22",
+  "q": "Whose boat came back empty?",
+  "gold": [
+   "captain moreau's",
+   "moreau's"
+  ],
+  "qevent": {
+   "verb": "come",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "The boat ___ came back empty."
+  },
+  "log": [
+   [
+    " The boat came back ___.",
+    "no event with blank"
+   ],
+   [
+    " The boat came back empty.",
+    "blanks"
+   ],
+   [
+    " The boat ___ came back empty.",
+    "ok"
+   ]
+  ]
+ },
+ "f22|Who suggested trying past the lighthouse?": {
+  "story": "f22",
+  "q": "Who suggested trying past the lighthouse?",
+  "gold": [
+   "idris",
+   "the cook"
+  ],
+  "qevent": {
+   "verb": "suggest",
+   "asked": "agent",
+   "agent": null,
+   "patient": "trying",
+   "place": "past the lighthouse",
+   "statement": "___ suggested trying past the lighthouse."
+  },
+  "log": [
+   [
+    " ___ suggested trying past the lighthouse.",
+    "ok"
+   ]
+  ]
+ },
+ "f22|What did they find past the lighthouse?": {
+  "story": "f22",
+  "q": "What did they find past the lighthouse?",
+  "gold": [
+   "shoal of herring",
+   "herring"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "They",
+   "patient": null,
+   "place": "past the lighthouse",
+   "statement": "They found ___ past the lighthouse."
+  },
+  "log": [
+   [
+    " They found ___ past the lighthouse.",
+    "ok"
+   ]
+  ]
+ },
+ "f22|Who wanted to give up?": {
+  "story": "f22",
+  "q": "Who wanted to give up?",
+  "gold": [
+   "her crew",
+   "crew"
+  ],
+  "qevent": {
+   "verb": "want",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "to give up",
+   "statement": "___ wanted to give up."
+  },
+  "log": [
+   [
+    " ___ wanted to give up.",
+    "ok"
+   ]
+  ]
+ },
+ "f22|What did the market pay them?": {
+  "story": "f22",
+  "q": "What did the market pay them?",
+  "gold": [
+   "twice the usual price",
+   "twice"
+  ],
+  "qevent": {
+   "verb": "pay",
+   "asked": "patient",
+   "agent": "The market",
+   "patient": null,
+   "place": null,
+   "statement": "The market paid ___."
+  },
+  "log": [
+   [
+    " The market paid ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f23|Where did the cat live at first?": {
+  "story": "f23",
+  "q": "Where did the cat live at first?",
+  "gold": [
+   "in a grocer's shop",
+   "a grocer's shop",
+   "grocer's shop"
+  ],
+  "qevent": {
+   "verb": "live",
+   "asked": "place",
+   "agent": "The cat",
+   "patient": null,
+   "place": null,
+   "statement": "The cat lived at first ___."
+  },
+  "log": [
+   [
+    " The cat lived at first ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f23|What was the cat supposed to catch?": {
+  "story": "f23",
+  "q": "What was the cat supposed to catch?",
+  "gold": [
+   "mice"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The cat was supposed to catch ___.",
+    "no event with blank"
+   ],
+   [
+    " The cat was supposed to catch ___.",
+    "no event with blank"
+   ],
+   [
+    " The cat was supposed to catch ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f23|What chewed through every sack?": {
+  "story": "f23",
+  "q": "What chewed through every sack?",
+  "gold": [
+   "the mice",
+   "mice"
+  ],
+  "qevent": {
+   "verb": "chew",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "___ chewed through every sack."
+  },
+  "log": [
+   [
+    " ___ chewed through every sack.",
+    "ok"
+   ]
+  ]
+ },
+ "f23|Who put the cat out?": {
+  "story": "f23",
+  "q": "Who put the cat out?",
+  "gold": [
+   "the grocer",
+   "grocer"
+  ],
+  "qevent": {
+   "verb": "put",
+   "asked": "patient",
+   "agent": "The cat",
+   "patient": null,
+   "place": null,
+   "statement": "The cat was put out ___."
+  },
+  "log": [
+   [
+    " The cat was put out ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f23|Where did the cat catch mice at the end?": {
+  "story": "f23",
+  "q": "Where did the cat catch mice at the end?",
+  "gold": [
+   "in the alley",
+   "the alley",
+   "alley"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The cat caught mice at the end ___.",
+    "no event with blank"
+   ],
+   [
+    " The cat caught mice at the end.",
+    "blanks"
+   ],
+   [
+    " The cat caught mice at the end.",
+    "blanks"
+   ]
+  ]
+ },
+ "f24|Whose clock was it?": {
+  "story": "f24",
+  "q": "Whose clock was it?",
+  "gold": [
+   "her grandmother's",
+   "grandmother's"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " It was ___'s clock.",
+    "no event with blank"
+   ],
+   [
+    " It was ___'s clock.",
+    "no event with blank"
+   ],
+   [
+    " It was ___'s clock.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f24|What did Elif take to the repair shop?": {
+  "story": "f24",
+  "q": "What did Elif take to the repair shop?",
+  "gold": [
+   "her grandmother's clock",
+   "clock"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "patient",
+   "agent": "Elif",
+   "patient": null,
+   "place": "to",
+   "statement": "Elif took ___ to the repair shop."
+  },
+  "log": [
+   [
+    " Elif took ___ to the repair shop.",
+    "ok"
+   ]
+  ]
+ },
+ "f24|Who kept the clock for a week?": {
+  "story": "f24",
+  "q": "Who kept the clock for a week?",
+  "gold": [
+   "mr varela",
+   "varela",
+   "the repairman"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The clock kept ___ for a week.",
+    "no event with blank"
+   ],
+   [
+    " The clock was kept by ___ for a week.",
+    "passive"
+   ],
+   [
+    " The clock was kept for a week by ___.",
+    "passive"
+   ]
+  ]
+ },
+ "f24|Who collected the clock?": {
+  "story": "f24",
+  "q": "Who collected the clock?",
+  "gold": [
+   "elif's uncle",
+   "uncle"
+  ],
+  "qevent": {
+   "verb": "collect",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the clock",
+   "place": null,
+   "statement": "___ collected the clock."
+  },
+  "log": [
+   [
+    " The clock ___.",
+    "no event with blank"
+   ],
+   [
+    " ___ collected the clock.",
+    "ok"
+   ]
+  ]
+ },
+ "f24|Where is the clock now?": {
+  "story": "f24",
+  "q": "Where is the clock now?",
+  "gold": [
+   "above the fireplace",
+   "the fireplace",
+   "fireplace"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The clock is now ___.",
+    "no event with blank"
+   ],
+   [
+    " The clock is now ___.",
+    "no event with blank"
+   ],
+   [
+    " The clock is now ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f25|Why did Mr Dlamini carry the groceries up the stairs?": {
+  "story": "f25",
+  "q": "Why did Mr Dlamini carry the groceries up the stairs?",
+  "gold": [
+   "the lift was broken",
+   "lift was broken"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Mr Dlamini carried the groceries up the stairs ___.",
+    "no event with blank"
+   ],
+   [
+    " Mr Dlamini carried the groceries up the stairs because ___.",
+    "no event with blank"
+   ],
+   [
+    " Mr Dlamini carried the groceries up the stairs because ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f25|What did Mr Dlamini carry up the stairs?": {
+  "story": "f25",
+  "q": "What did Mr Dlamini carry up the stairs?",
+  "gold": [
+   "his neighbour's groceries",
+   "groceries"
+  ],
+  "qevent": {
+   "verb": "carry",
+   "asked": "patient",
+   "agent": "Dlamini",
+   "patient": null,
+   "place": "up the stairs",
+   "statement": "Mr Dlamini carried ___ up the stairs."
+  },
+  "log": [
+   [
+    " Mr Dlamini carried ___ up the stairs.",
+    "ok"
+   ]
+  ]
+ },
+ "f25|Who was the retired teacher?": {
+  "story": "f25",
+  "q": "Who was the retired teacher?",
+  "gold": [
+   "ottilie"
+  ],
+  "qevent": {
+   "verb": "teacher",
+   "asked": "patient",
+   "agent": "The retired",
+   "patient": null,
+   "place": null,
+   "statement": "The retired teacher ___."
+  },
+  "log": [
+   [
+    " The retired teacher ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f25|What did Ottilie invite him in for?": {
+  "story": "f25",
+  "q": "What did Ottilie invite him in for?",
+  "gold": [
+   "soup"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Ottilie invited ___ in for ___.",
+    "blanks"
+   ],
+   [
+    " Ottilie invited ___ in for a cup of tea.",
+    "invented"
+   ],
+   [
+    " Ottilie invited ___ in for a cup of tea.",
+    "invented"
+   ]
+  ]
+ },
+ "f25|Who had Ottilie once taught?": {
+  "story": "f25",
+  "q": "Who had Ottilie once taught?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "qevent": {
+   "verb": "once",
+   "asked": "place",
+   "agent": "Ottilie",
+   "patient": "taught",
+   "place": null,
+   "statement": "Ottilie once taught ___."
+  },
+  "log": [
+   [
+    " Ottilie once taught ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f26|What did the donkey carry the first day?": {
+  "story": "f26",
+  "q": "What did the donkey carry the first day?",
+  "gold": [
+   "salt"
+  ],
+  "qevent": {
+   "verb": "carry",
+   "asked": "patient",
+   "agent": "The donkey",
+   "patient": null,
+   "place": null,
+   "statement": "The donkey carried ___ the first day."
+  },
+  "log": [
+   [
+    " The donkey carried ___ the first day.",
+    "ok"
+   ]
+  ]
+ },
+ "f26|Where did the donkey slip?": {
+  "story": "f26",
+  "q": "Where did the donkey slip?",
+  "gold": [
+   "in a river",
+   "a river",
+   "river"
+  ],
+  "qevent": {
+   "verb": "slip",
+   "asked": "patient",
+   "agent": "The donkey",
+   "patient": null,
+   "place": null,
+   "statement": "The donkey slipped ___."
+  },
+  "log": [
+   [
+    " The donkey slipped ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f26|What soaked up the water?": {
+  "story": "f26",
+  "q": "What soaked up the water?",
+  "gold": [
+   "the sponges",
+   "sponges"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The ___ soaked up the water.",
+    "no event with blank"
+   ],
+   [
+    " The ___ soaked up the water.",
+    "no event with blank"
+   ],
+   [
+    " The ___ soaked up the water.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f26|What did the donkey do the next day?": {
+  "story": "f26",
+  "q": "What did the donkey do the next day?",
+  "gold": [
+   "lay down"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The donkey did ___ the next day.",
+    "no event with blank"
+   ],
+   [
+    " The donkey did ___ the next day.",
+    "no event with blank"
+   ],
+   [
+    " The donkey did ___ the next day.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f26|What melted in the river?": {
+  "story": "f26",
+  "q": "What melted in the river?",
+  "gold": [
+   "the salt",
+   "salt"
+  ],
+  "qevent": {
+   "verb": "melt",
+   "asked": "patient",
+   "agent": "The river",
+   "patient": null,
+   "place": null,
+   "statement": "The river melted ___."
+  },
+  "log": [
+   [
+    " The river melted ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f27|Where was the kite in the morning?": {
+  "story": "f27",
+  "q": "Where was the kite in the morning?",
+  "gold": [
+   "in the plum tree",
+   "the plum tree",
+   "plum tree"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The kite was in the morning ___.",
+    "no event with blank"
+   ],
+   [
+    " The kite was in the morning.",
+    "blanks"
+   ],
+   [
+    " The kite was ___ in the morning.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f27|Who freed the kite?": {
+  "story": "f27",
+  "q": "Who freed the kite?",
+  "gold": [
+   "cosmin",
+   "her friend"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The kite freed ___.",
+    "no event with blank"
+   ],
+   [
+    " The kite was freed by ___.",
+    "passive"
+   ],
+   [
+    " The kite was freed by ___.",
+    "passive"
+   ]
+  ]
+ },
+ "f27|What carried the kite into the pond?": {
+  "story": "f27",
+  "q": "What carried the kite into the pond?",
+  "gold": [
+   "the wind",
+   "wind"
+  ],
+  "qevent": {
+   "verb": "carry",
+   "asked": "patient",
+   "agent": "The kite",
+   "patient": null,
+   "place": "into the pond",
+   "statement": "The kite carried ___ into the pond."
+  },
+  "log": [
+   [
+    " The kite carried ___ into the pond.",
+    "ok"
+   ]
+  ]
+ },
+ "f27|Where was the kite at the end?": {
+  "story": "f27",
+  "q": "Where was the kite at the end?",
+  "gold": [
+   "the farmer's pond",
+   "pond"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The kite was at the end ___.",
+    "no event with blank"
+   ],
+   [
+    " The kite was at the end.",
+    "blanks"
+   ],
+   [
+    " The kite was ___ at the end.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f27|What snapped?": {
+  "story": "f27",
+  "q": "What snapped?",
+  "gold": [
+   "the string",
+   "string"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " ___ snapped.",
+    "no event with blank"
+   ],
+   [
+    " The ___ snapped.",
+    "no event with blank"
+   ],
+   [
+    " The snap ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f28|Who was the young chemist?": {
+  "story": "f28",
+  "q": "Who was the young chemist?",
+  "gold": [
+   "gulnara"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The young chemist was ___.",
+    "no event with blank"
+   ],
+   [
+    " The young chemist was ___.",
+    "no event with blank"
+   ],
+   [
+    " The young chemist was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f28|What did Gulnara notice?": {
+  "story": "f28",
+  "q": "What did Gulnara notice?",
+  "gold": [
+   "a leak",
+   "leak"
+  ],
+  "qevent": {
+   "verb": "notice",
+   "asked": "patient",
+   "agent": "Gulnara",
+   "patient": null,
+   "place": null,
+   "statement": "Gulnara noticed ___."
+  },
+  "log": [
+   [
+    " Gulnara noticed ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f28|Who ignored Gulnara?": {
+  "story": "f28",
+  "q": "Who ignored Gulnara?",
+  "gold": [
+   "the foreman",
+   "foreman"
+  ],
+  "qevent": {
+   "verb": "ignore",
+   "asked": "patient",
+   "agent": "Gulnara",
+   "patient": null,
+   "place": null,
+   "statement": "Gulnara ignored ___."
+  },
+  "log": [
+   [
+    " Gulnara ignored ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f28|What did Gulnara do after the foreman ignored her?": {
+  "story": "f28",
+  "q": "What did Gulnara do after the foreman ignored her?",
+  "gold": [
+   "shut the valve herself",
+   "shut the valve"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Gulnara did ___ after the foreman ignored her.",
+    "no event with blank"
+   ],
+   [
+    " Gulnara ___ after the foreman ignored her.",
+    "no event with blank"
+   ],
+   [
+    " Gulnara did ___ after the foreman ignored her.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f28|Who promoted Gulnara?": {
+  "story": "f28",
+  "q": "Who promoted Gulnara?",
+  "gold": [
+   "mr ashworth",
+   "ashworth",
+   "the manager"
+  ],
+  "qevent": {
+   "verb": "promote",
+   "asked": "patient",
+   "agent": "Gulnara",
+   "patient": null,
+   "place": null,
+   "statement": "Gulnara promoted ___."
+  },
+  "log": [
+   [
+    " Gulnara promoted ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f29|Where did the first two goats meet?": {
+  "story": "f29",
+  "q": "Where did the first two goats meet?",
+  "gold": [
+   "on a narrow bridge",
+   "a narrow bridge",
+   "bridge"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The first two goats met ___.",
+    "no event with blank"
+   ],
+   [
+    " The first two goats met ___.",
+    "no event with blank"
+   ],
+   [
+    " The first two goats met ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f29|What did the first two goats do?": {
+  "story": "f29",
+  "q": "What did the first two goats do?",
+  "gold": [
+   "butted heads"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The first two goats ___.",
+    "no event with blank"
+   ],
+   [
+    " The first two goats ___.",
+    "no event with blank"
+   ],
+   [
+    " The first two goats ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f29|What did the first two goats fall into?": {
+  "story": "f29",
+  "q": "What did the first two goats fall into?",
+  "gold": [
+   "the water",
+   "water"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The first two goats fell into ___.",
+    "no event with blank"
+   ],
+   [
+    " The first two goats fell into ___.",
+    "no event with blank"
+   ],
+   [
+    " The first two goats fell into ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f29|What did one of the other goats do?": {
+  "story": "f29",
+  "q": "What did one of the other goats do?",
+  "gold": [
+   "knelt down",
+   "knelt"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " One of the other goats ___.",
+    "no event with blank"
+   ],
+   [
+    " The other goat ___.",
+    "invented"
+   ],
+   [
+    " One of the other goats ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f29|What did the other goat step over?": {
+  "story": "f29",
+  "q": "What did the other goat step over?",
+  "gold": [
+   "her back"
+  ],
+  "qevent": {
+   "verb": "step",
+   "asked": "place",
+   "agent": "goat",
+   "patient": null,
+   "place": null,
+   "statement": "The other goat stepped over ___."
+  },
+  "log": [
+   [
+    " The other goat ___ over the other goat.",
+    "no event with blank"
+   ],
+   [
+    " The other goat ___ over the other goat.",
+    "no event with blank"
+   ],
+   [
+    " The other goat stepped over ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f30|Where was the van at dawn?": {
+  "story": "f30",
+  "q": "Where was the van at dawn?",
+  "gold": [
+   "outside the bakery",
+   "the bakery",
+   "bakery"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The van was at dawn ___.",
+    "no event with blank"
+   ],
+   [
+    " The van was at ___ at dawn.",
+    "no event with blank"
+   ],
+   [
+    " The van was ___ at dawn.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f30|Who delivered the loaves to the hospital kitchen?": {
+  "story": "f30",
+  "q": "Who delivered the loaves to the hospital kitchen?",
+  "gold": [
+   "umar"
+  ],
+  "qevent": {
+   "verb": "deliver",
+   "asked": "patient",
+   "agent": "kitchen",
+   "patient": null,
+   "place": "to the loaves",
+   "statement": "The hospital kitchen delivered ___ to the loaves."
+  },
+  "log": [
+   [
+    " The hospital kitchen delivered ___ to the loaves.",
+    "ok"
+   ]
+  ]
+ },
+ "f30|What stole a sardine?": {
+  "story": "f30",
+  "q": "What stole a sardine?",
+  "gold": [
+   "a gull",
+   "gull"
+  ],
+  "qevent": {
+   "verb": "steal",
+   "asked": "agent",
+   "agent": null,
+   "patient": "a sardine",
+   "place": null,
+   "statement": "A ___ stole a sardine."
+  },
+  "log": [
+   [
+    " A ___ stole a sardine.",
+    "ok"
+   ]
+  ]
+ },
+ "f30|How many loaves did Umar load?": {
+  "story": "f30",
+  "q": "How many loaves did Umar load?",
+  "gold": [
+   "forty"
+  ],
+  "qevent": {
+   "verb": "load",
+   "asked": "place",
+   "agent": "Umar",
+   "patient": null,
+   "place": null,
+   "statement": "Umar loaded ___ loaves."
+  },
+  "log": [
+   [
+    " Umar loaded ___ loaves.",
+    "ok"
+   ]
+  ]
+ },
+ "f30|What did Umar collect at the harbour?": {
+  "story": "f30",
+  "q": "What did Umar collect at the harbour?",
+  "gold": [
+   "fish"
+  ],
+  "qevent": {
+   "verb": "collect",
+   "asked": "patient",
+   "agent": "Umar",
+   "patient": null,
+   "place": "at the harbour",
+   "statement": "Umar collected ___ at the harbour."
+  },
+  "log": [
+   [
+    " Umar collected ___ at the harbour.",
+    "ok"
+   ]
+  ]
+ },
+ "f31|Who led the choir?": {
+  "story": "f31",
+  "q": "Who led the choir?",
+  "gold": [
+   "orla"
+  ],
+  "qevent": {
+   "verb": "lead",
+   "asked": "patient",
+   "agent": "The choir",
+   "patient": null,
+   "place": null,
+   "statement": "The choir led ___."
+  },
+  "log": [
+   [
+    " The choir led ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f31|What did the choir not have?": {
+  "story": "f31",
+  "q": "What did the choir not have?",
+  "gold": [
+   "piano"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The choir did not have ___.",
+    "no event with blank"
+   ],
+   [
+    " The choir did not have ___.",
+    "no event with blank"
+   ],
+   [
+    " The choir did not have ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f31|Who offered the piano?": {
+  "story": "f31",
+  "q": "Who offered the piano?",
+  "gold": [
+   "mr castellanos",
+   "castellanos"
+  ],
+  "qevent": {
+   "verb": "offer",
+   "asked": "patient",
+   "agent": "The piano",
+   "patient": null,
+   "place": null,
+   "statement": "The piano offered ___."
+  },
+  "log": [
+   [
+    " The piano offered ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f31|When did the choir sing?": {
+  "story": "f31",
+  "q": "When did the choir sing?",
+  "gold": [
+   "at the spring festival",
+   "spring festival"
+  ],
+  "qevent": {
+   "verb": "sing",
+   "asked": "patient",
+   "agent": "The choir",
+   "patient": null,
+   "place": null,
+   "statement": "The choir sang ___."
+  },
+  "log": [
+   [
+    " The choir sang ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f31|Who drove the piano up the mountain road?": {
+  "story": "f31",
+  "q": "Who drove the piano up the mountain road?",
+  "gold": [
+   "six farmers",
+   "farmers"
+  ],
+  "qevent": {
+   "verb": "drive",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the piano",
+   "place": "up the mountain",
+   "statement": "The piano ___ drove the piano up the mountain road."
+  },
+  "log": [
+   [
+    " The piano ___ drove the piano up the mountain road.",
+    "ok"
+   ]
+  ]
+ },
+ "f32|Who warned the other birds?": {
+  "story": "f32",
+  "q": "Who warned the other birds?",
+  "gold": [
+   "a sparrow",
+   "sparrow"
+  ],
+  "qevent": {
+   "verb": "warn",
+   "asked": "patient",
+   "agent": "birds",
+   "patient": null,
+   "place": null,
+   "statement": "The other birds warned ___."
+  },
+  "log": [
+   [
+    " The other birds warned ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f32|What was the farmer sowing?": {
+  "story": "f32",
+  "q": "What was the farmer sowing?",
+  "gold": [
+   "flax"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The farmer was sowing ___.",
+    "no event with blank"
+   ],
+   [
+    " The farmer was sowing ___.",
+    "no event with blank"
+   ],
+   [
+    " The farmer was sowing ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f32|What would the flax become?": {
+  "story": "f32",
+  "q": "What would the flax become?",
+  "gold": [
+   "nets"
+  ],
+  "qevent": {
+   "verb": "become",
+   "asked": "patient",
+   "agent": "would",
+   "patient": null,
+   "place": null,
+   "statement": "The flax would become ___."
+  },
+  "log": [
+   [
+    " The flax would become ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f32|Where did the sparrow go to live?": {
+  "story": "f32",
+  "q": "Where did the sparrow go to live?",
+  "gold": [
+   "near the houses",
+   "the houses"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The sparrow went to live ___.",
+    "no event with blank"
+   ],
+   [
+    " The sparrow went to live ___.",
+    "no event with blank"
+   ],
+   [
+    " The sparrow went to live ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f32|What did the birds keep eating?": {
+  "story": "f32",
+  "q": "What did the birds keep eating?",
+  "gold": [
+   "the seeds",
+   "seeds"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The birds kept eating ___.",
+    "no event with blank"
+   ],
+   [
+    " The birds kept eating ___.",
+    "no event with blank"
+   ],
+   [
+    " The birds kept eating ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f33|Where was the mask at midnight?": {
+  "story": "f33",
+  "q": "Where was the mask at midnight?",
+  "gold": [
+   "in the safe",
+   "the safe",
+   "safe"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The mask was at midnight ___.",
+    "no event with blank"
+   ],
+   [
+    " The mask was at midnight in ___.",
+    "no event with blank"
+   ],
+   [
+    " The mask was at midnight ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f33|Who locked the mask in the safe?": {
+  "story": "f33",
+  "q": "Who locked the mask in the safe?",
+  "gold": [
+   "wiremu",
+   "the night guard"
+  ],
+  "qevent": {
+   "verb": "lock",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the mask",
+   "place": "in the safe",
+   "statement": "___ locked the mask in the safe."
+  },
+  "log": [
+   [
+    " The mask was locked in the safe by ___.",
+    "passive"
+   ],
+   [
+    " ___ locked the mask in the safe.",
+    "ok"
+   ]
+  ]
+ },
+ "f33|What made the noise in the east hall?": {
+  "story": "f33",
+  "q": "What made the noise in the east hall?",
+  "gold": [
+   "a cat",
+   "cat"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The noise in the east hall ___.",
+    "no event with blank"
+   ],
+   [
+    " The noise in the east hall ___.",
+    "no event with blank"
+   ],
+   [
+    " The noise in the east hall was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f33|Who moved the mask in the morning?": {
+  "story": "f33",
+  "q": "Who moved the mask in the morning?",
+  "gold": [
+   "dr sandoval",
+   "sandoval",
+   "the director"
+  ],
+  "qevent": {
+   "verb": "move",
+   "asked": "patient",
+   "agent": "The mask",
+   "patient": null,
+   "place": "in the morning",
+   "statement": "The mask moved ___ in the morning."
+  },
+  "log": [
+   [
+    " The mask moved ___ in the morning.",
+    "ok"
+   ]
+  ]
+ },
+ "f33|Where was the mask at the end?": {
+  "story": "f33",
+  "q": "Where was the mask at the end?",
+  "gold": [
+   "a glass case",
+   "glass case"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The mask was at the end ___.",
+    "no event with blank"
+   ],
+   [
+    " The mask was at the end.",
+    "blanks"
+   ],
+   [
+    " The mask was ___ at the end.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f34|Who kept the cows overnight?": {
+  "story": "f34",
+  "q": "Who kept the cows overnight?",
+  "gold": [
+   "yaw",
+   "a boy"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The cows were kept overnight by ___.",
+    "passive"
+   ],
+   [
+    " The cows were kept overnight by ___.",
+    "passive"
+   ],
+   [
+    " The cows were kept overnight by ___.",
+    "passive"
+   ]
+  ]
+ },
+ "f34|Who paid Yaw?": {
+  "story": "f34",
+  "q": "Who paid Yaw?",
+  "gold": [
+   "svetlana",
+   "the farmer"
+  ],
+  "qevent": {
+   "verb": "pay",
+   "asked": "patient",
+   "agent": "Yaw",
+   "patient": null,
+   "place": null,
+   "statement": "Yaw paid ___."
+  },
+  "log": [
+   [
+    " Yaw paid ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f34|What did Svetlana pay Yaw with?": {
+  "story": "f34",
+  "q": "What did Svetlana pay Yaw with?",
+  "gold": [
+   "a wheel of cheese",
+   "cheese"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Svetlana paid Yaw with ___.",
+    "no event with blank"
+   ],
+   [
+    " Svetlana paid Yaw with ___.",
+    "no event with blank"
+   ],
+   [
+    " Svetlana paid Yaw with ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f34|How far had the cows wandered?": {
+  "story": "f34",
+  "q": "How far had the cows wandered?",
+  "gold": [
+   "three miles"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The cows",
+   "patient": "wandered",
+   "place": null,
+   "statement": "The cows had wandered ___."
+  },
+  "log": [
+   [
+    " The cows had wandered ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f34|When did the cows wander downstream?": {
+  "story": "f34",
+  "q": "When did the cows wander downstream?",
+  "gold": [
+   "after the flood"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The cows wandered downstream ___.",
+    "no event with blank"
+   ],
+   [
+    " The cows wandered downstream ___.",
+    "no event with blank"
+   ],
+   [
+    " The cows wandered downstream ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f35|Who wanted to be as big as the ox?": {
+  "story": "f35",
+  "q": "Who wanted to be as big as the ox?",
+  "gold": [
+   "a frog",
+   "frog"
+  ],
+  "qevent": {
+   "verb": "want",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "___ wanted to be as big as the ox."
+  },
+  "log": [
+   [
+    " The ox wanted to be as big as ___.",
+    "no event with blank"
+   ],
+   [
+    " ___ wanted to be as big as the ox.",
+    "ok"
+   ]
+  ]
+ },
+ "f35|Where was the ox?": {
+  "story": "f35",
+  "q": "Where was the ox?",
+  "gold": [
+   "in the meadow",
+   "the meadow",
+   "meadow"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The ox was ___.",
+    "no event with blank"
+   ],
+   [
+    " The ox was ___.",
+    "no event with blank"
+   ],
+   [
+    " The ox was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f35|Who did the frog ask?": {
+  "story": "f35",
+  "q": "Who did the frog ask?",
+  "gold": [
+   "her children",
+   "children"
+  ],
+  "qevent": {
+   "verb": "ask",
+   "asked": "patient",
+   "agent": "The frog",
+   "patient": null,
+   "place": null,
+   "statement": "The frog asked ___."
+  },
+  "log": [
+   [
+    " The frog asked ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f35|What did the frog do to look bigger?": {
+  "story": "f35",
+  "q": "What did the frog do to look bigger?",
+  "gold": [
+   "puffed herself up",
+   "puffed"
+  ],
+  "qevent": {
+   "verb": "do",
+   "asked": "patient",
+   "agent": "The frog",
+   "patient": null,
+   "place": null,
+   "statement": "The frog did ___ to look bigger."
+  },
+  "log": [
+   [
+    " The frog ___ to look bigger.",
+    "no event with blank"
+   ],
+   [
+    " The frog ___ to look bigger.",
+    "no event with blank"
+   ],
+   [
+    " The frog did ___ to look bigger.",
+    "ok"
+   ]
+  ]
+ },
+ "f35|What happened to the frog in the end?": {
+  "story": "f35",
+  "q": "What happened to the frog in the end?",
+  "gold": [
+   "she burst",
+   "burst"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The frog ___ in the end.",
+    "no event with blank"
+   ],
+   [
+    " The frog ___ in the end.",
+    "no event with blank"
+   ],
+   [
+    " The frog ___ in the end.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f36|Where did Mateus leave his bicycle?": {
+  "story": "f36",
+  "q": "Where did Mateus leave his bicycle?",
+  "gold": [
+   "at the swimming pool",
+   "the swimming pool",
+   "pool"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "place",
+   "agent": "Mateus",
+   "patient": "his bicycle",
+   "place": null,
+   "statement": "Mateus left his bicycle ___."
+  },
+  "log": [
+   [
+    " Mateus left his bicycle ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f36|Who took the bicycle to the police station?": {
+  "story": "f36",
+  "q": "Who took the bicycle to the police station?",
+  "gold": [
+   "a cleaner",
+   "cleaner"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "patient",
+   "agent": "station",
+   "patient": null,
+   "place": "to",
+   "statement": "The police station took ___ to the bicycle."
+  },
+  "log": [
+   [
+    " The police station took ___ to the bicycle.",
+    "ok"
+   ]
+  ]
+ },
+ "f36|Who drove Mateus back on Saturday?": {
+  "story": "f36",
+  "q": "Who drove Mateus back on Saturday?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "qevent": {
+   "verb": "drive",
+   "asked": "patient",
+   "agent": "Mateus",
+   "patient": null,
+   "place": null,
+   "statement": "Mateus drove ___ back on Saturday."
+  },
+  "log": [
+   [
+    " Mateus drove ___ back on Saturday.",
+    "ok"
+   ]
+  ]
+ },
+ "f36|What did Mateus leave at the swimming pool?": {
+  "story": "f36",
+  "q": "What did Mateus leave at the swimming pool?",
+  "gold": [
+   "his bicycle",
+   "bicycle"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "place",
+   "agent": "Mateus",
+   "patient": null,
+   "place": null,
+   "statement": "Mateus left ___ at the swimming pool."
+  },
+  "log": [
+   [
+    " Mateus left ___ at the swimming pool.",
+    "ok"
+   ]
+  ]
+ },
+ "f36|Where did Mateus ride the bicycle?": {
+  "story": "f36",
+  "q": "Where did Mateus ride the bicycle?",
+  "gold": [
+   "to his grandfather's farm",
+   "his grandfather's farm",
+   "grandfather's farm"
+  ],
+  "qevent": {
+   "verb": "ride",
+   "asked": "place",
+   "agent": "Mateus",
+   "patient": "the bicycle",
+   "place": null,
+   "statement": "Mateus rode the bicycle ___."
+  },
+  "log": [
+   [
+    " Mateus rode the bicycle ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f37|Who was the weather reporter?": {
+  "story": "f37",
+  "q": "Who was the weather reporter?",
+  "gold": [
+   "kirra walsh",
+   "kirra"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The weather reporter was ___.",
+    "no event with blank"
+   ],
+   [
+    " The weather reporter was ___.",
+    "no event with blank"
+   ],
+   [
+    " The weather reporter was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f37|Why was Kirra late?": {
+  "story": "f37",
+  "q": "Why was Kirra late?",
+  "gold": [
+   "stuck in traffic",
+   "traffic"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Kirra was late ___.",
+    "no event with blank"
+   ],
+   [
+    " Kirra was late because ___.",
+    "no event with blank"
+   ],
+   [
+    " Kirra was late because ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f37|Who read the forecast instead?": {
+  "story": "f37",
+  "q": "Who read the forecast instead?",
+  "gold": [
+   "emil",
+   "the sports presenter"
+  ],
+  "qevent": {
+   "verb": "read",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the forecast instead",
+   "place": null,
+   "statement": "___ read the forecast instead."
+  },
+  "log": [
+   [
+    " The forecast was read ___.",
+    "no event with blank"
+   ],
+   [
+    " ___ read the forecast instead.",
+    "ok"
+   ]
+  ]
+ },
+ "f37|When was the forecast meant to be read?": {
+  "story": "f37",
+  "q": "When was the forecast meant to be read?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The forecast was meant to be read ___.",
+    "no event with blank"
+   ],
+   [
+    " The forecast was meant to be read ___.",
+    "no event with blank"
+   ],
+   [
+    " The forecast was meant to be read ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f37|Whose forecast was the funniest?": {
+  "story": "f37",
+  "q": "Whose forecast was the funniest?",
+  "gold": [
+   "emil's"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The forecast ___ was the funniest.",
+    "no event with blank"
+   ],
+   [
+    " The forecast was the ___'s.",
+    "no event with blank"
+   ],
+   [
+    " The forecast was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f38|Where was the dog chained?": {
+  "story": "f38",
+  "q": "Where was the dog chained?",
+  "gold": [
+   "in a yard",
+   "a yard",
+   "yard"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The dog was chained ___.",
+    "no event with blank"
+   ],
+   [
+    " The dog was chained ___.",
+    "no event with blank"
+   ],
+   [
+    " The dog was chained ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f38|Who gave the dog meat?": {
+  "story": "f38",
+  "q": "Who gave the dog meat?",
+  "gold": [
+   "his master",
+   "master"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The dog gave ___ meat.",
+    "no event with blank"
+   ],
+   [
+    " The dog gave ___ meat.",
+    "no event with blank"
+   ],
+   [
+    " The dog gave ___ meat.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f38|What had worn a mark on the dog's neck?": {
+  "story": "f38",
+  "q": "What had worn a mark on the dog's neck?",
+  "gold": [
+   "the chain",
+   "chain"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "neck",
+   "patient": null,
+   "place": null,
+   "statement": "The dog's neck had worn a mark ___."
+  },
+  "log": [
+   [
+    " The dog had worn a mark on its ___.",
+    "invented"
+   ],
+   [
+    " The dog had worn a mark on the dog's neck.",
+    "blanks"
+   ],
+   [
+    " The dog's neck had worn a mark ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f38|Where did the wolf go at the end?": {
+  "story": "f38",
+  "q": "Where did the wolf go at the end?",
+  "gold": [
+   "back to the forest",
+   "the forest",
+   "forest"
+  ],
+  "qevent": {
+   "verb": "go",
+   "asked": "patient",
+   "agent": "The wolf",
+   "patient": null,
+   "place": "at the end",
+   "statement": "The wolf went ___ at the end."
+  },
+  "log": [
+   [
+    " The wolf went ___ at the end.",
+    "ok"
+   ]
+  ]
+ },
+ "f38|Who found the dog?": {
+  "story": "f38",
+  "q": "Who found the dog?",
+  "gold": [
+   "a hungry wolf",
+   "the wolf",
+   "wolf"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The dog",
+   "patient": null,
+   "place": null,
+   "statement": "The dog found ___."
+  },
+  "log": [
+   [
+    " The dog found ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f39|Where was the suitcase at noon?": {
+  "story": "f39",
+  "q": "Where was the suitcase at noon?",
+  "gold": [
+   "the airport in budapest",
+   "budapest"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The suitcase was at ___ at noon.",
+    "no event with blank"
+   ],
+   [
+    " The suitcase was at ___ at noon.",
+    "no event with blank"
+   ],
+   [
+    " The suitcase was ___ at noon.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f39|Where did the suitcase spend the night?": {
+  "story": "f39",
+  "q": "Where did the suitcase spend the night?",
+  "gold": [
+   "in oslo",
+   "oslo"
+  ],
+  "qevent": {
+   "verb": "spend",
+   "asked": "place",
+   "agent": "The suitcase",
+   "patient": "the night",
+   "place": null,
+   "statement": "The suitcase spent the night ___."
+  },
+  "log": [
+   [
+    " The suitcase spent the night ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f39|Who sent the suitcase on to Madrid?": {
+  "story": "f39",
+  "q": "Who sent the suitcase on to Madrid?",
+  "gold": [
+   "jun",
+   "an airline clerk"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The suitcase ___ on to Madrid.",
+    "no event with blank"
+   ],
+   [
+    " The suitcase was sent on to Madrid by ___.",
+    "passive"
+   ],
+   [
+    " The suitcase was sent on to Madrid by ___.",
+    "passive"
+   ]
+  ]
+ },
+ "f39|When did Jun send the suitcase on?": {
+  "story": "f39",
+  "q": "When did Jun send the suitcase on?",
+  "gold": [
+   "the next morning",
+   "next morning"
+  ],
+  "qevent": {
+   "verb": "send",
+   "asked": "place",
+   "agent": "Jun",
+   "patient": "the suitcase",
+   "place": null,
+   "statement": "Jun sent the suitcase on ___."
+  },
+  "log": [
+   [
+    " Jun sent the suitcase on ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f39|Where was the suitcase by evening?": {
+  "story": "f39",
+  "q": "Where was the suitcase by evening?",
+  "gold": [
+   "in ilona's hotel room",
+   "ilona's hotel room",
+   "hotel room"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The suitcase was by ___ by evening.",
+    "passive"
+   ],
+   [
+    " The suitcase was by ___ by evening.",
+    "passive"
+   ],
+   [
+    " The suitcase was ___ by evening.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f40|Whose dog was Smoke?": {
+  "story": "f40",
+  "q": "Whose dog was Smoke?",
+  "gold": [
+   "the librarian's",
+   "librarian's"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " Smoke was ___'s dog.",
+    "no event with blank"
+   ],
+   [
+    " Smoke was ___'s dog.",
+    "no event with blank"
+   ],
+   [
+    " Smoke was ___'s dog.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f40|What did Smoke steal?": {
+  "story": "f40",
+  "q": "What did Smoke steal?",
+  "gold": [
+   "a sausage",
+   "sausage"
+  ],
+  "qevent": {
+   "verb": "steal",
+   "asked": "patient",
+   "agent": "Smoke",
+   "patient": null,
+   "place": null,
+   "statement": "Smoke stole ___."
+  },
+  "log": [
+   [
+    " Smoke stole ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f40|Who was the butcher?": {
+  "story": "f40",
+  "q": "Who was the butcher?",
+  "gold": [
+   "mr abara",
+   "abara"
+  ],
+  "qevent": null,
+  "log": [
+   [
+    " The butcher was ___.",
+    "no event with blank"
+   ],
+   [
+    " The butcher was ___.",
+    "no event with blank"
+   ],
+   [
+    " The butcher was ___.",
+    "no event with blank"
+   ]
+  ]
+ },
+ "f40|When did Smoke escape?": {
+  "story": "f40",
+  "q": "When did Smoke escape?",
+  "gold": [
+   "on market day",
+   "market day"
+  ],
+  "qevent": {
+   "verb": "escape",
+   "asked": "patient",
+   "agent": "Smoke",
+   "patient": null,
+   "place": null,
+   "statement": "Smoke escaped ___."
+  },
+  "log": [
+   [
+    " Smoke escaped ___.",
+    "ok"
+   ]
+  ]
+ },
+ "f40|Who caught Smoke?": {
+  "story": "f40",
+  "q": "Who caught Smoke?",
+  "gold": [
+   "luca and magnus",
+   "luca",
+   "magnus"
+  ],
+  "qevent": {
+   "verb": "catch",
+   "asked": "patient",
+   "agent": "Smoke",
+   "patient": null,
+   "place": null,
+   "statement": "Smoke caught ___."
+  },
+  "log": [
+   [
+    " Smoke caught ___.",
+    "ok"
+   ]
+  ]
+ }
+}

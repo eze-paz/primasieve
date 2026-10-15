@@ -227,3 +227,23 @@ ag9_qcanon.py --ckpt rwkv7/RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth --out ag
 val_fresh2 only (stories 62-101, 200 questions; no choices are made on it, the pipeline is fixed). Reported: stage-1
 yield against 0.4B's 39%, and stage-2 right / wrong on canonical and original text. PASS if untouched right > 25 at
 precision >= 0.89 on canonical. About 4x the 0.4B cost per question.
+
+## AG9b result -- FAIL (the translator is now the ceiling)
+1.5B proposer, untouched val_fresh2 (4,600 s): stage-1 yield **116 of 200** (0.4B: 39%); the model fills the blank
+only 10 times. Stage 2: canonical **19 right / 8 wrong (precision 0.70)**, original 13 / 5. Wrong answers are the
+AG1 translator's cut spans ('dark' for 'dark clouds', 'him a' for 'a cup of tea') and its missing roles: 'when' and
+'why' blanks get read as place or patient. Silences are mismatches between the question event and the clause event,
+again from the translator's spans and pronoun agents. Reading: with a proposer that can write the statements, the
+learned translator (32 synthetic verbs, three roles) is the limit at every stage.
+
+## AG10 registration (a rigid formal language the model writes directly; no learned translator)
+ag10_slots.py, 1.5B model, untouched val_fresh2 only (stories 62-101, 200 questions; nothing is chosen on it: the
+pipeline has no tunable). Sentences: for each sentence the model writes one slot line per event,
+'WHO: x | DID: verb | WHAT: x | WHERE: x | WHEN: x | WHY: x' ('-' for empty), few-shot; the engine keeps a line only if
+every slot's content words come from the sentence, its predecessor or a name seen so far, WHO and DID are filled, and
+the line is not a duplicate; a pronoun WHO is resolved to the last named WHO. Questions: the same line with '?' in
+the asked slot, kept only if it has exactly one '?' and its words come from the question. Answer: the '?' slot of the
+first story line whose DID lemma equals the question's and whose other filled slots match (shared content word or
+same last word); silent otherwise. Reported: yields of both stages, right / wrong / silent, precision, and the same
+on the original text's slot lines is not needed (there is no canonical text here; the slot lines are the canonical
+form). PASS if untouched right > 25 at precision >= 0.89 (AG3's symbolic reader: 25 / 3). Cost about 2 h.

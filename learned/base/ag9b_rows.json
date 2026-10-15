@@ -1,0 +1,2816 @@
+[
+ {
+  "q": "Who was the baker?",
+  "gold": [
+   "teodor"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who did Teodor call when the oven would not light?",
+  "gold": [
+   "radu",
+   "his cousin"
+  ],
+  "qevent": {
+   "verb": "call",
+   "asked": "patient",
+   "agent": "Teodor",
+   "patient": null,
+   "place": null,
+   "statement": "Teodor called ___ when the oven would not light."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Teodor sell while Radu worked?",
+  "gold": [
+   "yesterday's bread",
+   "bread"
+  ],
+  "qevent": {
+   "verb": "sell",
+   "asked": "patient",
+   "agent": "Teodor",
+   "patient": null,
+   "place": null,
+   "statement": "Teodor sold ___ while Radu worked."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When was the oven hot again?",
+  "gold": [
+   "by noon",
+   "noon"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was Teodor's shop?",
+  "gold": [
+   "on quay lane",
+   "quay lane"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the crow find?",
+  "gold": [
+   "a ring",
+   "ring"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The crow",
+   "patient": null,
+   "place": null,
+   "statement": "The crow found ___."
+  },
+  "original": "a ring",
+  "canonical": "a ring"
+ },
+ {
+  "q": "Who asked to see the ring?",
+  "gold": [
+   "a squirrel",
+   "squirrel"
+  ],
+  "qevent": {
+   "verb": "ask",
+   "asked": "agent",
+   "agent": null,
+   "patient": "to",
+   "place": "see the ring",
+   "statement": "___ asked to see the ring."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who had the ring at the end?",
+  "gold": [
+   "the squirrel",
+   "squirrel"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "The ring",
+   "patient": null,
+   "place": "at the end",
+   "statement": "The ring had the ___ at the end."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Why did the ring fall?",
+  "gold": [
+   "opened her beak"
+  ],
+  "qevent": {
+   "verb": "fall",
+   "asked": "patient",
+   "agent": "The ring",
+   "patient": null,
+   "place": null,
+   "statement": "The ring fell ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the ring at the end?",
+  "gold": [
+   "under the roots",
+   "the roots",
+   "roots"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Wanjiru pack?",
+  "gold": [
+   "a basket of mangoes",
+   "mangoes"
+  ],
+  "qevent": {
+   "verb": "pack",
+   "asked": "patient",
+   "agent": "Wanjiru",
+   "patient": null,
+   "place": null,
+   "statement": "Wanjiru packed ___."
+  },
+  "original": "a basket of mangoes",
+  "canonical": "a basket of mangoes"
+ },
+ {
+  "q": "When did Wanjiru pack the basket?",
+  "gold": [
+   "at eight o'clock",
+   "eight o'clock"
+  ],
+  "qevent": {
+   "verb": "pack",
+   "asked": "place",
+   "agent": "Wanjiru",
+   "patient": "the basket",
+   "place": null,
+   "statement": "Wanjiru packed the basket ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where were the rest of the mangoes in the afternoon?",
+  "gold": [
+   "her aunt's house",
+   "aunt's house"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who made jam with the mangoes?",
+  "gold": [
+   "her aunt",
+   "aunt"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did Wanjiru go home?",
+  "gold": [
+   "in the morning",
+   "the morning",
+   "morning"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who ran the lending library?",
+  "gold": [
+   "mrs adebayo",
+   "adebayo"
+  ],
+  "qevent": {
+   "verb": "run",
+   "asked": "patient",
+   "agent": "library",
+   "patient": null,
+   "place": null,
+   "statement": "The lending library ran ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the lending library?",
+  "gold": [
+   "in the village hall",
+   "the village hall",
+   "village hall"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who returned a book with a torn cover?",
+  "gold": [
+   "kazuo",
+   "a boy"
+  ],
+  "qevent": {
+   "verb": "return",
+   "asked": "agent",
+   "agent": null,
+   "patient": "a book",
+   "place": null,
+   "statement": "A ___ returned a book with a torn cover."
+  },
+  "original": "Kazuo",
+  "canonical": "Kazuo"
+ },
+ {
+  "q": "What did Mrs Adebayo use to mend the book?",
+  "gold": [
+   "tape and card",
+   "tape"
+  ],
+  "qevent": {
+   "verb": "use",
+   "asked": "patient",
+   "agent": "Adebayo",
+   "patient": null,
+   "place": "mend the book",
+   "statement": "Mrs Adebayo used ___ to mend the book."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What does Kazuo do after school?",
+  "gold": [
+   "helps her repair books",
+   "repair books"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who wanted the apples?",
+  "gold": [
+   "the goat",
+   "goat"
+  ],
+  "qevent": {
+   "verb": "want",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the apples",
+   "place": null,
+   "statement": "The ___ wanted the apples."
+  },
+  "original": null,
+  "canonical": "A goat"
+ },
+ {
+  "q": "Who shook the trunk?",
+  "gold": [
+   "the horse",
+   "horse"
+  ],
+  "qevent": {
+   "verb": "shake",
+   "asked": "patient",
+   "agent": "The trunk",
+   "patient": null,
+   "place": null,
+   "statement": "The trunk shook ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Why did the horse shake the trunk?",
+  "gold": [
+   "she promised him half",
+   "promised him half"
+  ],
+  "qevent": {
+   "verb": "shake",
+   "asked": "place",
+   "agent": "The horse",
+   "patient": "the trunk",
+   "place": null,
+   "statement": "The horse shook the trunk ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the goat leave?",
+  "gold": [
+   "only the cores",
+   "the cores",
+   "cores"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "patient",
+   "agent": "The goat",
+   "patient": null,
+   "place": null,
+   "statement": "The goat left ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Whose tree was it?",
+  "gold": [
+   "the farmer's",
+   "farmer's"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where were the boots before breakfast?",
+  "gold": [
+   "on the fence",
+   "the fence",
+   "fence"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who moved the boots into the barn?",
+  "gold": [
+   "jovana",
+   "his sister"
+  ],
+  "qevent": {
+   "verb": "move",
+   "asked": "patient",
+   "agent": "The boots",
+   "patient": null,
+   "place": "into the barn",
+   "statement": "The boots moved ___ into the barn."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who took the boots to the river?",
+  "gold": [
+   "their father",
+   "father"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the boots",
+   "place": "to the river",
+   "statement": "___ took the boots to the river."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where were the boots that evening?",
+  "gold": [
+   "beside the stove",
+   "the stove",
+   "stove"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did their father take the boots?",
+  "gold": [
+   "at noon",
+   "noon"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "place",
+   "agent": "father",
+   "patient": "the boots",
+   "place": null,
+   "statement": "Their father took the boots ___."
+  },
+  "original": "from the barn",
+  "canonical": null
+ },
+ {
+  "q": "Who was the new nurse?",
+  "gold": [
+   "fatou"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was shivering in the waiting room?",
+  "gold": [
+   "mr okonjo",
+   "okonjo",
+   "an old man"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Fatou bring along with the blanket?",
+  "gold": [
+   "a cup of tea",
+   "tea"
+  ],
+  "qevent": {
+   "verb": "bring",
+   "asked": "patient",
+   "agent": "Fatou",
+   "patient": null,
+   "place": "along",
+   "statement": "Fatou brought ___ along with the blanket."
+  },
+  "original": null,
+  "canonical": "him a"
+ },
+ {
+  "q": "Who saw Mr Okonjo first?",
+  "gold": [
+   "dr lindgren",
+   "lindgren"
+  ],
+  "qevent": {
+   "verb": "see",
+   "asked": "patient",
+   "agent": "Okonjo",
+   "patient": null,
+   "place": null,
+   "statement": "Mr Okonjo saw ___ first."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Why had Mr Okonjo walked from the hills?",
+  "gold": [
+   "bus had broken down",
+   "broken down"
+  ],
+  "qevent": {
+   "verb": "walk",
+   "asked": "place",
+   "agent": "had",
+   "patient": null,
+   "place": null,
+   "statement": "Mr Okonjo had walked from the hills ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What kept drumming on the owl's tree?",
+  "gold": [
+   "a woodpecker",
+   "woodpecker"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who did the owl ask for advice?",
+  "gold": [
+   "the wise heron",
+   "heron"
+  ],
+  "qevent": {
+   "verb": "ask",
+   "asked": "patient",
+   "agent": "The owl",
+   "patient": null,
+   "place": null,
+   "statement": "The owl asked ___ for advice."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the owl sleep in the end?",
+  "gold": [
+   "in the old chimney",
+   "the old chimney",
+   "chimney"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When could the owl not sleep?",
+  "gold": [
+   "during the day",
+   "the day"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the owl do in the chimney?",
+  "gold": [
+   "slept soundly"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did Ravi lose his hat?",
+  "gold": [
+   "the second day",
+   "second day"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where were they on the second day?",
+  "gold": [
+   "in porto",
+   "porto"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Ravi lose?",
+  "gold": [
+   "his hat",
+   "hat"
+  ],
+  "qevent": {
+   "verb": "lose",
+   "asked": "patient",
+   "agent": "Ravi",
+   "patient": null,
+   "place": null,
+   "statement": "Ravi lost ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who found the hat?",
+  "gold": [
+   "a driver",
+   "driver"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the hat",
+   "place": null,
+   "statement": "___ found the hat."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the hat on the third day?",
+  "gold": [
+   "at the hotel desk",
+   "the hotel desk",
+   "hotel desk"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What took the roof off the school?",
+  "gold": [
+   "the storm",
+   "storm"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was the headmistress?",
+  "gold": [
+   "ms mbatha",
+   "mbatha"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who brought timber?",
+  "gold": [
+   "goran",
+   "a carpenter"
+  ],
+  "qevent": {
+   "verb": "bring",
+   "asked": "agent",
+   "agent": null,
+   "patient": "timber",
+   "place": null,
+   "statement": "___ brought timber."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the children have lessons?",
+  "gold": [
+   "in the church hall",
+   "the church hall",
+   "church hall"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The children",
+   "patient": "lessons",
+   "place": null,
+   "statement": "The children had lessons ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "How many parents spent the weekend nailing?",
+  "gold": [
+   "ten"
+  ],
+  "qevent": {
+   "verb": "spend",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the weekend nailing",
+   "place": null,
+   "statement": "___ spent the weekend nailing."
+  },
+  "original": "mothers",
+  "canonical": "mothers"
+ },
+ {
+  "q": "Who invited the rooster down?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "qevent": {
+   "verb": "invite",
+   "asked": "patient",
+   "agent": "The rooster",
+   "patient": null,
+   "place": null,
+   "statement": "The rooster invited ___ down."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the rooster?",
+  "gold": [
+   "the wall",
+   "wall"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the rooster say he could see?",
+  "gold": [
+   "two dogs",
+   "dogs"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the fox do?",
+  "gold": [
+   "ran off at once",
+   "ran off"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What had all the animals made, according to the fox?",
+  "gold": [
+   "peace"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The fox",
+   "patient": "the animals make",
+   "place": null,
+   "statement": "The fox had all the animals make ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the phone when Hamid went to work?",
+  "gold": [
+   "on the kitchen table",
+   "the kitchen table",
+   "kitchen table"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who found the phone?",
+  "gold": [
+   "yusra",
+   "his daughter"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the phone",
+   "place": null,
+   "statement": "___ found the phone."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Yusra put the phone in?",
+  "gold": [
+   "her school bag",
+   "school bag"
+  ],
+  "qevent": {
+   "verb": "put",
+   "asked": "place",
+   "agent": "Yusra",
+   "patient": "the phone",
+   "place": null,
+   "statement": "Yusra put the phone ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who had the phone at the end?",
+  "gold": [
+   "hamid"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "The phone",
+   "patient": null,
+   "place": "at the",
+   "statement": "The phone had ___ at the end."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did Yusra hand the phone back?",
+  "gold": [
+   "that evening",
+   "evening"
+  ],
+  "qevent": {
+   "verb": "hand",
+   "asked": "place",
+   "agent": "Yusra",
+   "patient": "the phone",
+   "place": null,
+   "statement": "Yusra handed the phone back ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Zeynep find?",
+  "gold": [
+   "a violin",
+   "violin"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "Zeynep",
+   "patient": null,
+   "place": null,
+   "statement": "Zeynep found ___."
+  },
+  "original": "a violin",
+  "canonical": "a violin"
+ },
+ {
+  "q": "Who had left the violin in the taxi?",
+  "gold": [
+   "oskar",
+   "cellist"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The violin",
+   "patient": null,
+   "place": null,
+   "statement": "The violin had been left in the taxi ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did Zeynep drive?",
+  "gold": [
+   "to the concert hall",
+   "the concert hall",
+   "concert hall"
+  ],
+  "qevent": {
+   "verb": "drive",
+   "asked": "patient",
+   "agent": "Zeynep",
+   "patient": null,
+   "place": null,
+   "statement": "Zeynep drove ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What was inside the violin case?",
+  "gold": [
+   "a ticket stub",
+   "ticket stub"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Oskar give Zeynep?",
+  "gold": [
+   "two seats",
+   "seats"
+  ],
+  "qevent": {
+   "verb": "give",
+   "asked": "patient",
+   "agent": "Oskar",
+   "patient": null,
+   "place": null,
+   "statement": "Oskar gave ___ to Zeynep."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the mouse fall?",
+  "gold": [
+   "a bucket of milk",
+   "bucket"
+  ],
+  "qevent": {
+   "verb": "fall",
+   "asked": "patient",
+   "agent": "The mouse",
+   "patient": null,
+   "place": null,
+   "statement": "The mouse fell ___."
+  },
+  "original": "a bucket of",
+  "canonical": "a bucket of"
+ },
+ {
+  "q": "What turned the milk into butter?",
+  "gold": [
+   "her kicking",
+   "kicking"
+  ],
+  "qevent": {
+   "verb": "turn",
+   "asked": "patient",
+   "agent": "The milk",
+   "patient": null,
+   "place": null,
+   "statement": "The milk turned ___ into butter."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did the mouse jump out?",
+  "gold": [
+   "by morning",
+   "morning"
+  ],
+  "qevent": {
+   "verb": "jump",
+   "asked": "patient",
+   "agent": "The mouse",
+   "patient": null,
+   "place": null,
+   "statement": "The mouse jumped out ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who found the footprints?",
+  "gold": [
+   "the dairymaid",
+   "dairymaid"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the footprints",
+   "place": null,
+   "statement": "___ found the footprints."
+  },
+  "original": "The dairymaid",
+  "canonical": "The dairymaid"
+ },
+ {
+  "q": "What did the dairymaid find in the butter?",
+  "gold": [
+   "tiny footprints",
+   "footprints"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The dairymaid",
+   "patient": null,
+   "place": "in the butter",
+   "statement": "The dairymaid found ___ in the butter."
+  },
+  "original": "tiny footprints",
+  "canonical": "tiny footprints"
+ },
+ {
+  "q": "When did the bus leave the depot?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "place",
+   "agent": "The bus",
+   "patient": "the depot",
+   "place": null,
+   "statement": "The bus left the depot ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who got on at the bakery corner?",
+  "gold": [
+   "siobhan"
+  ],
+  "qevent": {
+   "verb": "get",
+   "asked": "place",
+   "agent": "corner",
+   "patient": null,
+   "place": null,
+   "statement": "The bakery corner got on ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who left a lunchbox on the seat?",
+  "gold": [
+   "malik"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "on the seat",
+   "statement": "A lunchbox ___ left on the seat."
+  },
+  "original": "Malik",
+  "canonical": "Malik"
+ },
+ {
+  "q": "Where was the lunchbox at the end of the day?",
+  "gold": [
+   "the depot",
+   "depot"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who drove the school bus?",
+  "gold": [
+   "mrs halloran",
+   "halloran"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who sold umbrellas?",
+  "gold": [
+   "vikram"
+  ],
+  "qevent": {
+   "verb": "sell",
+   "asked": "patient",
+   "agent": "were",
+   "patient": null,
+   "place": null,
+   "statement": "Umbrellas were sold ___."
+  },
+  "original": "umbrellas",
+  "canonical": "umbrellas"
+ },
+ {
+  "q": "Where did Vikram sell umbrellas?",
+  "gold": [
+   "outside the train station",
+   "the train station",
+   "train station"
+  ],
+  "qevent": {
+   "verb": "sell",
+   "asked": "place",
+   "agent": "Vikram",
+   "patient": "umbrellas",
+   "place": null,
+   "statement": "Vikram sold umbrellas ___."
+  },
+  "original": "outside the train station",
+  "canonical": "outside the train station"
+ },
+ {
+  "q": "What did Vikram start selling?",
+  "gold": [
+   "cold lemonade",
+   "lemonade"
+  ],
+  "qevent": {
+   "verb": "start",
+   "asked": "place",
+   "agent": "Vikram",
+   "patient": "selling",
+   "place": null,
+   "statement": "Vikram started selling ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What rolled in?",
+  "gold": [
+   "dark clouds",
+   "clouds"
+  ],
+  "qevent": {
+   "verb": "roll",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "___ rolled in."
+  },
+  "original": null,
+  "canonical": "dark"
+ },
+ {
+  "q": "What did Vikram do when the clouds came?",
+  "gold": [
+   "brought the umbrellas back",
+   "brought the umbrellas"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the bear and the badger find the beehive?",
+  "gold": [
+   "in a hollow log",
+   "a hollow log",
+   "log"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "place",
+   "agent": "the badger",
+   "patient": "the beehive",
+   "place": null,
+   "statement": "The bear and the badger found the beehive ___."
+  },
+  "original": "a hollow log",
+  "canonical": "a hollow log"
+ },
+ {
+  "q": "Who kept watch?",
+  "gold": [
+   "the badger",
+   "badger"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who ate the honey?",
+  "gold": [
+   "the bear",
+   "bear"
+  ],
+  "qevent": {
+   "verb": "eat",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the honey",
+   "place": null,
+   "statement": "The ___ ate the honey."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the bees sting?",
+  "gold": [
+   "his nose",
+   "nose"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did the bees find the bear?",
+  "gold": [
+   "that night",
+   "night"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The bees",
+   "patient": null,
+   "place": null,
+   "statement": "The bees found ___."
+  },
+  "original": "the bear",
+  "canonical": "the bear asleep"
+ },
+ {
+  "q": "Who lent Lerato the ladder?",
+  "gold": [
+   "bashir",
+   "her neighbour"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the ladder on Wednesday?",
+  "gold": [
+   "the school",
+   "school"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who took the ladder to the school?",
+  "gold": [
+   "her son",
+   "son"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "patient",
+   "agent": "The school",
+   "patient": null,
+   "place": "the",
+   "statement": "The school took ___ to the school."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who brought the ladder back on Friday?",
+  "gold": [
+   "the caretaker",
+   "caretaker"
+  ],
+  "qevent": {
+   "verb": "bring",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the ladder",
+   "place": null,
+   "statement": "___ brought the ladder back on Friday."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who had the ladder at the end?",
+  "gold": [
+   "bashir"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "The ladder",
+   "patient": null,
+   "place": "at the end",
+   "statement": "The ladder had ___ at the end."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Why was the ferry cancelled?",
+  "gold": [
+   "high winds",
+   "winds"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who hired a fishing boat?",
+  "gold": [
+   "sefa",
+   "the postman"
+  ],
+  "qevent": {
+   "verb": "hire",
+   "asked": "patient",
+   "agent": "boat",
+   "patient": null,
+   "place": null,
+   "statement": "A fishing boat hired ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who steered the boat?",
+  "gold": [
+   "akosua",
+   "an old woman"
+  ],
+  "qevent": {
+   "verb": "steer",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the boat",
+   "place": null,
+   "statement": "___ steered the boat."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Sefa hold?",
+  "gold": [
+   "the mail bags",
+   "mail bags"
+  ],
+  "qevent": {
+   "verb": "hold",
+   "asked": "patient",
+   "agent": "Sefa",
+   "patient": null,
+   "place": null,
+   "statement": "Sefa held ___."
+  },
+  "original": null,
+  "canonical": "the mail bags"
+ },
+ {
+  "q": "When did they reach the island?",
+  "gold": [
+   "before dark"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who laughed at the crane?",
+  "gold": [
+   "the peacock",
+   "peacock"
+  ],
+  "qevent": {
+   "verb": "laugh",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "at the crane",
+   "statement": "___ laughed at the crane."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What colour were the crane's feathers?",
+  "gold": [
+   "plain grey",
+   "grey"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the crane fly?",
+  "gold": [
+   "over the hills",
+   "the hills",
+   "hills"
+  ],
+  "qevent": {
+   "verb": "fly",
+   "asked": "patient",
+   "agent": "fly",
+   "patient": null,
+   "place": null,
+   "statement": "The crane fly flew ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where could the peacock walk?",
+  "gold": [
+   "in the farmyard",
+   "the farmyard",
+   "farmyard"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the crane do after the peacock laughed?",
+  "gold": [
+   "spread her wings"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the group gather at nine?",
+  "gold": [
+   "in the hotel lobby",
+   "the hotel lobby",
+   "lobby"
+  ],
+  "qevent": {
+   "verb": "gather",
+   "asked": "place",
+   "agent": "The group",
+   "patient": null,
+   "place": null,
+   "statement": "The group gathered at ___ at nine."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was the guide?",
+  "gold": [
+   "paulo"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who dropped a map into the water?",
+  "gold": [
+   "tamsin"
+  ],
+  "qevent": {
+   "verb": "drop",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "the",
+   "statement": "A map ___ dropped into the water."
+  },
+  "original": null,
+  "canonical": "Tamsin"
+ },
+ {
+  "q": "Who had Paulo's map after the harbour?",
+  "gold": [
+   "tamsin"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "patient",
+   "agent": "map",
+   "patient": null,
+   "place": "after the harbour",
+   "statement": "Paulo's map had ___ after the harbour."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Paulo hand each person?",
+  "gold": [
+   "a map",
+   "map"
+  ],
+  "qevent": {
+   "verb": "hand",
+   "asked": "patient",
+   "agent": "Paulo",
+   "patient": null,
+   "place": null,
+   "statement": "Paulo handed ___ to each person."
+  },
+  "original": null,
+  "canonical": "each"
+ },
+ {
+  "q": "Whose boat came back empty?",
+  "gold": [
+   "captain moreau's",
+   "moreau's"
+  ],
+  "qevent": {
+   "verb": "come",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "The boat ___ came back empty."
+  },
+  "original": "boat",
+  "canonical": "boat"
+ },
+ {
+  "q": "Who suggested trying past the lighthouse?",
+  "gold": [
+   "idris",
+   "the cook"
+  ],
+  "qevent": {
+   "verb": "suggest",
+   "asked": "agent",
+   "agent": null,
+   "patient": "trying",
+   "place": "past the lighthouse",
+   "statement": "___ suggested trying past the lighthouse."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did they find past the lighthouse?",
+  "gold": [
+   "shoal of herring",
+   "herring"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "They",
+   "patient": null,
+   "place": "past the lighthouse",
+   "statement": "They found ___ past the lighthouse."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who wanted to give up?",
+  "gold": [
+   "her crew",
+   "crew"
+  ],
+  "qevent": {
+   "verb": "want",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": "to give up",
+   "statement": "___ wanted to give up."
+  },
+  "original": null,
+  "canonical": "The crew"
+ },
+ {
+  "q": "What did the market pay them?",
+  "gold": [
+   "twice the usual price",
+   "twice"
+  ],
+  "qevent": {
+   "verb": "pay",
+   "asked": "patient",
+   "agent": "The market",
+   "patient": null,
+   "place": null,
+   "statement": "The market paid ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the cat live at first?",
+  "gold": [
+   "in a grocer's shop",
+   "a grocer's shop",
+   "grocer's shop"
+  ],
+  "qevent": {
+   "verb": "live",
+   "asked": "place",
+   "agent": "The cat",
+   "patient": null,
+   "place": null,
+   "statement": "The cat lived at first ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What was the cat supposed to catch?",
+  "gold": [
+   "mice"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What chewed through every sack?",
+  "gold": [
+   "the mice",
+   "mice"
+  ],
+  "qevent": {
+   "verb": "chew",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "___ chewed through every sack."
+  },
+  "original": null,
+  "canonical": "the mice"
+ },
+ {
+  "q": "Who put the cat out?",
+  "gold": [
+   "the grocer",
+   "grocer"
+  ],
+  "qevent": {
+   "verb": "put",
+   "asked": "patient",
+   "agent": "The cat",
+   "patient": null,
+   "place": null,
+   "statement": "The cat was put out ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the cat catch mice at the end?",
+  "gold": [
+   "in the alley",
+   "the alley",
+   "alley"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Whose clock was it?",
+  "gold": [
+   "her grandmother's",
+   "grandmother's"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Elif take to the repair shop?",
+  "gold": [
+   "her grandmother's clock",
+   "clock"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "patient",
+   "agent": "Elif",
+   "patient": null,
+   "place": "to",
+   "statement": "Elif took ___ to the repair shop."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who kept the clock for a week?",
+  "gold": [
+   "mr varela",
+   "varela",
+   "the repairman"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who collected the clock?",
+  "gold": [
+   "elif's uncle",
+   "uncle"
+  ],
+  "qevent": {
+   "verb": "collect",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the clock",
+   "place": null,
+   "statement": "___ collected the clock."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where is the clock now?",
+  "gold": [
+   "above the fireplace",
+   "the fireplace",
+   "fireplace"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Why did Mr Dlamini carry the groceries up the stairs?",
+  "gold": [
+   "the lift was broken",
+   "lift was broken"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Mr Dlamini carry up the stairs?",
+  "gold": [
+   "his neighbour's groceries",
+   "groceries"
+  ],
+  "qevent": {
+   "verb": "carry",
+   "asked": "patient",
+   "agent": "Dlamini",
+   "patient": null,
+   "place": "up the stairs",
+   "statement": "Mr Dlamini carried ___ up the stairs."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was the retired teacher?",
+  "gold": [
+   "ottilie"
+  ],
+  "qevent": {
+   "verb": "teacher",
+   "asked": "patient",
+   "agent": "The retired",
+   "patient": null,
+   "place": null,
+   "statement": "The retired teacher ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Ottilie invite him in for?",
+  "gold": [
+   "soup"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who had Ottilie once taught?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "qevent": {
+   "verb": "once",
+   "asked": "place",
+   "agent": "Ottilie",
+   "patient": "taught",
+   "place": null,
+   "statement": "Ottilie once taught ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the donkey carry the first day?",
+  "gold": [
+   "salt"
+  ],
+  "qevent": {
+   "verb": "carry",
+   "asked": "patient",
+   "agent": "The donkey",
+   "patient": null,
+   "place": null,
+   "statement": "The donkey carried ___ the first day."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the donkey slip?",
+  "gold": [
+   "in a river",
+   "a river",
+   "river"
+  ],
+  "qevent": {
+   "verb": "slip",
+   "asked": "patient",
+   "agent": "The donkey",
+   "patient": null,
+   "place": null,
+   "statement": "The donkey slipped ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What soaked up the water?",
+  "gold": [
+   "the sponges",
+   "sponges"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the donkey do the next day?",
+  "gold": [
+   "lay down"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What melted in the river?",
+  "gold": [
+   "the salt",
+   "salt"
+  ],
+  "qevent": {
+   "verb": "melt",
+   "asked": "patient",
+   "agent": "The river",
+   "patient": null,
+   "place": null,
+   "statement": "The river melted ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the kite in the morning?",
+  "gold": [
+   "in the plum tree",
+   "the plum tree",
+   "plum tree"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who freed the kite?",
+  "gold": [
+   "cosmin",
+   "her friend"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What carried the kite into the pond?",
+  "gold": [
+   "the wind",
+   "wind"
+  ],
+  "qevent": {
+   "verb": "carry",
+   "asked": "patient",
+   "agent": "The kite",
+   "patient": null,
+   "place": "into the pond",
+   "statement": "The kite carried ___ into the pond."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the kite at the end?",
+  "gold": [
+   "the farmer's pond",
+   "pond"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What snapped?",
+  "gold": [
+   "the string",
+   "string"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was the young chemist?",
+  "gold": [
+   "gulnara"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Gulnara notice?",
+  "gold": [
+   "a leak",
+   "leak"
+  ],
+  "qevent": {
+   "verb": "notice",
+   "asked": "patient",
+   "agent": "Gulnara",
+   "patient": null,
+   "place": null,
+   "statement": "Gulnara noticed ___."
+  },
+  "original": "a leak",
+  "canonical": "a leak"
+ },
+ {
+  "q": "Who ignored Gulnara?",
+  "gold": [
+   "the foreman",
+   "foreman"
+  ],
+  "qevent": {
+   "verb": "ignore",
+   "asked": "patient",
+   "agent": "Gulnara",
+   "patient": null,
+   "place": null,
+   "statement": "Gulnara ignored ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Gulnara do after the foreman ignored her?",
+  "gold": [
+   "shut the valve herself",
+   "shut the valve"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who promoted Gulnara?",
+  "gold": [
+   "mr ashworth",
+   "ashworth",
+   "the manager"
+  ],
+  "qevent": {
+   "verb": "promote",
+   "asked": "patient",
+   "agent": "Gulnara",
+   "patient": null,
+   "place": null,
+   "statement": "Gulnara promoted ___."
+  },
+  "original": null,
+  "canonical": "the following"
+ },
+ {
+  "q": "Where did the first two goats meet?",
+  "gold": [
+   "on a narrow bridge",
+   "a narrow bridge",
+   "bridge"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the first two goats do?",
+  "gold": [
+   "butted heads"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the first two goats fall into?",
+  "gold": [
+   "the water",
+   "water"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did one of the other goats do?",
+  "gold": [
+   "knelt down",
+   "knelt"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the other goat step over?",
+  "gold": [
+   "her back"
+  ],
+  "qevent": {
+   "verb": "step",
+   "asked": "place",
+   "agent": "goat",
+   "patient": null,
+   "place": null,
+   "statement": "The other goat stepped over ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the van at dawn?",
+  "gold": [
+   "outside the bakery",
+   "the bakery",
+   "bakery"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who delivered the loaves to the hospital kitchen?",
+  "gold": [
+   "umar"
+  ],
+  "qevent": {
+   "verb": "deliver",
+   "asked": "patient",
+   "agent": "kitchen",
+   "patient": null,
+   "place": "to the loaves",
+   "statement": "The hospital kitchen delivered ___ to the loaves."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What stole a sardine?",
+  "gold": [
+   "a gull",
+   "gull"
+  ],
+  "qevent": {
+   "verb": "steal",
+   "asked": "agent",
+   "agent": null,
+   "patient": "a sardine",
+   "place": null,
+   "statement": "A ___ stole a sardine."
+  },
+  "original": "a gull",
+  "canonical": "a gull"
+ },
+ {
+  "q": "How many loaves did Umar load?",
+  "gold": [
+   "forty"
+  ],
+  "qevent": {
+   "verb": "load",
+   "asked": "place",
+   "agent": "Umar",
+   "patient": null,
+   "place": null,
+   "statement": "Umar loaded ___ loaves."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Umar collect at the harbour?",
+  "gold": [
+   "fish"
+  ],
+  "qevent": {
+   "verb": "collect",
+   "asked": "patient",
+   "agent": "Umar",
+   "patient": null,
+   "place": "at the harbour",
+   "statement": "Umar collected ___ at the harbour."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who led the choir?",
+  "gold": [
+   "orla"
+  ],
+  "qevent": {
+   "verb": "lead",
+   "asked": "patient",
+   "agent": "The choir",
+   "patient": null,
+   "place": null,
+   "statement": "The choir led ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the choir not have?",
+  "gold": [
+   "piano"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who offered the piano?",
+  "gold": [
+   "mr castellanos",
+   "castellanos"
+  ],
+  "qevent": {
+   "verb": "offer",
+   "asked": "patient",
+   "agent": "The piano",
+   "patient": null,
+   "place": null,
+   "statement": "The piano offered ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did the choir sing?",
+  "gold": [
+   "at the spring festival",
+   "spring festival"
+  ],
+  "qevent": {
+   "verb": "sing",
+   "asked": "patient",
+   "agent": "The choir",
+   "patient": null,
+   "place": null,
+   "statement": "The choir sang ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who drove the piano up the mountain road?",
+  "gold": [
+   "six farmers",
+   "farmers"
+  ],
+  "qevent": {
+   "verb": "drive",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the piano",
+   "place": "up the mountain",
+   "statement": "The piano ___ drove the piano up the mountain road."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who warned the other birds?",
+  "gold": [
+   "a sparrow",
+   "sparrow"
+  ],
+  "qevent": {
+   "verb": "warn",
+   "asked": "patient",
+   "agent": "birds",
+   "patient": null,
+   "place": null,
+   "statement": "The other birds warned ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What was the farmer sowing?",
+  "gold": [
+   "flax"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What would the flax become?",
+  "gold": [
+   "nets"
+  ],
+  "qevent": {
+   "verb": "become",
+   "asked": "patient",
+   "agent": "would",
+   "patient": null,
+   "place": null,
+   "statement": "The flax would become ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the sparrow go to live?",
+  "gold": [
+   "near the houses",
+   "the houses"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the birds keep eating?",
+  "gold": [
+   "the seeds",
+   "seeds"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the mask at midnight?",
+  "gold": [
+   "in the safe",
+   "the safe",
+   "safe"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who locked the mask in the safe?",
+  "gold": [
+   "wiremu",
+   "the night guard"
+  ],
+  "qevent": {
+   "verb": "lock",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the mask",
+   "place": "in the safe",
+   "statement": "___ locked the mask in the safe."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What made the noise in the east hall?",
+  "gold": [
+   "a cat",
+   "cat"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who moved the mask in the morning?",
+  "gold": [
+   "dr sandoval",
+   "sandoval",
+   "the director"
+  ],
+  "qevent": {
+   "verb": "move",
+   "asked": "patient",
+   "agent": "The mask",
+   "patient": null,
+   "place": "in the morning",
+   "statement": "The mask moved ___ in the morning."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the mask at the end?",
+  "gold": [
+   "a glass case",
+   "glass case"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who kept the cows overnight?",
+  "gold": [
+   "yaw",
+   "a boy"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who paid Yaw?",
+  "gold": [
+   "svetlana",
+   "the farmer"
+  ],
+  "qevent": {
+   "verb": "pay",
+   "asked": "patient",
+   "agent": "Yaw",
+   "patient": null,
+   "place": null,
+   "statement": "Yaw paid ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Svetlana pay Yaw with?",
+  "gold": [
+   "a wheel of cheese",
+   "cheese"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "How far had the cows wandered?",
+  "gold": [
+   "three miles"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "The cows",
+   "patient": "wandered",
+   "place": null,
+   "statement": "The cows had wandered ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did the cows wander downstream?",
+  "gold": [
+   "after the flood"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who wanted to be as big as the ox?",
+  "gold": [
+   "a frog",
+   "frog"
+  ],
+  "qevent": {
+   "verb": "want",
+   "asked": "agent",
+   "agent": null,
+   "patient": null,
+   "place": null,
+   "statement": "___ wanted to be as big as the ox."
+  },
+  "original": "A frog",
+  "canonical": "A frog"
+ },
+ {
+  "q": "Where was the ox?",
+  "gold": [
+   "in the meadow",
+   "the meadow",
+   "meadow"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who did the frog ask?",
+  "gold": [
+   "her children",
+   "children"
+  ],
+  "qevent": {
+   "verb": "ask",
+   "asked": "patient",
+   "agent": "The frog",
+   "patient": null,
+   "place": null,
+   "statement": "The frog asked ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did the frog do to look bigger?",
+  "gold": [
+   "puffed herself up",
+   "puffed"
+  ],
+  "qevent": {
+   "verb": "do",
+   "asked": "patient",
+   "agent": "The frog",
+   "patient": null,
+   "place": null,
+   "statement": "The frog did ___ to look bigger."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What happened to the frog in the end?",
+  "gold": [
+   "she burst",
+   "burst"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did Mateus leave his bicycle?",
+  "gold": [
+   "at the swimming pool",
+   "the swimming pool",
+   "pool"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "place",
+   "agent": "Mateus",
+   "patient": "his bicycle",
+   "place": null,
+   "statement": "Mateus left his bicycle ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who took the bicycle to the police station?",
+  "gold": [
+   "a cleaner",
+   "cleaner"
+  ],
+  "qevent": {
+   "verb": "take",
+   "asked": "patient",
+   "agent": "station",
+   "patient": null,
+   "place": "to",
+   "statement": "The police station took ___ to the bicycle."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who drove Mateus back on Saturday?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "qevent": {
+   "verb": "drive",
+   "asked": "patient",
+   "agent": "Mateus",
+   "patient": null,
+   "place": null,
+   "statement": "Mateus drove ___ back on Saturday."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Mateus leave at the swimming pool?",
+  "gold": [
+   "his bicycle",
+   "bicycle"
+  ],
+  "qevent": {
+   "verb": "leave",
+   "asked": "place",
+   "agent": "Mateus",
+   "patient": null,
+   "place": null,
+   "statement": "Mateus left ___ at the swimming pool."
+  },
+  "original": null,
+  "canonical": "his bicycle at the swimming pool"
+ },
+ {
+  "q": "Where did Mateus ride the bicycle?",
+  "gold": [
+   "to his grandfather's farm",
+   "his grandfather's farm",
+   "grandfather's farm"
+  ],
+  "qevent": {
+   "verb": "ride",
+   "asked": "place",
+   "agent": "Mateus",
+   "patient": "the bicycle",
+   "place": null,
+   "statement": "Mateus rode the bicycle ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was the weather reporter?",
+  "gold": [
+   "kirra walsh",
+   "kirra"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Why was Kirra late?",
+  "gold": [
+   "stuck in traffic",
+   "traffic"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who read the forecast instead?",
+  "gold": [
+   "emil",
+   "the sports presenter"
+  ],
+  "qevent": {
+   "verb": "read",
+   "asked": "agent",
+   "agent": null,
+   "patient": "the forecast instead",
+   "place": null,
+   "statement": "___ read the forecast instead."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When was the forecast meant to be read?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Whose forecast was the funniest?",
+  "gold": [
+   "emil's"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the dog chained?",
+  "gold": [
+   "in a yard",
+   "a yard",
+   "yard"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who gave the dog meat?",
+  "gold": [
+   "his master",
+   "master"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What had worn a mark on the dog's neck?",
+  "gold": [
+   "the chain",
+   "chain"
+  ],
+  "qevent": {
+   "verb": "have",
+   "asked": "place",
+   "agent": "neck",
+   "patient": null,
+   "place": null,
+   "statement": "The dog's neck had worn a mark ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the wolf go at the end?",
+  "gold": [
+   "back to the forest",
+   "the forest",
+   "forest"
+  ],
+  "qevent": {
+   "verb": "go",
+   "asked": "patient",
+   "agent": "The wolf",
+   "patient": null,
+   "place": "at the end",
+   "statement": "The wolf went ___ at the end."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who found the dog?",
+  "gold": [
+   "a hungry wolf",
+   "the wolf",
+   "wolf"
+  ],
+  "qevent": {
+   "verb": "find",
+   "asked": "patient",
+   "agent": "The dog",
+   "patient": null,
+   "place": null,
+   "statement": "The dog found ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the suitcase at noon?",
+  "gold": [
+   "the airport in budapest",
+   "budapest"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where did the suitcase spend the night?",
+  "gold": [
+   "in oslo",
+   "oslo"
+  ],
+  "qevent": {
+   "verb": "spend",
+   "asked": "place",
+   "agent": "The suitcase",
+   "patient": "the night",
+   "place": null,
+   "statement": "The suitcase spent the night ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who sent the suitcase on to Madrid?",
+  "gold": [
+   "jun",
+   "an airline clerk"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did Jun send the suitcase on?",
+  "gold": [
+   "the next morning",
+   "next morning"
+  ],
+  "qevent": {
+   "verb": "send",
+   "asked": "place",
+   "agent": "Jun",
+   "patient": "the suitcase",
+   "place": null,
+   "statement": "Jun sent the suitcase on ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Where was the suitcase by evening?",
+  "gold": [
+   "in ilona's hotel room",
+   "ilona's hotel room",
+   "hotel room"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Whose dog was Smoke?",
+  "gold": [
+   "the librarian's",
+   "librarian's"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "What did Smoke steal?",
+  "gold": [
+   "a sausage",
+   "sausage"
+  ],
+  "qevent": {
+   "verb": "steal",
+   "asked": "patient",
+   "agent": "Smoke",
+   "patient": null,
+   "place": null,
+   "statement": "Smoke stole ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who was the butcher?",
+  "gold": [
+   "mr abara",
+   "abara"
+  ],
+  "qevent": null,
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "When did Smoke escape?",
+  "gold": [
+   "on market day",
+   "market day"
+  ],
+  "qevent": {
+   "verb": "escape",
+   "asked": "patient",
+   "agent": "Smoke",
+   "patient": null,
+   "place": null,
+   "statement": "Smoke escaped ___."
+  },
+  "original": null,
+  "canonical": null
+ },
+ {
+  "q": "Who caught Smoke?",
+  "gold": [
+   "luca and magnus",
+   "luca",
+   "magnus"
+  ],
+  "qevent": {
+   "verb": "catch",
+   "asked": "patient",
+   "agent": "Smoke",
+   "patient": null,
+   "place": null,
+   "statement": "Smoke caught ___."
+  },
+  "original": null,
+  "canonical": null
+ }
+]
