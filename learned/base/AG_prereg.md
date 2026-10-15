@@ -198,3 +198,7 @@ otherwise. Measured on the dev block (practice val_more, untouched val_fresh2), 
 against AG3's 25 / 3 (0.89) and AG8's 30 / 6. PASS if untouched right > 25 at precision >= 0.89 on canonical text.
 A PASS says the loop handles questions as it handles sentences and the hand parser can go; a FAIL is attributed by
 the stage-1 accept / reject counts (the model cannot form the statement) or by stage-2 matching.
+AG9 stage-1 fix before the full run (first 25 questions: 6 accepted): the model answers 'who' questions in the passive
+('The shelves were stacked by ___'), which the canonical grammar does not have, so passives are rejected and a third
+prompt asks for an active sentence; and the blank is probed as 'somebody / something / the blank / to the blank /
+somewhere' and must be read as a whole role (a bare 'Blank' was not tagged). Run restarted from the first question.
