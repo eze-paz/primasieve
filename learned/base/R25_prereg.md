@@ -1174,3 +1174,6 @@ what: trusted 12 / 3, 50 silent or untrusted (language model 46 right of 65); wh
 
 ## R25-ek result
 Rare-word reader on practice A-F, what: 107 right / 126 wrong (fitness -271): not usable as a what-fallback. Sentence-local position rules do not read what-questions well enough.
+
+## R25-el (development: what-answers skip verb forms)
+The listed what-mistakes on practice C+D mostly return a verb ('sold', 'owned', 'wanted', 'carried', 'opened', 'decided'). R25_NOVERB: what-answers skip verb forms (the dictionary's verb forms, -ed / -ing words) as well as common words and question words. Development on practice A-F; a fallback for 'what' only if it passes the trust rule there.

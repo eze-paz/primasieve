@@ -108,6 +108,12 @@ def why_answer(story, qw):                                                      
             while j + 1 < len(ws) and ws[j + 1] not in {"and", "but", "when", "while", "before", "after"}: j += 1
             return " ".join(ws[i + 1:j + 1])                                                   # without the leading to (gold forms omit it)
     return None
+VERBS_ = []
+def verbish(w):                                                                                 # R25-el: a verb form by the dictionary, or an -ed / -ing word
+    if not VERBS_:
+        import r24_dict as _D
+        on = _D.ON; _D.ON = True; VERBS_.append(set(_D.verb_forms())); _D.ON = on
+    return w in VERBS_[0] or w.endswith(("ed", "ing"))
 FULL = [False]; NEAR = [True]; NAMEONLY = bool(os.environ.get("R25_NAMEONLY"))   # R25-dq: who-answers only names
 def answer(story, q):
     qw = [w.lower() for w in toks(q)]; wh = qw[0] if qw else ""
@@ -166,7 +172,7 @@ def answer(story, q):
             if k - 1 >= 0 and ws[k - 1] in DET: k -= 1
             return " ".join(ws[k:j + 1]) if j >= 0 and ws[j] not in COMMON else None
         h = max(hits); k = h + 1
-        while k < len(ws) and (ws[k] in COMMON or stem(ws[k]) in qst): k += 1
+        while k < len(ws) and (ws[k] in COMMON or stem(ws[k]) in qst or (os.environ.get('R25_NOVERB') and verbish(ws[k]))): k += 1   # R25-el: skip verb forms
         j = k
         while j + 1 < len(ws) and ws[j + 1] not in COMMON and ws[j + 1] not in PLACE: j += 1
         if k < len(ws): j = extend_of(ws, j); return " ".join(ws[(k - 1) if ws[k - 1] in DET else k:j + 1])
