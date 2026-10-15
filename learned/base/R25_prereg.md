@@ -1084,3 +1084,9 @@ val_fresh10 with the 710 + val_fresh11 trust: main 45 / 5 (+30), reader 35 / 2 (
 
 ## R25-dx registration (practice from more writers)
 Since trust from a third writer helped, two more writer agents (separate briefs, same neutral rules as the fresh sets) write practice sets E and F (40 stories / 200 questions each), development data for choosing trust. Then the main system runs with them appended, trust is chosen on 710 + val_fresh11 + E + F, and val_fresh12 and val_fresh10 are reported with the combination.
+
+## R25-dx result (trust from five writers) -- no further gain
+Model on practice E+F: 262 / 400. Trust on 710 + val_fresh11 + E + F: val_fresh12 together 34 / 15 article-free (-11, as R25-dv), strict 23 / 26 (-55; R25-dv -47); val_fresh10 70 / 7 (+49). More writers in the trust choice no longer help: what fails on val_fresh12 is the answers themselves.
+
+## R25-dy registration (answers in the story's own words)
+The main system sometimes rewrites an answer's article or drops a title ('the newspaper' where the story says 'a newspaper'; 'Kowalski' for 'Mrs. Kowalski'). --story-span: after answering, the answer's core (without a leading article) is found in the story and returned with the story's own preceding article, possessive or title. Main system re-run with --story-span; combination on val_fresh12 and val_fresh10 with the five-writer trust; strict and article-free scorers.
