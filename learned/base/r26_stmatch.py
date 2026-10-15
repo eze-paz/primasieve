@@ -13,7 +13,7 @@ PLACEP = {"in", "on", "at", "into", "onto", "near", "under", "behind", "by", "in
 STOP = AUX | DET | {"who", "what", "where", "when", "whom", "of", "for", "with", "and", "or", "but", "it", "he", "she", "they", "him", "them", "there", "then", "so"} | PREP
 TIMEW = set("morning evening night noon dawn dusk midnight afternoon day days week weeks month months year years winter summer spring autumn monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december yesterday today tomorrow tonight hour hours minute minutes later o clock christmas birthday holiday".split())
 CLAUSE_END = {"and", "but", "because", "while", "when", "so", "then", "who", "which", "that", "after", "before", "until"}
-SIM = "--sim" in sys.argv; FIX5 = "--fix5" in sys.argv; FIX4 = "--fix4" in sys.argv; FIX3 = "--fix3" in sys.argv or FIX4 or FIX5; FIX2 = "--fix2" in sys.argv or FIX3; FIX = "--fix" in sys.argv or FIX2
+DANGLE = "--dangle" in sys.argv; SIM = "--sim" in sys.argv; FIX5 = "--fix5" in sys.argv; FIX4 = "--fix4" in sys.argv; FIX3 = "--fix3" in sys.argv or FIX4 or FIX5; FIX2 = "--fix2" in sys.argv or FIX3; FIX = "--fix" in sys.argv or FIX2
 WEEKMONTH = set("monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december".split())
 NUMW = set("one two three four five six seven eight nine ten eleven twelve twenty thirty a few several".split())
 PRONS = {"he", "she", "it", "they", "him", "her", "them", "his", "its", "their"}
@@ -132,6 +132,10 @@ def answer(text, q, relax=False):
                 if FIX and cand:                                                          # T22e (2): no time phrases; stop at a capital or a time word
                     ws = cand.split()
                     cut = next((j for j, w in enumerate(ws) if j > 0 and (w.lower() in TIMEW or (w[0].isupper() and not (FIX2 and ws[j - 1][0].isupper())))), len(ws)); cand = " ".join(ws[:cut])   # T22f (b)
+                    if DANGLE:                                                            # T22r: no dangling qualifier at the end
+                        ws2 = cand.split()
+                        while len(ws2) > 1 and ws2[-1].lower() in ("every", "each", "that", "this", "next", "last", "one", "the", "a", "an"): ws2 = ws2[:-1]
+                        cand = " ".join(ws2)
                     if any(w.lower() in TIMEW for w in cand.split()): cand = None
                 if FIX2 and cand:                                                         # T22f (a): keep the determiner the story used
                     j0 = i + 1; cand = " ".join(toks[j0:j0 + len(cand.split()) + (1 if toks[j0].lower() in DET else 0)])
@@ -183,7 +187,7 @@ def main():
     if SF != "val_all13.json":
         A = [answer(t, q, False) for t, q, g in items]; json.dump(A, open(sys.argv[sys.argv.index("--out") + 1], "w", encoding="utf-8")); print("answers", sum(a is not None for a in A)); return
     RELAX = "--relax" in sys.argv
-    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix5_answers.json" if FIX5 else "r26_stmatch_sim_answers.json" if SIM else "r26_stmatch_fix4_answers.json" if FIX4 else "r26_stmatch_fix3_answers.json" if FIX3 else "r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
+    A = [answer(t, q, RELAX) for t, q, g in items]; json.dump(A, open("r26_stmatch_fix2d_answers.json" if (DANGLE and FIX2 and not FIX3) else "r26_stmatch_fix5_answers.json" if FIX5 else "r26_stmatch_sim_answers.json" if SIM else "r26_stmatch_fix4_answers.json" if FIX4 else "r26_stmatch_fix3_answers.json" if FIX3 else "r26_stmatch_fix2_answers.json" if FIX2 else "r26_stmatch_fix_answers.json" if FIX else "r26_stmatch_relax_answers.json" if RELAX else "r26_stmatch_answers.json", "w", encoding="utf-8"))
     gold = [g for _, _, g in items]
     L = [l for l in open("r24_diag_asA.txt", encoding="utf-8", errors="replace") if l.startswith("VAL |")]
     route = [l.split("| route ")[1].split(" |")[0] for l in L]; ans = [l.split("| ans ")[1].split(" |")[0] for l in L]; ans = [None if a == "None" else a for a in ans]

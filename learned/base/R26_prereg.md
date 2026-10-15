@@ -374,3 +374,9 @@ Neural cache (N 2000, theta 10 chosen on 0-499): alone 13.88 on 500-999 (it cove
 
 ## T44 result -- not run within the cap
 r25_discover2.py --all-text --more on range 1 rebuilt its shape search from scratch and reached only three of six shapes in 30 minutes (words-x 8.1605, groups-x 8.6381, dictgroups-x 8.3796 on its slice); stopped by the cap, no component. Would need the shape choice saved and only the chosen models rebuilt.
+
+## T22r registration (no dangling qualifier at the end of a place answer)
+Found in the R27 demo ('on the warm stove every' from '... every night'): in the fix2 extraction, when a where-answer is cut at a time word, trailing words in {every, each, that, this, next, last, one, the, a, an} are removed. The per-word version choice of T22p is rerun with the new fix2 answers (both practice pools). PASS if the policy beats +512.
+
+## T22r result -- no effect
+The trimmed fix2 answers are identical on all 2,510 questions and the 600 extra practice questions (statement match alone: practice 204 / 18, untouched 558 / 83, unchanged); the policy stays at +512. The fault occurs in the demo story's phrasing but not in the test sets; the fix is kept (it cannot hurt on these sets).
