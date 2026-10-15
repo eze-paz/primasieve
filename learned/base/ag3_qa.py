@@ -6,11 +6,18 @@ Run: py -3.12 ag3_qa.py"""
 import os, sys, re, json, random, collections
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); os.chdir(HERE)
 import torch
-sys.argv = [sys.argv[0]]
+ARGV = list(sys.argv); sys.argv = [sys.argv[0]]
 import ag1_translator as A
 from ag3_canon import STORIES, PRACTICE, UNTOUCHED, ent, STOP
 from b6_rwkv import hit
 AUX = r"(?:did|does|do|had|has|was|were|is|are)"
+CANON = ARGV[ARGV.index("--canon") + 1] if "--canon" in ARGV else "ag3_canon.json"     # AG4: --canon ag4_canon.json --all --copular
+COPULAR = "--copular" in ARGV
+if "--all" in ARGV:                                                                     # question index ranges of R25: practice 0-309, 510-909
+    _S = json.load(open(os.path.join(HERE, "val_all13.json"), encoding="utf-8"))["stories"]; _c = 0; PRACTICE = set(); UNTOUCHED = set()
+    for _k, _s in enumerate(_S):
+        (PRACTICE if (_c < 310 or 510 <= _c < 910) else UNTOUCHED).add(_k); _c += len(_s["qs"])
+    STORIES = list(range(len(_S)))
 
 
 def parse_q(q):
@@ -26,6 +33,9 @@ def parse_q(q):
     if m and m.group(1) not in STOP: return m.group(1), "patient", m.group(2) or "", "agent"
     m = re.match(rf"where {AUX} (.+?) (\w+)(?: (.*))?$", ql)                     # where did X V (Y)?  -> place
     if m and m.group(2) not in STOP: return m.group(2), "agent", m.group(1), "place"
+    if COPULAR:
+        m = re.match(r"(?:what|where|who) (?:was|were|is|are) (.+)$", ql)         # what / where was X?  -> copular patient
+        if m: return "be", "agent", m.group(1), "patient"
     return None
 
 
@@ -54,14 +64,17 @@ def main():
     random.Random(0).shuffle(data); F = A.Feats([tk for st in data[:2240] for tk, _ in A.gold_examples(st)])
     vm = A.Tagger(F, 2, False); am = A.Tagger(F, len(A.ATAGS), True); sd = torch.load("ag1_translator.pt"); vm.load_state_dict(sd["vm"]); am.load_state_dict(sd["am"]); vm.eval(); am.eval()
     T = A.Translator(F, vm, am)
-    S = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; C = json.load(open("ag3_canon.json", encoding="utf-8"))
+    S = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; C = json.load(open(CANON, encoding="utf-8"))
+    if COPULAR:
+        from ag4_canon import events_of; reader = lambda sent: events_of(T, sent)
+    else: reader = T.read
     res = collections.defaultdict(lambda: [0, 0, 0]); rows = []
     for k in STORIES:
         s = S[k]
         if s["id"] not in C: continue
         evs = {}
         for tname, text in (("original", s["text"]), ("canonical", C[s["id"]]["canon"])):
-            evs[tname] = [e for sent in [x.strip() for x in A.SENT.split(text) if x.strip()] for e in T.read(sent)]
+            evs[tname] = [e for sent in [x.strip() for x in A.SENT.split(text) if x.strip()] for e in reader(sent)]
         for q, g in s["qs"]:
             row = dict(id=s["id"], q=q, gold=g)
             for tname in ("original", "canonical"):

@@ -109,3 +109,15 @@ words, event structure and roles survive, and the canonical text is more readabl
 prose, at higher precision. The model's own errors (loops, agent swaps, inventions) were caught, not trusted.
 Limits: 14% of questions reached; the largest rejection class ('no event', 294) is the translator's narrow idea of an
 event (no copular or existential clauses); the 0.4B model costs ~2 min per story on this CPU.
+
+## AG4 registration (the loop one level deeper, on every story)
+ag4_canon.py: as AG3 with (1) depth 2: a clause rejected as 'no event' or 'fragment' is itself sent back to the model
+once ('WHO DID WHAT WHERE'), its pieces through the same verifier; (2) copular clauses ('X was ADJ / NP / PP') count
+as events (verb 'be') when the translator finds none, in the verifier and in the question answerer (ag3_qa.py
+--copular, new question shape 'what / where was X'); (3) all 502 stories, the 80 AG3 stories first.
+Instrument: ag3_qa.py (--canon ag4_canon.json --copular), original vs canonical, same reader on both.
+Gates: dev (val_fresh2, 200 questions, AG3 canonical 25 / 3): PASS if right > 25 at precision >= 0.89. Scale (the
+1,800 untouched questions, scored once when all stories are done): PASS if canonical gives more right answers than
+the original at no lower precision. Expected: the depth-2 pass recovers part of the 294 'no event' rejections; the
+copular rule reaches 'what was in the jar' questions. Cost: about 1.3 min per story once B2b frees the CPU, so the
+full 502 is an overnight run (resumable, checkpoint per story).
