@@ -1063,3 +1063,13 @@ Second scorer, fixed now and applied the same way everywhere: an answer counts i
 
 ## R25-du run 1 -- scorer not a superset; corrected
 As first written, the article-free scorer replaced the strict test instead of adding to it, so the main system lost answers its own hit test accepts (val_fresh10 44 / 12 against strict 50 / 6). Corrected to: strict hit OR article-and-title-free match. (Strict numbers from this run, with the name-only reader: val_fresh10 reader 35 / 2, together 70 / 7, fitness +49 against the main system's +32; val_fresh12 reader 10 / 6, together 23 / 27.)
+
+## R25-du result (strict OR article/title-free scoring)
+| set | main system trusted | reader trusted (names only) | together |
+|---|---|---|---|
+| val_fresh10 | 50 / 6 (+32) | 35 / 2 (+29) | **70 / 7 (+49)** |
+| val_fresh12 | 25 / 16 (-23) | 13 / 3 (+4) | **34 / 16 (-14)** |
+The combination beats the main system alone on both sets. On val_fresh12 the main system's trusted routes themselves are unreliable (the story-event cue routes trusted on practice answer almost nothing there, agree+role makes real errors): its trust was chosen on stories from only two earlier writers.
+
+## R25-dv registration (trust chosen on more writers)
+Main system's route trust chosen on the 710 practice questions plus val_fresh11 (spent on the reader, so development data, a third writer), then val_fresh12 scored once with this trust (strict and article/title-free), alone and with the reader. Needs one more main-system run with val_fresh11 appended after val_fresh12 (positions 2710-2910) and the model's answers for val_fresh11 appended likewise.
