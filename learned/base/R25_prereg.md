@@ -1218,3 +1218,9 @@ Add, per candidate, how close its last word's vector is to the question's words 
 With the meaning feature: all kinds 133 / 255, top 3 contains gold 48% (was 47%), confident-only 23 / 31. The counted answer-finder plateaus well below the main system's reliability; not adopted.
 
 ## R25-es (analysis): cases where the gold answer is a candidate but not chosen -- chosen vs gold, to see what the features miss.
+
+## R25-es result
+Chosen answers are often of the wrong kind entirely: 'slowly' for who, 'questions' for where, 'loved bananas' for when, 'female' for a name. The features carry no answer type.
+
+## R25-et registration (answer type from the dictionary)
+Add the WordNet class of the candidate's last word (noun.person, noun.location, noun.time, noun.artifact, noun.food ...; 'name' for capitalised words; 'number' for numbers) paired with the question kind as a feature, so who-questions learn to prefer persons and names, where-questions places, when-questions times. Same development split.
