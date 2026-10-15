@@ -314,3 +314,10 @@ precision 0.76); canonical 207 right / 60 wrong (+27, precision 0.78)**; practic
 at no lower precision, as registered. Precision at scale (0.78) is below the dev set's 0.89: val_fresh2 was a
 favourable 200. For the record beside the other readers on the same 1,800: T22p policy +512 (833 / 107), thresholded
 model +321 (570 / 83), this reader +27 (207 / 60). The slot-line chain (AG12-scale) is still running.
+
+## AG13 registration (time and reason recovered: slot lines from each clause with its source sentence)
+ag10_slots.py --from-canon --with-sentence (dev: stories 62-101; question lines reused from AG10 with the AG10b
+syntax). The 1.5B model writes the slot line of each AG4 clause with the clause's source sentence shown beside it, and
+is told to take WHEN and WHY from the sentence; provenance allows the clause, the sentence, the previous sentence and
+names. Everything else as AG12. PASS if untouched right > 28 at precision >= 0.89 (AG12: 28 / 2), with the
+when / why counts reported (AG12: 0 / 0 / 16 and 0 / 0 / 6).

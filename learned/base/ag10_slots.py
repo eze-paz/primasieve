@@ -12,7 +12,27 @@ from ag3_canon import STOP, ent, content, toks
 from b6_rwkv import hit
 CKPT = ARGV[ARGV.index("--ckpt") + 1] if "--ckpt" in ARGV else os.path.join("rwkv7", "RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth")
 ALL = "--all" in ARGV; STORIES = list(range(502)) if ALL else list(range(62, 102)); FROM_CANON = "--from-canon" in ARGV
-OUT = "ag12all_lines.json" if (FROM_CANON and ALL) else "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
+WITH_SENT = "--with-sentence" in ARGV
+OUT = "ag13_lines.json" if (FROM_CANON and WITH_SENT) else "ag12all_lines.json" if (FROM_CANON and ALL) else "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
+S_PROMPT3 = ("Instruction: Describe the clause as one line of slots. Take WHEN and WHY from the sentence when the sentence gives them. "
+             "Use only words from the clause or the sentence. Write - for an empty slot.
+
+"
+             "Sentence: In the morning Rosa took the key to the well because the bucket was lost.
+Clause: Rosa took the key to the well.
+"
+             "WHO: Rosa | DID: took | WHAT: the key | WHERE: to the well | WHEN: in the morning | WHY: because the bucket was lost
+
+"
+             "Sentence: The jar was full of flour.
+Clause: The jar was full of flour.
+"
+             "WHO: The jar | DID: was | WHAT: full of flour | WHERE: - | WHEN: - | WHY: -
+
+"
+             "Sentence: {sent}
+Clause: {clause}
+")
 SLOTS = ["WHO", "DID", "WHAT", "WHERE", "WHEN", "WHY"]
 LINE = re.compile(r"WHO:\s*(.*?)\s*\|\s*DID:\s*(.*?)\s*\|\s*WHAT:\s*(.*?)\s*\|\s*WHERE:\s*(.*?)\s*\|\s*WHEN:\s*(.*?)\s*\|\s*WHY:\s*(.*?)\s*$")
 PRON = {"he", "she", "they", "it", "him", "her", "them", "his", "their", "its"}
@@ -85,12 +105,15 @@ def main():
         rec = done.get(s["id"]) or {}
         if "lines" not in rec:
             sents = [x.strip() for x in A.SENT.split(s["text"]) if x.strip()]; names = set(); prev = ""; lines = []; last_who = None
+            units = [(x, x) for x in sents]
             if FROM_CANON:                                                            # AG12: units are the AG4 canonical clauses
-                CAN = load_canon(); sents = [x.strip() for x in A.SENT.split(CAN[s["id"]]["canon"]) if x.strip()]
-            for sent in sents:
+                CAN = load_canon(); sents = [x.strip() for x in A.SENT.split(CAN[s["id"]]["canon"]) if x.strip()]; units = [(x, x) for x in sents]
+                if WITH_SENT:                                                         # AG13: each clause with its source sentence
+                    units = [(c, l["sent"]) for l in CAN[s["id"]]["log"] for c in (l["kept"] or [l["sent"]])]
+            for sent, src in units:
                 tk = toks(sent); names |= {t.lower() for t in tk[1:] if t[0].isupper()} | ({tk[0].lower()} if tk and tk[0][0].isupper() and tk[0].lower() not in STOP else set())
-                allowed = set(content(sent)) | {A.lemma(w) for w in content(sent)} | set(content(prev)) | names | {"the", "a", "an"}
-                for d in parse(gen(m, tok, S_PROMPT.format(sent=sent))):
+                allowed = set(content(sent)) | {A.lemma(w) for w in content(sent)} | set(content(src)) | {A.lemma(w) for w in content(src)} | set(content(prev)) | names | {"the", "a", "an"}
+                for d in parse(gen(m, tok, S_PROMPT3.format(sent=src, clause=sent) if WITH_SENT else S_PROMPT.format(sent=sent))):
                     if not d["WHO"] or not d["DID"]: stats["line:no who/did"] += 1; continue
                     if not provenance_ok(d, allowed): stats["line:invented"] += 1; continue
                     if d["WHO"].lower() in PRON:
