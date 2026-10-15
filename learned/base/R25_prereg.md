@@ -1207,3 +1207,9 @@ Confidence thresholds per kind (from training): test 19 right / 23 wrong (fitnes
 On E-F a gold answer is among the candidates for only 59% of questions, and among the top 3 for 47% (top 1: 34%). Both halves fail: candidate phrases miss the gold span 41% of the time (boundaries, sentence choice), and the counted features choose poorly among those that contain it.
 
 ## R25-eq (development): candidate recall with wider candidates -- every sentence instead of the best two, and span variants extended through 'of' / 'and' + a noun phrase and with or without the leading article.
+
+## R25-eq result
+Every sentence and 'of' / 'and' extensions: gold among candidates **66%** (was 59%), but among the top 3 still 47% and all-kinds answers 131 / 257: the choosing is now the bottleneck.
+
+## R25-er registration (a meaning feature for choosing)
+Add, per candidate, how close its last word's vector is to the question's words (cosine with the mean vector of the question's content words, bucketed), so 'What did Ilya eat?' prefers food-like candidates. Same train A-D / test E-F; reported with R25-en/eo/ep lines.

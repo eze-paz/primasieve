@@ -17,6 +17,8 @@ src = open("r25_rwg.py", encoding="utf-8").read(); src = src[:src.index("tot = c
 R = {"__name__": "rwg", "__file__": os.path.join(HERE, "r25_rwg.py")}; exec(compile(src, "r25_rwg.py", "exec"), R)
 COMMON, rar, stem, sentences, toks, norm = R["COMMON"], R["rar"], R["stem"], R["sentences"], R["toks"], R["norm"]
 GROUPS = json.load(open("r25_classes.json", encoding="utf-8"))
+import numpy as np
+_z = np.load("r25_vectors_all.npz"); VEC = {w: v / (np.linalg.norm(v) + 1e-9) for w, v in zip(_z["vocab"].tolist(), _z["vecs"])}   # R25-er
 ART = {"the", "a", "an", "his", "her", "their", "its", "my", "our", "your", "mr", "mrs", "ms", "dr"}
 PLACE = {"in", "on", "at", "under", "into", "onto", "near", "behind", "beside", "inside", "across", "over", "by", "from", "to", "through", "along"}
 def files(arg): return [f"val_practice_{x.lower()}.json" if len(x) == 1 else x for x in arg.split(",")]
@@ -33,6 +35,7 @@ def candidates(story, q):
         raw = toks(s_); ws = [w.lower() for w in raw]; st = {stem(w) for w in ws}
         scored.append((sum(rar(w) for w in key if stem(w) in st), raw, ws))
     scored.sort(key=lambda x: -x[0]); out = []
+    qv = [VEC[w] for w in key if w in VEC]; qv = (np.mean(qv, 0) / (np.linalg.norm(np.mean(qv, 0)) + 1e-9)) if qv else None
     for rank, (sc, raw, ws) in enumerate(scored[:(99 if WIDE else 2)]):
         if sc <= 0: continue
         hits = [i for i, w in enumerate(ws) if stem(w) in qst and w not in COMMON]
@@ -58,7 +61,7 @@ def candidates(story, q):
                     f = [("k", kind(q)), ("kd", kind(q) + "|" + side + db), ("kp", kind(q) + "|" + (prev if prev in COMMON or prev == "<s>" else "C")),
                          ("kcap", kind(q) + "|" + str(raw[i][:1].isupper())), ("knum", kind(q) + "|" + str(any(R["isnum"](w) for w in ws[i:j + 1]))),
                          ("klen", kind(q) + "|" + str(min(j - i + 1, 4))), ("krank", kind(q) + "|" + str(rank)),
-                         ("kgrp", kind(q) + "|" + str(GROUPS.get(ws[j], -1))), ("kstart", kind(q) + "|" + ws[bb] if ws[bb] in ART | PLACE else kind(q) + "|-")]
+                         ("kgrp", kind(q) + "|" + str(GROUPS.get(ws[j], -1))), ("ksim", kind(q) + "|" + (str(int(4 * max(-0.99, min(0.99, float(VEC[ws[j_]] @ qv))) + 4)) if (qv is not None and ws[j_] in VEC) else "none")), ("kstart", kind(q) + "|" + ws[bb] if ws[bb] in ART | PLACE else kind(q) + "|-")]
                     out.append((text, f))
             i = j + 1
     return out
