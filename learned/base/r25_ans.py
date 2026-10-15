@@ -70,7 +70,7 @@ def candidates(story, q):
                     f = [("k", kind(q)), ("kd", kind(q) + "|" + side + db), ("kp", kind(q) + "|" + (prev if prev in COMMON or prev == "<s>" else "C")),
                          ("kcap", kind(q) + "|" + str(raw[i][:1].isupper())), ("knum", kind(q) + "|" + str(any(R["isnum"](w) for w in ws[i:j + 1]))),
                          ("klen", kind(q) + "|" + str(min(j - i + 1, 4))), ("krank", kind(q) + "|" + str(rank)),
-                         ("kgrp", kind(q) + "|" + str(GROUPS.get(ws[j], -1))), ("ktype", kind(q) + "|" + wtype(ws[j_], raw[j_])), ("ksim", kind(q) + "|" + (str(int(4 * max(-0.99, min(0.99, float(VEC[ws[j_]] @ qv))) + 4)) if (qv is not None and ws[j_] in VEC) else "none")), ("kstart", kind(q) + "|" + ws[bb] if ws[bb] in ART | PLACE else kind(q) + "|-")]
+                         ("kgrp", kind(q) + "|" + str(GROUPS.get(ws[j], -1))), ("ktype", kind(q) + "|" + wtype(ws[j_], raw[j_])), ("vtype", (R["EXC"].get(key[-1], key[-1]) if key else "-") + "|" + wtype(ws[j_], raw[j_])), ("ksim", kind(q) + "|" + (str(int(4 * max(-0.99, min(0.99, float(VEC[ws[j_]] @ qv))) + 4)) if (qv is not None and ws[j_] in VEC) else "none")), ("kstart", kind(q) + "|" + ws[bb] if ws[bb] in ART | PLACE else kind(q) + "|-")]
                     out.append((text, f))
             i = j + 1
     return out

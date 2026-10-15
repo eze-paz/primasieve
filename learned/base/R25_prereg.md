@@ -1224,3 +1224,9 @@ Chosen answers are often of the wrong kind entirely: 'slowly' for who, 'question
 
 ## R25-et registration (answer type from the dictionary)
 Add the WordNet class of the candidate's last word (noun.person, noun.location, noun.time, noun.artifact, noun.food ...; 'name' for capitalised words; 'number' for numbers) paired with the question kind as a feature, so who-questions learn to prefer persons and names, where-questions places, when-questions times. Same development split.
+
+## R25-et result -- helps, still far below the main system
+With answer types: all kinds **148 / 240** (was 133 / 255), top 3 contains gold 52% (was 48%), what 49 / 65, who 39 / 38, when 15 / 12; confident-only 38 / 34. Precision about 0.38 against the main system's 0.83-0.87.
+
+## R25-eu registration (verb-to-type)
+Add the question's main content word paired with the candidate's type ('eat' + noun.food, 'buy' + noun.artifact), so the counts learn what each verb's answers usually are. Same development split.
