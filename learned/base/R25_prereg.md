@@ -1161,3 +1161,8 @@ Current best: main system (five-writer trust, full story phrases) + reader fallb
 Language model 116 / 200. Main system **33 right / 5 wrong** (0.87, +18). Reader fallback 22 / 14 strict (27 / 9 article/title-free). **Together 54 right / 11 wrong** (0.83, +21), 135 silent; article/title-free 56 / 9 (+29). Confirms R25-eb/ed: when the system answers it is right about 5 times in 6; it answers about a third of the questions, against the language model's 58% right overall.
 
 ## R25-ei (analysis): silent questions on val_fresh14 by kind.
+
+## R25-ei result (val_fresh14, main system only, by kind)
+what: trusted 12 / 3, 50 silent or untrusted (language model 46 right of 65); where 7 / 1, 24 (14); how 0 / 0, 28 (21; the reader's quantity answers cover part); who 11 / 0, 12 (7); when 3 / 1, 14 (15); why 0 / 0, 15 (2); whose 9, which 9 untouched. 'what' is now the largest gap.
+
+## R25-ej (analysis): the main system's what-answers by route on practice (A-F, the 710 and val_fresh11): which routes answer 'what' and how often they are right, trusted or not.
