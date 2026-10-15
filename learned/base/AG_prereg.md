@@ -164,3 +164,37 @@ ag3_qa.py --sim T: a question verb absent from the events matches an event verb 
 applied once to untouched val_fresh2, on the AG4 canonical text and on the original. PASS if untouched right rises
 above 25 at precision >= 0.89 on canonical. Expected: the reach limit is partly verb mismatch ('lend' / 'gave');
 this is the cheapest test of that.
+
+## AG7 result -- FAIL, with the audit that matters
+Verb similarity at 0.8 / 0.7 / 0.6 / 0.5: untouched canonical stays 25 / 3 (then 25 / 4); practice 31 / 5-6. Verb
+mismatch is not the reach limit. Audit of the 172 silent untouched questions (ag7_audit.txt): 74 'verb in text but
+no event' -- mostly the question parser picking the wrong word as the verb ('What did the crow find?' -> 'crow');
+46 question shapes not handled (when 16, why 6, whose 5, how 3, 'who was ...ing'); 25 known-role mismatches, nearly
+all pronoun agents in the canonical clauses ('He called ...', 'She brought ...'); 20 verbs absent; 7 empty roles.
+So the limit is the symbolic question answerer, not the rewrite and not the translator.
+
+## AG8 registration (fix the two largest audit classes in the question answerer)
+ag3_qa.py --v2: (1) the question verb is the first word after the subject that is an inflected or dictionary verb
+(r24_dict), not the first word after a lazy subject match; (2) a pronoun agent in a canonical clause is resolved to
+the last named agent before it (he / she / they -> last name; it / they -> last thing is left alone). Same measure
+as AG7, canonical and original, practice and untouched. PASS if untouched right > 25 at precision >= 0.89 on the
+canonical text; the original is reported for the same fix so the canonical gain is isolated.
+
+## AG8 result -- FAIL on precision (reach up)
+Untouched canonical **30 right / 6 wrong (+12, precision 0.83)** against 25 / 3 (+16, 0.89); original 21 / 6
+(from 17 / 4); practice canonical 36 / 8. The verb and pronoun fixes reach more questions on both texts and the
+canonical advantage holds (30 vs 21 right), but the new answers come at 0.83 precision, under the 0.89 gate.
+Reading: each hand-written fix to the question parser trades precision for reach, the pattern the project already
+saw with hand cues (R24). The parser is the weak part; it should not be hand-written.
+
+## AG9 registration (the question converged to canonical form by the same loop; no hand question shapes)
+ag9_qcanon.py. Stage 1: for each question the model proposes a statement with one blank for the asked part
+('Who planted Arjun's rows?' -> '___ planted Arjun's rows.'); the engine keeps the proposal only if its words come
+from the question (plus 'the'), it has exactly one blank, and the AG1 translator reads it as an event in which the
+blank fills a role (agent / patient / place). One retry with a stricter prompt. Stage 2: the answer is that role in
+the first canonical clause (AG4 text; and the original text for comparison) whose event has the same verb lemma and
+whose other roles match the question event's roles (name match on first token or shared content word); silent
+otherwise. Measured on the dev block (practice val_more, untouched val_fresh2), right / wrong / fitness / precision,
+against AG3's 25 / 3 (0.89) and AG8's 30 / 6. PASS if untouched right > 25 at precision >= 0.89 on canonical text.
+A PASS says the loop handles questions as it handles sentences and the hand parser can go; a FAIL is attributed by
+the stage-1 accept / reject counts (the model cannot form the statement) or by stage-2 matching.

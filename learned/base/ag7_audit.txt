@@ -1,0 +1,30 @@
+EX mismatch | ('Who did Teodor call when the oven would not light?', 'teodor', [('He', 'call', 'his')])
+EX mismatch | ('What did Teodor sell while Radu worked?', 'teodor', [('Radu', 'sell', "yesterday's bread")])
+EX mismatch | ('Who took the boots to the river?', 'the boots to the river', [('He', 'take', 'the boots')])
+EX mismatch | ('What did Fatou bring along with the blanket?', 'fatou', [('She', 'bring', 'him a'), ('She', 'bring', 'him')])
+EX mismatch | ('Who saw Mr Okonjo first?', 'mr okonjo first', [('Lindgren', 'see', 'him')])
+EX mismatch | ('Who brought timber?', 'timber', [('Goran', 'bring', None)])
+EX mismatch | ('Who invited the rooster down?', 'the rooster down', [('A fox', 'invite', 'him')])
+EX mismatch | ('Who found the phone?', 'the phone', [('Yusra', 'find', 'it'), ('Yusra', 'find', 'it')])
+EX mismatch | ('What did Yusra put the phone in?', 'yusra', [('Yusra', 'put', None)])
+EX mismatch | ('Where did Zeynep drive?', 'zeynep', [('She', 'drive', None)])
+EX shape | When was the oven hot again?
+EX shape | Why did the ring fall?
+EX shape | When did Wanjiru pack the basket?
+EX shape | When did Wanjiru go home?
+EX shape | What does Kazuo do after school?
+EX shape | Why did the horse shake the trunk?
+EX shape | Whose tree was it?
+EX shape | When did their father take the boots?
+EX shape | Who was shivering in the waiting room?
+EX shape | Why had Mr Okonjo walked from the hills?
+EX noevent | ("Where was Teodor's shop?", 'shop', 'Teodor opened his shop on Quay Lane at six.')
+EX noevent | ('What did the crow find?', 'crow', 'A crow found a ring in the grass.')
+EX noevent | ('Who had the ring at the end?', 'ring', 'A crow found a ring in the grass.')
+EX noevent | ('Where was the ring at the end?', 'ring', 'A crow found a ring in the grass.')
+EX noevent | ('Where were the rest of the mangoes in the afternoon?', 'rest', "In the afternoon she carried the rest to her aunt's house by the lake.")
+EX noevent | ('Where was the lending library?', 'lend', 'Mrs Adebayo ran the lending library in the village hall.')
+EX noevent | ('What did Mrs Adebayo use to mend the book?', 'adebayo', 'Mrs Adebayo ran the lending library in the village hall.')
+EX noevent | ('Who shook the trunk?', 'shake', 'She asked the horse to shake the trunk, and he did, because she promised him half.')
+EX noevent | ('What did the goat leave?', 'goat', "A goat wanted the apples on the farmer's tree.")
+EX noevent | ('Where were the boots before breakfast?', 'boot', 'Before breakfast, Dmitri hung his wet boots on the fence.')

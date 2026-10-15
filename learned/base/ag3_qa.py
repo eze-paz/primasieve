@@ -20,8 +20,30 @@ if "--all" in ARGV:                                                             
     STORIES = list(range(len(_S)))
 
 
+V2 = "--v2" in ARGV
+import r24_dict as D
+def is_verb(w):
+    return w not in STOP and (A.lemma(w) != w or (D.mainly_verb(w) if D.verb_base(w) else False))
+
+
+def parse_q2(q):
+    """AG8: the question verb is the first verb-like word after the wh-word and auxiliary; the subject is what precedes it"""
+    ql = q.strip().rstrip("?").lower(); w = ql.split()
+    if not w or w[0] not in ("who", "what", "where"): return None
+    aux = len(w) > 1 and re.fullmatch(AUX, w[1]) is not None
+    start = 2 if aux else 1; vi = next((i for i in range(start, len(w)) if is_verb(w[i])), None)
+    if vi is None: return None
+    subj = " ".join(w[start:vi]); rest = " ".join(w[vi + 1:]); verb = w[vi]
+    if w[0] == "where": return (verb, "agent", subj, "place") if subj else None
+    if subj: return verb, "agent", subj, "patient"                                      # who / what did X V?  -> patient
+    return verb, "patient", rest, "agent"                                               # who / what V Y?  -> agent
+
+
 def parse_q(q):
     """-> (verb word, known role, known filler, asked role) or None"""
+    if V2:
+        p = parse_q2(q)
+        if p: return p
     ql = q.strip().rstrip("?").lower()
     m = re.match(rf"who {AUX} (.+?) (\w+)(?: (.*))?$", ql)                       # who did X V (Y)?  -> patient
     if m and m.group(2) not in STOP: return m.group(2), "agent", m.group(1), "patient"
@@ -46,10 +68,26 @@ def match(filler, span):
     return bool(set(f) & set(s) - STOP) or f[-1] == s[-1]
 
 
+SIM = float(ARGV[ARGV.index("--sim") + 1]) if "--sim" in ARGV else None
+if SIM is not None:
+    import numpy as np
+    _z = np.load(os.path.join(HERE, "r25_vectors.npz"), allow_pickle=True); _V = _z["vecs"] / (np.linalg.norm(_z["vecs"], axis=1, keepdims=True) + 1e-9)
+    _W = {w: i for i, w in enumerate(_z["vocab"].tolist())}
+    def vsim(a, b):
+        if a == b: return 1.0
+        if a not in _W or b not in _W: return 0.0
+        return float(_V[_W[a]] @ _V[_W[b]])
+else:
+    def vsim(a, b): return 1.0 if a == b else 0.0
+
+
 def answer(events, q):
     p = parse_q(q)
     if not p: return None
     verb, krole, kfill, arole = p; lem = A.lemma(verb)
+    if SIM is not None and not any(e["verb"] == lem for e in events):            # AG7: nearest event verb by learned vectors
+        best = max(((vsim(lem, e["verb"]), e["verb"]) for e in events), default=(0, None))
+        if best[0] >= SIM: lem = best[1]
     for e in events:
         if e["verb"] != lem: continue
         if krole == "patient" and kfill and not match(kfill, e.get("patient") or "") and not match(kfill, e.get("place") or ""): continue
@@ -75,6 +113,13 @@ def main():
         evs = {}
         for tname, text in (("original", s["text"]), ("canonical", C[s["id"]]["canon"])):
             evs[tname] = [e for sent in [x.strip() for x in A.SENT.split(text) if x.strip()] for e in reader(sent)]
+            if V2:                                                                        # AG8: he / she / they -> the last named agent
+                last = None
+                for e in evs[tname]:
+                    a = (e.get("agent") or "").strip()
+                    if a.lower() in ("he", "she", "they"):
+                        if last: e["agent"] = last
+                    elif a and a[0].isupper(): last = a
         for q, g in s["qs"]:
             row = dict(id=s["id"], q=q, gold=g)
             for tname in ("original", "canonical"):
