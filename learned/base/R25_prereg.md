@@ -1060,3 +1060,6 @@ val_fresh10 trusted 50 / 6, carried by the story-event cue routes (cue-alone-loo
 
 ## R25-du registration (scoring that ignores leading articles and titles; reported alongside strict)
 Second scorer, fixed now and applied the same way everywhere: an answer counts if, after lower-casing and removing punctuation, dropping leading 'a', 'an', 'the' and titles ('mr', 'mrs', 'ms', 'dr') from both answer and gold, it equals a gold form. Reported with the strict scorer for the main system, the reader and the combination on val_fresh10 and val_fresh12. Trust stays chosen with the strict scorer on practice.
+
+## R25-du run 1 -- scorer not a superset; corrected
+As first written, the article-free scorer replaced the strict test instead of adding to it, so the main system lost answers its own hit test accepts (val_fresh10 44 / 12 against strict 50 / 6). Corrected to: strict hit OR article-and-title-free match. (Strict numbers from this run, with the name-only reader: val_fresh10 reader 35 / 2, together 70 / 7, fitness +49 against the main system's +32; val_fresh12 reader 10 / 6, together 23 / 27.)
