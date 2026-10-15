@@ -34,5 +34,20 @@ for (text, q, gold), l in zip(qs, F):
     if a is not None and (q.split()[0].lower(), R["FULL"][0], R["NEAR"][0]) in rkeep: rd = R["norm"](a) in {R["norm"](x) for x in gold}
     for cnt, v in ((m, main), (r, rd), (c, main if main is not None else rd)):
         cnt["silent" if v is None else ("right" if v else "wrong")] += 1
+import re as _re
+def _k(x):                                                                                     # R25-du: drop leading articles and titles
+    w = _re.findall(r"[a-z0-9']+", x.lower())
+    while w and w[0] in {"a", "an", "the", "mr", "mrs", "ms", "dr"}: w = w[1:]
+    return " ".join(w)
+def soft_ok(a, g): return _k(a) in {_k(x) for x in g}
+m2, r2, c2 = collections.Counter(), collections.Counter(), collections.Counter()
+for (text, q, gold), l in zip(qs, F):
+    mv = None
+    if spoke(l) and route(l) in keep: mv = soft_ok(l.split("| ans ")[1].split(" | hit")[0], gold)
+    a = R["answer"](text, q); rv = None
+    if a is not None and (q.split()[0].lower(), R["FULL"][0], R["NEAR"][0]) in rkeep: rv = soft_ok(a, gold)
+    for cnt, v in ((m2, mv), (r2, rv), (c2, mv if mv is not None else rv)): cnt["silent" if v is None else ("right" if v else "wrong")] += 1
+for nm, cnt in (("main system, trusted [articles/titles ignored]", m2), ("reader, trusted [articles/titles ignored]", r2), ("together [articles/titles ignored]", c2)):
+    print(f"R25-du {nm}: {cnt['right']} right / {cnt['wrong']} wrong / {cnt['silent']} silent (fitness {cnt['right'] - 3 * cnt['wrong']})", flush=True)
 for nm, cnt in (("main system, trusted", m), ("reader, trusted", r), ("together", c)):
     print(f"R25-dp {nm}: {cnt['right']} right / {cnt['wrong']} wrong / {cnt['silent']} silent (fitness {cnt['right'] - 3 * cnt['wrong']})", flush=True)

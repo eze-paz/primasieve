@@ -1054,3 +1054,9 @@ Main system trusted: **16 right / 25 wrong** (fitness -59); reader trusted: 10 /
 The 'lenient' scoring gave 11 / 30, fewer right than the strict 16 / 25: it is not a superset of the main system's own hit test (which already accepts some forms my normaliser does not), so it measures nothing useful. Discarded; the strict R25-dr numbers stand.
 
 ## R25-dt (analysis, no score): which trusted routes failed on val_fresh12 compared with val_fresh10.
+
+## R25-dt result (which trusted routes failed on val_fresh12)
+val_fresh10 trusted 50 / 6, carried by the story-event cue routes (cue-alone-loose+soft+role 12 / 1 etc.); on val_fresh12 those answered almost nothing (0 / 1), and agree+role went 3 / 8. The agree+role 'mistakes' are mostly article and title forms: system 'the newspaper' vs gold 'a newspaper', 'the small sailboat' vs 'a small sailboat', 'Kowalski' vs 'mrs. kowalski'. This writer's gold lists rarely include a form without 'a' or the title, and the scorer compares exactly.
+
+## R25-du registration (scoring that ignores leading articles and titles; reported alongside strict)
+Second scorer, fixed now and applied the same way everywhere: an answer counts if, after lower-casing and removing punctuation, dropping leading 'a', 'an', 'the' and titles ('mr', 'mrs', 'ms', 'dr') from both answer and gold, it equals a gold form. Reported with the strict scorer for the main system, the reader and the combination on val_fresh10 and val_fresh12. Trust stays chosen with the strict scorer on practice.
