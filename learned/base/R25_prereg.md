@@ -1101,3 +1101,9 @@ Cut noun phrases ('a book about', 'an old pocket', 'a new copper', 'her own toy'
 
 ## R25-ea registration (the full phrase from the story)
 --story-span2: the answer is found in the story and widened to the full phrase: left over articles, possessives, titles and a preceding capitalised first name; right over following noun-like words (not function words, not verb forms by the dictionary, not -ed / -ing) and through 'and' / 'of' / 'about' + a noun phrase; where-questions keep the place word before it. Tested on the listed cases ('Okafor' -> 'Mrs. Adaeze Okafor', 'a book about' -> 'a book about dinosaurs', 'a shirt' -> 'a shirt and a tie', 'a pine tree' -> 'under a pine tree'; 'watch' stays cut because the dictionary lists it as a verb). val_fresh12 is now development data; the check for harm is practice (all 1,310 practice-type positions) and val_fresh10; a new untouched set gives the clean score.
+
+## R25-ea result (full story phrases) -- PASS, adopted
+val_fresh12 (development now): main system **35 right / 5 wrong** (was 27 / 13; 16 / 24 before R25-dy); together **42 / 7** (+21; was -11). Harm check, all routes on the first 2,310 positions (practice and earlier sets): **963 right** of 1,207 answered (story-span only: 936). val_fresh10 unchanged (together 70 / 7). Adopted.
+
+## R25-eb registration (clean score: val_fresh13)
+A writer agent writes val_fresh13 (same neutral rules as val_fresh12). Then once: model answers appended, main system (adopted configuration: five-writer trust, --story-span2) with val_fresh13 appended at positions 3310-3510, combination with the reader's name-only who-answers; strict and article/title-free.
