@@ -1213,3 +1213,8 @@ Every sentence and 'of' / 'and' extensions: gold among candidates **66%** (was 5
 
 ## R25-er registration (a meaning feature for choosing)
 Add, per candidate, how close its last word's vector is to the question's words (cosine with the mean vector of the question's content words, bucketed), so 'What did Ilya eat?' prefers food-like candidates. Same train A-D / test E-F; reported with R25-en/eo/ep lines.
+
+## R25-er result -- marginal
+With the meaning feature: all kinds 133 / 255, top 3 contains gold 48% (was 47%), confident-only 23 / 31. The counted answer-finder plateaus well below the main system's reliability; not adopted.
+
+## R25-es (analysis): cases where the gold answer is a candidate but not chosen -- chosen vs gold, to see what the features miss.

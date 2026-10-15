@@ -116,3 +116,12 @@ for text, q, g in test:
     if any(gold_hit(c[0], g) for c in cs): inc += 1
     if any(gold_hit(c[0], g) for c in sorted(cs, key=lambda c: -score(c[1]))[:3]): top3 += 1
 print(f"R25-ep test: gold among candidates {inc}/{n} = {inc / n:.2f}; among the top 3 {top3}/{n} = {top3 / n:.2f}", flush=True)
+if "--show" in ARGV:                                                                            # R25-es
+    shown = 0
+    for text, q, g in test:
+        cs = candidates(text, q)
+        if not cs or not any(gold_hit(c[0], g) for c in cs): continue
+        best = max(cs, key=lambda c: score(c[1]))
+        if gold_hit(best[0], g): continue
+        print(f"   R25-es {q} | chose {best[0]!r} | gold {g[0]!r}", flush=True); shown += 1
+        if shown >= 25: break
