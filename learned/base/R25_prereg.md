@@ -1230,3 +1230,6 @@ With answer types: all kinds **148 / 240** (was 133 / 255), top 3 contains gold 
 
 ## R25-eu registration (verb-to-type)
 Add the question's main content word paired with the candidate's type ('eat' + noun.food, 'buy' + noun.artifact), so the counts learn what each verb's answers usually are. Same development split.
+
+## R25-eu result -- no gain; the counted answer-finder line is closed
+With verb-to-type: all kinds 145 / 243 (148 / 240 without), top 3 50%, confident-only 45 / 49. The counted finder plateaus at about 0.38 precision, far below the main system (0.83-0.87 on the untouched sets); it is not used. Comprehension stands at the R25-eh configuration.
