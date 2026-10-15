@@ -1124,3 +1124,6 @@ Language model 96 / 200. Main system (five-writer trust, full story phrases): **
 | when | 16 | 1 / 2 | 3 / 1 | 9 | 5 |
 | which | 10 | 0 / 0 | 5 / 0 | 5 | 4 |
 The largest gap is 'how' questions (37, the language model gets 24; the main system none); 'which' answers are right but untrusted (5 / 0).
+
+## R25-ed registration (a quantity reader for 'how' questions)
+Development counts (practice A-F + val_fresh11): how many 47, how long 23, how did 22, how much 9, how old 4, far / late / often 2 each. r25_rwg.py how_answer: for how many / much / old / long / far / late / often, the sentence that best covers the question's rare words and contains a number (or 'once / twice / every', or 'all' for how long) gives the number nearest the matched words, extended over number words and a following unit ('forty dollars', 'twelve miles', 'forty minutes late', 'once a week'). 'how did' is not attempted. Development on practice A-F; trust as the reader's other kinds; then once on val_fresh13 together with the main system.

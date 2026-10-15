@@ -53,10 +53,38 @@ def phrase_at(ws, i, raw=None):
         while j + 1 < len(ws) and raw[j + 1][0].isupper(): j += 1
         return " ".join(ws[i:j + 1])
     return ws[i]
+NUMW = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty",
+        "ninety", "hundred", "thousand", "dozen", "half", "a", "an", "several", "both"}
+UNITS = {"minute", "minutes", "hour", "hours", "day", "days", "week", "weeks", "month", "months", "year", "years", "night", "nights",
+         "mile", "miles", "kilometre", "kilometres", "kilometer", "kilometers", "metre", "metres", "meter", "meters", "feet", "foot",
+         "dollar", "dollars", "pound", "pounds", "euro", "euros", "coin", "coins", "cent", "cents", "rupees", "yen", "pence"}
+HOWQ = {"many", "much", "old", "long", "far", "late", "often"}
+def isnum(w): return w.isdigit() or w in NUMW - {"a", "an", "both"} or bool(re.fullmatch(r"\d+[:.]?\d*", w))
+def how_answer(story, qw, qrare):                                                             # R25-ed: the number or quantity phrase in the sentence that matches the question
+    sub = qw[1]; key = [w for w in qw[2:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
+    best = None
+    for s_ in sentences(story):
+        ws = [w.lower() for w in toks(s_)]; st = {stem(w) for w in ws}
+        sc = sum(rar(w) for w in key if stem(w) in st)
+        nums = [i for i, w in enumerate(ws) if isnum(w) or (sub == "often" and w in {"once", "twice", "every", "daily", "weekly"}) or (sub == "long" and w == "all")]
+        if nums and (best is None or sc > best[0]): best = (sc, ws, nums)
+    if best is None or (key and best[0] < 0.5 * sum(rar(w) for w in key)): return None
+    sc, ws, nums = best; hits = [i for i, w in enumerate(ws) if stem(w) in {stem(x) for x in key}]
+    i = min(nums, key=lambda j: min([abs(j - h) for h in hits] or [0]))
+    if sub in ("many", "old"):
+        return ws[i]
+    j = i
+    while j + 1 < len(ws) and (isnum(ws[j + 1]) or ws[j + 1] in {"and", "a", "half"}): j += 1
+    if j + 1 < len(ws) and (ws[j + 1] in UNITS or sub in ("long", "often") and ws[j + 1] not in COMMON): j += 1
+    if sub == "often" and j + 2 < len(ws) and ws[j + 1] in {"a", "every", "each"}: j += 2
+    if sub == "late" and j + 1 < len(ws) and ws[j + 1] == "late": j += 1
+    return " ".join(ws[i:j + 1])
 FULL = [False]; NEAR = [True]; NAMEONLY = bool(os.environ.get("R25_NAMEONLY"))   # R25-dq: who-answers only names
 def answer(story, q):
     qw = [w.lower() for w in toks(q)]; wh = qw[0] if qw else ""
     qrare = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
+    if wh == "how" and len(qw) > 1 and qw[1] in HOWQ: return how_answer(story, qw, qrare)      # R25-ed: quantity questions
     if not qrare or wh not in ("who", "where", "when", "what"): return None
     cands = [match_score(qrare, s) + (s,) for s in sentences(story)]
     names = [w.lower() for w in toks(q)[1:] if w[0].isupper()]                                   # R25-df: a sentence must contain the question's names
