@@ -1078,3 +1078,9 @@ Main system's route trust chosen on the 710 practice questions plus val_fresh11 
 Model on val_fresh11: 127 / 200 (on val_fresh12 only 90 / 200: val_fresh12 is a hard set for everyone). val_fresh12, strict: main 15 / 21 (-48; was -59), together 22 / 23 (-47; was -58). Article/title-free: main 22 / 14 (-20; was -23), together **31 / 14 (-11; was -14)**. A third writer in the trust choice helps a little; the main system's routes remain unreliable on this writer.
 
 ## R25-dw (check): the same more-writers trust on val_fresh10 (positions 2310-2510 of the same run), to confirm it does not lose there.
+
+## R25-dw result -- more-writers trust adopted
+val_fresh10 with the 710 + val_fresh11 trust: main 45 / 5 (+30), reader 35 / 2 (+29), together **66 / 6 (+48)** (with the 710-only trust: 70 / 7, +49) -- no loss there, a small gain on val_fresh12. Adopted: main-system trust from the 710 practice questions plus val_fresh11, the reader's name-only who-answers as fallback.
+
+## R25-dx registration (practice from more writers)
+Since trust from a third writer helped, two more writer agents (separate briefs, same neutral rules as the fresh sets) write practice sets E and F (40 stories / 200 questions each), development data for choosing trust. Then the main system runs with them appended, trust is chosen on 710 + val_fresh11 + E + F, and val_fresh12 and val_fresh10 are reported with the combination.
