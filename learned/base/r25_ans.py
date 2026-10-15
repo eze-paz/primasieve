@@ -78,3 +78,22 @@ print("R25-en training kinds (right, wrong, silent):", {k: tuple(v) for k, v in 
 print("R25-en test kinds (right, wrong, silent):", {k: tuple(v) for k, v in sorted(te.items(), key=lambda kv: -sum(kv[1]))}, flush=True)
 a = sum(v[0] for k, v in te.items() if k in keep); w = sum(v[1] for k, v in te.items() if k in keep)
 print(f"R25-en test, trusted kinds only: {a} right / {w} wrong (fitness {a - 3 * w}); all kinds {sum(v[0] for v in te.values())} / {sum(v[1] for v in te.values())}", flush=True)
+# R25-eo: answer only when confident -- per kind, a threshold on the top candidate's score chosen on training (right - 3 x wrong)
+def scored(data):
+    out = []
+    for text, q, g in data:
+        cs = candidates(text, q); k = kind(q).split()[0] if not kind(q).startswith("how ") else kind(q)
+        if not cs: out.append((k, None, False)); continue
+        best = max(cs, key=lambda c: score(c[1])); s2 = sorted((score(c[1]) for c in cs), reverse=True)
+        conf = s2[0] - (s2[1] if len(s2) > 1 else s2[0] - 5)
+        out.append((k, conf, gold_hit(best[0], g)))
+    return out
+TR, TE = scored(train), scored(test); th = {}
+for k in {x[0] for x in TR}:
+    rows = sorted([(c, h) for kk, c, h in TR if kk == k and c is not None], reverse=True); best = (0, None); a = w = 0
+    for c, h in rows:
+        a += h; w += (not h)
+        if a - 3 * w > best[0]: best = (a - 3 * w, c)
+    if best[1] is not None: th[k] = best[1]
+a = sum(1 for k, c, h in TE if k in th and c is not None and c >= th[k] and h); w = sum(1 for k, c, h in TE if k in th and c is not None and c >= th[k] and not h)
+print(f"R25-eo confident answers only (thresholds per kind from training: {len(th)} kinds): test {a} right / {w} wrong (fitness {a - 3 * w})", flush=True)

@@ -1191,3 +1191,9 @@ Best comprehension configuration: main system (trust from five writers, answers 
 
 ## R25-en registration (a learned answer-finder, by counting)
 r25_ans.py: candidates = content-word runs (with optional article / title, and a place word for where-questions) in the two sentences that best cover the question's rare words; features = question kind with: side and distance to the matched words, preceding word, capital, number, length, sentence rank, the learner's word group of the last word, starting word. Naive-Bayes log odds counted from practice (gold candidate vs other), top candidate answers; trust per kind by right - 3 x wrong on training. Development: train A-D, test E-F. If a kind passes on E-F, it joins the combination and is scored once on a new untouched set.
+
+## R25-en result (development: train A-D, test E-F)
+1,004 gold / 8,953 other candidates counted. It always answers, so precision is low: test all kinds 136 right / 252 wrong (what 43 / 71, who 35 / 42, where 16 / 46). Kinds kept by trust on training: whose, how old, how does -> test 6 / 8.
+
+## R25-eo registration (answer only when confident)
+Per kind, a threshold on the top candidate's margin over the second, chosen on training to maximise right - 3 x wrong; test E-F reported.
