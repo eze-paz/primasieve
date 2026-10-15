@@ -1,0 +1,6 @@
+OURS: Every morning the baker, Teodor, opened his shop on Quay Lane at six. On Thursday his oven would not light, so he called his cousin Radu, who fixed gas pipes for a living. While Radu worked, Teodor sold yesterday's bread at half price. By noon the oven was hot again and the street smelled of rye. 
+HUMAN: Teodor, a baker, opened his shop on Quay Lane at six every morning. On Thursday his oven would not light, so he called his cousin Radu, who fixed gas pipes for a living. While Radu worked on it, Teodor sold the previous day's bread at half price. By noon the oven was hot again and the street smelled of rye. 
+OURS: A crow found a ring in the grass and carried it to the top of an oak. A squirrel who lived below asked to see it. The crow, proud of her prize, opened her beak to answer, and the ring fell into the squirrel's paws. The squirrel buried it under the roots, and the crow never found it again. 
+HUMAN: A crow found a ring in the grass and took it to the top of an oak. A squirrel living below asked to see it. When the proud crow opened her beak to answer, the ring dropped into the squirrel's paws. The squirrel buried it under the roots, and the crow never found it again. 
+P9 P9 sentence-level summary: judge 5.318, form 0.988, order gain 0.626, continuity 0.983
+P9 human summaries: judge 5.248, form 0.988, order gain 0.640, continuity 0.967

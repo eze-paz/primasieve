@@ -142,3 +142,6 @@ Same 20 stories: human summaries (written by a separate agent that saw only thes
 
 ## P9 registration (sentence-level content plan)
 r27_summarise.py: the content unit is a whole story sentence. Selection: each sentence scores by its count of role-reader clauses with a subject and verb plus 1 if it mentions the story's main person (the most frequent name); keep the top 4 in story order. Sentence planning: a sentence starting with the same name as the previous kept sentence starts with he / she instead (gender from the story); nothing else rewritten. Same 20 stories; scored with judge, form, order gain, continuity, against the human summaries. PASS if within 0.5 bits of the human summaries' judge with form >= 0.95.
+
+## P9 result -- PASS as registered, but vacuous on these stories
+Sentence-level summary: judge 5.318, form 0.988, order gain 0.626, continuity 0.983; human summaries 5.248 / 0.988 / 0.640 / 0.967. Within 0.5 bits, so the gate passes -- but the test stories have 4-5 sentences, so 'keep the best 4' mostly reproduces the story (its judge equals the stories' own 5.318). The pass shows only that sentence-level units avoid the clause-level faults; content selection is not tested here. A real test needs long texts (book passages of 15+ sentences) with human summaries.
