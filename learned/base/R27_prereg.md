@@ -102,3 +102,25 @@ Same as P2b but no linking words at all (story order and pronouns carry the sequ
 
 ## P4 result -- PASS (learned rules replace the hand ones at no cost)
 Learned from 449 practice pairs: 155 past forms (kept, gave, left, grew, bought, fixed, ...) and answer order by question shape -- 'what did' + noun: rest first (41 / 10); 'what did' + preposition: answer first (23 / 20); 'where did' + noun: rest first (54 / 13); 'when did': rest first (31 / 0); 'why did': rest first (14 / 0). These are the orders the hand rules had chosen: the learner re-derived them from text. With the learned tables (R27_LEARN=1): F2b 3.296 (P1e 3.296), form 0.983, gold 53 / 53 on the same 60 answers; 923 sentences made on all untouched answers (hand rules 921).
+
+## P2c result -- FAIL by 0.08 bits (judge); PASS form, order, faithfulness
+No links: retelling judge 6.393 (P2b 6.552), form 0.915, order gain 0.388, continuity 0.929, faithfulness 0.973; stories 5.318 (gap 1.075). Dropping the stacked links helped most so far. Remaining fault: referring expressions ('A crow found a ring in the grass. A crow carried it ...').
+
+## P2d registration (referring expressions)
+On P2c: (1) a subject that was mentioned before and begins with a / an switches to 'the'; (2) a subject equal to the previous sentence's subject becomes the pronoun the story uses for it (the first he / she / it / they after its first mention; 'it' if the story has none and the subject is not a name). Same 20 stories and gates.
+
+## P2d result -- FAIL by 0.09 bits (judge); PASS form, order, faithfulness
+Definite second mentions and pronouns: judge 6.410 (P2c 6.393), form 0.915, order gain 0.480 (P2c 0.388: sentence order now carries more), continuity 0.929, faithfulness 0.973; stories 5.318. The retelling line has reached diminishing returns on the judge (6.60 -> 6.55 -> 6.39 -> 6.41). Part of the remaining ~1.1-bit gap is likely inherent to summaries -- every sentence brings a new fact without the story's lead-in -- and a human-written summary reference would be needed to tell how much.
+
+## R27 summary so far
+| test | result |
+|---|---|
+| F0 fluency score (judge, form, repetition) | built; human 6.22, shuffled 10.55, our free samples 6.72 |
+| F1 coherence (order gain, continuity) | built |
+| F2 / F2b judge in context | built (F2 reference corrected before use) |
+| P1-P1d answer sentences (context-free judge) | form and gold PASS; judge gap ~2.7 (short, name-led sentences are unfairly expensive without context) |
+| P1e answer sentences, in context (F2b) | PASS: 3.30 vs fresh human 6.57; gold 53 / 53 |
+| P2-P2d story retelling | form, order, faithfulness PASS; judge gap 1.07-1.28 (FAIL) |
+| P3 reply paragraphs (answer + related events) | gold, form, continuity PASS; context-free judge FAIL |
+| P4 inflection and order learned from data | PASS: re-derives the hand rules |
+| P5 / P5b own models choose wording | FAIL: our models cannot judge word order yet |

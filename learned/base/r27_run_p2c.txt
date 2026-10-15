@@ -1,0 +1,3 @@
+P2 retelling: judge 6.393, form 0.915, order gain 0.388, continuity 0.929 over 20
+P2 story first six sentences: judge 5.318, form 0.988, order gain 0.626, continuity 0.983 over 20
+P2 faithfulness (retelling sentences whose wording is found in the story): 0.973
