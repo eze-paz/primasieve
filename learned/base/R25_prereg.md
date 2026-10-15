@@ -1182,3 +1182,9 @@ The listed what-mistakes on practice C+D mostly return a verb ('sold', 'owned', 
 what 115 right / 109 wrong on practice A-F (was 107 / 126): better, still far from the trust rule (right > 3 x wrong).
 
 ## R25-em (development): is any subset of what-answers trustworthy? Trust keys (kind, full cover, place/answer close to the matched words) chosen on practice A-D, checked on E-F.
+
+## R25-em result -- no trustworthy subset
+Practice A-D what-answers by (full cover, near, short): best cell 65 right / 30 wrong; none passes right - 3 x wrong > 0, so nothing is kept (E-F: 0 / 0). The rare-word reader stays out of 'what'.
+
+## Standing state (after R25-eh)
+Best comprehension configuration: main system (trust from five writers, answers as full story phrases) + reader fallback (name-only who, quantity how). Clean untouched scores: val_fresh13 52 / 14, val_fresh14 54 / 11 (about 0.8 precision, a third of questions answered); the language model answers 48-58% correctly. Open gaps: what (largest), where, when, why, whose, which.

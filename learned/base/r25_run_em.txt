@@ -1,0 +1,3 @@
+R25-ar data: 208980 training paragraphs, 13036704 tokens; vocabulary 20000 + unknown (50 s)
+R25-em practice A-D what by (full cover, near, short): {'(True, True, True)': (65, 30), '(False, True, True)': (8, 31), '(True, True, False)': (3, 3), '(False, True, False)': (1, 2)} | kept: set()
+R25-em practice E-F with that trust: 0 right / 0 wrong
