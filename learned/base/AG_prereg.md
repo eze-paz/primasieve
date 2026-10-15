@@ -130,3 +130,37 @@ Symbolic QA, untouched val_fresh2: canonical **25 / 3** (AG3 25 / 3; original 17
 the question answerer reaches only 14% of questions (172 silent of 200); the rewriting yield is no longer the limit,
 the reader's reach is. The full-502 run continues for the scale measurement, but the next registration moves the
 loop to the answer side.
+
+## AG5 registration (the loop on the answer side: the model proposes the answer, the canonical text verifies it)
+ag5_support.py. The model's reply for each question (b2_conf_answers.json, already computed) is accepted only if the
+text supports it: every content word of the reply occurs in the text (no invention), and one sentence or clause
+contains the reply's last content word together with the question's verb lemma, or, when the question has no verb
+beyond 'be / do / have', one of the question's content words. The support check is run on two substrates: the
+original sentences and the AG4 canonical clauses. Variants: unthresholded reply + support; thresholded reply
+(min_lp >= -0.11, the B2b choice) + support. Measured on dev untouched val_fresh2 (200 questions; practice val_more
+reported too), as right / wrong / fitness, against the thresholded model alone (B2b) on the same questions, and
+combined with the T22p policy where it is silent. PASS if on val_fresh2 support-on-canonical gives higher fitness
+than both support-on-original and the thresholded model alone: then the canonical text is the better verifier
+substrate, and the loop has a second use. Scored again on the 1,800 untouched once AG4 finishes all stories.
+
+## AG5 dev result -- FAIL
+Untouched val_fresh2 (200): thresholded model alone +25 (64 / 13); thresholded + support on original +25 (55 / 10);
+thresholded + support on canonical **+22 (46 / 8)**; unthresholded + support: original +3, canonical +11. With the
+policy first: +41 / +42 / +41. The canonical text verifies the model's answers no better than the prose: it has
+lost some facts (26 of 267 events, and the sentences kept unchanged carry the rest), so support fails where the
+prose would have passed, and precision rises only from 0.85 to 0.85-0.86. The loop's gain is for a symbolic reader
+(AG3), not as a verifier substrate for a model's answers.
+
+## AG6 registration (does the signal survive for a strong reader? the model answers from the canonical text)
+ag6_model_canon.py: the same model and prompt as B2b, but the story is replaced by its AG4 canonical text, for the
+400 questions of the dev block (val_more practice, val_fresh2 untouched); replies with confidence; compared with the
+B2b replies from the prose on the same questions, unthresholded and at the B2b threshold. PASS (signal kept) if
+untouched right answers from canonical >= 0.9 x those from prose at no lower precision; a large drop measures how
+much the loop loses, by question kind.
+
+## AG7 registration (reach of the symbolic reader: verb similarity)
+ag3_qa.py --sim T: a question verb absent from the events matches an event verb whose learned word vector
+(r25_vectors.npz, 13M book tokens) has cosine >= T with it; T chosen on practice val_more from {0.5, 0.6, 0.7, 0.8},
+applied once to untouched val_fresh2, on the AG4 canonical text and on the original. PASS if untouched right rises
+above 25 at precision >= 0.89 on canonical. Expected: the reach limit is partly verb mismatch ('lend' / 'gave');
+this is the cheapest test of that.
