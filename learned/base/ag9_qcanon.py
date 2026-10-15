@@ -9,8 +9,9 @@ ARGV = list(sys.argv); sys.argv = [sys.argv[0]]
 import ag1_translator as A
 from ag3_canon import STOP, ent, content, toks, gen
 from b6_rwkv import hit
-STORIES = list(range(22, 102)); PRACTICE = set(range(22, 62))
-OUT = "ag9_qstatements.json"
+STORIES = list(range(62, 102)) if "--untouched" in ARGV else list(range(22, 102)); PRACTICE = set(range(22, 62))
+OUT = ARGV[ARGV.index("--out") + 1] if "--out" in ARGV else "ag9_qstatements.json"
+CKPT = ARGV[ARGV.index("--ckpt") + 1] if "--ckpt" in ARGV else os.path.join("rwkv7", "RWKV-x070-World-0.4B-v2.9-20250107-ctx4096.pth")
 FEW = ("Instruction: Turn the question into a statement. Put ___ in place of the asked part. Use only words from the question.\n\n"
        "Question: Who planted the rows?\nStatement: ___ planted the rows.\n\n"
        "Question: Where did Rosa drop the key?\nStatement: Rosa dropped the key ___.\n\n"
@@ -56,7 +57,7 @@ def qevent(T, statement, q):
 def main():
     from rwkv7 import RWKV7, tokenizer
     T = load_translator()
-    m = RWKV7.load(os.path.join("rwkv7", "RWKV-x070-World-0.4B-v2.9-20250107-ctx4096.pth")); m.eval(); tok = tokenizer()
+    m = RWKV7.load(CKPT); m.eval(); tok = tokenizer()
     S = json.load(open("val_all13.json", encoding="utf-8"))["stories"]
     done = json.load(open(OUT, encoding="utf-8")) if os.path.exists(OUT) else {}
     stats = collections.Counter(done.pop("_stats", {})); t0 = time.time(); k = 0
@@ -117,7 +118,7 @@ def score():
                 elif hit(a, g): cell[0] += 1
                 else: cell[1] += 1
             rows.append(row)
-    json.dump(rows, open("ag9_rows.json", "w", encoding="utf-8"), indent=1)
+    json.dump(rows, open(OUT.replace("_qstatements", "_rows"), "w", encoding="utf-8"), indent=1)
     for key in sorted(res):
         r, w, sil = res[key]; print(f"AG9 {key[0]:9s} text, {key[1]:9s}: {r} right / {w} wrong / {sil} silent / fitness {r - 3 * w} / precision {r / max(1, r + w):.2f}")
     print("AG9 question events formed:", sum(1 for x in rows if x["qevent"]), "of", len(rows))
