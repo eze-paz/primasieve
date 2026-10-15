@@ -1,0 +1,4 @@
+P10 P9 selection (k=5): coverage 0.326, words 115, judge 6.124, form 0.679
+P10 lead-5: coverage 0.221, words 73, judge 6.621, form 0.696
+P10 clause retelling: coverage 0.119, words 37, judge 8.090, form 0.830
+P10 human summaries: coverage 1.000, words 128, judge 5.769, form 0.693
