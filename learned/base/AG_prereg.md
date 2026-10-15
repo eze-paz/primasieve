@@ -305,3 +305,12 @@ every question (1.5B, as AG10), AG10b syntax. Scored once on the 1,800 untouched
 the AG3 clause reader alone, and the union; reported as right / wrong / fitness / precision, beside the T22p policy
 (+512, 833 / 107) and the thresholded model (+321, 570 / 83) on the same questions. No gate beyond reporting: this
 is the number for the record. Cost: about a day of CPU at 1.5B; checkpoint per story.
+
+## AG4 scale result -- PASS (the clause loop on all 502 stories, 73,050 s)
+Verifier totals: 2,525 clauses accepted (245 at depth 2, 105 copular); rejected: no event 2,706, invented 847,
+fragment 799, copies 197, swap 7; 1,479 sentences rewritten, 330 kept as written; signal 1,426 of 1,577 events kept.
+AG3 clause reader (ag3_qa.py, no v2, no sim), **1,800 untouched questions: original 156 right / 50 wrong (+6,
+precision 0.76); canonical 207 right / 60 wrong (+27, precision 0.78)**; practice 710: 57 / 16 -> 82 / 16. More right
+at no lower precision, as registered. Precision at scale (0.78) is below the dev set's 0.89: val_fresh2 was a
+favourable 200. For the record beside the other readers on the same 1,800: T22p policy +512 (833 / 107), thresholded
+model +321 (570 / 83), this reader +27 (207 / 60). The slot-line chain (AG12-scale) is still running.
