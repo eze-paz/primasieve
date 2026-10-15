@@ -202,3 +202,13 @@ AG9 stage-1 fix before the full run (first 25 questions: 6 accepted): the model 
 ('The shelves were stacked by ___'), which the canonical grammar does not have, so passives are rejected and a third
 prompt asks for an active sentence; and the blank is probed as 'somebody / something / the blank / to the blank /
 somewhere' and must be read as a whole role (a bare 'Blank' was not tagged). Run restarted from the first question.
+
+## AG6 result -- PASS (the signal survives for a strong reader)
+The model (ckpt_read1b) answering the dev block's 400 questions from the AG4 canonical text instead of the prose
+(2,616 s). Untouched val_fresh2: unthresholded prose 125 right / 67 wrong, canonical **116 / 60** (0.93 of the right
+answers, precision 0.65 -> 0.66); thresholded (-0.11) prose 64 / 13, canonical **58 / 11** (0.91, precision 0.83 ->
+0.84). Practice: 138 / 55 -> 134 / 53; thresholded 72 / 11 -> 71 / 13. By kind (untouched, unthresholded): who 52 /
+16 -> 48 / 17, what 38 / 16 -> 35 / 12, where 21 / 19 -> 21 / 15, when 9 / 7 -> 7 / 7. Reading: the verified
+rewrite loses 7-9% of what a competent reader could answer from the prose and gains a little precision; the loss sits
+in 'who' and 'when' (dropped clauses, time phrases cut). The canonical text is a near-lossless simplification: the
+engine can take it as its input without giving up much of the signal.
