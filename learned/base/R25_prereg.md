@@ -1150,3 +1150,9 @@ why-questions (19 on val_fresh13, all silent for the main system): in the senten
 
 ## R25-eg development 1
 why 19 right / 22 wrong on practice A-F + val_fresh13 (fails the trust rule). One visible cause: purpose phrases returned with 'to' ('to fill the bird bath') where the gold forms start at the verb. Dropping the leading 'to' and re-checking.
+
+## R25-eg result -- FAIL, not adopted
+After dropping 'to': why 16 right / 25 wrong. The reason usually sits in a different sentence from the one that matches the question ('Why did Jasper deliver the letters?' -> the sore ankle is mentioned earlier), 'so' inside 'so loudly' is not a cue, and gold spans vary ('because of an accident' / 'an accident'). A sentence-local reason reader does not work; why-questions need links between sentences.
+
+## R25-eh registration (independent confirmation of the current best combination)
+Current best: main system (five-writer trust, full story phrases) + reader fallback (name-only who, quantity how). Scored once on val_fresh14, a new untouched set from a new writer agent, by the same pipeline as R25-eb (model answers appended, main system with --val-fresh14 at positions 3510-3710, combination with R25_HOW).
