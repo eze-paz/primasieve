@@ -1135,3 +1135,9 @@ Practice A-F how-questions: **52 right / 8 wrong** (0.87), 24 silent ('how did' 
 Strict: main system 27 / 6 (+9); reader (name-only who + how) 28 / 9 (+1); **together 52 right / 14 wrong** (+10), 134 silent. Article/title-free: together 53 / 13 (+14). Compared with R25-eb's combination (31 / 8, +7): twice as many questions answered (66 against 39) at 0.79 precision, a small gain in fitness.
 
 ## R25-ee (analysis): the reader's val_fresh13 mistakes (val_fresh13 is development from here).
+
+## R25-ee analysis (reader mistakes on val_fresh13)
+how 21 right / 6 wrong ('one' taken as a number: 'one' for 'three dollars'); who 7 / 6: titled names lost or confused with place names ('street' for 'Mrs. Okafor', 'riverside under' for 'Mrs. Alvarez', 'clarke' for 'Mr. Clarke').
+
+## R25-ef registration (titles and units)
+R25_TITLES: who-answers prefer a name right after a title (Mr, Mrs, Dr, Captain, Aunt ...) and keep the title; quantity answers drop 'one' unless a unit follows (except 'how many') and, for how much / far / long / late, prefer numbers followed by a unit. Development on practice A-F and val_fresh13 (both development now); the next clean score needs another untouched set.

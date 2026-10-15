@@ -71,6 +71,11 @@ def how_answer(story, qw, qrare):                                               
         if nums and (best is None or sc > best[0]): best = (sc, ws, nums)
     if best is None or (key and best[0] < 0.5 * sum(rar(w) for w in key)): return None
     sc, ws, nums = best; hits = [i for i, w in enumerate(ws) if stem(w) in {stem(x) for x in key}]
+    if os.environ.get("R25_TITLES"):                                                         # R25-ef
+        nums = [j for j in nums if not (ws[j] == "one" and sub != "many" and not (j + 1 < len(ws) and ws[j + 1] in UNITS))] or nums
+        if sub in ("much", "far", "long", "late"):
+            withunit = [j for j in nums if j + 1 < len(ws) and ws[j + 1] in UNITS]
+            nums = withunit or nums
     i = min(nums, key=lambda j: min([abs(j - h) for h in hits] or [0]))
     if sub in ("many", "old"):
         return ws[i]
@@ -104,7 +109,11 @@ def answer(story, q):
         return min(cands, key=lambda i: min(abs(i - h) for h in hits)) if cands else None
     if wh == "who":
         c = [i for i, w in enumerate(ws) if stem(w) not in qst and (raw[i][0].isupper() and i > 0 and ws[i - 1] not in PLACE or (not NAMEONLY and (w in PERSONW or (w in PERSONX and i > 0 and ws[i - 1] in DET))))]
-        i = near(c); return None if i is None else phrase_at(ws, i, raw)
+        titled = [i for i in c if i > 0 and ws[i - 1] in {"mr", "mrs", "ms", "dr", "miss", "captain", "professor", "aunt", "uncle"}]   # R25-ef
+        i = near(titled) if (titled and os.environ.get("R25_TITLES")) else near(c)
+        if i is None: return None
+        ans = phrase_at(ws, i, raw)
+        return (raw[i - 1] + " " + ans) if (os.environ.get("R25_TITLES") and i > 0 and ws[i - 1] in {"mr", "mrs", "ms", "dr", "miss", "captain", "professor", "aunt", "uncle"}) else ans
     if wh == "where":
         c = [i for i, w in enumerate(ws) if w in PLACE and i + 1 < len(ws)]
         after = [i for i in c if i > max(hits)]; c = after or c
