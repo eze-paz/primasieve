@@ -1147,3 +1147,6 @@ Practice A-F + val_fresh13: without 505 / 331 overall (who 158 / 42, how 73 / 14
 
 ## R25-eg registration (a reason reader for 'why' questions)
 why-questions (19 on val_fresh13, all silent for the main system): in the sentence that best covers the question's rare words, the clause after 'because', 'since', 'so that' or 'so' (up to the next comma or full stop), else after 'to' + verb following the matched verb ('went to the shop to buy milk' -> 'to buy milk'). Development on practice A-F (+ val_fresh13 as development); trusted if right - 3 x wrong > 0 there.
+
+## R25-eg development 1
+why 19 right / 22 wrong on practice A-F + val_fresh13 (fails the trust rule). One visible cause: purpose phrases returned with 'to' ('to fill the bird bath') where the gold forms start at the verb. Dropping the leading 'to' and re-checking.

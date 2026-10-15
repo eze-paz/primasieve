@@ -106,7 +106,7 @@ def why_answer(story, qw):                                                      
         if ws[i] == "to" and ws[i + 1] not in COMMON - {"buy", "get", "see", "help", "find", "make"}:
             j = i + 1
             while j + 1 < len(ws) and ws[j + 1] not in {"and", "but", "when", "while", "before", "after"}: j += 1
-            return " ".join(ws[i:j + 1])
+            return " ".join(ws[i + 1:j + 1])                                                   # without the leading to (gold forms omit it)
     return None
 FULL = [False]; NEAR = [True]; NAMEONLY = bool(os.environ.get("R25_NAMEONLY"))   # R25-dq: who-answers only names
 def answer(story, q):
