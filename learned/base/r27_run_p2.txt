@@ -1,0 +1,6 @@
+P2 retelling: judge 6.597, form 0.938, order gain 0.395, continuity 0.929 over 20
+P2 story first six sentences: judge 5.318, form 0.988, order gain 0.626, continuity 0.983 over 20
+P2 faithfulness (retelling sentences whose wording is found in the story): 0.973
+RETELL: Every morning the baker, Teodor opened his shop on Quay Lane at six. Then, on thursday his oven would not light, he called his cousin Radu who fixed gas pipes for a living. Later, While radu worked, Teodor sold yesterday's bread at half price. After that, by noon, the oven was hot again. In the end, the street smelled of rye.
+RETELL: A crow found a ring in the grass. Then, a crow carried it to the top of an oak. Later, a squirrel lived below asked to see it. In the end, her prize opened her beak to answer.
+RETELL: Wanjiru packed a basket of mangoes. Then, she took the bus to the market in town. Later, she sold half of them before lunch. After that, in the afternoon, she carried the rest to her aunt's house by the lake. In the end, her aunt made jam with them.

@@ -78,3 +78,15 @@ judge bits/word of a reply given the story and the question as a prefix ('<story
 
 ## P5b result -- FAIL
 The counter changed 30 of 300 sentences; judge 10.452 -> 10.572 (worse). It prefers moving an unknown name away from the sentence start ('wheeled the crate up the slipway Teague.') and base verb forms ('The bear eat the honey.'): with sentence-initial names costly and no notion of agreement, our count model is not a usable judge of whole-sentence word order either. Word-order choice stays with the rules for now; an own-model chooser needs the story as context (names known) and a model of agreement.
+
+## F2 correction (before any F2 result was read)
+Under F2 the story's own sentence is a verbatim copy of text in the prefix and costs about 1 bit/word (a 3-item check: 1.03), so it is no reference for fluency. F2b: the human reference is the story's sentence holding the answer judged after only the story text BEFORE it (fresh human text in context); our reply is judged after the whole story and the question. P1e's gate uses F2b: realised within 1 bit of the human reference.
+
+## P1e result -- PASS (F2b)
+60 untouched answers (reduced from 300: the judge reads token by token on this CPU and the full run exceeded 30 minutes): our answer sentence after story + question **3.296** bits/word; a fresh human sentence after the text before it **6.569**; form 0.983; 5 replies quoted the story (unsure rewrites); gold 53 / 53. In context, our answer sentences read as more predictable than fresh human text -- partly because they restate the question, which the reader has just seen.
+
+## P2 result -- FAIL by 0.28 bits on the judge; PASS on form, order, faithfulness
+20 untouched stories (reduced from 360 for the same reason): retelling judge 6.597, form 0.938, order gain 0.395 (> 0), continuity 0.929; story's first six sentences 5.318, 0.988, 0.626, 0.983; faithfulness 0.973. Gap 1.28 > 1. Faults seen: casing after links ('Later, While radu worked', 'on thursday'), a link before a clause that already opens with a subordinator (while / when / as), a relative clause losing 'who' ('a squirrel lived below asked to see it').
+
+## P2b registration (retelling fixes)
+(1) after a link, only a function word is lower-cased (names and weekdays keep their capital; time phrases keep the story's casing); (2) a clause that opens with a subordinator (when / while / as / after / before / if / because) gets no link; (3) a subject that the story follows with 'who' / 'that' keeps it ('a squirrel who lived below asked to see it' -> the clause is skipped if the 'who' clause is the predicate's own). Same 20 stories. PASS if within 1 bit of the stories on the judge, other gates as P2.

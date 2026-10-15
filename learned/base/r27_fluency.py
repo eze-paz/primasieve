@@ -76,3 +76,19 @@ def judge_ctx(prefix, text):
     with torch.no_grad(): lp = torch.log_softmax(m(torch.tensor([p + t]), m.new_state())[0].float(), -1)
     bits = -sum(lp[len(p) + j - 1, x].item() for j, x in enumerate(t)) / math.log(2)
     return bits / max(1, len(re.findall(r"[A-Za-z']+", text)))
+
+
+def judge_ctx_many(prefix, texts):
+    """F2, fast: the prefix is read once; each text is scored from a copy of the state after it"""
+    import copy
+    m, tok = _model(); p = tok.encode(prefix)[-3000:]
+    with torch.no_grad():
+        st0 = m.new_state(); last = torch.log_softmax(m(torch.tensor([p]), st0)[0, -1].float(), -1); out = []
+        for text in texts:
+            t = tok.encode(text)
+            if not t: out.append(float("nan")); continue
+            st = copy.deepcopy(st0); b = -last[t[0]].item()
+            if len(t) > 1:
+                lp = torch.log_softmax(m(torch.tensor([t[:-1]]), st)[0].float(), -1); b -= sum(lp[j, t[j + 1]].item() for j in range(len(t) - 1))
+            out.append(b / math.log(2) / max(1, len(re.findall(r"[A-Za-z']+", text))))
+    return out
