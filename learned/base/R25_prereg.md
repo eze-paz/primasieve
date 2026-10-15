@@ -1188,3 +1188,6 @@ Practice A-D what-answers by (full cover, near, short): best cell 65 right / 30 
 
 ## Standing state (after R25-eh)
 Best comprehension configuration: main system (trust from five writers, answers as full story phrases) + reader fallback (name-only who, quantity how). Clean untouched scores: val_fresh13 52 / 14, val_fresh14 54 / 11 (about 0.8 precision, a third of questions answered); the language model answers 48-58% correctly. Open gaps: what (largest), where, when, why, whose, which.
+
+## R25-en registration (a learned answer-finder, by counting)
+r25_ans.py: candidates = content-word runs (with optional article / title, and a place word for where-questions) in the two sentences that best cover the question's rare words; features = question kind with: side and distance to the matched words, preceding word, capital, number, length, sentence rank, the learner's word group of the last word, starting word. Naive-Bayes log odds counted from practice (gold candidate vs other), top candidate answers; trust per kind by right - 3 x wrong on training. Development: train A-D, test E-F. If a kind passes on E-F, it joins the combination and is scored once on a new untouched set.
