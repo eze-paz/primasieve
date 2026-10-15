@@ -11,7 +11,8 @@ import ag1_translator as A
 from ag3_canon import STOP, ent, content, toks
 from b6_rwkv import hit
 CKPT = ARGV[ARGV.index("--ckpt") + 1] if "--ckpt" in ARGV else os.path.join("rwkv7", "RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth")
-STORIES = list(range(62, 102)); FROM_CANON = "--from-canon" in ARGV; OUT = "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
+ALL = "--all" in ARGV; STORIES = list(range(502)) if ALL else list(range(62, 102)); FROM_CANON = "--from-canon" in ARGV
+OUT = "ag12all_lines.json" if (FROM_CANON and ALL) else "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
 SLOTS = ["WHO", "DID", "WHAT", "WHERE", "WHEN", "WHY"]
 LINE = re.compile(r"WHO:\s*(.*?)\s*\|\s*DID:\s*(.*?)\s*\|\s*WHAT:\s*(.*?)\s*\|\s*WHERE:\s*(.*?)\s*\|\s*WHEN:\s*(.*?)\s*\|\s*WHY:\s*(.*?)\s*$")
 PRON = {"he", "she", "they", "it", "him", "her", "them", "his", "their", "its"}
@@ -72,6 +73,7 @@ def main():
     for k in STORIES:
         s = S[k]
         if s["id"] in done and done[s["id"]].get("qs"): continue
+        if FROM_CANON and s["id"] not in json.load(open("ag4_canon.json", encoding="utf-8")): stats["story:canon not ready"] += 1; continue
         rec = done.get(s["id"]) or {}
         if "lines" not in rec:
             sents = [x.strip() for x in A.SENT.split(s["text"]) if x.strip()]; names = set(); prev = ""; lines = []; last_who = None
@@ -90,8 +92,8 @@ def main():
                 prev = sent
             rec["lines"] = lines
         qs = []
-        if FROM_CANON and os.path.exists("ag10_lines.json"):                          # AG12: question lines reused from AG10
-            Q10 = json.load(open("ag10_lines.json", encoding="utf-8")).get(s["id"], {}).get("qs")
+        if FROM_CANON and os.path.exists("ag12_lines.json" if ALL else "ag10_lines.json"):   # AG12: question lines reused where they exist
+            Q10 = json.load(open("ag12_lines.json" if ALL else "ag10_lines.json", encoding="utf-8")).get(s["id"], {}).get("qs")
             if Q10: rec["qs"] = Q10; done[s["id"]] = rec; done["_stats"] = dict(stats); json.dump(done, open(OUT, "w", encoding="utf-8"), indent=1); print(f"  story {k} {s['id']} ({time.time() - t0:.0f} s) {dict(stats)}".encode("ascii", "replace").decode(), flush=True); continue
         for q, g in s["qs"]:
             allowed = set(content(q)) | {A.lemma(w) for w in content(q)} | {"the", "a", "an"}
