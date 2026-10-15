@@ -1107,3 +1107,8 @@ val_fresh12 (development now): main system **35 right / 5 wrong** (was 27 / 13; 
 
 ## R25-eb registration (clean score: val_fresh13)
 A writer agent writes val_fresh13 (same neutral rules as val_fresh12). Then once: model answers appended, main system (adopted configuration: five-writer trust, --story-span2) with val_fresh13 appended at positions 3310-3510, combination with the reader's name-only who-answers; strict and article/title-free.
+
+## R25-eb result (clean, val_fresh13, scored once)
+Language model 96 / 200. Main system (five-writer trust, full story phrases): **27 right / 6 wrong**, 167 silent (precision 0.82, fitness +9). Reader (name-only who): 7 / 3 strict. Together **31 / 8** strict (+7), 32 / 7 article/title-free (+11). On the untouched set the main system is now reliable when it speaks (it was 16 / 24 on val_fresh12 before the answer-form fixes), but it answers only 17% of questions; the reader's fallback roughly breaks even here.
+
+## R25-ec (analysis): what the main system leaves silent on val_fresh13, by question kind, against the language model's answers.
