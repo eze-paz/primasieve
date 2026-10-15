@@ -1043,3 +1043,6 @@ run_dr.sh: when val_fresh12.json exists, the language model answers its 200 ques
 
 ## R25-dr run 1 -- the main system crashed on val_fresh12
 Model on val_fresh12: 90 / 200. The main system stopped with an IndexError at val_fresh12 story f12_16, question 'Who invited her to wait?' (story mentions 'Her neighbor, Mr. Sato'), after 2,586 of 2,710 questions; no combination score. Finding the cause with a short reproduction (base stories + val_fresh12 only, full traceback) before re-running.
+
+## R25-dr bug fix (main system)
+r24_events.find: a question object whose entity form is empty ('her' in 'Who invited her to wait?') indexed an empty word list. Guarded (an empty form matches nothing); no other behaviour changes. Then run_dr.sh is repeated from the main-system step (the model's answers for val_fresh12 are already appended).

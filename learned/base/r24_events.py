@@ -283,7 +283,7 @@ def _ask(log, q):
         out = []
         for e in log.events:
             if verb and not same_verb(e["verb"], verb, loose): continue
-            if obj and not (e["obj"] and (ent(obj) == e["obj"] or ent(obj).split()[-1] == e["obj"].split()[-1])): continue
+            if obj and not (e["obj"] and (ent(obj) == e["obj"] or (ent(obj).split() or [""])[-1] == (e["obj"].split() or [""])[-1])): continue
             if actor and not any(a.lower() == actor.lower() or a.lower() == ent(actor).lower() for a in e["actors"]): continue
             e = dict(e); e["strict"] = (not loose) and bool(verb) and (bool(actor) or bool(obj)) and lemma(e["verb"]) == lemma(verb); out.append(e)
         if not out and verb and not loose and not any(same_verb(e["verb"], verb) for e in log.events): return find(verb, obj, actor, loose=True)   # class-based verb similarity only when NO event has the verb
