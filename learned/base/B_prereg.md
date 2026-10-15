@@ -40,3 +40,16 @@ can add to a model (combined policy wins) or a property the model can get by its
 Runtime note: 6 s per question on this CPU (0.4B model, story prompt), about 4 h for 2,510; launched detached
 2026-10-15 00:27 with checkpoints every 50 questions (b2_conf_answers.json), over the local minutes cap but no
 alternative substrate is reachable tonight; the threshold choice and scoring run in seconds once it ends.
+
+## B2b result -- PASS (combined policy); the model alone does not reach our policy
+All 2,510 questions scored with confidence (18,045 s, CPU shared with AG3/AG4). Threshold chosen on the 710 practice
+questions: min log2-probability over the reply's tokens >= -0.11 (mean -0.04 and first-token -0.08 were worse).
+Untouched (1,800): model unthresholded -344 (1,237 right / 527 wrong); **thresholded model alone +321 (570 / 83,
+precision 0.87)**; our current policy (T22p, r26_policy_answers.json, reproduces 512 / 833 / 107) **+512**;
+**combined, policy first then the thresholded model where the policy is silent: +620 (1,082 right / 154 wrong)**.
+Where the policy is silent (860 questions) the thresholded model adds 249 right / 47 wrong (+108). Where both speak
+(357) they agree on 279 and are equally right (322 vs 321). Practice: combined +316 (policy +258).
+Reading: a confidence threshold gives the model most of its honesty (-344 -> +321), but our engine still answers
+more under the rule (+512), and the two are complementary (+620): the engine is a module that adds to a competent
+model, which is what path B needed to show. Next for B: the model as a proposer checked by the engine's rival /
+role checks on the 357 shared questions, and the thresholded model in the panels' rival check.
