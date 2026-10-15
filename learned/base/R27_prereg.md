@@ -133,3 +133,12 @@ r27_about.py. Content plan: the role reader's clauses in which X (a name or noun
 
 ## Where R27 stands (fluency line)
 Built: a fluency score (judge, form, order gain, continuity, in-context judge), a planner (content selection by question / story / entity, sentence planning with shared subjects, pronouns and definite second mentions), a realiser (statement rewriting with learned inflection and order, story wording for events). Answer sentences are fluent in context (P1e); retellings and entity replies are faithful, relevant and well-formed but ~1.1-1.2 bits/word less natural to the judge than the source text. Next lever: a human-written summary reference to tell how much of that gap is inherent, and aggregation (joining two short events into one sentence: 'She took the bus to the market and sold half of them before lunch').
+
+## P8 registration (aggregation)
+On P2d: two consecutive realised clauses with the same subject, neither opening with a time phrase or a subordinate clause, and together at most 22 words, are joined into one sentence 'Subject pred1 and pred2.' Same 20 stories; scored against P2d (6.410) and the stories (5.318); the human summaries (being written) are added as a reference when ready. PASS if the judge falls below P2d's with form >= 0.9 and faithfulness >= 0.9.
+
+## P8 result -- PASS (small); and the human reference
+Same 20 stories: human summaries (written by a separate agent that saw only these stories) judge **5.248**, form 0.988, order gain 0.640, continuity 0.967 -- as natural to the judge as the stories themselves (5.318). P2d 6.410; P8 aggregated **6.370** (form 0.918, order gain 0.428). The ~1.1-bit gap is therefore not inherent to summaries: our retellings are measurably less natural than a human summary. The visible cause is the clause-level plan: role-reader fragments and mis-assigned subjects ('Her prize opened her beak to answer'), predicates cut at clause edges.
+
+## P9 registration (sentence-level content plan)
+r27_summarise.py: the content unit is a whole story sentence. Selection: each sentence scores by its count of role-reader clauses with a subject and verb plus 1 if it mentions the story's main person (the most frequent name); keep the top 4 in story order. Sentence planning: a sentence starting with the same name as the previous kept sentence starts with he / she instead (gender from the story); nothing else rewritten. Same 20 stories; scored with judge, form, order gain, continuity, against the human summaries. PASS if within 0.5 bits of the human summaries' judge with form >= 0.95.

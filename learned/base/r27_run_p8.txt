@@ -1,0 +1,3 @@
+P8 human summaries: judge 5.248, form 0.988, order gain 0.640, continuity 0.967 over 20
+P8 P2d retelling: judge 6.410, form 0.915, order gain 0.480, continuity 0.929 over 20
+P8 P8 aggregated retelling: judge 6.370, form 0.918, order gain 0.428, continuity 0.929 over 20
