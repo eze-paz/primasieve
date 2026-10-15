@@ -1177,3 +1177,8 @@ Rare-word reader on practice A-F, what: 107 right / 126 wrong (fitness -271): no
 
 ## R25-el (development: what-answers skip verb forms)
 The listed what-mistakes on practice C+D mostly return a verb ('sold', 'owned', 'wanted', 'carried', 'opened', 'decided'). R25_NOVERB: what-answers skip verb forms (the dictionary's verb forms, -ed / -ing words) as well as common words and question words. Development on practice A-F; a fallback for 'what' only if it passes the trust rule there.
+
+## R25-el result
+what 115 right / 109 wrong on practice A-F (was 107 / 126): better, still far from the trust rule (right > 3 x wrong).
+
+## R25-em (development): is any subset of what-answers trustworthy? Trust keys (kind, full cover, place/answer close to the matched words) chosen on practice A-D, checked on E-F.
