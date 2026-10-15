@@ -7,8 +7,13 @@ Dct.load(); PAST = {}
 for f, b in Dct.EXC.items():
     if f != b and not f.endswith(("n", "ing", "s")) and (b not in PAST or len(f) < len(PAST[b])): PAST[b] = f
 PAST.update({"be": "was", "have": "had", "do": "did", "go": "went", "see": "saw", "come": "came", "give": "gave", "take": "took", "get": "got", "make": "made", "know": "knew", "find": "found", "tell": "told", "say": "said", "leave": "left", "bring": "brought", "buy": "bought", "think": "thought", "put": "put", "set": "set", "let": "let", "cut": "cut", "read": "read", "keep": "kept", "hold": "held", "run": "ran", "win": "won", "sit": "sat", "stand": "stood", "lose": "lost", "pay": "paid", "send": "sent", "build": "built", "fall": "fell", "eat": "ate", "drink": "drank", "write": "wrote", "ride": "rode", "fly": "flew", "grow": "grew", "throw": "threw", "draw": "drew", "wear": "wore", "sell": "sold", "teach": "taught", "catch": "caught", "feel": "felt", "meet": "met", "lead": "led", "hide": "hid", "spend": "spent", "lend": "lent", "sleep": "slept", "swim": "swam", "sing": "sang", "begin": "began", "break": "broke", "speak": "spoke", "steal": "stole", "wake": "woke", "choose": "chose", "forget": "forgot", "hang": "hung", "shake": "shook", "dig": "dug", "feed": "fed", "light": "lit", "bite": "bit", "blow": "blew"})
+LEARN = os.environ.get('R27_LEARN') == '1'
+LP, LO = ({}, {})
+if LEARN:
+    _j = json.load(open(os.path.join(HERE, 'r27_learned_real.json'), encoding='utf-8')); LP, LO = _j['past'], _j['order']
 def past(v):
     v = v.lower()
+    if LEARN and v in LP: return LP[v]                                                     # P4: learned inflection first
     if v in PAST: return PAST[v]
     if v.endswith("e"): return v + "d"
     if v.endswith("y") and len(v) > 2 and v[-2] not in "aeiou": return v[:-1] + "ied"
@@ -47,6 +52,10 @@ def sentence(q, a, text=''):
         PREPS = ("to", "at", "in", "on", "from", "with", "for", "into", "by", "near", "under", "behind", "after", "before", "over", "onto", "towards", "toward", "about")
         if after.split() and after.split()[-1].lower() in PREPS and a.split()[0].lower() == after.split()[-1].lower(): after = " ".join(after.split()[:-1])   # P1c (a)
         if after.lower() in PREPS: return fin(f"{subj} {vf} {after} {a}" if not a.lower().startswith(after.lower() + " ") else f"{subj} {vf} {a}")   # P1c (b)
+        if wh in ("who", "what", "whom") and LEARN:                                           # P4: learned order
+            key = f"{wh} {aux} {'prep' if after and after.split()[0].lower() in PREPS else 'noun'}"
+            if after and LO.get(key) == "answer-first": return fin(f"{subj} {vf} {a} {after}")
+            if after and LO.get(key) == "rest-first": return fin(f"{subj} {vf} {after} {a}")
         if wh in ("who", "what", "whom"):
             if after and after.split()[0].lower() not in ("to", "at", "in", "on", "from", "with", "for", "into", "by", "near", "under", "behind", "after", "before", "while", "when", "during", "about", "over"):
                 return fin(f"{subj} {vf} {after} {a}")                                          # P1b: 'gave Osip the pot of honey'

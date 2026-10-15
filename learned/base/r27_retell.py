@@ -9,6 +9,7 @@ from r27_answer import past, cap
 data = json.load(open("stories_train_v2.json", encoding="utf-8")); random.Random(24).shuffle(data); names = T.mid_caps([s["text"] for s in data[:7000]])
 train_b, _ = D0.books(); E.induce_verbish([p["text"] for p in B.paragraphs(train_b, 150000)], k=200)
 D.ON = True; T.SPAN_STOP.update(D.verb_forms() - E.NOUNISH); QR.ARGV = ["x", "--pron-ref"]
+P2B = "--p2b" in ARGV0 or "--p2c" in ARGV0; P2C = "--p2c" in ARGV0
 LINK = ["", "Then", "Later", "After that", "Then", "Later"]
 PRON = {"he", "she", "they", "it", "him", "her", "them"}
 def gender(text, name):
@@ -42,11 +43,17 @@ def realise(text, rows):
         if prev and subj.lower() == prev.lower() and subj.lower() not in PRON:
             g = gender(text, subj); subj_s = g if g else subj
         else: subj_s = subj
+        if P2B and re.search(re.escape(str(r["subj"])) + r"\s+(who|that|which)\s+" + re.escape(pred.split()[0]), text, re.I): continue   # P2b (3): a relative clause, not the main event
         s = f"{subj_s} {pred}"
         if r["when"] and r["si"] not in said_time and str(r["when"]).lower() not in s.lower():
-            w = str(r["when"]); s = f"{w[0].upper() + w[1:]}, {s[0].lower() + s[1:] if not s.split()[0][0].isupper() or s.split()[0].lower() in PRON else s}"; said_time.add(r["si"])
+            w = str(r["when"])
+            if P2B:                                                                              # P2b (1): the story's own casing
+                mw = re.search(re.escape(w), text, re.I); w = mw.group(0) if mw else w
+            s = f"{w[0].upper() + w[1:]}, {s[0].lower() + s[1:] if not s.split()[0][0].isupper() or s.split()[0].lower() in PRON else s}"; said_time.add(r["si"])
         n_out = len(out); link = "In the end" if (k == len(rows) - 1 and n_out >= 2) else LINK[min(n_out, len(LINK) - 1)]
         s = s.strip()
+        if P2C: link = "In the end" if (k == len(rows) - 1 and n_out >= 2 and r["si"] == max(x["si"] for x in rows)) else ""
+        if P2B and s.split()[0].lower() in ("when", "while", "as", "after", "before", "if", "because", "since", "until"): link = ""   # P2b (2)
         if link: s = link + ", " + (s[0].lower() + s[1:] if s.split()[0].lower() in PRON | {"the", "a", "an", "one", "every", "until", "when", "after", "before", "on", "in", "at", "by", "during"} else s)
         out.append(cap(s).rstrip(".") + "."); prev = subj
     return " ".join(out)
@@ -65,7 +72,7 @@ if __name__ == "__main__":
         rows = plan(texts[k]); out = realise(texts[k], rows) if rows else ""
         story6 = " ".join([x for x in T.SENT.split(texts[k]) if x.strip()][:6])
         res.append(dict(k=k, retell=out, story=story6, n=len(rows)))
-    json.dump(res, open("r27_p2_retell.json" if "--untouched" in ARGV0 else "r27_p2_retell_practice.json", "w", encoding="utf-8"), indent=0)
+    json.dump(res, open(("r27_p2c_retell.json" if P2C else "r27_p2b_retell.json" if P2B else "r27_p2_retell.json") if "--untouched" in ARGV0 else "r27_p2_retell_practice.json", "w", encoding="utf-8"), indent=0)
     for r in res[:5]: print("STORY:", r["story"][:300], "\nRETELL:", r["retell"], "\n")
     if "--score" in ARGV0:
         good = [r for r in res if r["retell"].count(".") >= 3]

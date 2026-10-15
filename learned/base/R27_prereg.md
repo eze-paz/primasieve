@@ -90,3 +90,15 @@ Under F2 the story's own sentence is a verbatim copy of text in the prefix and c
 
 ## P2b registration (retelling fixes)
 (1) after a link, only a function word is lower-cased (names and weekdays keep their capital; time phrases keep the story's casing); (2) a clause that opens with a subordinator (when / while / as / after / before / if / because) gets no link; (3) a subject that the story follows with 'who' / 'that' keeps it ('a squirrel who lived below asked to see it' -> the clause is skipped if the 'who' clause is the predicate's own). Same 20 stories. PASS if within 1 bit of the stories on the judge, other gates as P2.
+
+## P4 registration (realisation learned from question / story-sentence pairs)
+r27_learnreal.py. From the practice questions (main 710 + extra 600) and the story sentence holding each gold answer, the learner collects (1) inflection: for each question verb (did-questions), the word in the story sentence sharing its dictionary base -> a learned base -> past table, used before the hand table and the -ed rule; (2) order: for each question shape (question word, auxiliary), how often the gold stands right after the verb vs after the rest of the question's words in the story sentence -> the majority order per shape replaces the hand choice. Applied to the same 60 untouched answers as P1e and scored with F2b; reported against P1e (3.296). PASS if not worse than P1e by more than 0.1 bits/word with form >= 0.95 and gold kept -- i.e. the learned rules can replace the hand ones.
+
+## P2b result -- FAIL (judge gap 1.23)
+Same 20 stories: retelling judge 6.552 (P2 6.597), form 0.938, order gain 0.400, continuity 0.929, faithfulness 0.973; stories 5.318. Casing and link fixes help by only 0.05.
+
+## P2c registration (no stacked links)
+Same as P2b but no linking words at all (story order and pronouns carry the sequence); 'In the end' kept only when the last clause is the story's last sentence. Same 20 stories and gates.
+
+## P4 result -- PASS (learned rules replace the hand ones at no cost)
+Learned from 449 practice pairs: 155 past forms (kept, gave, left, grew, bought, fixed, ...) and answer order by question shape -- 'what did' + noun: rest first (41 / 10); 'what did' + preposition: answer first (23 / 20); 'where did' + noun: rest first (54 / 13); 'when did': rest first (31 / 0); 'why did': rest first (14 / 0). These are the orders the hand rules had chosen: the learner re-derived them from text. With the learned tables (R27_LEARN=1): F2b 3.296 (P1e 3.296), form 0.983, gold 53 / 53 on the same 60 answers; 923 sentences made on all untouched answers (hand rules 921).
