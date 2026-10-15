@@ -1,0 +1,5 @@
+ABOUT Teodor : Every morning the baker, Teodor opened his shop on Quay Lane at six. On Thursday his oven would not light, he called his cousin Radu who fixed gas pipes for a living. While Radu worked, he sold yesterday's bread at half price.
+ABOUT Wanjiru : Wanjiru packed a basket of mangoes. She sold half of them before lunch. In the afternoon, she carried the rest to her aunt's house by the lake. She slept there that night. In the end, she went home in the morning.
+ABOUT Mrs : Mrs showed him how to mend it with tape card.
+ABOUT She : She asked the horse to shake the trunk. She did.
+P7 relevance 1.000, faithfulness 0.920, judge reply 7.541 vs reference 6.331, form 0.940 over 25
