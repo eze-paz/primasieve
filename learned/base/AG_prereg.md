@@ -121,3 +121,12 @@ Gates: dev (val_fresh2, 200 questions, AG3 canonical 25 / 3): PASS if right > 25
 the original at no lower precision. Expected: the depth-2 pass recovers part of the 294 'no event' rejections; the
 copular rule reaches 'what was in the jar' questions. Cost: about 1.3 min per story once B2b frees the CPU, so the
 full 502 is an overnight run (resumable, checkpoint per story).
+
+## AG4 dev result -- FAIL on the dev gate (no gain on untouched; the yield is no longer the bottleneck)
+Dev block (stories 22-101, 10,519 s): 415 clauses accepted (AG3 361), 36 of them rescued at depth 2, 13 copular;
+rejected: no event 455, fragment 131, invented 110, copies 33, swap 1; signal 241 of 267 events kept.
+Symbolic QA, untouched val_fresh2: canonical **25 / 3** (AG3 25 / 3; original 17 / 4) -- unchanged; practice 30 / 5
+(AG3 25 / 4). The copular rule changed no answer. Reading: more accepted clauses do not become more answers because
+the question answerer reaches only 14% of questions (172 silent of 200); the rewriting yield is no longer the limit,
+the reader's reach is. The full-502 run continues for the scale measurement, but the next registration moves the
+loop to the answer side.
