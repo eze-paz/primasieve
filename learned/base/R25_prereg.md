@@ -1141,3 +1141,9 @@ how 21 right / 6 wrong ('one' taken as a number: 'one' for 'three dollars'); who
 
 ## R25-ef registration (titles and units)
 R25_TITLES: who-answers prefer a name right after a title (Mr, Mrs, Dr, Captain, Aunt ...) and keep the title; quantity answers drop 'one' unless a unit follows (except 'how many') and, for how much / far / long / late, prefer numbers followed by a unit. Development on practice A-F and val_fresh13 (both development now); the next clean score needs another untouched set.
+
+## R25-ef result -- no effect, not adopted
+Practice A-F + val_fresh13: without 505 / 331 overall (who 158 / 42, how 73 / 14); with 505 / 331 (who 158 / 42, how 72 / 15). The listed who-mistakes come from choosing the wrong sentence, not from the title rule. Left off.
+
+## R25-eg registration (a reason reader for 'why' questions)
+why-questions (19 on val_fresh13, all silent for the main system): in the sentence that best covers the question's rare words, the clause after 'because', 'since', 'so that' or 'so' (up to the next comma or full stop), else after 'to' + verb following the matched verb ('went to the shop to buy milk' -> 'to buy milk'). Development on practice A-F (+ val_fresh13 as development); trusted if right - 3 x wrong > 0 there.

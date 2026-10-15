@@ -85,11 +85,35 @@ def how_answer(story, qw, qrare):                                               
     if sub == "often" and j + 2 < len(ws) and ws[j + 1] in {"a", "every", "each"}: j += 2
     if sub == "late" and j + 1 < len(ws) and ws[j + 1] == "late": j += 1
     return " ".join(ws[i:j + 1])
+def why_answer(story, qw):                                                                    # R25-eg: the reason clause in the best-matching sentence
+    key = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
+    if not key: return None
+    best = None
+    for s_ in sentences(story):
+        ws = [w.lower() for w in toks(s_)]; st = {stem(w) for w in ws}
+        sc = sum(rar(w) for w in key if stem(w) in st)
+        if best is None or sc > best[0]: best = (sc, s_)
+    if best[0] < 0.5 * sum(rar(w) for w in key): return None
+    low = best[1].lower()
+    for cue in (" because ", " since ", " so that ", ", so ", " so "):
+        k = low.find(cue)
+        if k >= 0:
+            rest = low[k + len(cue):]; rest = rest.split(",")[0].split(".")[0].strip()
+            return rest if rest else None
+    ws = [w.lower() for w in toks(best[1])]; qst = {stem(w) for w in key}
+    hits = [i for i, w in enumerate(ws) if stem(w) in qst]
+    for i in range(max(hits) + 1 if hits else 0, len(ws) - 1):
+        if ws[i] == "to" and ws[i + 1] not in COMMON - {"buy", "get", "see", "help", "find", "make"}:
+            j = i + 1
+            while j + 1 < len(ws) and ws[j + 1] not in {"and", "but", "when", "while", "before", "after"}: j += 1
+            return " ".join(ws[i:j + 1])
+    return None
 FULL = [False]; NEAR = [True]; NAMEONLY = bool(os.environ.get("R25_NAMEONLY"))   # R25-dq: who-answers only names
 def answer(story, q):
     qw = [w.lower() for w in toks(q)]; wh = qw[0] if qw else ""
     qrare = [w for w in qw[1:] if w not in COMMON and w not in {"did", "does", "was", "were", "is", "do"}]
     if wh == "how" and len(qw) > 1 and qw[1] in HOWQ: return how_answer(story, qw, qrare)      # R25-ed: quantity questions
+    if wh == "why" and os.environ.get("R25_WHY"): return why_answer(story, qw)                   # R25-eg
     if not qrare or wh not in ("who", "where", "when", "what"): return None
     cands = [match_score(qrare, s) + (s,) for s in sentences(story)]
     names = [w.lower() for w in toks(q)[1:] if w[0].isupper()]                                   # R25-df: a sentence must contain the question's names
