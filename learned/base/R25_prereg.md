@@ -1171,3 +1171,6 @@ what: trusted 12 / 3, 50 silent or untrusted (language model 46 right of 65); wh
 198 practice what-questions get no answer at all; the routes that do answer are reliable when trusted (agree 19 / 1, agree+soft 12 / 0, role-alone+soft 15 / 1 ...) and the untrusted ones are poor (role-alone 8 / 20, learned-alone-exact 3 / 10). The gap is coverage: a reader that answers more what-questions, not a trust change.
 
 ## R25-ek (development): the rare-word reader's what-answers on practice A-F as they stand (after the R25-dh fixes), to see whether a fallback for 'what' could pass the trust rule.
+
+## R25-ek result
+Rare-word reader on practice A-F, what: 107 right / 126 wrong (fitness -271): not usable as a what-fallback. Sentence-local position rules do not read what-questions well enough.
