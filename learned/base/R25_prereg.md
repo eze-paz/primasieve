@@ -1130,3 +1130,8 @@ Development counts (practice A-F + val_fresh11): how many 47, how long 23, how d
 
 ## R25-ed development result
 Practice A-F how-questions: **52 right / 8 wrong** (0.87), 24 silent ('how did' and unmatched); trust fitness +28, so how-answers are trusted. Scored once on val_fresh13: main system first, then the reader's name-only who-answers and its how-answers.
+
+## R25-ed result (val_fresh13, scored once with the quantity reader)
+Strict: main system 27 / 6 (+9); reader (name-only who + how) 28 / 9 (+1); **together 52 right / 14 wrong** (+10), 134 silent. Article/title-free: together 53 / 13 (+14). Compared with R25-eb's combination (31 / 8, +7): twice as many questions answered (66 against 39) at 0.79 precision, a small gain in fitness.
+
+## R25-ee (analysis): the reader's val_fresh13 mistakes (val_fresh13 is development from here).
