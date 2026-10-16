@@ -1,0 +1,18 @@
+G1 generated 24 sentences (9 s)
+   GEN A squirrel was then living below.
+   GEN She had just sold half.
+   GEN A goat wanted the apples on the tree.
+   GEN She asked the horse.
+   GEN She had brought a blanket.
+   GEN An owl slept.
+   GEN She was then flying from the heron.
+   GEN The heron was telling in the mill.
+   GEN Ravi had lost his hat on a tram.
+   GEN They took a train.
+   GEN The children would then have the lessons in the hall.
+   GEN The animals had peace.
+   GEN The animals made peace.
+   GEN The rooster said dogs.
+   GEN Her then would back seat.
+G1 novelty 0.705; sentences with an invented content word 7 / 24; judge in context: generated 7.068 vs the story's own sentence 6.169 over 19
+G2b invented content at the root level: 0 / 24

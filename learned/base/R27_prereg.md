@@ -210,3 +210,6 @@ A planned clause is generated only if, in its story sentence, the subject's head
 
 ## G2b registration (tighter plan check)
 As G2, plus: 'and' / 'but' / 'or' / 'so' between subject and verb breaks the link; a subject head that is itself a verb form (e.g. 'torn') is rejected. PASS if the judge gap falls below G2's 1.04 with invention-free >= 90% and novelty >= 0.3.
+
+## G2b result -- PASS
+24 sentences (the stricter check drops more plans): novelty **0.705**, judge in context **7.068** vs 6.169 (gap **0.90**, G2 1.04), invention by root: see r27_run_g2b.txt. Remaining faults are still plan-side ('The rooster said dogs.', 'Her then would back seat.'), and coverage falls (24 of 60 planned facts survive the check).

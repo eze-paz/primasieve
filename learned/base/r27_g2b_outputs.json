@@ -1,0 +1,602 @@
+[
+{
+"k": 63,
+"req": [
+[
+"a"
+],
+[
+"squirrel"
+],
+[
+"live",
+"lived",
+"lives",
+"living"
+],
+[
+"below"
+]
+],
+"gen": "A squirrel was then living below.",
+"src": "A squirrel who lived below asked to see it.",
+"plan": "a squirrel | live | below | None"
+},
+{
+"k": 64,
+"req": [
+[
+"she"
+],
+[
+"sell",
+"selling",
+"sold",
+"sells"
+],
+[
+"half"
+]
+],
+"gen": "She had just sold half.",
+"src": null,
+"plan": "she | sell | half | None"
+},
+{
+"k": 66,
+"req": [
+[
+"a"
+],
+[
+"goat"
+],
+[
+"want",
+"wants",
+"wanting",
+"wanted"
+],
+[
+"the"
+],
+[
+"apples"
+],
+[
+"on"
+],
+[
+"the"
+],
+[
+"tree"
+]
+],
+"gen": "A goat wanted the apples on the tree.",
+"src": "A goat wanted the apples on the farmer's tree, but the branches were too high.",
+"plan": "a goat | want | the apples | on the farmer's tree"
+},
+{
+"k": 66,
+"req": [
+[
+"she"
+],
+[
+"ask",
+"asks",
+"asked",
+"asking"
+],
+[
+"the"
+],
+[
+"horse"
+]
+],
+"gen": "She asked the horse.",
+"src": "She asked the horse to shake the trunk, and he did, because she promised him half.",
+"plan": "she | ask | the horse | None"
+},
+{
+"k": 68,
+"req": [
+[
+"she"
+],
+[
+"bring",
+"brought",
+"bringing",
+"brings"
+],
+[
+"a"
+],
+[
+"blanket"
+]
+],
+"gen": "She had brought a blanket.",
+"src": null,
+"plan": "she | bring | a blanket | None"
+},
+{
+"k": 69,
+"req": [
+[
+"a"
+],
+[
+"owl"
+],
+[
+"sleep",
+"slept",
+"sleeps",
+"sleeping"
+]
+],
+"gen": "An owl slept.",
+"src": "A young owl could not sleep during the day because a woodpecker kept drumming on her tree.",
+"plan": "a young owl | sleep | None | None"
+},
+{
+"k": 69,
+"req": [
+[
+"she"
+],
+[
+"fly",
+"flying",
+"flew"
+],
+[
+"the"
+],
+[
+"heron"
+]
+],
+"gen": "She was then flying from the heron.",
+"src": null,
+"plan": "she | fly | None | the wise heron"
+},
+{
+"k": 69,
+"req": [
+[
+"the"
+],
+[
+"heron"
+],
+[
+"tell",
+"tells",
+"told",
+"telling",
+"telled"
+],
+[
+"in"
+],
+[
+"the"
+],
+[
+"mill"
+]
+],
+"gen": "The heron was telling in the mill.",
+"src": "The heron told her to sleep in the old chimney of the empty mill.",
+"plan": "the heron | tell | None | in the old chimney of the empty mill"
+},
+{
+"k": 70,
+"req": [
+[
+"ravi"
+],
+[
+"lose",
+"lost",
+"losing",
+"loses"
+],
+[
+"his"
+],
+[
+"hat"
+],
+[
+"on"
+],
+[
+"a"
+],
+[
+"tram"
+]
+],
+"gen": "Ravi had lost his hat on a tram.",
+"src": "They spent the second day in Porto, where Ravi lost his hat on a tram.",
+"plan": "Ravi | lose | his hat | on a tram"
+},
+{
+"k": 70,
+"req": [
+[
+"they"
+],
+[
+"take",
+"taking",
+"takes",
+"took"
+],
+[
+"a"
+],
+[
+"train"
+]
+],
+"gen": "They took a train.",
+"src": "On the third day they took a train back to Lisbon, and the hat was waiting for them at the hotel desk, because a driver had found it.",
+"plan": "they | take | a train | None"
+},
+{
+"k": 71,
+"req": [
+[
+"the"
+],
+[
+"children"
+],
+[
+"have",
+"had",
+"having"
+],
+[
+"lessons"
+],
+[
+"in"
+],
+[
+"the"
+],
+[
+"hall"
+]
+],
+"gen": "The children would then have the lessons in the hall.",
+"src": "Ten fathers and mothers spent the weekend nailing it in place, and the children had lessons in the church hall until the roof was finished.",
+"plan": "the children | have | lessons | in the church hall"
+},
+{
+"k": 72,
+"req": [
+[
+"the"
+],
+[
+"animals"
+],
+[
+"have",
+"had",
+"having"
+],
+[
+"peace"
+]
+],
+"gen": "The animals had peace.",
+"src": "A fox told a rooster that all the animals had made peace and invited him down from the wall.",
+"plan": "the animals | have | peace | None"
+},
+{
+"k": 72,
+"req": [
+[
+"the"
+],
+[
+"animals"
+],
+[
+"make",
+"makes",
+"made",
+"making"
+],
+[
+"peace"
+]
+],
+"gen": "The animals made peace.",
+"src": "A fox told a rooster that all the animals had made peace and invited him down from the wall.",
+"plan": "the animals | make | peace | None"
+},
+{
+"k": 72,
+"req": [
+[
+"the"
+],
+[
+"rooster"
+],
+[
+"say",
+"saying",
+"said",
+"says"
+],
+[
+"dogs"
+]
+],
+"gen": "The rooster said dogs.",
+"src": "The rooster said he could see two dogs running toward them and asked whether the fox would wait to greet them.",
+"plan": "the rooster | say | two dogs | None"
+},
+{
+"k": 74,
+"req": [
+[
+"her"
+],
+[
+"back",
+"backing",
+"backs",
+"backed"
+],
+[
+"seat"
+]
+],
+"gen": "Her then would back seat.",
+"src": "Zeynep, a taxi driver in a busy port city, found a violin on her back seat one night.",
+"plan": "her | back | seat | None"
+},
+{
+"k": 74,
+"req": [
+[
+"she"
+],
+[
+"drive",
+"drives",
+"driving",
+"drove"
+],
+[
+"the"
+],
+[
+"hall"
+]
+],
+"gen": "She was just driving up to the hall.",
+"src": null,
+"plan": "she | drive | None | the concert hall"
+},
+{
+"k": 75,
+"req": [
+[
+"she"
+],
+[
+"climb",
+"climbing",
+"climbed",
+"climbs"
+],
+[
+"the"
+],
+[
+"sides"
+]
+],
+"gen": "She would then climb the sides.",
+"src": "She could not climb the smooth sides, so she kept swimming in circles all night.",
+"plan": "she | climb | the smooth sides | None"
+},
+{
+"k": 76,
+"req": [
+[
+"it"
+],
+[
+"pick",
+"picked",
+"picking",
+"picks"
+],
+[
+"at"
+],
+[
+"the"
+],
+[
+"corner"
+]
+],
+"gen": "It had just picked at the corner.",
+"src": "Next it picked up Siobhan at the bakery corner.",
+"plan": "it | pick | Siobhan | at the bakery corner"
+},
+{
+"k": 78,
+"req": [
+[
+"he"
+],
+[
+"break",
+"broke",
+"breaks",
+"breaking"
+],
+[
+"the"
+],
+[
+"badger"
+]
+],
+"gen": "He broke the badger.",
+"src": "The bear said he would break it open if the badger kept watch for the bees.",
+"plan": "he | break | the badger | None"
+},
+{
+"k": 79,
+"req": [
+[
+"her"
+],
+[
+"son"
+],
+[
+"take",
+"taking",
+"takes",
+"took"
+],
+[
+"the"
+],
+[
+"ladder"
+],
+[
+"the"
+],
+[
+"school"
+]
+],
+"gen": "Her son took the ladder to the school.",
+"src": "On Tuesday her son took the ladder to the school to help paint a mural.",
+"plan": "her son | take | the ladder | the school"
+},
+{
+"k": 80,
+"req": [
+[
+"the"
+],
+[
+"island"
+],
+[
+"be",
+"bing",
+"was",
+"bes"
+]
+],
+"gen": "The island was.",
+"src": "The ferry to the island was cancelled because of high winds, so the postman, Sefa, hired a fishing boat.",
+"plan": "the island | be | None | None"
+},
+{
+"k": 80,
+"req": [
+[
+"the"
+],
+[
+"island"
+],
+[
+"cancel",
+"cancelled",
+"cancels",
+"canceled"
+]
+],
+"gen": "The island cancelled.",
+"src": "The ferry to the island was cancelled because of high winds, so the postman, Sefa, hired a fishing boat.",
+"plan": "the island | cancel | None | None"
+},
+{
+"k": 81,
+"req": [
+[
+"a"
+],
+[
+"peacock"
+],
+[
+"laugh",
+"laughed",
+"laughs",
+"laughing"
+],
+[
+"her"
+],
+[
+"grey"
+],
+[
+"at"
+],
+[
+"a"
+],
+[
+"crane"
+]
+],
+"gen": "A peacock was also laughing her grey at a crane.",
+"src": "A peacock laughed at a crane for her plain grey feathers.",
+"plan": "a peacock | laugh | her plain grey | at a crane"
+},
+{
+"k": 81,
+"req": [
+[
+"she"
+],
+[
+"fly",
+"flying",
+"flew"
+],
+[
+"high"
+],
+[
+"over"
+],
+[
+"the"
+],
+[
+"hills"
+]
+],
+"gen": "She was then flying high over the hills.",
+"src": null,
+"plan": "she | fly | high | over the hills"
+}
+]
