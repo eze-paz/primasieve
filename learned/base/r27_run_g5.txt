@@ -1,0 +1,8 @@
+OURS: The oven was hot. 
+OURS: A squirrel was then living below. 
+OURS: She sold her half. It carried the rest of her house. Her aunt made. 
+OURS:  
+G3 G5 counts+network own-words retelling: judge 7.751, form 0.792, order gain 0.421 over 12
+G3 human summaries: judge 5.240, form 1.000, order gain 0.621 over 12
+G3 P8 story-wording retelling: judge 6.252, form 0.918, order gain 0.480 over 12
+G3 novelty of our retellings: 0.699

@@ -228,3 +228,15 @@ Clause plans (every content word required): judge 7.688, form 0.830, order gain 
 
 ## G5 registration (a stronger writer: counts + the network)
 Same generator as G4 and G2b, but each step's next-word distribution is the average of the counter's (o5mxa) and the static network's (r25_ch, state carried through the words written so far) full distributions over the 65,534-word list; beam 16. Run on the G2b plans (sentence level) and the G4 clause plans (paragraph level), same 20 stories. PASS if either beats its own earlier result on the judge (G2b gap 0.90; G4 7.688) without losing invention-freedom.
+
+## G5 result -- small gain at paragraph level; clause plans not completed
+Counts + network (network state from reading the story), sentence plans: judge 7.751 (G3 with counts alone 7.965), form 0.792, order gain 0.421, novelty 0.699 (12 stories with 2+ sentences); P8 story wording 6.252; human 5.240. Clause plans: the run exceeded 30 minutes (network step per beam per word) and produced no score; a one-story check still reads 'with his back fixed on her the gas out of the pipes in the of living'. Reading: the network helps a little; paragraph-level own-words writing is limited by plan coverage (sentence plans) and by our models' grammar over long constrained spans (clause plans).
+
+## G-line summary
+| test | what | result |
+|---|---|---|
+| G1 / G1b | plan words + count model writes one sentence | novelty 0.60-0.69; judge gap 2.3 -> 1.6 |
+| G2 / G2b | plan checked before writing | PASS: gap 1.04 -> 0.90, no invented content, novelty 0.69-0.71 |
+| G3 | paragraphs from checked plans | FAIL: thin content (7.97 vs P8 6.19) |
+| G4 | paragraphs from whole-clause plans | FAIL: broken function-word chains (7.69) |
+| G5 | counts + network writer | small gain (7.75); long plans too slow / still broken |

@@ -197,3 +197,78 @@ def paragraph_clause(text, max_sent=6):
             s = realise_words(w, text)
             if s: out.append(s); prev = subj
     return " ".join(out)
+
+
+# ---- G5: counts + network writer ----------------------------------------------------------------------------------
+_NET = {}
+def _net():
+    if not _NET:
+        argv_ = sys.argv; sys.argv = ["r25_rnn.py", "--groups", "--oov-groups", "--lookup", "0", "--threads", "4", "--groups-file", "r25_classes_wnx.json"]
+        src = open(os.path.join(HERE, "r25_rnn.py"), encoding="utf-8").read(); src = src[:src.index("net = RNet()")]
+        R = {"__name__": "r25_rnn_defs", "__file__": os.path.join(HERE, "r25_rnn.py")}; exec(compile(src, "r25_rnn.py", "exec"), R); sys.argv = argv_
+        torch = R["torch"]; net = R["RNet"](); net.load_state_dict(torch.load(os.path.join(HERE, "r25_ch.pt"))); net.eval()
+        gw, unk2, _uni, _cnt, UNKG, vi_ = R["gw"], R["unk2"], R["_uni"], R["_cnt"], R["UNKG"], R["vi"]
+        grp = np.array([gw(w) for w in top]); fac = np.array([(_uni[w] + 0.5) / _cnt[gw(w)] if gw(w) != UNKG else 2 ** -unk2(w) for w in top])
+        _NET.update(torch=torch, net=net, grp=grp, fac=fac, vi=vi_)
+    return _NET
+def net_step(h, word):
+    N = _net(); torch = N["torch"]; net = N["net"]
+    with torch.no_grad():
+        x = torch.tensor([[N["vi"].get(word, 0)]]); o, h2 = net.rnn(net.inp(net.emb(x)), h)
+        lp = torch.log_softmax(net.out(net.out_ln(o[0, -1:])), -1)[0].numpy()
+    pv = np.zeros(65536); pv[1:65535] = np.exp(lp[N["grp"]]) * N["fac"]; return h2, pv
+def net_read(text):
+    N = _net(); torch = N["torch"]; net = N["net"]; ws = [x.lower() for x in re.findall(r"[A-Za-z']+", text)]
+    with torch.no_grad():
+        x = torch.tensor([[N["vi"].get(w, 0) for w in ws]]); o, h = net.rnn(net.inp(net.emb(x)), None)
+        lp = torch.log_softmax(net.out(net.out_ln(o[0, -1:])), -1)[0].numpy()
+    pv = np.zeros(65536); pv[1:65535] = np.exp(lp[N["grp"]]) * N["fac"]; return h, pv
+def generate_mix(req, text_state, width=16, vi=1, gaps=None):
+    """as generate(), with the next-word distribution = mean of counts and network (state from reading the story)"""
+    h0, pv0 = text_state
+    beams = [(0.0, [0], [], 0, 0, h0, pv0)]; done = []
+    for step in range(5 * len(req) + 2):
+        nb = []
+        for lp, prev, words, r, free, h, pv in beams:
+            p = 0.5 * kn_full(prev) + 0.5 * pv
+            fl = req[r]
+            if r == vi and len(fl) > 1 and words:
+                aux = next((x for x in reversed(words[-2:]) if x in ("had", "was", "were", "would", "could", "did")), None); b = fl[0]
+                if aux == "had": fl = [f for f in fl if f == past(b)] or fl
+                elif aux in ("was", "were"): fl = [f for f in fl if f.endswith("ing")] or fl
+                elif aux in ("would", "could", "did"): fl = [b] if b in wid else fl
+                else: fl = [f for f in fl if f == past(b)] or fl
+            cand = [(wid[f], f, r + 1, 0) for f in fl]
+            gcls, gmax = gaps[r] if gaps else ((0, 1) if r == 0 else ((1, 3) if r <= vi else (2, 3)))
+            if gcls is not None and free < gmax:
+                allow = SLOT[gcls]; fids = allow[np.argsort(-p[allow])[:12]]
+                cand += [(int(i), top[int(i) - 1], r, free + 1) for i in fids]
+            for i, w, r2, f2 in cand:
+                if words and w == words[-1]: continue
+                if w in ("was", "were") and words:
+                    plural = words[-1].endswith("s") and words[-1] not in ("his", "was") or words[-1] in ("they", "we")
+                    if (w == "were") != plural: continue
+                nb.append((lp + math.log(max(p[i], 1e-12)), prev + [i], words + [w], r2, f2, h, None))
+        nb.sort(key=lambda s: -s[0]); nb = nb[:width]; beams = []
+        for s_ in nb:
+            h2, pv2 = net_step(s_[5], s_[2][-1])
+            st2 = s_[:5] + (h2, pv2)
+            (done if s_[3] == len(req) else beams).append(st2)
+        if not beams: break
+    if not done: return None
+    return max(done, key=lambda s: s[0])[2]
+def paragraph_mix(text, clause=False, max_sent=5):
+    out = []; prev = None; ts = net_read(text)
+    plans = RT.plan(text)[:6] if clause else [x for x in RT.plan(text) if plan_ok(text, x)][:max_sent]
+    for r in plans:
+        rq = requirements_clause(r) if clause else requirements(r)
+        if not rq: continue
+        req, vi, gaps = rq; subj = str(r["subj"]).lower()
+        if prev and subj == prev:
+            g = RT.gender(text, str(r["subj"])) or ("it" if not str(r["subj"])[0].isupper() else None)
+            if g and g in wid: req = [[g]] + req[vi:] if not clause else [[g]] + req[1:]; gaps = ([(None, 0)] + gaps[vi:]) if not clause else ([(None, 0)] + gaps[1:]); vi = 1
+        w = generate_mix(req, ts, vi=vi, gaps=gaps)
+        if w:
+            s = realise_words(w, text)
+            if s: out.append(s); prev = subj
+    return " ".join(out)
