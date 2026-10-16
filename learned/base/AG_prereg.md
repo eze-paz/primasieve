@@ -373,3 +373,15 @@ union AG3 + AG14: 46 right / 6 wrong / 148 silent / fitness 28 / precision 0.885
 Reading: the two slot-line writings of the same clauses (alone, and with the source sentence) are complementary:
 the first is precise on who / what, the second brings time and reason. The scale run (AG12-scale) is still the
 AG12 configuration; the AG13 pass over all stories would be a second day of CPU and is not started.
+
+## AG14 silence audit (untouched, 164 silent)
+63 no question line (the AG10 question writer's lines were rejected before the zero-'?' allowance); 64 no story line
+with the question's verb (38 plain, 26 where the verb sits in another slot), most of them copular 'who was / where
+was / who had' questions, which the slot writer rarely renders as lines; 24 a verb line exists but another slot
+mismatches (pronoun objects, a different agent); 13 matched but the asked slot is empty (the place written into WHAT).
+
+## AG15 registration (all 200 question lines regenerated with the AG13c allowance)
+ag15_q.py: every question of the untouched dev block gets a new line from the 1.5B model (AG10 prompt for who / what
+/ where, AG13b prompt for when / why / whose / how), verifier as AG13c (zero or one '?', provenance), syntax rule
+places the '?'; story lines = AG14's. The scale run is paused for it (one 1.5B model fits in memory) and resumed
+after. PASS if untouched right > 33 at precision >= 0.89.
