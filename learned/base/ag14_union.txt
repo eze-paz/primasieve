@@ -1,0 +1,2 @@
+union AG3 + AG14: 46 right / 6 wrong / 148 silent / fitness 28 / precision 0.885 (AG14 added 24)
+union AG14 first, then AG3: 46 right / 6 wrong / 148 silent / fitness 28 / precision 0.885

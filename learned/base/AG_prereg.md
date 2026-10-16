@@ -359,3 +359,17 @@ the gate. Union with the AG3 clause reader 41 / 7 (0.85); AG12's union stays bes
 time questions are now reachable through the chain (story WHEN from clause + sentence, question WHEN from syntax),
 at the cost of a few wrong where / why lines from the sentence context; the next step is the two together (AG12's
 story lines where AG13's add nothing) rather than either alone.
+
+## AG14 registration (AG12 and AG13 story lines together; no model runs)
+Story lines = AG12's (from clauses alone) plus AG13's (clause + sentence) for each story, AG12's first, duplicates
+dropped; question lines = AG13c's (AG10's with the when / why / whose / how lines regenerated), AG10b syntax rule.
+Scored from the saved files on untouched val_fresh2. PASS if right > 28 at precision >= 0.89.
+
+## AG14 result -- PASS
+309 merged story lines (AG12 210 + AG13 additions). Untouched val_fresh2, syntax rule: **33 right / 3 wrong / 164
+silent, fitness +24, precision 0.92**; by kind who 14 / 1, what 10 / 0, when 4 / 0, where 4 / 2, why 1 / 0. Best
+single symbolic reader of the line (AG12 28 / 2, AG3 clause reader 25 / 3). Unions with the clause reader:
+union AG3 + AG14: 46 right / 6 wrong / 148 silent / fitness 28 / precision 0.885 (AG14 added 24); union AG14 first, then AG3: 46 right / 6 wrong / 148 silent / fitness 28 / precision 0.885.
+Reading: the two slot-line writings of the same clauses (alone, and with the source sentence) are complementary:
+the first is precise on who / what, the second brings time and reason. The scale run (AG12-scale) is still the
+AG12 configuration; the AG13 pass over all stories would be a second day of CPU and is not started.
