@@ -434,3 +434,15 @@ recovery against AG3 / AG4 (0.4B: 240 of 266 events kept on this block), and the
 clauses (AG3: 25 / 3). Then, if the clauses are better, the slot lines are rewritten from them (AG12 and AG13 style)
 and the AG15 question lines reused. PASS for this registration if the clause reader on the 1.5B clauses beats 25 / 3
 at precision >= 0.89. The scale run (AG12 configuration) is paused for it; one 1.5B model fits in memory.
+
+## AG19 result -- PASS
+1.5B clause loop on the 40 untouched dev stories (2,393 s): 178 clauses accepted, 109 sentences rewritten, 28 kept
+as written; rejected: fragment 184, no event 143, copies 41, invented 34, swap 1; signal 95 of 119 events kept (the
+1.5B writes fewer, cleaner clauses). AG3 clause reader on them: **26 right / 2 wrong (0.93)** against 25 / 3 on the
+0.4B clauses. Clauses are slightly better; the gain for the chain comes next.
+
+## AG20 registration (the full chain on the 1.5B clauses)
+ag10_slots.py --from-canon --canon-file ag19_canon.json, twice: clauses alone (AG12 style, out ag20a_lines.json) and
+clause + sentence (AG13 style, out ag20b_lines.json); question lines reused from AG15 (--qlines ag15_lines.json);
+story lines merged as AG14; AG16 matching; syntax rule. Untouched val_fresh2 once. PASS if right > 34 at precision
+>= 0.89 (AG15: 34 / 4). About two hours of 1.5B time; the scale run stays paused.

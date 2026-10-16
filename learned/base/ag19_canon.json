@@ -1,0 +1,1104 @@
+{
+ "f1": {
+  "k": 62,
+  "canon": "Every morning the baker, Teodor, opened his shop on Quay Lane at six. On Thursday his oven would not light, so he called his cousin Radu, who fixed gas pipes for a living. Radu worked. the street smelled of rye.",
+  "log": [
+   {
+    "sent": "Every morning the baker, Teodor, opened his shop on Quay Lane at six.",
+    "kept": []
+   },
+   {
+    "sent": "On Thursday his oven would not light, so he called his cousin Radu, who fixed gas pipes for a living.",
+    "kept": []
+   },
+   {
+    "sent": "While Radu worked, Teodor sold yesterday's bread at half price.",
+    "kept": [
+     "Radu worked"
+    ]
+   },
+   {
+    "sent": "By noon the oven was hot again and the street smelled of rye.",
+    "kept": [
+     "the street smelled of rye"
+    ]
+   }
+  ]
+ },
+ "_stats": {
+  "reject:fragment": 184,
+  "reject:no event": 143,
+  "reject:copies context": 41,
+  "sentence:kept": 28,
+  "accept": 178,
+  "sentence:rewritten": 109,
+  "signal:events": 119,
+  "signal:recovered": 95,
+  "reject:invented ok": 1,
+  "reject:invented": 16,
+  "reject:invented quickly": 1,
+  "reject:invented laughed": 1,
+  "reject:invented helped": 1,
+  "reject:invented painted": 2,
+  "reject:swap": 1,
+  "reject:invented name": 1,
+  "reject:invented carried": 1,
+  "reject:invented donkey's": 1,
+  "reject:invented collected": 1,
+  "reject:invented about,sentence": 1,
+  "reject:invented kind,owner,replied": 1,
+  "reject:invented master,surprised": 1,
+  "reject:invented kind,man,nodded,owned,said": 1,
+  "reject:invented impressed": 1,
+  "reject:invented dog's,name": 1
+ },
+ "f2": {
+  "k": 63,
+  "canon": "A crow found a ring in the grass. The crow carried the ring to the top of an oak. A squirrel who lived below asked to see it. The crow opened her beak. The ring fell into the squirrel's paws. The squirrel buried it under the roots. The crow never found it again.",
+  "log": [
+   {
+    "sent": "A crow found a ring in the grass and carried it to the top of an oak.",
+    "kept": [
+     "A crow found a ring in the grass.",
+     "The crow carried the ring to the top of an oak."
+    ]
+   },
+   {
+    "sent": "A squirrel who lived below asked to see it.",
+    "kept": []
+   },
+   {
+    "sent": "The crow, proud of her prize, opened her beak to answer, and the ring fell into the squirrel's paws.",
+    "kept": [
+     "The crow opened her beak.",
+     "The ring fell into the squirrel's paws."
+    ]
+   },
+   {
+    "sent": "The squirrel buried it under the roots, and the crow never found it again.",
+    "kept": [
+     "The squirrel buried it under the roots.",
+     "The crow never found it again."
+    ]
+   }
+  ]
+ },
+ "f3": {
+  "k": 64,
+  "canon": "Wanjiru packed a basket of mangoes. She sold half of them. In the afternoon she carried the rest to her aunt's house by the lake, and her aunt made jam with them. Wanjiru slept there that night. Wanjiru went home in the morning.",
+  "log": [
+   {
+    "sent": "At eight o'clock Wanjiru packed a basket of mangoes and took the bus to the market in town.",
+    "kept": [
+     "Wanjiru packed a basket of mangoes"
+    ]
+   },
+   {
+    "sent": "She sold half of them before lunch.",
+    "kept": [
+     "She sold half of them."
+    ]
+   },
+   {
+    "sent": "In the afternoon she carried the rest to her aunt's house by the lake, and her aunt made jam with them.",
+    "kept": []
+   },
+   {
+    "sent": "Wanjiru slept there that night and went home in the morning.",
+    "kept": [
+     "Wanjiru slept there that night.",
+     "Wanjiru went home in the morning."
+    ]
+   }
+  ]
+ },
+ "f4": {
+  "k": 65,
+  "canon": "Mrs Adebayo ran the lending library. Mrs Adebayo was the one who ran the lending library. One rainy Saturday a boy named Kazuo returned a book with a torn cover. she showed him how to mend it with tape and card. Now Kazuo helps her repair books after school.",
+  "log": [
+   {
+    "sent": "Mrs Adebayo ran the lending library in the village hall.",
+    "kept": [
+     "Mrs Adebayo ran the lending library.",
+     "Mrs Adebayo was the one who ran the lending library."
+    ]
+   },
+   {
+    "sent": "One rainy Saturday a boy named Kazuo returned a book with a torn cover.",
+    "kept": []
+   },
+   {
+    "sent": "Instead of scolding him, she showed him how to mend it with tape and card.",
+    "kept": [
+     "she showed him how to mend it with tape and card"
+    ]
+   },
+   {
+    "sent": "Now Kazuo helps her repair books after school.",
+    "kept": []
+   }
+  ]
+ },
+ "f5": {
+  "k": 66,
+  "canon": "A goat wanted the apples on the farmer's tree. She asked the horse to shake the trunk. The horse did it because she promised him half. When the apples fell, the goat ate every one. The goat left only the cores. The horse never helped the goat. The horse never helped the goat again.",
+  "log": [
+   {
+    "sent": "A goat wanted the apples on the farmer's tree, but the branches were too high.",
+    "kept": [
+     "A goat wanted the apples on the farmer's tree."
+    ]
+   },
+   {
+    "sent": "She asked the horse to shake the trunk, and he did, because she promised him half.",
+    "kept": [
+     "She asked the horse to shake the trunk.",
+     "The horse did it because she promised him half."
+    ]
+   },
+   {
+    "sent": "When the apples fell, the goat ate every one and left only the cores.",
+    "kept": [
+     "When the apples fell, the goat ate every one.",
+     "The goat left only the cores."
+    ]
+   },
+   {
+    "sent": "The horse never helped the goat again.",
+    "kept": [
+     "The horse never helped the goat.",
+     "The horse never helped the goat again."
+    ]
+   }
+  ]
+ },
+ "f6": {
+  "k": 67,
+  "canon": "Before breakfast, Dmitri hung his wet boots on the fence. His sister Jovana moved them into the barn. When it started to rain. He took the boots from the barn to the river. That evening Dmitri found them drying beside the stove.",
+  "log": [
+   {
+    "sent": "Before breakfast, Dmitri hung his wet boots on the fence.",
+    "kept": []
+   },
+   {
+    "sent": "His sister Jovana moved them into the barn when it started to rain.",
+    "kept": [
+     "His sister Jovana moved them into the barn.",
+     "When it started to rain."
+    ]
+   },
+   {
+    "sent": "At noon their father wanted to go fishing and took the boots from the barn to the river.",
+    "kept": [
+     "He took the boots from the barn to the river."
+    ]
+   },
+   {
+    "sent": "That evening Dmitri found them drying beside the stove.",
+    "kept": []
+   }
+  ]
+ },
+ "f7": {
+  "k": 68,
+  "canon": "The new nurse at the clinic noticed an old man in the waiting room shivering. The new nurse at the clinic noticed an old man. She brought him a blanket. She brought him a cup of tea. The man, Mr Okonjo, said he had walked from the hills because his bus had broken down. Mr Okonjo said he had walked from the hills because his bus had broken down. Dr Lindgren saw him first. Fatou drove him home after her shift.",
+  "log": [
+   {
+    "sent": "The new nurse at the clinic, Fatou, noticed that an old man in the waiting room was shivering.",
+    "kept": [
+     "The new nurse at the clinic noticed an old man in the waiting room shivering.",
+     "The new nurse at the clinic noticed an old man"
+    ]
+   },
+   {
+    "sent": "She brought him a blanket and a cup of tea.",
+    "kept": [
+     "She brought him a blanket.",
+     "She brought him a cup of tea."
+    ]
+   },
+   {
+    "sent": "The man, Mr Okonjo, said he had walked from the hills because his bus had broken down.",
+    "kept": [
+     "The man, Mr Okonjo, said he had walked from the hills because his bus had broken down.",
+     "Mr Okonjo said he had walked from the hills because his bus had broken down."
+    ]
+   },
+   {
+    "sent": "Dr Lindgren saw him first, and Fatou drove him home after her shift.",
+    "kept": [
+     "Dr Lindgren saw him first.",
+     "Fatou drove him home after her shift."
+    ]
+   }
+  ]
+ },
+ "f8": {
+  "k": 69,
+  "canon": "A young owl could not sleep during the day because a woodpecker kept drumming on her tree. She flew to the wise heron. She asked for advice. The heron told her to sleep in the old chimney of the empty mill. The heron told her to sleep in the old. There the owl slept soundly, and the woodpecker drummed for no one.",
+  "log": [
+   {
+    "sent": "A young owl could not sleep during the day because a woodpecker kept drumming on her tree.",
+    "kept": []
+   },
+   {
+    "sent": "She flew to the wise heron and asked for advice.",
+    "kept": [
+     "She flew to the wise heron.",
+     "She asked for advice."
+    ]
+   },
+   {
+    "sent": "The heron told her to sleep in the old chimney of the empty mill.",
+    "kept": [
+     "The heron told her to sleep in the old chimney of the empty mill.",
+     "The heron told her to sleep in the old"
+    ]
+   },
+   {
+    "sent": "There the owl slept soundly, and the woodpecker drummed for no one.",
+    "kept": []
+   }
+  ]
+ },
+ "f9": {
+  "k": 70,
+  "canon": "Priya and her brother Ravi flew from Delhi to Lisbon. They flew on the first day of the trip. They flew from Delhi to Lisbon. They spent the second day in Porto. they took a train back to Lisbon.",
+  "log": [
+   {
+    "sent": "On the first day of the trip, Priya and her brother Ravi flew from Delhi to Lisbon.",
+    "kept": [
+     "Priya and her brother Ravi flew from Delhi to Lisbon.",
+     "They flew on the first day of the trip.",
+     "They flew from Delhi to Lisbon."
+    ]
+   },
+   {
+    "sent": "They spent the second day in Porto, where Ravi lost his hat on a tram.",
+    "kept": [
+     "They spent the second day in Porto."
+    ]
+   },
+   {
+    "sent": "On the third day they took a train back to Lisbon, and the hat was waiting for them at the hotel desk, because a driver had found it.",
+    "kept": [
+     "they took a train back to Lisbon"
+    ]
+   }
+  ]
+ },
+ "f10": {
+  "k": 71,
+  "canon": "When the storm took the roof off the school,. Goran brought timber from his yard. Goran is a carpenter. Ten fathers and mothers spent the weekend. And the children had lessons in the church hall.",
+  "log": [
+   {
+    "sent": "When the storm took the roof off the school, the headmistress, Ms Mbatha, asked parents for help.",
+    "kept": [
+     "When the storm took the roof off the school,"
+    ]
+   },
+   {
+    "sent": "A carpenter, Goran, brought timber from his yard.",
+    "kept": [
+     "Goran brought timber from his yard.",
+     "Goran is a carpenter."
+    ]
+   },
+   {
+    "sent": "Ten fathers and mothers spent the weekend nailing it in place, and the children had lessons in the church hall until the roof was finished.",
+    "kept": [
+     "Ten fathers and mothers spent the weekend",
+     "And the children had lessons in the church hall"
+    ]
+   }
+  ]
+ },
+ "f11": {
+  "k": 72,
+  "canon": "A fox told a rooster. and invited him down from the wall. The rooster asked whether the fox would wait to greet them. The fox ran off. The fox ran off at once. The rooster laughed.",
+  "log": [
+   {
+    "sent": "A fox told a rooster that all the animals had made peace and invited him down from the wall.",
+    "kept": [
+     "A fox told a rooster",
+     "and invited him down from the wall."
+    ]
+   },
+   {
+    "sent": "The rooster said he could see two dogs running toward them and asked whether the fox would wait to greet them.",
+    "kept": [
+     "The rooster asked whether the fox would wait to greet them."
+    ]
+   },
+   {
+    "sent": "The fox ran off at once.",
+    "kept": [
+     "The fox ran off.",
+     "The fox ran off at once."
+    ]
+   },
+   {
+    "sent": "The rooster laughed, because there were no dogs at all.",
+    "kept": [
+     "The rooster laughed"
+    ]
+   }
+  ]
+ },
+ "f12": {
+  "k": 73,
+  "canon": "Hamid left his phone on the kitchen table. His daughter found it. She put it in her school bag. At lunchtime she called him from it, laughing, and that evening she handed it back to him at the bus stop.",
+  "log": [
+   {
+    "sent": "Hamid left his phone on the kitchen table when he went to work.",
+    "kept": [
+     "Hamid left his phone on the kitchen table."
+    ]
+   },
+   {
+    "sent": "His daughter Yusra found it and put it in her school bag by mistake.",
+    "kept": [
+     "His daughter found it.",
+     "She put it in her school bag."
+    ]
+   },
+   {
+    "sent": "At lunchtime she called him from it, laughing, and that evening she handed it back to him at the bus stop.",
+    "kept": []
+   }
+  ]
+ },
+ "f13": {
+  "k": 74,
+  "canon": "Zeynep found a violin on her back seat. Zeynep found a violin on her back seat one night. She drove to the concert hall. The case had a ticket stub inside. The orchestra's cellist, Oskar, had left it there. Oskar had left it there. He gave Zeynep two seats. He gave Zeynep two seats for the Sunday show.",
+  "log": [
+   {
+    "sent": "Zeynep, a taxi driver in a busy port city, found a violin on her back seat one night.",
+    "kept": [
+     "Zeynep found a violin on her back seat.",
+     "Zeynep found a violin on her back seat one night."
+    ]
+   },
+   {
+    "sent": "She drove to the concert hall because the case had a ticket stub inside.",
+    "kept": [
+     "She drove to the concert hall.",
+     "The case had a ticket stub inside."
+    ]
+   },
+   {
+    "sent": "The orchestra's cellist, Oskar, had left it there after his last ride.",
+    "kept": [
+     "The orchestra's cellist, Oskar, had left it there.",
+     "Oskar had left it there."
+    ]
+   },
+   {
+    "sent": "He gave Zeynep two seats for the Sunday show.",
+    "kept": [
+     "He gave Zeynep two seats.",
+     "He gave Zeynep two seats for the Sunday show."
+    ]
+   }
+  ]
+ },
+ "f14": {
+  "k": 75,
+  "canon": "A mouse fell into a bucket of milk. The mouse fell into the bucket of milk. She kept swimming in circles all night. By morning her kicking had churned the milk into butter, and she stepped onto it and jumped out. The dairymaid found tiny footprints in the butter. The dairymaid wondered what had happened.",
+  "log": [
+   {
+    "sent": "A mouse fell into a bucket of milk at the dairy.",
+    "kept": [
+     "A mouse fell into a bucket of milk.",
+     "The mouse fell into the bucket of milk."
+    ]
+   },
+   {
+    "sent": "She could not climb the smooth sides, so she kept swimming in circles all night.",
+    "kept": [
+     "She kept swimming in circles all night."
+    ]
+   },
+   {
+    "sent": "By morning her kicking had churned the milk into butter, and she stepped onto it and jumped out.",
+    "kept": []
+   },
+   {
+    "sent": "The dairymaid found tiny footprints in the butter and wondered what had happened.",
+    "kept": [
+     "The dairymaid found tiny footprints in the butter.",
+     "The dairymaid wondered what had happened."
+    ]
+   }
+  ]
+ },
+ "f15": {
+  "k": 76,
+  "canon": "The school bus left the depot at seven. It stopped at the farm. Next it picked up Siobhan at the bakery corner. Malik left his lunchbox on the seat. The driver carried it back to the depot. The driver carried it back to the depot at the end of the day.",
+  "log": [
+   {
+    "sent": "The school bus left the depot at seven and stopped first at the farm, where the twins, Malik and Noor, got on.",
+    "kept": [
+     "The school bus left the depot at seven.",
+     "It stopped at the farm."
+    ]
+   },
+   {
+    "sent": "Next it picked up Siobhan at the bakery corner.",
+    "kept": []
+   },
+   {
+    "sent": "Malik left his lunchbox on the seat when they reached the school.",
+    "kept": [
+     "Malik left his lunchbox on the seat."
+    ]
+   },
+   {
+    "sent": "The driver, Mrs Halloran, carried it back to the depot at the end of the day.",
+    "kept": [
+     "The driver carried it back to the depot.",
+     "The driver carried it back to the depot at the end of the day."
+    ]
+   }
+  ]
+ },
+ "f16": {
+  "k": 77,
+  "canon": "Vikram sold umbrellas outside the train station. It had not rained for a month. He started selling cold lemonade. and he quickly brought the umbrellas back out.",
+  "log": [
+   {
+    "sent": "Vikram sold umbrellas outside the train station, but it had not rained for a month.",
+    "kept": [
+     "Vikram sold umbrellas outside the train station.",
+     "It had not rained for a month."
+    ]
+   },
+   {
+    "sent": "One afternoon he started selling cold lemonade instead, and a queue formed at once.",
+    "kept": [
+     "He started selling cold lemonade."
+    ]
+   },
+   {
+    "sent": "Then, while he was pouring the last glass, dark clouds rolled in, and he quickly brought the umbrellas back out.",
+    "kept": [
+     "and he quickly brought the umbrellas back out."
+    ]
+   }
+  ]
+ },
+ "f17": {
+  "k": 78,
+  "canon": "A bear and a badger found a beehive in a hollow log. The bear said he would break it open. The bear ate all the honey. That night the bees found the bear asleep and stung his nose.",
+  "log": [
+   {
+    "sent": "A bear and a badger found a beehive in a hollow log.",
+    "kept": [
+     "A bear and a badger found a beehive in a hollow log."
+    ]
+   },
+   {
+    "sent": "The bear said he would break it open if the badger kept watch for the bees.",
+    "kept": [
+     "The bear said he would break it open."
+    ]
+   },
+   {
+    "sent": "The badger watched, but the bear ate all the honey himself.",
+    "kept": [
+     "The bear ate all the honey."
+    ]
+   },
+   {
+    "sent": "That night the bees found the bear asleep and stung his nose.",
+    "kept": []
+   }
+  ]
+ },
+ "f18": {
+  "k": 79,
+  "canon": "Lerato borrowed a ladder from her neighbour Bashir on Monday. Lerato borrowed a ladder from her neighbour Bashir. On Tuesday her son took the ladder to the school. and she returned it to Bashir that weekend.",
+  "log": [
+   {
+    "sent": "Lerato borrowed a ladder from her neighbour Bashir on Monday to clean her gutters.",
+    "kept": [
+     "Lerato borrowed a ladder from her neighbour Bashir on Monday.",
+     "Lerato borrowed a ladder from her neighbour Bashir"
+    ]
+   },
+   {
+    "sent": "On Tuesday her son took the ladder to the school to help paint a mural.",
+    "kept": [
+     "On Tuesday her son took the ladder to the school."
+    ]
+   },
+   {
+    "sent": "It stayed there until Friday, when the caretaker brought it back to Lerato's garden, and she returned it to Bashir that weekend.",
+    "kept": [
+     "and she returned it to Bashir that weekend."
+    ]
+   }
+  ]
+ },
+ "f19": {
+  "k": 80,
+  "canon": "Sefa hired a fishing boat. The fishing boat was hired. Sefa held the mail bags. They reached the island before dark. The islanders cheered when the letters arrived.",
+  "log": [
+   {
+    "sent": "The ferry to the island was cancelled because of high winds, so the postman, Sefa, hired a fishing boat.",
+    "kept": [
+     "Sefa hired a fishing boat.",
+     "The fishing boat was hired."
+    ]
+   },
+   {
+    "sent": "Its owner, an old woman called Akosua, steered through the waves while Sefa held the mail bags.",
+    "kept": [
+     "Sefa held the mail bags."
+    ]
+   },
+   {
+    "sent": "They reached the island before dark, and the islanders cheered when the letters arrived.",
+    "kept": [
+     "They reached the island before dark.",
+     "The islanders cheered when the letters arrived."
+    ]
+   }
+  ]
+ },
+ "f20": {
+  "k": 81,
+  "canon": "A peacock laughed at a crane. A peacock laughed at a crane for her plain grey feathers. The crane spread her wings. She flew high over the hills.",
+  "log": [
+   {
+    "sent": "A peacock laughed at a crane for her plain grey feathers.",
+    "kept": [
+     "A peacock laughed at a crane.",
+     "A peacock laughed at a crane for her plain grey feathers."
+    ]
+   },
+   {
+    "sent": "The crane said nothing and spread her wings.",
+    "kept": [
+     "The crane spread her wings."
+    ]
+   },
+   {
+    "sent": "She flew high over the hills while the peacock, with all his bright colours, could only walk in the farmyard.",
+    "kept": [
+     "She flew high over the hills."
+    ]
+   }
+  ]
+ },
+ "f21": {
+  "k": 82,
+  "canon": "At nine the tour group gathered in the hotel lobby, where their guide, Paulo, handed each person a map. They walked to the cathedral. They walked to the old harbour. Tamsin dropped her map into the water. Tamsin dropped her map. Paulo gave her his own map. He led the group back to the hotel without one.",
+  "log": [
+   {
+    "sent": "At nine the tour group gathered in the hotel lobby, where their guide, Paulo, handed each person a map.",
+    "kept": []
+   },
+   {
+    "sent": "They walked to the cathedral and then to the old harbour.",
+    "kept": [
+     "They walked to the cathedral.",
+     "They walked to the old harbour."
+    ]
+   },
+   {
+    "sent": "At the harbour Tamsin dropped her map into the water.",
+    "kept": [
+     "Tamsin dropped her map into the water.",
+     "Tamsin dropped her map."
+    ]
+   },
+   {
+    "sent": "Paulo gave her his own map, and he led the group back to the hotel without one.",
+    "kept": [
+     "Paulo gave her his own map.",
+     "He led the group back to the hotel without one."
+    ]
+   }
+  ]
+ },
+ "f22": {
+  "k": 83,
+  "canon": "Captain Moreau's fishing boat came back empty. Her crew wanted to give up. They found a huge shoal of herring.",
+  "log": [
+   {
+    "sent": "Captain Moreau's fishing boat came back empty for the third day in a row.",
+    "kept": [
+     "Captain Moreau's fishing boat came back empty."
+    ]
+   },
+   {
+    "sent": "Her crew wanted to give up, but the cook, Idris, suggested they try the cold water past the lighthouse.",
+    "kept": [
+     "Her crew wanted to give up."
+    ]
+   },
+   {
+    "sent": "They found a huge shoal of herring there, and the market in the harbour paid them twice the usual price.",
+    "kept": [
+     "They found a huge shoal of herring."
+    ]
+   }
+  ]
+ },
+ "f23": {
+  "k": 84,
+  "canon": "A cat lived in a shop. The cat lived in a shop. Instead she slept on the flour sacks all day. the mice chewed through every sack. the grocer put the cat out in the street. After that she caught mice in the alley. She caught mice in the alley.",
+  "log": [
+   {
+    "sent": "A lazy cat lived in a grocer's shop and was supposed to catch mice.",
+    "kept": [
+     "A cat lived in a shop.",
+     "The cat lived in a shop."
+    ]
+   },
+   {
+    "sent": "Instead she slept on the flour sacks all day.",
+    "kept": []
+   },
+   {
+    "sent": "One night the mice chewed through every sack, and the grocer put the cat out in the street.",
+    "kept": [
+     "the mice chewed through every sack",
+     "the grocer put the cat out in the street"
+    ]
+   },
+   {
+    "sent": "After that she caught mice in the alley just to eat.",
+    "kept": [
+     "After that she caught mice in the alley.",
+     "She caught mice in the alley."
+    ]
+   }
+  ]
+ },
+ "f24": {
+  "k": 85,
+  "canon": "Elif took her grandmother's clock from their flat to a repair shop on Bridge Street. Elif took her grandmother's clock to a repair shop on Bridge Street. The repairman, Mr Varela, kept it for a week. Elif's uncle collected it.",
+  "log": [
+   {
+    "sent": "Early on Sunday, Elif took her grandmother's clock from their flat to a repair shop on Bridge Street.",
+    "kept": [
+     "Elif took her grandmother's clock from their flat to a repair shop on Bridge Street.",
+     "Elif took her grandmother's clock to a repair shop on Bridge Street."
+    ]
+   },
+   {
+    "sent": "The repairman, Mr Varela, kept it for a week.",
+    "kept": []
+   },
+   {
+    "sent": "On the following Sunday Elif's uncle collected it and carried it to the grandmother's cottage in the country, where it still hangs above the fireplace.",
+    "kept": [
+     "Elif's uncle collected it."
+    ]
+   }
+  ]
+ },
+ "f25": {
+  "k": 86,
+  "canon": "Mr Dlamini carried his neighbour's groceries up nine flights of stairs. The neighbour invited him in for soup. The neighbour is a retired teacher. She discovered that she had once taught his mother.",
+  "log": [
+   {
+    "sent": "Because the lift was broken, Mr Dlamini carried his neighbour's groceries up nine flights of stairs.",
+    "kept": [
+     "Mr Dlamini carried his neighbour's groceries up nine flights of stairs."
+    ]
+   },
+   {
+    "sent": "The neighbour, a retired teacher named Ottilie, invited him in for soup.",
+    "kept": [
+     "The neighbour invited him in for soup.",
+     "The neighbour is a retired teacher."
+    ]
+   },
+   {
+    "sent": "They talked for hours, and she discovered that she had once taught his mother.",
+    "kept": [
+     "She discovered that she had once taught his mother."
+    ]
+   }
+  ]
+ },
+ "f26": {
+  "k": 87,
+  "canon": "The donkey slipped in a river. he lay down in the river. The sponges soaked up the water, and the donkey could hardly walk home.",
+  "log": [
+   {
+    "sent": "A donkey carrying salt slipped in a river, and his load grew lighter as the salt melted.",
+    "kept": [
+     "The donkey slipped in a river."
+    ]
+   },
+   {
+    "sent": "The next day, loaded with sponges, he lay down in the river on purpose.",
+    "kept": [
+     "he lay down in the river"
+    ]
+   },
+   {
+    "sent": "The sponges soaked up the water, and the donkey could hardly walk home.",
+    "kept": []
+   }
+  ]
+ },
+ "f27": {
+  "k": 88,
+  "canon": "In the morning the red kite was in Hana's garden, tangled in the plum tree. Her friend Cosmin climbed up and freed it. They flew it on the hill behind the church all afternoon. The wind carried the kite into the farmer's pond.",
+  "log": [
+   {
+    "sent": "In the morning the red kite was in Hana's garden, tangled in the plum tree.",
+    "kept": []
+   },
+   {
+    "sent": "Her friend Cosmin climbed up and freed it.",
+    "kept": []
+   },
+   {
+    "sent": "They flew it on the hill behind the church all afternoon until the string snapped, and the wind carried the kite into the farmer's pond.",
+    "kept": [
+     "They flew it on the hill behind the church all afternoon.",
+     "The wind carried the kite into the farmer's pond."
+    ]
+   }
+  ]
+ },
+ "f28": {
+  "k": 89,
+  "canon": "Gulnara worked at the paint factory for a month. She noticed a leak in a pipe. She had worked at the paint factory for a month. She told the foreman. She shut the valve herself. She wrote to the manager. Mr Ashworth promoted her.",
+  "log": [
+   {
+    "sent": "Gulnara, a young chemist, had worked at the paint factory for a month when she noticed a leak in a pipe.",
+    "kept": [
+     "Gulnara worked at the paint factory for a month.",
+     "She noticed a leak in a pipe.",
+     "She had worked at the paint factory for a month."
+    ]
+   },
+   {
+    "sent": "She told the foreman, but he ignored her.",
+    "kept": [
+     "She told the foreman."
+    ]
+   },
+   {
+    "sent": "So she shut the valve herself and wrote to the manager, Mr Ashworth, who promoted her the following week.",
+    "kept": [
+     "She shut the valve herself.",
+     "She wrote to the manager.",
+     "Mr Ashworth promoted her."
+    ]
+   }
+  ]
+ },
+ "f29": {
+  "k": 90,
+  "canon": "Two goats met on a narrow bridge over a deep gorge. Both fell into the water. Further down the valley, two other goats met on a bridge just as narrow. The other stepped carefully over her back.",
+  "log": [
+   {
+    "sent": "Two goats met on a narrow bridge over a deep gorge.",
+    "kept": []
+   },
+   {
+    "sent": "Neither would step back, so they butted heads until both fell into the water.",
+    "kept": [
+     "Both fell into the water."
+    ]
+   },
+   {
+    "sent": "Further down the valley, two other goats met on a bridge just as narrow.",
+    "kept": []
+   },
+   {
+    "sent": "One knelt down, the other stepped carefully over her back, and both crossed safely.",
+    "kept": [
+     "The other stepped carefully over her back."
+    ]
+   }
+  ]
+ },
+ "f30": {
+  "k": 91,
+  "canon": "He loaded forty loaves. He drove on to the harbour. He drove to the hospital kitchen. He delivered the fish to the hospital kitchen. He drove to the harbour. While he was at the harbour, a gull stole a sardine from the open crate. A gull stole a sardine from the open crate. The chef counted one fish short.",
+  "log": [
+   {
+    "sent": "Umar parked his van outside the bakery at dawn and loaded forty loaves.",
+    "kept": [
+     "He loaded forty loaves."
+    ]
+   },
+   {
+    "sent": "By eight he had delivered them to the hospital kitchen, and he drove on to the harbour to collect fish for the hotel.",
+    "kept": [
+     "He drove on to the harbour.",
+     "He drove to the hospital kitchen.",
+     "He delivered the fish to the hospital kitchen.",
+     "He drove to the harbour."
+    ]
+   },
+   {
+    "sent": "While he was at the harbour, a gull stole a sardine from the open crate.",
+    "kept": [
+     "While he was at the harbour, a gull stole a sardine from the open crate.",
+     "A gull stole a sardine from the open crate."
+    ]
+   },
+   {
+    "sent": "At ten the van was back at the hotel, and the chef counted one fish short.",
+    "kept": [
+     "The chef counted one fish short."
+    ]
+   }
+  ]
+ },
+ "f31": {
+  "k": 92,
+  "canon": "Orla wrote to a radio station. A listener in the city, Mr Castellanos, offered his late wife's piano for free. Six farmers drove it up the mountain road. They drove it up the mountain road.",
+  "log": [
+   {
+    "sent": "The village choir had no piano, so its leader, Orla, wrote to a radio station.",
+    "kept": [
+     "Orla wrote to a radio station."
+    ]
+   },
+   {
+    "sent": "A listener in the city, Mr Castellanos, offered his late wife's piano for free.",
+    "kept": []
+   },
+   {
+    "sent": "Six farmers drove it up the mountain road on a hay cart, and the choir sang at the spring festival.",
+    "kept": [
+     "Six farmers drove it up the mountain road.",
+     "They drove it up the mountain road."
+    ]
+   }
+  ]
+ },
+ "f32": {
+  "k": 93,
+  "canon": "A sparrow warned the other birds. The birds laughed and kept eating the seeds. The sparrow went to live near the houses.",
+  "log": [
+   {
+    "sent": "A sparrow warned the other birds that a farmer was sowing flax, which would one day become nets.",
+    "kept": [
+     "A sparrow warned the other birds."
+    ]
+   },
+   {
+    "sent": "The birds laughed and kept eating the seeds.",
+    "kept": []
+   },
+   {
+    "sent": "The sparrow went to live near the houses, and when the nets were made, the birds who had laughed were caught in them.",
+    "kept": [
+     "The sparrow went to live near the houses."
+    ]
+   }
+  ]
+ },
+ "f33": {
+  "k": 94,
+  "canon": "Wiremu locked the golden mask in the safe at half past six. Wiremu locked the golden. At midnight he heard a noise in the east hall. In the morning, the director moved the mask from the safe to a glass case. The director moved the mask from the safe to a glass case.",
+  "log": [
+   {
+    "sent": "At half past six the night guard, Wiremu, locked the museum's golden mask in the safe.",
+    "kept": [
+     "Wiremu locked the golden mask in the safe at half past six.",
+     "Wiremu locked the golden"
+    ]
+   },
+   {
+    "sent": "At midnight he heard a noise in the east hall, but it was only a cat.",
+    "kept": [
+     "At midnight he heard a noise in the east hall."
+    ]
+   },
+   {
+    "sent": "In the morning the director, Dr Sandoval, moved the mask from the safe to a glass case in the main gallery for the new exhibition.",
+    "kept": [
+     "In the morning, the director moved the mask from the safe to a glass case.",
+     "The director moved the mask from the safe to a glass case."
+    ]
+   }
+  ]
+ },
+ "f34": {
+  "k": 95,
+  "canon": "After the flood, the farmer Svetlana found that her cows had wandered three miles downstream. The farmer Svetlana found that her cows had wandered three miles downstream. The farmer Svetlana found that her cows. A boy from the next village, Yaw, had kept them in his father's barn overnight. Svetlana paid him with a wheel of cheese. Her cows walked home behind his bicycle.",
+  "log": [
+   {
+    "sent": "After the flood, the farmer Svetlana found that her cows had wandered three miles downstream.",
+    "kept": [
+     "After the flood, the farmer Svetlana found that her cows had wandered three miles downstream.",
+     "The farmer Svetlana found that her cows had wandered three miles downstream.",
+     "The farmer Svetlana found that her cows"
+    ]
+   },
+   {
+    "sent": "A boy from the next village, Yaw, had kept them in his father's barn overnight.",
+    "kept": []
+   },
+   {
+    "sent": "Svetlana paid him with a wheel of cheese, and her cows walked home behind his bicycle.",
+    "kept": [
+     "Svetlana paid him with a wheel of cheese.",
+     "Her cows walked home behind his bicycle."
+    ]
+   }
+  ]
+ },
+ "f35": {
+  "k": 96,
+  "canon": "A frog wanted to be as big as the ox in the meadow. The frog wanted to be as big as the ox in the meadow. She puffed herself up. She asked her children. She puffed harder and harder.",
+  "log": [
+   {
+    "sent": "A frog wanted to be as big as the ox in the meadow.",
+    "kept": [
+     "A frog wanted to be as big as the ox in the meadow.",
+     "The frog wanted to be as big as the ox in the meadow."
+    ]
+   },
+   {
+    "sent": "She puffed herself up and asked her children if she was big enough.",
+    "kept": [
+     "She puffed herself up.",
+     "She asked her children."
+    ]
+   },
+   {
+    "sent": "They said no, so she puffed harder and harder until she burst.",
+    "kept": [
+     "She puffed harder and harder."
+    ]
+   }
+  ]
+ },
+ "f36": {
+  "k": 97,
+  "canon": "Mateus left his bicycle at the swimming pool. Mateus walked home with friends. On Saturday his mother drove him back. A cleaner had already taken the bicycle to the police station. Mateus fetched it from the station. Mateus fetched it from the station that afternoon. Mateus fetched it from the station that afternoon and rode it to his grandfather's farm.",
+  "log": [
+   {
+    "sent": "On Friday evening Mateus left his bicycle at the swimming pool and walked home with friends.",
+    "kept": [
+     "Mateus left his bicycle at the swimming pool.",
+     "Mateus walked home with friends."
+    ]
+   },
+   {
+    "sent": "On Saturday his mother drove him back, but a cleaner had already taken the bicycle to the police station.",
+    "kept": [
+     "On Saturday his mother drove him back.",
+     "A cleaner had already taken the bicycle to the police station."
+    ]
+   },
+   {
+    "sent": "Mateus fetched it from the station that afternoon and rode it to his grandfather's farm.",
+    "kept": [
+     "Mateus fetched it from the station",
+     "Mateus fetched it from the station that afternoon",
+     "Mateus fetched it from the station that afternoon and rode it to his grandfather's farm"
+    ]
+   }
+  ]
+ },
+ "f37": {
+  "k": 98,
+  "canon": "The weather reporter, Kirra Walsh, was meant to read the forecast at seven, but she was stuck in traffic. while she ran up the stairs. The sports presenter, Emil, read it instead while she ran up the stairs. Viewers wrote in to say that Emil's forecast was the funniest they had ever heard.",
+  "log": [
+   {
+    "sent": "The weather reporter, Kirra Walsh, was meant to read the forecast at seven, but she was stuck in traffic.",
+    "kept": []
+   },
+   {
+    "sent": "The sports presenter, Emil, read it instead while she ran up the stairs.",
+    "kept": [
+     "while she ran up the stairs",
+     "The sports presenter, Emil, read it instead while she ran up the stairs."
+    ]
+   },
+   {
+    "sent": "Viewers wrote in to say that Emil's forecast was the funniest they had ever heard.",
+    "kept": [
+     "Viewers wrote in to say that Emil's forecast was the funniest they had ever heard."
+    ]
+   }
+  ]
+ },
+ "f38": {
+  "k": 99,
+  "canon": "A hungry wolf found a dog chained in a yard. The dog said his master gave him meat. His master gave him meat. His master gave him meat every day. When the wolf saw the mark that the chain had worn on the dog's neck, he decided he would rather stay hungry and free. He went back to the forest.",
+  "log": [
+   {
+    "sent": "A hungry wolf found a dog chained in a yard and asked why he looked so well fed.",
+    "kept": [
+     "A hungry wolf found a dog chained in a yard."
+    ]
+   },
+   {
+    "sent": "The dog said his master gave him meat every day.",
+    "kept": [
+     "The dog said his master gave him meat.",
+     "His master gave him meat.",
+     "His master gave him meat every day."
+    ]
+   },
+   {
+    "sent": "When the wolf saw the mark that the chain had worn on the dog's neck, he decided he would rather stay hungry and free, and he went back to the forest.",
+    "kept": [
+     "When the wolf saw the mark that the chain had worn on the dog's neck, he decided he would rather stay hungry and free.",
+     "He went back to the forest."
+    ]
+   }
+  ]
+ },
+ "f39": {
+  "k": 100,
+  "canon": "At noon Ilona's suitcase was checked in at the airport in Budapest. It was put on the wrong plane. The next morning an airline clerk sent the suitcase to Madrid.",
+  "log": [
+   {
+    "sent": "At noon Ilona's suitcase was checked in at the airport in Budapest.",
+    "kept": []
+   },
+   {
+    "sent": "It was put on the wrong plane and spent the night in Oslo, while Ilona slept in a hotel in Madrid.",
+    "kept": [
+     "It was put on the wrong plane."
+    ]
+   },
+   {
+    "sent": "The next morning an airline clerk, Jun, sent it on to Madrid, and by evening the suitcase was in Ilona's hotel room.",
+    "kept": [
+     "The next morning an airline clerk sent the suitcase to Madrid."
+    ]
+   }
+  ]
+ },
+ "f40": {
+  "k": 101,
+  "canon": "The dog escaped through the back gate. He was seen stealing a sausage from the butcher. He was seen running across the square. Two schoolboys, Luca and Magnus, caught him by the fountain and walked him back to the library.",
+  "log": [
+   {
+    "sent": "The librarian's dog, a grey whippet called Smoke, escaped through the back gate on market day.",
+    "kept": [
+     "The dog escaped through the back gate."
+    ]
+   },
+   {
+    "sent": "He was seen stealing a sausage from the butcher, Mr Abara, and then running across the square.",
+    "kept": [
+     "He was seen stealing a sausage from the butcher.",
+     "He was seen running across the square."
+    ]
+   },
+   {
+    "sent": "Two schoolboys, Luca and Magnus, caught him by the fountain and walked him back to the library.",
+    "kept": []
+   }
+  ]
+ }
+}

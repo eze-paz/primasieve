@@ -13,7 +13,10 @@ from b6_rwkv import hit
 CKPT = ARGV[ARGV.index("--ckpt") + 1] if "--ckpt" in ARGV else os.path.join("rwkv7", "RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth")
 ALL = "--all" in ARGV; STORIES = list(range(502)) if ALL else list(range(62, 102)); FROM_CANON = "--from-canon" in ARGV
 WITH_SENT = "--with-sentence" in ARGV
-OUT = "ag13_lines.json" if (FROM_CANON and WITH_SENT) else "ag12all_lines.json" if (FROM_CANON and ALL) else "ag12_lines.json" if FROM_CANON else "ag10_lines.json"
+CANON_FILE = ARGV[ARGV.index("--canon-file") + 1] if "--canon-file" in ARGV else "ag4_canon.json"
+QLINES = ARGV[ARGV.index("--qlines") + 1] if "--qlines" in ARGV else None
+OUT_OVERRIDE = ARGV[ARGV.index("--out") + 1] if "--out" in ARGV else None
+OUT = OUT_OVERRIDE or ("ag13_lines.json" if (FROM_CANON and WITH_SENT) else "ag12all_lines.json" if (FROM_CANON and ALL) else "ag12_lines.json" if FROM_CANON else "ag10_lines.json")
 S_PROMPT3 = ("Instruction: Describe the clause as one line of slots. Take WHEN and WHY from the sentence when the sentence gives them. "
              "Use only words from the clause or the sentence. Write - for an empty slot.\n\n"
              "Sentence: In the morning Rosa took the key to the well because the bucket was lost.\nClause: Rosa took the key to the well.\n"
@@ -56,7 +59,7 @@ def gen(m, tok, prompt, n=140):
 def load_canon():
     """the AG4 clause file is being written by another process; retry a torn read"""
     for _ in range(10):
-        try: return json.load(open("ag4_canon.json", encoding="utf-8"))
+        try: return json.load(open(CANON_FILE, encoding="utf-8"))
         except json.JSONDecodeError: time.sleep(3)
     return {}
 
@@ -111,8 +114,9 @@ def main():
                 prev = sent
             rec["lines"] = lines
         qs = []
-        if FROM_CANON and os.path.exists("ag12_lines.json" if ALL else "ag10_lines.json"):   # AG12: question lines reused where they exist
-            Q10 = json.load(open("ag12_lines.json" if ALL else "ag10_lines.json", encoding="utf-8")).get(s["id"], {}).get("qs")
+        QF = QLINES or ("ag12_lines.json" if ALL else "ag10_lines.json")
+        if FROM_CANON and os.path.exists(QF):                                          # AG12: question lines reused where they exist
+            Q10 = json.load(open(QF, encoding="utf-8")).get(s["id"], {}).get("qs")
             if Q10: rec["qs"] = Q10; done[s["id"]] = rec; done["_stats"] = dict(stats); json.dump(done, open(OUT, "w", encoding="utf-8"), indent=1); print(f"  story {k} {s['id']} ({time.time() - t0:.0f} s) {dict(stats)}".encode("ascii", "replace").decode(), flush=True); continue
         for q, g in s["qs"]:
             allowed = set(content(q)) | {A.lemma(w) for w in content(q)} | {"the", "a", "an"}
