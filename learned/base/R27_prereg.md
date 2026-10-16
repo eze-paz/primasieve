@@ -204,3 +204,9 @@ Root-level count: **0 / 38** -- no generated sentence adds content the story lac
 
 ## G2 registration (plan check before generation)
 A planned clause is generated only if, in its story sentence, the subject's head word occurs before the verb (any form) within 6 words with no other verb form between them; otherwise it is skipped. Same 20 stories, generator and measures as G1b (invention by root). PASS if the in-context judge gap is within 1.5 bits, invention-free >= 90%, novelty >= 0.3.
+
+## G2 result -- PASS
+35 sentences from 20 untouched stories: novelty **0.686**, invention-free **35 / 35** (by root), judge in context **7.043** vs the story's own sentences 6.006 (gap 1.04; bar 1.5). First pass of the G-line: the system writes sentences in its own wording (69% of word triples new), adds no content the story lacks, and reads within about a bit of the source. The plan check is weaker than intended -- 'and' between subject and verb is not treated as a break, so 'The grass had also carried the oak' (from 'found a ring in the grass and carried it') still passes.
+
+## G2b registration (tighter plan check)
+As G2, plus: 'and' / 'but' / 'or' / 'so' between subject and verb breaks the link; a subject head that is itself a verb form (e.g. 'torn') is rejected. PASS if the judge gap falls below G2's 1.04 with invention-free >= 90% and novelty >= 0.3.

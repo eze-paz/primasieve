@@ -94,6 +94,21 @@ def requirements(r):
             if ws and ws[0] in DETS and len(ws) > 1: req.append([ws[0]]); gaps.append((None, 0) if slot == "obj" else (g0 if first else (None, 0))); first = False
             req.append([ws[-1]]); gaps.append(g0 if first else (None, 0))
     return req, vi, gaps
+G2 = "--g2" in ARGV0
+def plan_ok(text, r):
+    """G2: the subject's head stands before the verb within 6 words, no other verb form between them"""
+    sw = re.findall(r"[A-Za-z']+", str(r["subj"]))
+    if not sw: return False
+    head = sw[-1].lower(); vb = RT.D.verb_base(r["verb"]) or r["verb"]
+    for sent in RT.T.SENT.split(text):
+        w = [x.lower() for x in re.findall(r"[A-Za-z']+", sent)]
+        for i, x in enumerate(w):
+            if x != head: continue
+            for j in range(i + 1, min(len(w), i + 7)):
+                bj = RT.D.verb_base(w[j])
+                if bj == vb: return True
+                if bj and RT.D.mainly_verb(w[j]) and w[j] not in ("had", "was", "were", "would", "could", "did", "has", "is"): break
+    return False
 def realise_words(words, text):
     names = {w.lower(): w for w in re.findall(r"(?<=[a-z,;] )[A-Z][a-z]+", text)}
     out = [names.get(w, w) if not (i == 0) else w for i, w in enumerate(words)]
@@ -110,7 +125,7 @@ if __name__ == "__main__":
     rows = []; t0 = time.time()
     for k in un[:N]:
         text = st_[k]["text"]
-        for r in RT.plan(text)[:3]:
+        for r in [x for x in RT.plan(text) if (not G2) or plan_ok(text, x)][:3]:
             rq = requirements(r)
             if not rq: continue
             req, vi, gaps = rq; w = generate(req, vi=vi, gaps=gaps)
@@ -119,7 +134,7 @@ if __name__ == "__main__":
             g_ = realise_words(w, text)
             if not g_: continue
             rows.append(dict(k=k, req=req, gen=g_, src=src, plan=f"{r['subj']} | {r['verb']} | {r.get('obj')} | {r.get('place')}"))
-    json.dump(rows, open("r27_g1_outputs.json", "w", encoding="utf-8"), indent=0)
+    json.dump(rows, open("r27_g2_outputs.json" if G2 else "r27_g1_outputs.json", "w", encoding="utf-8"), indent=0)
     print(f"G1 generated {len(rows)} sentences ({time.time() - t0:.0f} s)")
     for r in rows[:15]: print(f"  PLAN {r['plan']}\n   GEN {r['gen']}\n   SRC {r['src']}")
     if "--score" in ARGV0:
