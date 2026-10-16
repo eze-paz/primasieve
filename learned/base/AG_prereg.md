@@ -421,3 +421,16 @@ ones (dropped clauses), so the timeline ends early. The state rules are fine; th
 Story lines = AG14's (clauses alone, clauses + sentence) plus AG10's lines written from the raw sentences
 (ag10_lines.json), duplicates dropped; question lines AG15's; syntax rule; AG16 matching. Untouched val_fresh2 once.
 PASS if right > 34 at precision >= 0.89.
+
+## AG18 result -- FAIL
+361 merged lines: untouched 34 / 5 (0.87); the raw-sentence lines add one wrong 'what' and nothing right.
+Dev plateau: AG15 34 / 4 is the configuration; the remaining silences need better clauses, not more writings.
+
+## AG19 registration (the clause loop itself with the 1.5B proposer)
+ag3_canon.py --ckpt rwkv7/RWKV-x070-World-1.5B-v3-20250127-ctx4096.pth --untouched --out ag19_canon.json: the AG3
+loop (propose simple clauses per sentence, verifier: provenance, no copy of context, no fragment, parses to an event,
+no agent swap; one retry) with the 1.5B model on the 40 untouched dev stories. Reported: verifier counts and signal
+recovery against AG3 / AG4 (0.4B: 240 of 266 events kept on this block), and the AG3 clause reader's score on the new
+clauses (AG3: 25 / 3). Then, if the clauses are better, the slot lines are rewritten from them (AG12 and AG13 style)
+and the AG15 question lines reused. PASS for this registration if the clause reader on the 1.5B clauses beats 25 / 3
+at precision >= 0.89. The scale run (AG12 configuration) is paused for it; one 1.5B model fits in memory.

@@ -13,7 +13,9 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys
 import torch
 ARGV = list(sys.argv); sys.argv = [sys.argv[0]]
 import ag1_translator as A
-STORIES = list(range(22, 102)); PRACTICE = set(range(22, 62)); UNTOUCHED = set(range(62, 102))
+STORIES = list(range(62, 102)) if "--untouched" in ARGV else list(range(22, 102)); PRACTICE = set(range(22, 62)); UNTOUCHED = set(range(62, 102))
+CKPT = ARGV[ARGV.index("--ckpt") + 1] if "--ckpt" in ARGV else os.path.join("rwkv7", "RWKV-x070-World-0.4B-v2.9-20250107-ctx4096.pth")
+OUTF = ARGV[ARGV.index("--out") + 1] if "--out" in ARGV else "ag3_canon.json"
 STOP = set("""a an the and or but so of to in on at by for with from into onto over under near behind across along up down out off
 his her their its he she it they him them this that these those who whom which what when where why how was were is are be been being
 had has have did do does not no yes as than then there here very one two three first second last next some any all each every
@@ -80,9 +82,9 @@ def main():
     random.Random(0).shuffle(data); F = A.Feats([tk for st in data[:2240] for tk, _ in A.gold_examples(st)])
     vm = A.Tagger(F, 2, False); am = A.Tagger(F, len(A.ATAGS), True); sd = torch.load("ag1_translator.pt"); vm.load_state_dict(sd["vm"]); am.load_state_dict(sd["am"]); vm.eval(); am.eval()
     T = A.Translator(F, vm, am)
-    m = RWKV7.load(os.path.join("rwkv7", "RWKV-x070-World-0.4B-v2.9-20250107-ctx4096.pth")); m.eval(); tok = tokenizer()
+    m = RWKV7.load(CKPT); m.eval(); tok = tokenizer()
     S = json.load(open("val_all13.json", encoding="utf-8"))["stories"]
-    OUT = "ag3_canon.json"; done = json.load(open(OUT, encoding="utf-8")) if os.path.exists(OUT) else {}
+    OUT = OUTF; done = json.load(open(OUT, encoding="utf-8")) if os.path.exists(OUT) else {}
     stats = collections.Counter(done.pop("_stats", {})); t0 = time.time()
     for k in STORIES:
         s = S[k]
