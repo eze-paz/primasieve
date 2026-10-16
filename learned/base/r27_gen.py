@@ -152,3 +152,48 @@ if __name__ == "__main__":
                 jg.append(judge_ctx_many(text + "\n\n", [r["gen"]])[0]); before = text[:text.find(r["src"])]
                 js.append(judge_ctx_many(before, [r["src"]])[0] if before.strip() else judge_bits(r["src"]))
         print(f"G1 novelty {st.mean(nov):.3f}; sentences with an invented content word {sum(inv)} / {len(inv)}; judge in context: generated {st.mean(jg):.3f} vs the story's own sentence {st.mean(js):.3f} over {len(jg)}")
+
+
+def paragraph(text, max_sent=5):
+    """G3: a retelling in the model's own words from the checked plans, with pronouns for a repeated subject"""
+    out = []; prev = None
+    for r in [x for x in RT.plan(text) if plan_ok(text, x)][:max_sent]:
+        rq = requirements(r)
+        if not rq: continue
+        req, vi, gaps = rq; subj = str(r["subj"]).lower()
+        if prev and subj == prev:
+            g = RT.gender(text, str(r["subj"])) or ("it" if not str(r["subj"])[0].isupper() else None)
+            if g and g in wid: req = [[g]] + req[vi:]; gaps = [(None, 0)] + gaps[vi:]; vi = 1
+        w = generate(req, vi=vi, gaps=gaps)
+        if w:
+            s = realise_words(w, text)
+            if s: out.append(s); prev = subj
+    return " ".join(out)
+
+
+def requirements_clause(r):
+    """G4: subject head + every content word of the predicate span, in order; the verb in any form"""
+    subj = [w.lower() for w in re.findall(r"[A-Za-z']+", str(r["subj"]))]
+    pred = [w.lower() for w in re.findall(r"[A-Za-z']+", r.get("do") or "")]
+    if not subj or subj[-1] not in wid or not pred: return None
+    req = [[subj[-1]]]; gaps = [(0, 1) if subj[-1] not in ("he", "she", "they", "it") and not str(r["subj"])[0].isupper() else (None, 0)]
+    vf = [x for x in [RT.D.verb_base(pred[0]) or pred[0]] + forms(pred[0]) + [pred[0]] if x in wid]
+    if not vf: return None
+    vi = 1; req.append(list(dict.fromkeys(vf))); gaps.append((1, 2))
+    for w in pred[1:]:
+        if w not in FUNCSET and w in wid: req.append([w]); gaps.append((2, 3))
+    return req, vi, gaps
+def paragraph_clause(text, max_sent=6):
+    out = []; prev = None
+    for r in RT.plan(text)[:max_sent]:
+        rq = requirements_clause(r)
+        if not rq: continue
+        req, vi, gaps = rq; subj = str(r["subj"]).lower()
+        if prev and subj == prev:
+            g = RT.gender(text, str(r["subj"])) or ("it" if not str(r["subj"])[0].isupper() else None)
+            if g and g in wid: req = [[g]] + req[1:]; gaps = [(None, 0)] + gaps[1:]
+        w = generate(req, vi=vi, gaps=gaps)
+        if w:
+            s = realise_words(w, text)
+            if s: out.append(s); prev = subj
+    return " ".join(out)

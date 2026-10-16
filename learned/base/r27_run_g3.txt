@@ -1,0 +1,12 @@
+OURS: The oven was hot. 
+HUMAN: Teodor, a baker, opened his shop on Quay Lane at six every morning. On Thursday his oven would not light, so he called his cousin Radu, who fixed gas pipes for a living. While Radu worked on it, Teodor sold the previous day's bread at half price. By noon the oven was hot again and the street smelled of rye. 
+OURS: A squirrel was then living below. 
+HUMAN: A crow found a ring in the grass and took it to the top of an oak. A squirrel living below asked to see it. When the proud crow opened her beak to answer, the ring dropped into the squirrel's paws. The squirrel buried it under the roots, and the crow never found it again. 
+OURS: She had just sold half. It had also carried the rest of her house. Her aunt was making. 
+HUMAN: At eight o'clock Wanjiru packed a basket of mangoes and took the bus to the market in town. She sold half of them before lunch. In the afternoon she took the rest to her aunt's house by the lake, where her aunt made jam with them. Wanjiru stayed the night there and went home the next morning. 
+OURS:  
+HUMAN: Mrs Adebayo ran the lending library in the village hall. One rainy Saturday a boy named Kazuo brought back a book with a torn cover. Rather than scold him, she showed him how to mend it with tape and card. Kazuo now helps her repair books after school. 
+G3 G3 own-words retelling: judge 7.965, form 0.720, order gain 0.320 over 11
+G3 human summaries: judge 5.175, form 1.000, order gain 0.602 over 11
+G3 P8 story-wording retelling: judge 6.185, form 0.911, order gain 0.506 over 11
+G3 novelty of our retellings: 0.729

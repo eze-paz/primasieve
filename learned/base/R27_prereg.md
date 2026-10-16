@@ -213,3 +213,18 @@ As G2, plus: 'and' / 'but' / 'or' / 'so' between subject and verb breaks the lin
 
 ## G2b result -- PASS
 24 sentences (the stricter check drops more plans): novelty **0.705**, judge in context **7.068** vs 6.169 (gap **0.90**, G2 1.04), invention by root: see r27_run_g2b.txt. Remaining faults are still plan-side ('The rooster said dogs.', 'Her then would back seat.'), and coverage falls (24 of 60 planned facts survive the check).
+
+## G3 registration (a retelling written in the system's own words)
+For the 20 stories with human summaries: the story's checked plans (G2b check), up to 5, each generated as in G2b; a subject equal to the previous sentence's subject is required as its pronoun (he / she / it / they from the story) instead of its noun. Paragraph scored: judge (context-free, as the P8 references), form, order gain, novelty (word triples not in the story). Compared with human summaries (judge 5.248) and the story-wording retelling P8 (6.370). PASS if the judge is within 1 bit of the human summaries with novelty >= 0.3, or below P8's judge with novelty >= 0.3.
+
+## G3 result -- FAIL
+Own-words retellings: judge 7.965, form 0.720, order gain 0.320, novelty 0.729 (11 of 20 stories had at least 2 sentences); human summaries 5.175 / 1.000 / 0.602; P8 story-wording 6.185 / 0.911 / 0.506. The paragraphs miss the main events ('The oven was hot.' for the baker story) and some sentences are incomplete ('Her aunt was making.'): the strict plan check drops most clauses, and the slot-wise plan (subject, verb, object head, place head) loses meaning. The bottleneck for own-words paragraphs is the content plan, not the writer.
+
+## G4 registration (plans from whole clauses)
+Each planned clause (as P8 selects them, no G2 check) gives its required tokens as: the subject head, then every content word of its predicate span (the story's words from the verb to the clause end that are not among the 300 commonest words), in story order, the verb in any of its forms. The model chooses all function words, auxiliaries, determiners and prepositions (gap classes as G2, up to 3 free words per gap). Pronouns for a repeated subject as G3. Same 20 stories and measures as G3. PASS if the judge is below P8's (6.185) with novelty >= 0.3, or within 1 bit of the human summaries.
+
+## G4 result -- FAIL
+Clause plans (every content word required): judge 7.688, form 0.830, order gain 0.102, novelty 0.931; human 5.248; P8 6.370. With many required words the 5-word counter fills the gaps with broken function-word chains ('called out to her cousin with the of fixed in the of gas by the of pipes living'); novelty this high means scrambled, not paraphrased. Reading of G1-G4: the system can restate one short fact in its own words faithfully (G2b), but the count model alone cannot hold a long constrained sentence together.
+
+## G5 registration (a stronger writer: counts + the network)
+Same generator as G4 and G2b, but each step's next-word distribution is the average of the counter's (o5mxa) and the static network's (r25_ch, state carried through the words written so far) full distributions over the 65,534-word list; beam 16. Run on the G2b plans (sentence level) and the G4 clause plans (paragraph level), same 20 stories. PASS if either beats its own earlier result on the judge (G2b gap 0.90; G4 7.688) without losing invention-freedom.
