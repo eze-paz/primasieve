@@ -321,3 +321,41 @@ syntax). The 1.5B model writes the slot line of each AG4 clause with the clause'
 is told to take WHEN and WHY from the sentence; provenance allows the clause, the sentence, the previous sentence and
 names. Everything else as AG12. PASS if untouched right > 28 at precision >= 0.89 (AG12: 28 / 2), with the
 when / why counts reported (AG12: 0 / 0 / 16 and 0 / 0 / 6).
+
+## AG13 result -- FAIL on the gate; the block moved to the question side
+Story lines from clause + sentence (7,464 s): 196 lines kept, **69 with WHEN and 41 with WHY** (AG12: WHEN rare,
+WHY none). Untouched val_fresh2 with the syntax rule: **24 right / 3 wrong (0.89)**, below AG12's 28 / 2 (14
+invented lines rejected against 4; a few who / where lines lost). When / why / whose / how: still 0 right, because
+their question lines are None: the 1.5B question writer (AG10 prompt) fails on every when / why question (wrong
+number of '?'). Union AG3 + AG13 37 / 7. Note: the union against the --all rows file gives AG3 + AG12 41 / 6 instead
+of 41 / 5 because that file keys by question text across 502 stories (duplicates collide); the dev-only 41 / 5 stands.
+
+## AG13b registration (question lines for when / why / whose / how, with their own few-shot)
+ag13b_q.py: the 30 when / why / whose / how questions of the dev untouched block get new question lines from the
+1.5B model with a few-shot made of when / why / whose / how examples (none from the test set); same verifier (one '?',
+provenance) and the AG10b syntax rule; all other question lines unchanged; story lines = AG13's (which carry WHEN and
+WHY). Scored as AG13. PASS if untouched right > 28 at precision >= 0.89, with the when / why counts reported.
+
+## AG13b result -- FAIL
+Dedicated few-shot for the 30 when / why / whose / how questions (474 s): **1 of 30 question lines kept, 29 rejected
+for the wrong number of '?'**. Score unchanged from AG13 (24 / 3; when 0 / 0 / 16). The 1.5B proposer does not form
+these question lines even with examples; the story side now has WHEN (69 lines) and WHY (41) but nothing asks them.
+Operational note: two 1.5B models cannot run together on this machine (16 GB, under 4 GB free beside one), so the
+scale run was paused for this test and resumed after it.
+
+## AG13c registration (the asked slot placed by the question syntax when the proposer writes none)
+The raw lines show the proposer fills every slot it knows and writes '-' in the asked one ('When did Wanjiru pack
+the basket?' -> 'WHO: Wanjiru | DID: pack | WHAT: the basket | WHEN: -'). AG13b's verifier rejected these for having
+no '?'. AG13c accepts a line with zero '?' and lets the AG10b syntax rule place the '?' from the wh-word (the
+formal language's syntax already decides which slot is asked); lines with two or more '?' are still rejected. The
+30 when / why / whose / how question lines are regenerated (same prompt); story lines AG13. PASS as AG13b: untouched
+right > 28 at precision >= 0.89, when / why counts reported.
+
+## AG13c result -- narrow FAIL; the first 'when' answers of the line
+29 of 30 when / why / whose / how question lines kept once the syntax rule places the '?'. Untouched val_fresh2:
+**28 right / 4 wrong / 168 silent, fitness +16, precision 0.88**; by kind who 11 / 1, what 10 / 0, **when 4 / 0**,
+where 3 / 2, why 0 / 1. Equal reach to AG12 (28 / 2) with two more wrong (why, where); precision one hundredth under
+the gate. Union with the AG3 clause reader 41 / 7 (0.85); AG12's union stays best at 41 / 5 (0.89, +26). Reading:
+time questions are now reachable through the chain (story WHEN from clause + sentence, question WHEN from syntax),
+at the cost of a few wrong where / why lines from the sentence context; the next step is the two together (AG12's
+story lines where AG13's add nothing) rather than either alone.

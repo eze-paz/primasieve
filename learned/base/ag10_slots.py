@@ -138,7 +138,9 @@ def match(filler, span):
 
 
 def answer(lines, qd):
-    asked = next(k for k, v in qd.items() if v == "?"); v = A.lemma(qd["DID"].split()[-1])
+    asked = next((k for k, v in qd.items() if v == "?"), None)
+    if asked is None or not qd.get("DID"): return None
+    v = A.lemma(qd["DID"].split()[-1])
     for d in lines:
         if not d.get("DID") or A.lemma(d["DID"].split()[-1]) != v: continue
         if all(match(qd[k], d.get(k)) for k in SLOTS if k != asked and qd.get(k)):
@@ -157,7 +159,9 @@ def grammar(q, qd):
     d = dict(qd)
     if want == "WHO" and asked == "WHAT" and d.get("WHO"): d["WHO"], d["WHAT"] = "?", d["WHO"]; return d
     if want == "WHAT" and asked == "WHO" and d.get("WHAT"): d["WHO"], d["WHAT"] = d["WHAT"], "?"; return d
-    if d.get(want) in (None, "-"): d[asked] = None; d[want] = "?"; return d
+    if d.get(want) in (None, "-"):
+        if asked: d[asked] = None
+        d[want] = "?"; return d
     return None
 
 

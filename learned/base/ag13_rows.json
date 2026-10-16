@@ -1,0 +1,2602 @@
+[
+ {
+  "q": "Who was the baker?",
+  "gold": [
+   "teodor"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the baker",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who did Teodor call when the oven would not light?",
+  "gold": [
+   "radu",
+   "his cousin"
+  ],
+  "answer": "his cousin Radu",
+  "qline": {
+   "WHO": "Teodor",
+   "DID": "call",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Teodor sell while Radu worked?",
+  "gold": [
+   "yesterday's bread",
+   "bread"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Teodor",
+   "DID": "sell",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When was the oven hot again?",
+  "gold": [
+   "by noon",
+   "noon"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was Teodor's shop?",
+  "gold": [
+   "on quay lane",
+   "quay lane"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did the crow find?",
+  "gold": [
+   "a ring",
+   "ring"
+  ],
+  "answer": "a ring",
+  "qline": {
+   "WHO": "the crow",
+   "DID": "find",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who asked to see the ring?",
+  "gold": [
+   "a squirrel",
+   "squirrel"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the ring",
+   "DID": "ask",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who had the ring at the end?",
+  "gold": [
+   "the squirrel",
+   "squirrel"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the ring",
+   "DID": "have",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Why did the ring fall?",
+  "gold": [
+   "opened her beak"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was the ring at the end?",
+  "gold": [
+   "under the roots",
+   "the roots",
+   "roots"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the ring",
+   "DID": "be",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Wanjiru pack?",
+  "gold": [
+   "a basket of mangoes",
+   "mangoes"
+  ],
+  "answer": "a basket of mangoes",
+  "qline": {
+   "WHO": "Wanjiru",
+   "DID": "pack",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did Wanjiru pack the basket?",
+  "gold": [
+   "at eight o'clock",
+   "eight o'clock"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where were the rest of the mangoes in the afternoon?",
+  "gold": [
+   "her aunt's house",
+   "aunt's house"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the mangoes",
+   "DID": "were",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who made jam with the mangoes?",
+  "gold": [
+   "her aunt",
+   "aunt"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "When did Wanjiru go home?",
+  "gold": [
+   "in the morning",
+   "the morning",
+   "morning"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who ran the lending library?",
+  "gold": [
+   "mrs adebayo",
+   "adebayo"
+  ],
+  "answer": "Mrs Adebayo",
+  "qline": {
+   "WHO": "the lending library",
+   "DID": "run",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the lending library?",
+  "gold": [
+   "in the village hall",
+   "the village hall",
+   "village hall"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the lending library",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who returned a book with a torn cover?",
+  "gold": [
+   "kazuo",
+   "a boy"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Mrs Adebayo use to mend the book?",
+  "gold": [
+   "tape and card",
+   "tape"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Mrs Adebayo",
+   "DID": "use",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What does Kazuo do after school?",
+  "gold": [
+   "helps her repair books",
+   "repair books"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who wanted the apples?",
+  "gold": [
+   "the goat",
+   "goat"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who shook the trunk?",
+  "gold": [
+   "the horse",
+   "horse"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the trunk",
+   "DID": "shake",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Why did the horse shake the trunk?",
+  "gold": [
+   "she promised him half",
+   "promised him half"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did the goat leave?",
+  "gold": [
+   "only the cores",
+   "the cores",
+   "cores"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the goat",
+   "DID": "leave",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Whose tree was it?",
+  "gold": [
+   "the farmer's",
+   "farmer's"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the tree",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where were the boots before breakfast?",
+  "gold": [
+   "on the fence",
+   "the fence",
+   "fence"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who moved the boots into the barn?",
+  "gold": [
+   "jovana",
+   "his sister"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who took the boots to the river?",
+  "gold": [
+   "their father",
+   "father"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where were the boots that evening?",
+  "gold": [
+   "beside the stove",
+   "the stove",
+   "stove"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the boots",
+   "DID": "were",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did their father take the boots?",
+  "gold": [
+   "at noon",
+   "noon"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who was the new nurse?",
+  "gold": [
+   "fatou"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the new nurse",
+   "DID": "be",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who was shivering in the waiting room?",
+  "gold": [
+   "mr okonjo",
+   "okonjo",
+   "an old man"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Fatou bring along with the blanket?",
+  "gold": [
+   "a cup of tea",
+   "tea"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Fatou",
+   "DID": "bring",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who saw Mr Okonjo first?",
+  "gold": [
+   "dr lindgren",
+   "lindgren"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Mr Okonjo",
+   "DID": "see",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Why had Mr Okonjo walked from the hills?",
+  "gold": [
+   "bus had broken down",
+   "broken down"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What kept drumming on the owl's tree?",
+  "gold": [
+   "a woodpecker",
+   "woodpecker"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who did the owl ask for advice?",
+  "gold": [
+   "the wise heron",
+   "heron"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the owl sleep in the end?",
+  "gold": [
+   "in the old chimney",
+   "the old chimney",
+   "chimney"
+  ],
+  "answer": "because a woodpecker kept drumming on her tree",
+  "qline": {
+   "WHO": "the owl",
+   "DID": "sleep",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When could the owl not sleep?",
+  "gold": [
+   "during the day",
+   "the day"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the owl",
+   "DID": "not sleep",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the owl do in the chimney?",
+  "gold": [
+   "slept soundly"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "When did Ravi lose his hat?",
+  "gold": [
+   "the second day",
+   "second day"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where were they on the second day?",
+  "gold": [
+   "in porto",
+   "porto"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Ravi lose?",
+  "gold": [
+   "his hat",
+   "hat"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Ravi",
+   "DID": "lose",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who found the hat?",
+  "gold": [
+   "a driver",
+   "driver"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the hat",
+   "DID": "found",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the hat on the third day?",
+  "gold": [
+   "at the hotel desk",
+   "the hotel desk",
+   "hotel desk"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the hat",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What took the roof off the school?",
+  "gold": [
+   "the storm",
+   "storm"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the roof",
+   "DID": "take",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who was the headmistress?",
+  "gold": [
+   "ms mbatha",
+   "mbatha"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the headmistress",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who brought timber?",
+  "gold": [
+   "goran",
+   "a carpenter"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the children have lessons?",
+  "gold": [
+   "in the church hall",
+   "the church hall",
+   "church hall"
+  ],
+  "answer": "in the church hall",
+  "qline": {
+   "WHO": "the children",
+   "DID": "have",
+   "WHAT": "lessons",
+   "WHERE": "?",
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "How many parents spent the weekend nailing?",
+  "gold": [
+   "ten"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who invited the rooster down?",
+  "gold": [
+   "the fox",
+   "fox"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was the rooster?",
+  "gold": [
+   "the wall",
+   "wall"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the rooster",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the rooster say he could see?",
+  "gold": [
+   "two dogs",
+   "dogs"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did the fox do?",
+  "gold": [
+   "ran off at once",
+   "ran off"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the fox",
+   "DID": "do",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What had all the animals made, according to the fox?",
+  "gold": [
+   "peace"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the fox",
+   "DID": "had",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the phone when Hamid went to work?",
+  "gold": [
+   "on the kitchen table",
+   "the kitchen table",
+   "kitchen table"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who found the phone?",
+  "gold": [
+   "yusra",
+   "his daughter"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the phone",
+   "DID": "find",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Yusra put the phone in?",
+  "gold": [
+   "her school bag",
+   "school bag"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who had the phone at the end?",
+  "gold": [
+   "hamid"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the phone",
+   "DID": "have",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did Yusra hand the phone back?",
+  "gold": [
+   "that evening",
+   "evening"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Zeynep find?",
+  "gold": [
+   "a violin",
+   "violin"
+  ],
+  "answer": "a violin",
+  "qline": {
+   "WHO": "Zeynep",
+   "DID": "find",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who had left the violin in the taxi?",
+  "gold": [
+   "oskar",
+   "cellist"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did Zeynep drive?",
+  "gold": [
+   "to the concert hall",
+   "the concert hall",
+   "concert hall"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Zeynep",
+   "DID": "drive",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What was inside the violin case?",
+  "gold": [
+   "a ticket stub",
+   "ticket stub"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the violin case",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Oskar give Zeynep?",
+  "gold": [
+   "two seats",
+   "seats"
+  ],
+  "answer": "two seats",
+  "qline": {
+   "WHO": "Oskar",
+   "DID": "give",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did the mouse fall?",
+  "gold": [
+   "a bucket of milk",
+   "bucket"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What turned the milk into butter?",
+  "gold": [
+   "her kicking",
+   "kicking"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the milk",
+   "DID": "turn",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did the mouse jump out?",
+  "gold": [
+   "by morning",
+   "morning"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who found the footprints?",
+  "gold": [
+   "the dairymaid",
+   "dairymaid"
+  ],
+  "answer": "The dairymaid",
+  "qline": {
+   "WHO": "the footprints",
+   "DID": "found",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the dairymaid find in the butter?",
+  "gold": [
+   "tiny footprints",
+   "footprints"
+  ],
+  "answer": "tiny footprints",
+  "qline": {
+   "WHO": "the dairymaid",
+   "DID": "find",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did the bus leave the depot?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who got on at the bakery corner?",
+  "gold": [
+   "siobhan"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who left a lunchbox on the seat?",
+  "gold": [
+   "malik"
+  ],
+  "answer": "Malik",
+  "qline": {
+   "WHO": "the lunchbox",
+   "DID": "left",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the lunchbox at the end of the day?",
+  "gold": [
+   "the depot",
+   "depot"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who drove the school bus?",
+  "gold": [
+   "mrs halloran",
+   "halloran"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the school bus",
+   "DID": "drive",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who sold umbrellas?",
+  "gold": [
+   "vikram"
+  ],
+  "answer": "Vikram",
+  "qline": {
+   "WHO": "umbrellas",
+   "DID": "sell",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did Vikram sell umbrellas?",
+  "gold": [
+   "outside the train station",
+   "the train station",
+   "train station"
+  ],
+  "answer": "outside the train station",
+  "qline": {
+   "WHO": "Vikram",
+   "DID": "sell",
+   "WHAT": "umbrellas",
+   "WHERE": "?",
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Vikram start selling?",
+  "gold": [
+   "cold lemonade",
+   "lemonade"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What rolled in?",
+  "gold": [
+   "dark clouds",
+   "clouds"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the roll",
+   "DID": "in",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Vikram do when the clouds came?",
+  "gold": [
+   "brought the umbrellas back",
+   "brought the umbrellas"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the bear and the badger find the beehive?",
+  "gold": [
+   "in a hollow log",
+   "a hollow log",
+   "log"
+  ],
+  "answer": "in a hollow log",
+  "qline": {
+   "WHO": "the bear",
+   "DID": "find",
+   "WHAT": "the beehive",
+   "WHERE": "?",
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who kept watch?",
+  "gold": [
+   "the badger",
+   "badger"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who ate the honey?",
+  "gold": [
+   "the bear",
+   "bear"
+  ],
+  "answer": "The bear",
+  "qline": {
+   "WHO": "the honey",
+   "DID": "ate",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the bees sting?",
+  "gold": [
+   "his nose",
+   "nose"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the bees",
+   "DID": "sting",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did the bees find the bear?",
+  "gold": [
+   "that night",
+   "night"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who lent Lerato the ladder?",
+  "gold": [
+   "bashir",
+   "her neighbour"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was the ladder on Wednesday?",
+  "gold": [
+   "the school",
+   "school"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the ladder",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who took the ladder to the school?",
+  "gold": [
+   "her son",
+   "son"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who brought the ladder back on Friday?",
+  "gold": [
+   "the caretaker",
+   "caretaker"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who had the ladder at the end?",
+  "gold": [
+   "bashir"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the ladder",
+   "DID": "have",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Why was the ferry cancelled?",
+  "gold": [
+   "high winds",
+   "winds"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who hired a fishing boat?",
+  "gold": [
+   "sefa",
+   "the postman"
+  ],
+  "answer": "Sefa",
+  "qline": {
+   "WHO": "a fishing boat",
+   "DID": "hire",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who steered the boat?",
+  "gold": [
+   "akosua",
+   "an old woman"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the boat",
+   "DID": "steer",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Sefa hold?",
+  "gold": [
+   "the mail bags",
+   "mail bags"
+  ],
+  "answer": "the mail bags",
+  "qline": {
+   "WHO": "Sefa",
+   "DID": "hold",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did they reach the island?",
+  "gold": [
+   "before dark"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who laughed at the crane?",
+  "gold": [
+   "the peacock",
+   "peacock"
+  ],
+  "answer": "A peacock",
+  "qline": {
+   "WHO": "the crane",
+   "DID": "laugh",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What colour were the crane's feathers?",
+  "gold": [
+   "plain grey",
+   "grey"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the crane fly?",
+  "gold": [
+   "over the hills",
+   "the hills",
+   "hills"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the crane fly",
+   "DID": "fly",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where could the peacock walk?",
+  "gold": [
+   "in the farmyard",
+   "the farmyard",
+   "farmyard"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the peacock",
+   "DID": "walk",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the crane do after the peacock laughed?",
+  "gold": [
+   "spread her wings"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the group gather at nine?",
+  "gold": [
+   "in the hotel lobby",
+   "the hotel lobby",
+   "lobby"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who was the guide?",
+  "gold": [
+   "paulo"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the guide",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who dropped a map into the water?",
+  "gold": [
+   "tamsin"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who had Paulo's map after the harbour?",
+  "gold": [
+   "tamsin"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Paulo hand each person?",
+  "gold": [
+   "a map",
+   "map"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Whose boat came back empty?",
+  "gold": [
+   "captain moreau's",
+   "moreau's"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who suggested trying past the lighthouse?",
+  "gold": [
+   "idris",
+   "the cook"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did they find past the lighthouse?",
+  "gold": [
+   "shoal of herring",
+   "herring"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who wanted to give up?",
+  "gold": [
+   "her crew",
+   "crew"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did the market pay them?",
+  "gold": [
+   "twice the usual price",
+   "twice"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the market",
+   "DID": "pay",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did the cat live at first?",
+  "gold": [
+   "in a grocer's shop",
+   "a grocer's shop",
+   "grocer's shop"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the cat",
+   "DID": "live",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What was the cat supposed to catch?",
+  "gold": [
+   "mice"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What chewed through every sack?",
+  "gold": [
+   "the mice",
+   "mice"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the chew",
+   "DID": "chew",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who put the cat out?",
+  "gold": [
+   "the grocer",
+   "grocer"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the cat catch mice at the end?",
+  "gold": [
+   "in the alley",
+   "the alley",
+   "alley"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Whose clock was it?",
+  "gold": [
+   "her grandmother's",
+   "grandmother's"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the clock",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Elif take to the repair shop?",
+  "gold": [
+   "her grandmother's clock",
+   "clock"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who kept the clock for a week?",
+  "gold": [
+   "mr varela",
+   "varela",
+   "the repairman"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the clock",
+   "DID": "keep",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who collected the clock?",
+  "gold": [
+   "elif's uncle",
+   "uncle"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the clock",
+   "DID": "collect",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where is the clock now?",
+  "gold": [
+   "above the fireplace",
+   "the fireplace",
+   "fireplace"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the clock",
+   "DID": "be",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Why did Mr Dlamini carry the groceries up the stairs?",
+  "gold": [
+   "the lift was broken",
+   "lift was broken"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Mr Dlamini carry up the stairs?",
+  "gold": [
+   "his neighbour's groceries",
+   "groceries"
+  ],
+  "answer": "his neighbour's groceries",
+  "qline": {
+   "WHO": "Mr Dlamini",
+   "DID": "carry",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who was the retired teacher?",
+  "gold": [
+   "ottilie"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the retired teacher",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Ottilie invite him in for?",
+  "gold": [
+   "soup"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Ottilie",
+   "DID": "invite",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who had Ottilie once taught?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did the donkey carry the first day?",
+  "gold": [
+   "salt"
+  ],
+  "answer": "salt",
+  "qline": {
+   "WHO": "the donkey",
+   "DID": "carry",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did the donkey slip?",
+  "gold": [
+   "in a river",
+   "a river",
+   "river"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the donkey",
+   "DID": "slip",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What soaked up the water?",
+  "gold": [
+   "the sponges",
+   "sponges"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the water",
+   "DID": "soak",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the donkey do the next day?",
+  "gold": [
+   "lay down"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What melted in the river?",
+  "gold": [
+   "the salt",
+   "salt"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the river",
+   "DID": "melt",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the kite in the morning?",
+  "gold": [
+   "in the plum tree",
+   "the plum tree",
+   "plum tree"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the kite",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who freed the kite?",
+  "gold": [
+   "cosmin",
+   "her friend"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the kite",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What carried the kite into the pond?",
+  "gold": [
+   "the wind",
+   "wind"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the kite",
+   "DID": "carry",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the kite at the end?",
+  "gold": [
+   "the farmer's pond",
+   "pond"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the kite",
+   "DID": "be",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What snapped?",
+  "gold": [
+   "the string",
+   "string"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the snap",
+   "DID": "snap",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who was the young chemist?",
+  "gold": [
+   "gulnara"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the young chemist",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Gulnara notice?",
+  "gold": [
+   "a leak",
+   "leak"
+  ],
+  "answer": "a leak",
+  "qline": {
+   "WHO": "Gulnara",
+   "DID": "notice",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who ignored Gulnara?",
+  "gold": [
+   "the foreman",
+   "foreman"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Gulnara",
+   "DID": "ignore",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Gulnara do after the foreman ignored her?",
+  "gold": [
+   "shut the valve herself",
+   "shut the valve"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who promoted Gulnara?",
+  "gold": [
+   "mr ashworth",
+   "ashworth",
+   "the manager"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Gulnara",
+   "DID": "promote",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did the first two goats meet?",
+  "gold": [
+   "on a narrow bridge",
+   "a narrow bridge",
+   "bridge"
+  ],
+  "answer": "over a deep gorge",
+  "qline": {
+   "WHO": "the first two goats",
+   "DID": "meet",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the first two goats do?",
+  "gold": [
+   "butted heads"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the first two goats",
+   "DID": "do",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the first two goats fall into?",
+  "gold": [
+   "the water",
+   "water"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the first two goats",
+   "DID": "fall",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did one of the other goats do?",
+  "gold": [
+   "knelt down",
+   "knelt"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "one of the other goats",
+   "DID": "do",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the other goat step over?",
+  "gold": [
+   "her back"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the other goat",
+   "DID": "step",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the van at dawn?",
+  "gold": [
+   "outside the bakery",
+   "the bakery",
+   "bakery"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the van",
+   "DID": "be",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who delivered the loaves to the hospital kitchen?",
+  "gold": [
+   "umar"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What stole a sardine?",
+  "gold": [
+   "a gull",
+   "gull"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the sardine",
+   "DID": "steal",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "How many loaves did Umar load?",
+  "gold": [
+   "forty"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Umar collect at the harbour?",
+  "gold": [
+   "fish"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Umar",
+   "DID": "collect",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who led the choir?",
+  "gold": [
+   "orla"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the choir",
+   "DID": "led",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the choir not have?",
+  "gold": [
+   "piano"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the choir",
+   "DID": "not have",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who offered the piano?",
+  "gold": [
+   "mr castellanos",
+   "castellanos"
+  ],
+  "answer": "A listener",
+  "qline": {
+   "WHO": "the piano",
+   "DID": "offer",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did the choir sing?",
+  "gold": [
+   "at the spring festival",
+   "spring festival"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the choir",
+   "DID": "sing",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who drove the piano up the mountain road?",
+  "gold": [
+   "six farmers",
+   "farmers"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who warned the other birds?",
+  "gold": [
+   "a sparrow",
+   "sparrow"
+  ],
+  "answer": "A sparrow",
+  "qline": {
+   "WHO": "the other birds",
+   "DID": "warn",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What was the farmer sowing?",
+  "gold": [
+   "flax"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the farmer",
+   "DID": "sow",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What would the flax become?",
+  "gold": [
+   "nets"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the flax",
+   "DID": "become",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did the sparrow go to live?",
+  "gold": [
+   "near the houses",
+   "the houses"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did the birds keep eating?",
+  "gold": [
+   "the seeds",
+   "seeds"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was the mask at midnight?",
+  "gold": [
+   "in the safe",
+   "the safe",
+   "safe"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who locked the mask in the safe?",
+  "gold": [
+   "wiremu",
+   "the night guard"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What made the noise in the east hall?",
+  "gold": [
+   "a cat",
+   "cat"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the noise",
+   "DID": "make",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who moved the mask in the morning?",
+  "gold": [
+   "dr sandoval",
+   "sandoval",
+   "the director"
+  ],
+  "answer": "The director",
+  "qline": {
+   "WHO": "the mask",
+   "DID": "move",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the mask at the end?",
+  "gold": [
+   "a glass case",
+   "glass case"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the mask",
+   "DID": "be",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who kept the cows overnight?",
+  "gold": [
+   "yaw",
+   "a boy"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who paid Yaw?",
+  "gold": [
+   "svetlana",
+   "the farmer"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Yaw",
+   "DID": "pay",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Svetlana pay Yaw with?",
+  "gold": [
+   "a wheel of cheese",
+   "cheese"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "How far had the cows wandered?",
+  "gold": [
+   "three miles"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the cows",
+   "DID": "wander",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did the cows wander downstream?",
+  "gold": [
+   "after the flood"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who wanted to be as big as the ox?",
+  "gold": [
+   "a frog",
+   "frog"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was the ox?",
+  "gold": [
+   "in the meadow",
+   "the meadow",
+   "meadow"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the ox",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who did the frog ask?",
+  "gold": [
+   "her children",
+   "children"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the frog",
+   "DID": "ask",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did the frog do to look bigger?",
+  "gold": [
+   "puffed herself up",
+   "puffed"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What happened to the frog in the end?",
+  "gold": [
+   "she burst",
+   "burst"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the frog",
+   "DID": "happen",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did Mateus leave his bicycle?",
+  "gold": [
+   "at the swimming pool",
+   "the swimming pool",
+   "pool"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who took the bicycle to the police station?",
+  "gold": [
+   "a cleaner",
+   "cleaner"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who drove Mateus back on Saturday?",
+  "gold": [
+   "his mother",
+   "mother"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What did Mateus leave at the swimming pool?",
+  "gold": [
+   "his bicycle",
+   "bicycle"
+  ],
+  "answer": "his bicycle",
+  "qline": {
+   "WHO": "Mateus",
+   "DID": "leave",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did Mateus ride the bicycle?",
+  "gold": [
+   "to his grandfather's farm",
+   "his grandfather's farm",
+   "grandfather's farm"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who was the weather reporter?",
+  "gold": [
+   "kirra walsh",
+   "kirra"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the weather reporter",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Why was Kirra late?",
+  "gold": [
+   "stuck in traffic",
+   "traffic"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who read the forecast instead?",
+  "gold": [
+   "emil",
+   "the sports presenter"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the forecast",
+   "DID": "read",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When was the forecast meant to be read?",
+  "gold": [
+   "at seven",
+   "seven"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Whose forecast was the funniest?",
+  "gold": [
+   "emil's"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the forecast",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the dog chained?",
+  "gold": [
+   "in a yard",
+   "a yard",
+   "yard"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the dog",
+   "DID": "be chained",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who gave the dog meat?",
+  "gold": [
+   "his master",
+   "master"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "What had worn a mark on the dog's neck?",
+  "gold": [
+   "the chain",
+   "chain"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where did the wolf go at the end?",
+  "gold": [
+   "back to the forest",
+   "the forest",
+   "forest"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the wolf",
+   "DID": "go",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who found the dog?",
+  "gold": [
+   "a hungry wolf",
+   "the wolf",
+   "wolf"
+  ],
+  "answer": "A hungry wolf",
+  "qline": {
+   "WHO": "the dog",
+   "DID": "find",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where was the suitcase at noon?",
+  "gold": [
+   "the airport in budapest",
+   "budapest"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the suitcase",
+   "DID": "be",
+   "WHAT": "at",
+   "WHERE": "?",
+   "WHEN": "noon",
+   "WHY": null
+  }
+ },
+ {
+  "q": "Where did the suitcase spend the night?",
+  "gold": [
+   "in oslo",
+   "oslo"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who sent the suitcase on to Madrid?",
+  "gold": [
+   "jun",
+   "an airline clerk"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "When did Jun send the suitcase on?",
+  "gold": [
+   "the next morning",
+   "next morning"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Where was the suitcase by evening?",
+  "gold": [
+   "in ilona's hotel room",
+   "ilona's hotel room",
+   "hotel room"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Whose dog was Smoke?",
+  "gold": [
+   "the librarian's",
+   "librarian's"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Smoke",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "What did Smoke steal?",
+  "gold": [
+   "a sausage",
+   "sausage"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Smoke",
+   "DID": "steal",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "Who was the butcher?",
+  "gold": [
+   "mr abara",
+   "abara"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "the butcher",
+   "DID": "was",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ },
+ {
+  "q": "When did Smoke escape?",
+  "gold": [
+   "on market day",
+   "market day"
+  ],
+  "answer": null,
+  "qline": null
+ },
+ {
+  "q": "Who caught Smoke?",
+  "gold": [
+   "luca and magnus",
+   "luca",
+   "magnus"
+  ],
+  "answer": null,
+  "qline": {
+   "WHO": "Smoke",
+   "DID": "catch",
+   "WHAT": "?",
+   "WHERE": null,
+   "WHEN": null,
+   "WHY": null
+  }
+ }
+]
