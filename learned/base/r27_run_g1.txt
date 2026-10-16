@@ -1,0 +1,17 @@
+G1 generated 44 sentences (9 s)
+   GEN He called his cousin.
+   GEN A crow had found a ring in the grass.
+   GEN The grass had also carried the oak.
+   GEN A squirrel was then living below.
+   GEN A mangoes took the bus back into the market.
+   GEN She had just sold half.
+   GEN A torn covered.
+   GEN A goat wanted the apples on the tree.
+   GEN She asked the horse.
+   GEN The horse was just shaking the trunk.
+   GEN It started.
+   GEN The room was.
+   GEN The room shivered.
+   GEN A owl not.
+   GEN A owl slept.
+G1 novelty 0.599; sentences with an invented content word 8 / 44; judge in context: generated 8.378 vs the story's own sentence 6.037 over 42
