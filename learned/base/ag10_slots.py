@@ -122,7 +122,7 @@ def main():
             allowed = set(content(q)) | {A.lemma(w) for w in content(q)} | {"the", "a", "an"}
             ds = parse(gen(m, tok, Q_PROMPT.format(q=q), n=60)); qd = None
             for d in ds:
-                if sum(1 for v in d.values() if v == "?") != 1: stats["q:blanks"] += 1; continue
+                if sum(1 for v in d.values() if v == "?") > 1: stats["q:blanks"] += 1; continue          # AG13c allowance: the syntax rule places a missing "?"
                 if not d["DID"] or d["DID"] == "?": stats["q:no did"] += 1; continue
                 if not provenance_ok(d, allowed): stats["q:invented"] += 1; continue
                 qd = d; stats["q:kept"] += 1; break

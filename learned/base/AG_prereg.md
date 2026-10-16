@@ -446,3 +446,12 @@ ag10_slots.py --from-canon --canon-file ag19_canon.json, twice: clauses alone (A
 clause + sentence (AG13 style, out ag20b_lines.json); question lines reused from AG15 (--qlines ag15_lines.json);
 story lines merged as AG14; AG16 matching; syntax rule. Untouched val_fresh2 once. PASS if right > 34 at precision
 >= 0.89 (AG15: 34 / 4). About two hours of 1.5B time; the scale run stays paused.
+
+## AG20 result -- FAIL
+Slot lines from the 1.5B clauses: clauses alone 27 / 2 (0.93), clause + sentence 27 / 5, merged **31 / 5 (0.86)**,
+below AG15's 34 / 4. The 1.5B clause loop writes fewer clauses (178 against about 200), and the slot writer loses
+coverage with them even though the clause reader preferred them. The 0.4B clause loop feeding the 1.5B slot writer
+(AG15) stays the configuration. Decision for the scale run: it continues with the AG12 configuration, with the
+question verifier relaxed from here on to the AG13c allowance (zero or one '?'); the strict-rule stories already
+done (about the first 220) get their missing question lines regenerated in a follow-up pass, so that the final
+scale score is the AG15 configuration minus the AG13 story lines.

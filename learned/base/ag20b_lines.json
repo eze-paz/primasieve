@@ -1,0 +1,5159 @@
+{
+ "f1": {
+  "lines": [
+   {
+    "WHO": "Teodor",
+    "DID": "opened",
+    "WHAT": "his shop",
+    "WHERE": "on Quay Lane",
+    "WHEN": "at six",
+    "WHY": null,
+    "sent": "Every morning the baker, Teodor, opened his shop on Quay Lane at six."
+   },
+   {
+    "WHO": "On Thursday",
+    "DID": "his oven would not light",
+    "WHAT": "so he called his cousin Radu",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "On Thursday his oven would not light, so he called his cousin Radu, who fixed gas pipes for a living."
+   },
+   {
+    "WHO": "Radu",
+    "DID": "worked",
+    "WHAT": "sold yesterday's bread",
+    "WHERE": "at half price",
+    "WHEN": "while",
+    "WHY": "Teodor sold yesterday's bread at half price",
+    "sent": "Radu worked"
+   },
+   {
+    "WHO": "the street",
+    "DID": "smell",
+    "WHAT": "of rye",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "the street smelled of rye"
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who was the baker?",
+    "gold": [
+     "teodor"
+    ],
+    "qline": {
+     "WHO": "the baker",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who did Teodor call when the oven would not light?",
+    "gold": [
+     "radu",
+     "his cousin"
+    ],
+    "qline": {
+     "WHO": "Teodor",
+     "DID": "call",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Teodor sell while Radu worked?",
+    "gold": [
+     "yesterday's bread",
+     "bread"
+    ],
+    "qline": {
+     "WHO": "Teodor",
+     "DID": "sell",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When was the oven hot again?",
+    "gold": [
+     "by noon",
+     "noon"
+    ],
+    "qline": {
+     "WHO": "the oven",
+     "DID": "be",
+     "WHAT": "hot",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the oven",
+     "DID": "be",
+     "WHAT": "hot",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was Teodor's shop?",
+    "gold": [
+     "on quay lane",
+     "quay lane"
+    ],
+    "qline": null
+   }
+  ]
+ },
+ "_stats": {
+  "line:kept": 191,
+  "line:invented": 13,
+  "line:pronoun resolved": 42
+ },
+ "f2": {
+  "lines": [
+   {
+    "WHO": "A crow",
+    "DID": "found",
+    "WHAT": "a ring",
+    "WHERE": "in the grass",
+    "WHEN": "in the grass",
+    "WHY": null,
+    "sent": "A crow found a ring in the grass."
+   },
+   {
+    "WHO": "A squirrel",
+    "DID": "asked",
+    "WHAT": "to see",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A squirrel who lived below asked to see it."
+   },
+   {
+    "WHO": "The crow",
+    "DID": "opened her beak",
+    "WHAT": "to answer",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The crow opened her beak."
+   },
+   {
+    "WHO": "The crow",
+    "DID": "was",
+    "WHAT": "proud of her prize",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The ring fell into the squirrel's paws."
+   },
+   {
+    "WHO": "The squirrel",
+    "DID": "buried",
+    "WHAT": "it",
+    "WHERE": "under the roots",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The squirrel buried it under the roots."
+   },
+   {
+    "WHO": "The crow",
+    "DID": "never found it again",
+    "WHAT": "the squirrel buried it under the roots",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The crow never found it again."
+   }
+  ],
+  "qs": [
+   {
+    "q": "What did the crow find?",
+    "gold": [
+     "a ring",
+     "ring"
+    ],
+    "qline": {
+     "WHO": "the crow",
+     "DID": "find",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who asked to see the ring?",
+    "gold": [
+     "a squirrel",
+     "squirrel"
+    ],
+    "qline": {
+     "WHO": "the ring",
+     "DID": "ask",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who had the ring at the end?",
+    "gold": [
+     "the squirrel",
+     "squirrel"
+    ],
+    "qline": {
+     "WHO": "the ring",
+     "DID": "have",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Why did the ring fall?",
+    "gold": [
+     "opened her beak"
+    ],
+    "qline": {
+     "WHO": "the ring",
+     "DID": "fall",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the ring",
+     "DID": "fall",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the ring at the end?",
+    "gold": [
+     "under the roots",
+     "the roots",
+     "roots"
+    ],
+    "qline": {
+     "WHO": "the ring",
+     "DID": "be",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f3": {
+  "lines": [
+   {
+    "WHO": "Wanjiru",
+    "DID": "packed",
+    "WHAT": "a basket of mangoes",
+    "WHERE": "at eight o'clock",
+    "WHEN": "at eight o'clock",
+    "WHY": "to the market in town",
+    "sent": "Wanjiru packed a basket of mangoes"
+   },
+   {
+    "WHO": "Wanjiru",
+    "DID": "sold",
+    "WHAT": "half of them",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She sold half of them."
+   }
+  ],
+  "qs": [
+   {
+    "q": "What did Wanjiru pack?",
+    "gold": [
+     "a basket of mangoes",
+     "mangoes"
+    ],
+    "qline": {
+     "WHO": "Wanjiru",
+     "DID": "pack",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did Wanjiru pack the basket?",
+    "gold": [
+     "at eight o'clock",
+     "eight o'clock"
+    ],
+    "qline": {
+     "WHO": "Wanjiru",
+     "DID": "pack",
+     "WHAT": "the basket",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Wanjiru",
+     "DID": "pack",
+     "WHAT": "the basket",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where were the rest of the mangoes in the afternoon?",
+    "gold": [
+     "her aunt's house",
+     "aunt's house"
+    ],
+    "qline": {
+     "WHO": "the mangoes",
+     "DID": "were",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who made jam with the mangoes?",
+    "gold": [
+     "her aunt",
+     "aunt"
+    ],
+    "qline": {
+     "WHO": "the mangoes",
+     "DID": "make",
+     "WHAT": "jam",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did Wanjiru go home?",
+    "gold": [
+     "in the morning",
+     "the morning",
+     "morning"
+    ],
+    "qline": {
+     "WHO": "Wanjiru",
+     "DID": "go home",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Wanjiru",
+     "DID": "go home",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f4": {
+  "lines": [
+   {
+    "WHO": "Mrs Adebayo",
+    "DID": "ran",
+    "WHAT": "the lending library",
+    "WHERE": "in the village hall",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Mrs Adebayo ran the lending library."
+   },
+   {
+    "WHO": "Mrs Adebayo",
+    "DID": "was",
+    "WHAT": "the one who ran",
+    "WHERE": "the lending library",
+    "WHEN": "in the village hall",
+    "WHY": "because she was the one who ran it",
+    "sent": "Mrs Adebayo was the one who ran the lending library."
+   },
+   {
+    "WHO": "One rainy Saturday",
+    "DID": "returned",
+    "WHAT": "a book",
+    "WHERE": "with a torn cover",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "One rainy Saturday a boy named Kazuo returned a book with a torn cover."
+   },
+   {
+    "WHO": "One rainy Saturday",
+    "DID": "showed",
+    "WHAT": "him",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "she showed him how to mend it with tape and card"
+   },
+   {
+    "WHO": "Kazuo",
+    "DID": "helps",
+    "WHAT": "her",
+    "WHERE": "after school",
+    "WHEN": "after school",
+    "WHY": "repair books",
+    "sent": "Now Kazuo helps her repair books after school."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who ran the lending library?",
+    "gold": [
+     "mrs adebayo",
+     "adebayo"
+    ],
+    "qline": {
+     "WHO": "the lending library",
+     "DID": "run",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the lending library?",
+    "gold": [
+     "in the village hall",
+     "the village hall",
+     "village hall"
+    ],
+    "qline": {
+     "WHO": "the lending library",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who returned a book with a torn cover?",
+    "gold": [
+     "kazuo",
+     "a boy"
+    ],
+    "qline": {
+     "WHO": "the book",
+     "DID": "return",
+     "WHAT": "with a torn cover",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Mrs Adebayo use to mend the book?",
+    "gold": [
+     "tape and card",
+     "tape"
+    ],
+    "qline": {
+     "WHO": "Mrs Adebayo",
+     "DID": "use",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What does Kazuo do after school?",
+    "gold": [
+     "helps her repair books",
+     "repair books"
+    ],
+    "qline": {
+     "WHO": "Kazuo",
+     "DID": "do",
+     "WHAT": "after school",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f5": {
+  "lines": [
+   {
+    "WHO": "A goat",
+    "DID": "wanted",
+    "WHAT": "the apples",
+    "WHERE": "on the farmer's tree",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A goat wanted the apples on the farmer's tree."
+   },
+   {
+    "WHO": "A goat",
+    "DID": "asked",
+    "WHAT": "the horse",
+    "WHERE": "to shake the trunk",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She asked the horse to shake the trunk."
+   },
+   {
+    "WHO": "The horse",
+    "DID": "it",
+    "WHAT": "to shake the trunk",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The horse did it because she promised him half."
+   },
+   {
+    "WHO": "The goat",
+    "DID": "ate",
+    "WHAT": "every one",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "When the apples fell, the goat ate every one."
+   },
+   {
+    "WHO": "The goat",
+    "DID": "ate",
+    "WHAT": "the apples",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The goat left only the cores."
+   },
+   {
+    "WHO": "The horse",
+    "DID": "never",
+    "WHAT": "helped",
+    "WHERE": "the goat",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The horse never helped the goat."
+   },
+   {
+    "WHO": "The horse",
+    "DID": "never",
+    "WHAT": "helped",
+    "WHERE": "the goat",
+    "WHEN": "again",
+    "WHY": null,
+    "sent": "The horse never helped the goat again."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who wanted the apples?",
+    "gold": [
+     "the goat",
+     "goat"
+    ],
+    "qline": {
+     "WHO": "the apples",
+     "DID": "want",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who shook the trunk?",
+    "gold": [
+     "the horse",
+     "horse"
+    ],
+    "qline": {
+     "WHO": "the trunk",
+     "DID": "shake",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Why did the horse shake the trunk?",
+    "gold": [
+     "she promised him half",
+     "promised him half"
+    ],
+    "qline": {
+     "WHO": "the horse",
+     "DID": "shake",
+     "WHAT": "the trunk",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the horse",
+     "DID": "shake",
+     "WHAT": "the trunk",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the goat leave?",
+    "gold": [
+     "only the cores",
+     "the cores",
+     "cores"
+    ],
+    "qline": {
+     "WHO": "the goat",
+     "DID": "leave",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Whose tree was it?",
+    "gold": [
+     "the farmer's",
+     "farmer's"
+    ],
+    "qline": {
+     "WHO": "?",
+     "DID": "was",
+     "WHAT": "tree",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "?",
+     "DID": "was",
+     "WHAT": "tree",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f6": {
+  "lines": [
+   {
+    "WHO": "Dmitri",
+    "DID": "hung",
+    "WHAT": "his wet boots",
+    "WHERE": "on the fence",
+    "WHEN": "before breakfast",
+    "WHY": "because they were wet",
+    "sent": "Before breakfast, Dmitri hung his wet boots on the fence."
+   },
+   {
+    "WHO": "His sister Jovana",
+    "DID": "moved",
+    "WHAT": "them",
+    "WHERE": "into the barn",
+    "WHEN": "when it started to rain",
+    "WHY": "because it started to rain",
+    "sent": "His sister Jovana moved them into the barn."
+   },
+   {
+    "WHO": "Their father",
+    "DID": "took",
+    "WHAT": "the boots",
+    "WHERE": "from the barn",
+    "WHEN": "at noon",
+    "WHY": "to the river",
+    "sent": "He took the boots from the barn to the river."
+   },
+   {
+    "WHO": "Dmitri",
+    "DID": "found",
+    "WHAT": "them",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "That evening Dmitri found them drying beside the stove."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where were the boots before breakfast?",
+    "gold": [
+     "on the fence",
+     "the fence",
+     "fence"
+    ],
+    "qline": {
+     "WHO": "the boots",
+     "DID": "be",
+     "WHAT": "before breakfast",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who moved the boots into the barn?",
+    "gold": [
+     "jovana",
+     "his sister"
+    ],
+    "qline": {
+     "WHO": "the boots",
+     "DID": "move",
+     "WHAT": "into the barn",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who took the boots to the river?",
+    "gold": [
+     "their father",
+     "father"
+    ],
+    "qline": {
+     "WHO": "the boots",
+     "DID": "took",
+     "WHAT": "to the river",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where were the boots that evening?",
+    "gold": [
+     "beside the stove",
+     "the stove",
+     "stove"
+    ],
+    "qline": {
+     "WHO": "the boots",
+     "DID": "were",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did their father take the boots?",
+    "gold": [
+     "at noon",
+     "noon"
+    ],
+    "qline": {
+     "WHO": "their father",
+     "DID": "take",
+     "WHAT": "the boots",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "their father",
+     "DID": "take",
+     "WHAT": "the boots",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f7": {
+  "lines": [
+   {
+    "WHO": "The new nurse",
+    "DID": "noticed",
+    "WHAT": "an old man",
+    "WHERE": "in the waiting room",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The new nurse at the clinic noticed an old man in the waiting room shivering."
+   },
+   {
+    "WHO": "The new nurse",
+    "DID": "noticed",
+    "WHAT": "an old man",
+    "WHERE": "in the waiting room",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The new nurse at the clinic noticed an old man"
+   },
+   {
+    "WHO": "The new nurse",
+    "DID": "brought",
+    "WHAT": "a blanket",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She brought him a blanket."
+   },
+   {
+    "WHO": "The new nurse",
+    "DID": "brought",
+    "WHAT": "a cup of tea",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She brought him a cup of tea."
+   },
+   {
+    "WHO": "The man",
+    "DID": "said",
+    "WHAT": "he had walked",
+    "WHERE": "from the hills",
+    "WHEN": "because his bus had broken down",
+    "WHY": "his bus had broken down",
+    "sent": "The man, Mr Okonjo, said he had walked from the hills because his bus had broken down."
+   },
+   {
+    "WHO": "Mr Okonjo",
+    "DID": "said",
+    "WHAT": "he had walked",
+    "WHERE": "from the hills",
+    "WHEN": "because his bus had broken down",
+    "WHY": "his bus had broken down",
+    "sent": "Mr Okonjo said he had walked from the hills because his bus had broken down."
+   },
+   {
+    "WHO": "Dr Lindgren",
+    "DID": "saw",
+    "WHAT": "him",
+    "WHERE": "first",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Dr Lindgren saw him first."
+   },
+   {
+    "WHO": "Fatou",
+    "DID": "drove",
+    "WHAT": "him",
+    "WHERE": "home",
+    "WHEN": "after her shift",
+    "WHY": null,
+    "sent": "Fatou drove him home after her shift."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who was the new nurse?",
+    "gold": [
+     "fatou"
+    ],
+    "qline": {
+     "WHO": "the new nurse",
+     "DID": "be",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who was shivering in the waiting room?",
+    "gold": [
+     "mr okonjo",
+     "okonjo",
+     "an old man"
+    ],
+    "qline": {
+     "WHO": "shivering",
+     "DID": "in",
+     "WHAT": "the waiting room",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Fatou bring along with the blanket?",
+    "gold": [
+     "a cup of tea",
+     "tea"
+    ],
+    "qline": {
+     "WHO": "Fatou",
+     "DID": "bring",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who saw Mr Okonjo first?",
+    "gold": [
+     "dr lindgren",
+     "lindgren"
+    ],
+    "qline": {
+     "WHO": "Mr Okonjo",
+     "DID": "see",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Why had Mr Okonjo walked from the hills?",
+    "gold": [
+     "bus had broken down",
+     "broken down"
+    ],
+    "qline": {
+     "WHO": "Mr Okonjo",
+     "DID": "walk",
+     "WHAT": "from the hills",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Mr Okonjo",
+     "DID": "walk",
+     "WHAT": "from the hills",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f8": {
+  "lines": [
+   {
+    "WHO": "A young owl",
+    "DID": "could not sleep",
+    "WHAT": "during the day",
+    "WHERE": "because a woodpecker kept drumming on her tree",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A young owl could not sleep during the day because a woodpecker kept drumming on her tree."
+   },
+   {
+    "WHO": "A young owl",
+    "DID": "flew",
+    "WHAT": "to the wise heron",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She flew to the wise heron."
+   },
+   {
+    "WHO": "A young owl",
+    "DID": "asked",
+    "WHAT": "for advice",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She asked for advice."
+   },
+   {
+    "WHO": "The heron",
+    "DID": "told",
+    "WHAT": "her",
+    "WHERE": "to sleep",
+    "WHEN": "in the old chimney of the empty mill",
+    "WHY": "because the mill was empty",
+    "sent": "The heron told her to sleep in the old chimney of the empty mill."
+   },
+   {
+    "WHO": "The heron",
+    "DID": "told",
+    "WHAT": "her",
+    "WHERE": "to sleep",
+    "WHEN": "in the old",
+    "WHY": null,
+    "sent": "The heron told her to sleep in the old"
+   },
+   {
+    "WHO": "There",
+    "DID": "slept",
+    "WHAT": "the owl",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": "- | WHO: the woodpecker | DID: drummed | WHAT: for no one | WHERE: - | WHEN: - | WHY: -",
+    "sent": "There the owl slept soundly, and the woodpecker drummed for no one."
+   }
+  ],
+  "qs": [
+   {
+    "q": "What kept drumming on the owl's tree?",
+    "gold": [
+     "a woodpecker",
+     "woodpecker"
+    ],
+    "qline": null
+   },
+   {
+    "q": "Who did the owl ask for advice?",
+    "gold": [
+     "the wise heron",
+     "heron"
+    ],
+    "qline": {
+     "WHO": "the owl",
+     "DID": "ask",
+     "WHAT": "for",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did the owl sleep in the end?",
+    "gold": [
+     "in the old chimney",
+     "the old chimney",
+     "chimney"
+    ],
+    "qline": {
+     "WHO": "the owl",
+     "DID": "sleep",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When could the owl not sleep?",
+    "gold": [
+     "during the day",
+     "the day"
+    ],
+    "qline": {
+     "WHO": "the owl",
+     "DID": "not sleep",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the owl",
+     "DID": "not sleep",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the owl do in the chimney?",
+    "gold": [
+     "slept soundly"
+    ],
+    "qline": {
+     "WHO": "the owl",
+     "DID": "do",
+     "WHAT": "in the chimney",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f9": {
+  "lines": [
+   {
+    "WHO": "Priya",
+    "DID": "flew",
+    "WHAT": "from Delhi to Lisbon",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Priya and her brother Ravi flew from Delhi to Lisbon."
+   },
+   {
+    "WHO": "Priya",
+    "DID": "flew",
+    "WHAT": "from Delhi to Lisbon",
+    "WHERE": "on the first day of the trip",
+    "WHEN": "on the first day of the trip",
+    "WHY": null,
+    "sent": "They flew on the first day of the trip."
+   },
+   {
+    "WHO": "Priya",
+    "DID": "flew",
+    "WHAT": "from Delhi to Lisbon",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "They flew from Delhi to Lisbon."
+   },
+   {
+    "WHO": "Priya",
+    "DID": "spent",
+    "WHAT": "the second day",
+    "WHERE": "in Porto",
+    "WHEN": "on a tram",
+    "WHY": "lost his hat",
+    "sent": "They spent the second day in Porto."
+   },
+   {
+    "WHO": "Priya",
+    "DID": "took",
+    "WHAT": "a train back to Lisbon",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "they took a train back to Lisbon"
+   }
+  ],
+  "qs": [
+   {
+    "q": "When did Ravi lose his hat?",
+    "gold": [
+     "the second day",
+     "second day"
+    ],
+    "qline": {
+     "WHO": "Ravi",
+     "DID": "lose",
+     "WHAT": "his hat",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Ravi",
+     "DID": "lose",
+     "WHAT": "his hat",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where were they on the second day?",
+    "gold": [
+     "in porto",
+     "porto"
+    ],
+    "qline": {
+     "WHO": "they",
+     "DID": "were",
+     "WHAT": "on the second day",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Ravi lose?",
+    "gold": [
+     "his hat",
+     "hat"
+    ],
+    "qline": {
+     "WHO": "Ravi",
+     "DID": "lose",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who found the hat?",
+    "gold": [
+     "a driver",
+     "driver"
+    ],
+    "qline": {
+     "WHO": "the hat",
+     "DID": "found",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the hat on the third day?",
+    "gold": [
+     "at the hotel desk",
+     "the hotel desk",
+     "hotel desk"
+    ],
+    "qline": {
+     "WHO": "the hat",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f10": {
+  "lines": [
+   {
+    "WHO": "The storm",
+    "DID": "took",
+    "WHAT": "the roof",
+    "WHERE": "to the school",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "When the storm took the roof off the school,"
+   },
+   {
+    "WHO": "Goran",
+    "DID": "brought",
+    "WHAT": "timber",
+    "WHERE": "from his yard",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Goran brought timber from his yard."
+   },
+   {
+    "WHO": "Goran",
+    "DID": "brought",
+    "WHAT": "timber",
+    "WHERE": "from his yard",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Goran is a carpenter."
+   },
+   {
+    "WHO": "Ten fathers and mothers",
+    "DID": "spent",
+    "WHAT": "the weekend",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Ten fathers and mothers spent the weekend"
+   },
+   {
+    "WHO": "The children",
+    "DID": "had",
+    "WHAT": "lessons",
+    "WHERE": "in the church hall",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "And the children had lessons in the church hall"
+   }
+  ],
+  "qs": [
+   {
+    "q": "What took the roof off the school?",
+    "gold": [
+     "the storm",
+     "storm"
+    ],
+    "qline": {
+     "WHO": "the roof",
+     "DID": "take",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who was the headmistress?",
+    "gold": [
+     "ms mbatha",
+     "mbatha"
+    ],
+    "qline": {
+     "WHO": "the headmistress",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who brought timber?",
+    "gold": [
+     "goran",
+     "a carpenter"
+    ],
+    "qline": {
+     "WHO": "the timber",
+     "DID": "bring",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did the children have lessons?",
+    "gold": [
+     "in the church hall",
+     "the church hall",
+     "church hall"
+    ],
+    "qline": {
+     "WHO": "the children",
+     "DID": "have",
+     "WHAT": "lessons",
+     "WHERE": "?",
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "How many parents spent the weekend nailing?",
+    "gold": [
+     "ten"
+    ],
+    "qline": {
+     "WHO": "the parents",
+     "DID": "spend",
+     "WHAT": "the weekend",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the parents",
+     "DID": "spend",
+     "WHAT": "the weekend",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f11": {
+  "lines": [
+   {
+    "WHO": "A fox",
+    "DID": "told",
+    "WHAT": "a rooster",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A fox told a rooster"
+   },
+   {
+    "WHO": "A fox",
+    "DID": "told",
+    "WHAT": "a rooster",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "and invited him down from the wall."
+   },
+   {
+    "WHO": "The rooster",
+    "DID": "asked",
+    "WHAT": "whether the fox would wait to greet them",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The rooster asked whether the fox would wait to greet them."
+   },
+   {
+    "WHO": "The fox",
+    "DID": "ran",
+    "WHAT": "off",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The fox ran off."
+   },
+   {
+    "WHO": "The fox",
+    "DID": "ran",
+    "WHAT": "off",
+    "WHERE": "at once",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The fox ran off at once."
+   },
+   {
+    "WHO": "The rooster",
+    "DID": "laugh",
+    "WHAT": "because there were no dogs",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The rooster laughed"
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who invited the rooster down?",
+    "gold": [
+     "the fox",
+     "fox"
+    ],
+    "qline": {
+     "WHO": "the rooster",
+     "DID": "down",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the rooster?",
+    "gold": [
+     "the wall",
+     "wall"
+    ],
+    "qline": {
+     "WHO": "the rooster",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the rooster say he could see?",
+    "gold": [
+     "two dogs",
+     "dogs"
+    ],
+    "qline": {
+     "WHO": "the rooster",
+     "DID": "say",
+     "WHAT": "he could see",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the fox do?",
+    "gold": [
+     "ran off at once",
+     "ran off"
+    ],
+    "qline": {
+     "WHO": "the fox",
+     "DID": "do",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What had all the animals made, according to the fox?",
+    "gold": [
+     "peace"
+    ],
+    "qline": {
+     "WHO": "the fox",
+     "DID": "had",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f12": {
+  "lines": [
+   {
+    "WHO": "Hamid",
+    "DID": "left",
+    "WHAT": "his phone",
+    "WHERE": "on the kitchen table",
+    "WHEN": "when he went to work",
+    "WHY": null,
+    "sent": "Hamid left his phone on the kitchen table."
+   },
+   {
+    "WHO": "His daughter",
+    "DID": "found",
+    "WHAT": "it",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "His daughter found it."
+   },
+   {
+    "WHO": "His daughter",
+    "DID": "put",
+    "WHAT": "it",
+    "WHERE": "in her school bag",
+    "WHEN": "by mistake",
+    "WHY": null,
+    "sent": "She put it in her school bag."
+   },
+   {
+    "WHO": "His daughter",
+    "DID": "called",
+    "WHAT": "him",
+    "WHERE": "from it",
+    "WHEN": "at lunchtime",
+    "WHY": "laughing | THAT: evening | HANDED: it back to him | AT: the bus stop",
+    "sent": "At lunchtime she called him from it, laughing, and that evening she handed it back to him at the bus stop."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where was the phone when Hamid went to work?",
+    "gold": [
+     "on the kitchen table",
+     "the kitchen table",
+     "kitchen table"
+    ],
+    "qline": {
+     "WHO": "Hamid",
+     "DID": "go",
+     "WHAT": "to work",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who found the phone?",
+    "gold": [
+     "yusra",
+     "his daughter"
+    ],
+    "qline": {
+     "WHO": "the phone",
+     "DID": "find",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Yusra put the phone in?",
+    "gold": [
+     "her school bag",
+     "school bag"
+    ],
+    "qline": {
+     "WHO": "Yusra",
+     "DID": "put",
+     "WHAT": "the phone",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who had the phone at the end?",
+    "gold": [
+     "hamid"
+    ],
+    "qline": {
+     "WHO": "the phone",
+     "DID": "have",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did Yusra hand the phone back?",
+    "gold": [
+     "that evening",
+     "evening"
+    ],
+    "qline": {
+     "WHO": "Yusra",
+     "DID": "hand",
+     "WHAT": "the phone",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Yusra",
+     "DID": "hand",
+     "WHAT": "the phone",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f13": {
+  "lines": [
+   {
+    "WHO": "Zeynep",
+    "DID": "found",
+    "WHAT": "a violin",
+    "WHERE": "on her back seat",
+    "WHEN": "one night",
+    "WHY": null,
+    "sent": "Zeynep found a violin on her back seat."
+   },
+   {
+    "WHO": "Zeynep",
+    "DID": "found",
+    "WHAT": "a violin",
+    "WHERE": "on her back seat",
+    "WHEN": "one night",
+    "WHY": null,
+    "sent": "Zeynep found a violin on her back seat one night."
+   },
+   {
+    "WHO": "Zeynep",
+    "DID": "drove",
+    "WHAT": "to the concert hall",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She drove to the concert hall."
+   },
+   {
+    "WHO": "Zeynep",
+    "DID": "drove",
+    "WHAT": "to the concert hall",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The case had a ticket stub inside."
+   },
+   {
+    "WHO": "The orchestra's cellist",
+    "DID": "had left",
+    "WHAT": "it",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The orchestra's cellist, Oskar, had left it there."
+   },
+   {
+    "WHO": "Oskar",
+    "DID": "had left",
+    "WHAT": "it",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Oskar had left it there."
+   },
+   {
+    "WHO": "Oskar",
+    "DID": "gave",
+    "WHAT": "two seats",
+    "WHERE": "for the Sunday show",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He gave Zeynep two seats."
+   },
+   {
+    "WHO": "Oskar",
+    "DID": "gave",
+    "WHAT": "two seats",
+    "WHERE": "for the Sunday show",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He gave Zeynep two seats for the Sunday show."
+   }
+  ],
+  "qs": [
+   {
+    "q": "What did Zeynep find?",
+    "gold": [
+     "a violin",
+     "violin"
+    ],
+    "qline": {
+     "WHO": "Zeynep",
+     "DID": "find",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who had left the violin in the taxi?",
+    "gold": [
+     "oskar",
+     "cellist"
+    ],
+    "qline": {
+     "WHO": "the violin",
+     "DID": "had",
+     "WHAT": "left",
+     "WHERE": "in the taxi",
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did Zeynep drive?",
+    "gold": [
+     "to the concert hall",
+     "the concert hall",
+     "concert hall"
+    ],
+    "qline": {
+     "WHO": "Zeynep",
+     "DID": "drive",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What was inside the violin case?",
+    "gold": [
+     "a ticket stub",
+     "ticket stub"
+    ],
+    "qline": {
+     "WHO": "the violin case",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Oskar give Zeynep?",
+    "gold": [
+     "two seats",
+     "seats"
+    ],
+    "qline": {
+     "WHO": "Oskar",
+     "DID": "give",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f14": {
+  "lines": [
+   {
+    "WHO": "A mouse",
+    "DID": "fell",
+    "WHAT": "into a bucket of milk",
+    "WHERE": "at the dairy",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A mouse fell into a bucket of milk."
+   },
+   {
+    "WHO": "The mouse",
+    "DID": "fell",
+    "WHAT": "into the bucket of milk",
+    "WHERE": "at the dairy",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The mouse fell into the bucket of milk."
+   },
+   {
+    "WHO": "The mouse",
+    "DID": "keep swimming",
+    "WHAT": "in circles",
+    "WHERE": "all night",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She kept swimming in circles all night."
+   },
+   {
+    "WHO": "By morning",
+    "DID": "her kicking",
+    "WHAT": "had churned the milk into butter",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "By morning her kicking had churned the milk into butter, and she stepped onto it and jumped out."
+   },
+   {
+    "WHO": "The dairymaid",
+    "DID": "found",
+    "WHAT": "tiny footprints",
+    "WHERE": "in the butter",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The dairymaid found tiny footprints in the butter."
+   },
+   {
+    "WHO": "The dairymaid",
+    "DID": "found",
+    "WHAT": "tiny footprints",
+    "WHERE": "in the butter",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The dairymaid wondered what had happened."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where did the mouse fall?",
+    "gold": [
+     "a bucket of milk",
+     "bucket"
+    ],
+    "qline": {
+     "WHO": "the mouse",
+     "DID": "fall",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What turned the milk into butter?",
+    "gold": [
+     "her kicking",
+     "kicking"
+    ],
+    "qline": {
+     "WHO": "the milk",
+     "DID": "turn",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did the mouse jump out?",
+    "gold": [
+     "by morning",
+     "morning"
+    ],
+    "qline": {
+     "WHO": "the mouse",
+     "DID": "jump out",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the mouse",
+     "DID": "jump out",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who found the footprints?",
+    "gold": [
+     "the dairymaid",
+     "dairymaid"
+    ],
+    "qline": {
+     "WHO": "the footprints",
+     "DID": "found",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the dairymaid find in the butter?",
+    "gold": [
+     "tiny footprints",
+     "footprints"
+    ],
+    "qline": {
+     "WHO": "the dairymaid",
+     "DID": "find",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f15": {
+  "lines": [
+   {
+    "WHO": "The school bus",
+    "DID": "left",
+    "WHAT": "the depot",
+    "WHERE": "at seven",
+    "WHEN": "at seven",
+    "WHY": null,
+    "sent": "The school bus left the depot at seven."
+   },
+   {
+    "WHO": "The school bus",
+    "DID": "left",
+    "WHAT": "the depot",
+    "WHERE": "at seven",
+    "WHEN": "at seven",
+    "WHY": null,
+    "sent": "It stopped at the farm."
+   },
+   {
+    "WHO": "Next",
+    "DID": "it",
+    "WHAT": "picked up",
+    "WHERE": "at the bakery corner",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Next it picked up Siobhan at the bakery corner."
+   },
+   {
+    "WHO": "Malik",
+    "DID": "left",
+    "WHAT": "his lunchbox",
+    "WHERE": "on the seat",
+    "WHEN": "when they reached the school",
+    "WHY": null,
+    "sent": "Malik left his lunchbox on the seat."
+   }
+  ],
+  "qs": [
+   {
+    "q": "When did the bus leave the depot?",
+    "gold": [
+     "at seven",
+     "seven"
+    ],
+    "qline": {
+     "WHO": "the bus",
+     "DID": "leave",
+     "WHAT": "the depot",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the bus",
+     "DID": "leave",
+     "WHAT": "the depot",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who got on at the bakery corner?",
+    "gold": [
+     "siobhan"
+    ],
+    "qline": {
+     "WHO": "got on",
+     "DID": "got",
+     "WHAT": "at the bakery corner",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who left a lunchbox on the seat?",
+    "gold": [
+     "malik"
+    ],
+    "qline": {
+     "WHO": "the lunchbox",
+     "DID": "left",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the lunchbox at the end of the day?",
+    "gold": [
+     "the depot",
+     "depot"
+    ],
+    "qline": {
+     "WHO": "the lunchbox",
+     "DID": "be",
+     "WHAT": "at the end of the day",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who drove the school bus?",
+    "gold": [
+     "mrs halloran",
+     "halloran"
+    ],
+    "qline": {
+     "WHO": "the school bus",
+     "DID": "drive",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f16": {
+  "lines": [
+   {
+    "WHO": "Vikram",
+    "DID": "sold",
+    "WHAT": "umbrellas",
+    "WHERE": "outside the train station",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Vikram sold umbrellas outside the train station."
+   },
+   {
+    "WHO": "Vikram",
+    "DID": "sold",
+    "WHAT": "umbrellas",
+    "WHERE": "outside the train station",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "It had not rained for a month."
+   },
+   {
+    "WHO": "Vikram",
+    "DID": "started",
+    "WHAT": "selling cold lemonade",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He started selling cold lemonade."
+   },
+   {
+    "WHO": "Vikram",
+    "DID": "was",
+    "WHAT": "pouring the last glass",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "and he quickly brought the umbrellas back out."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who sold umbrellas?",
+    "gold": [
+     "vikram"
+    ],
+    "qline": {
+     "WHO": "umbrellas",
+     "DID": "sell",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did Vikram sell umbrellas?",
+    "gold": [
+     "outside the train station",
+     "the train station",
+     "train station"
+    ],
+    "qline": {
+     "WHO": "Vikram",
+     "DID": "sell",
+     "WHAT": "umbrellas",
+     "WHERE": "?",
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Vikram start selling?",
+    "gold": [
+     "cold lemonade",
+     "lemonade"
+    ],
+    "qline": {
+     "WHO": "Vikram",
+     "DID": "start",
+     "WHAT": "selling",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What rolled in?",
+    "gold": [
+     "dark clouds",
+     "clouds"
+    ],
+    "qline": {
+     "WHO": "the roll",
+     "DID": "in",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Vikram do when the clouds came?",
+    "gold": [
+     "brought the umbrellas back",
+     "brought the umbrellas"
+    ],
+    "qline": {
+     "WHO": "Vikram",
+     "DID": "do",
+     "WHAT": "when the clouds came",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f17": {
+  "lines": [
+   {
+    "WHO": "A bear",
+    "DID": "found",
+    "WHAT": "a beehive",
+    "WHERE": "in a hollow log",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A bear and a badger found a beehive in a hollow log."
+   },
+   {
+    "WHO": "The bear",
+    "DID": "said",
+    "WHAT": "he would break it open",
+    "WHERE": "if the badger kept watch for the bees",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The bear said he would break it open."
+   },
+   {
+    "WHO": "The bear",
+    "DID": "ate",
+    "WHAT": "all the honey",
+    "WHERE": "himself",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The bear ate all the honey."
+   },
+   {
+    "WHO": "The bees",
+    "DID": "found",
+    "WHAT": "the bear",
+    "WHERE": "asleep",
+    "WHEN": "that night",
+    "WHY": "stung his nose",
+    "sent": "That night the bees found the bear asleep and stung his nose."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where did the bear and the badger find the beehive?",
+    "gold": [
+     "in a hollow log",
+     "a hollow log",
+     "log"
+    ],
+    "qline": {
+     "WHO": "the bear",
+     "DID": "find",
+     "WHAT": "the beehive",
+     "WHERE": "?",
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who kept watch?",
+    "gold": [
+     "the badger",
+     "badger"
+    ],
+    "qline": {
+     "WHO": "kept",
+     "DID": "watch",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who ate the honey?",
+    "gold": [
+     "the bear",
+     "bear"
+    ],
+    "qline": {
+     "WHO": "the honey",
+     "DID": "ate",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the bees sting?",
+    "gold": [
+     "his nose",
+     "nose"
+    ],
+    "qline": {
+     "WHO": "the bees",
+     "DID": "sting",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did the bees find the bear?",
+    "gold": [
+     "that night",
+     "night"
+    ],
+    "qline": {
+     "WHO": "the bees",
+     "DID": "find",
+     "WHAT": "the bear",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the bees",
+     "DID": "find",
+     "WHAT": "the bear",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f18": {
+  "lines": [
+   {
+    "WHO": "Lerato",
+    "DID": "borrowed",
+    "WHAT": "a ladder",
+    "WHERE": "from her neighbour Bashir",
+    "WHEN": "on Monday",
+    "WHY": "to clean her gutters",
+    "sent": "Lerato borrowed a ladder from her neighbour Bashir on Monday."
+   },
+   {
+    "WHO": "Lerato",
+    "DID": "borrowed",
+    "WHAT": "a ladder",
+    "WHERE": "from her neighbour Bashir",
+    "WHEN": "on Monday",
+    "WHY": "to clean her gutters",
+    "sent": "Lerato borrowed a ladder from her neighbour Bashir"
+   },
+   {
+    "WHO": "her son",
+    "DID": "took",
+    "WHAT": "the ladder",
+    "WHERE": "to the school",
+    "WHEN": "on Tuesday",
+    "WHY": "to help paint a mural",
+    "sent": "On Tuesday her son took the ladder to the school."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who lent Lerato the ladder?",
+    "gold": [
+     "bashir",
+     "her neighbour"
+    ],
+    "qline": {
+     "WHO": "Lerato",
+     "DID": "lent",
+     "WHAT": "the ladder",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the ladder on Wednesday?",
+    "gold": [
+     "the school",
+     "school"
+    ],
+    "qline": {
+     "WHO": "the ladder",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who took the ladder to the school?",
+    "gold": [
+     "her son",
+     "son"
+    ],
+    "qline": {
+     "WHO": "the ladder",
+     "DID": "took",
+     "WHAT": "the school",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who brought the ladder back on Friday?",
+    "gold": [
+     "the caretaker",
+     "caretaker"
+    ],
+    "qline": {
+     "WHO": "the ladder",
+     "DID": "bring",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who had the ladder at the end?",
+    "gold": [
+     "bashir"
+    ],
+    "qline": {
+     "WHO": "the ladder",
+     "DID": "have",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f19": {
+  "lines": [
+   {
+    "WHO": "Sefa",
+    "DID": "hired",
+    "WHAT": "a fishing boat",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Sefa hired a fishing boat."
+   },
+   {
+    "WHO": "Sefa",
+    "DID": "hired",
+    "WHAT": "a fishing boat",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The fishing boat was hired."
+   },
+   {
+    "WHO": "Sefa",
+    "DID": "held",
+    "WHAT": "the mail bags",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Sefa held the mail bags."
+   },
+   {
+    "WHO": "Sefa",
+    "DID": "reach",
+    "WHAT": "the island",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "They reached the island before dark."
+   },
+   {
+    "WHO": "The islanders",
+    "DID": "cheer",
+    "WHAT": "when the letters arrived",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The islanders cheered when the letters arrived."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Why was the ferry cancelled?",
+    "gold": [
+     "high winds",
+     "winds"
+    ],
+    "qline": {
+     "WHO": "the ferry",
+     "DID": "was",
+     "WHAT": "cancelled",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the ferry",
+     "DID": "was",
+     "WHAT": "cancelled",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who hired a fishing boat?",
+    "gold": [
+     "sefa",
+     "the postman"
+    ],
+    "qline": {
+     "WHO": "a fishing boat",
+     "DID": "hire",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who steered the boat?",
+    "gold": [
+     "akosua",
+     "an old woman"
+    ],
+    "qline": {
+     "WHO": "the boat",
+     "DID": "steer",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Sefa hold?",
+    "gold": [
+     "the mail bags",
+     "mail bags"
+    ],
+    "qline": {
+     "WHO": "Sefa",
+     "DID": "hold",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did they reach the island?",
+    "gold": [
+     "before dark"
+    ],
+    "qline": {
+     "WHO": "they",
+     "DID": "reach",
+     "WHAT": "the island",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "they",
+     "DID": "reach",
+     "WHAT": "the island",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f20": {
+  "lines": [
+   {
+    "WHO": "A peacock",
+    "DID": "laughed",
+    "WHAT": "at a crane",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A peacock laughed at a crane."
+   },
+   {
+    "WHO": "A peacock",
+    "DID": "laughed",
+    "WHAT": "at a crane",
+    "WHERE": "for her plain grey feathers",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A peacock laughed at a crane for her plain grey feathers."
+   },
+   {
+    "WHO": "The crane",
+    "DID": "spread",
+    "WHAT": "her wings",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The crane spread her wings."
+   },
+   {
+    "WHO": "The crane",
+    "DID": "flew",
+    "WHAT": "high over the hills",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She flew high over the hills."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who laughed at the crane?",
+    "gold": [
+     "the peacock",
+     "peacock"
+    ],
+    "qline": {
+     "WHO": "the crane",
+     "DID": "laugh",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What colour were the crane's feathers?",
+    "gold": [
+     "plain grey",
+     "grey"
+    ],
+    "qline": null
+   },
+   {
+    "q": "Where did the crane fly?",
+    "gold": [
+     "over the hills",
+     "the hills",
+     "hills"
+    ],
+    "qline": {
+     "WHO": "the crane fly",
+     "DID": "fly",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where could the peacock walk?",
+    "gold": [
+     "in the farmyard",
+     "the farmyard",
+     "farmyard"
+    ],
+    "qline": {
+     "WHO": "the peacock",
+     "DID": "walk",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the crane do after the peacock laughed?",
+    "gold": [
+     "spread her wings"
+    ],
+    "qline": {
+     "WHO": "the crane",
+     "DID": "do",
+     "WHAT": "after",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f21": {
+  "lines": [
+   {
+    "WHO": "At nine",
+    "DID": "gathered",
+    "WHAT": "in the hotel lobby",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": "- | WHO: - | DID: handed | WHAT: each person | WHERE: - | WHEN: - | WHY: - | WHO: - | DID: handed | WHAT: each person | WHERE: - | WHEN: - | WHY: - | WHO: - | DID: handed | WHAT: each person | WHERE: - | WHEN: - | WHY: - | WHO: - | DID: handed | WHAT: each person | WHERE: - | WHEN: - | WHY: - | WHO: - | DID: handed",
+    "sent": "At nine the tour group gathered in the hotel lobby, where their guide, Paulo, handed each person a map."
+   },
+   {
+    "WHO": "At nine",
+    "DID": "walked",
+    "WHAT": "to the cathedral",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "They walked to the cathedral."
+   },
+   {
+    "WHO": "At nine",
+    "DID": "walked",
+    "WHAT": "to the old harbour",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "They walked to the old harbour."
+   },
+   {
+    "WHO": "Tamsin",
+    "DID": "dropped",
+    "WHAT": "her map",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Tamsin dropped her map into the water."
+   },
+   {
+    "WHO": "Tamsin",
+    "DID": "drop",
+    "WHAT": "her map",
+    "WHERE": "at the harbour",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Tamsin dropped her map."
+   },
+   {
+    "WHO": "Paulo",
+    "DID": "gave",
+    "WHAT": "his own map",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Paulo gave her his own map."
+   },
+   {
+    "WHO": "Paulo",
+    "DID": "gave",
+    "WHAT": "his own map",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He led the group back to the hotel without one."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where did the group gather at nine?",
+    "gold": [
+     "in the hotel lobby",
+     "the hotel lobby",
+     "lobby"
+    ],
+    "qline": {
+     "WHO": "the group",
+     "DID": "gather",
+     "WHAT": "at",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who was the guide?",
+    "gold": [
+     "paulo"
+    ],
+    "qline": {
+     "WHO": "the guide",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who dropped a map into the water?",
+    "gold": [
+     "tamsin"
+    ],
+    "qline": {
+     "WHO": "a map",
+     "DID": "drop",
+     "WHAT": "into the water",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who had Paulo's map after the harbour?",
+    "gold": [
+     "tamsin"
+    ],
+    "qline": null
+   },
+   {
+    "q": "What did Paulo hand each person?",
+    "gold": [
+     "a map",
+     "map"
+    ],
+    "qline": {
+     "WHO": "Paulo",
+     "DID": "hand",
+     "WHAT": "each person",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f22": {
+  "lines": [
+   {
+    "WHO": "Captain Moreau's fishing boat",
+    "DID": "came back",
+    "WHAT": "empty",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Captain Moreau's fishing boat came back empty."
+   },
+   {
+    "WHO": "Her crew",
+    "DID": "wanted to give up",
+    "WHAT": "but the cook, Idris, suggested they try the cold water past the lighthouse",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Her crew wanted to give up."
+   },
+   {
+    "WHO": "Her crew",
+    "DID": "found",
+    "WHAT": "a huge shoal of herring",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "They found a huge shoal of herring."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Whose boat came back empty?",
+    "gold": [
+     "captain moreau's",
+     "moreau's"
+    ],
+    "qline": {
+     "WHO": "the boat",
+     "DID": "come back",
+     "WHAT": "empty",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the boat",
+     "DID": "come back",
+     "WHAT": "empty",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who suggested trying past the lighthouse?",
+    "gold": [
+     "idris",
+     "the cook"
+    ],
+    "qline": {
+     "WHO": "suggested",
+     "DID": "try",
+     "WHAT": "past the lighthouse",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did they find past the lighthouse?",
+    "gold": [
+     "shoal of herring",
+     "herring"
+    ],
+    "qline": {
+     "WHO": "they",
+     "DID": "find",
+     "WHAT": "past the lighthouse",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who wanted to give up?",
+    "gold": [
+     "her crew",
+     "crew"
+    ],
+    "qline": {
+     "WHO": "wanted",
+     "DID": "give up",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the market pay them?",
+    "gold": [
+     "twice the usual price",
+     "twice"
+    ],
+    "qline": {
+     "WHO": "the market",
+     "DID": "pay",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f23": {
+  "lines": [
+   {
+    "WHO": "A cat",
+    "DID": "lived",
+    "WHAT": "in a shop",
+    "WHERE": "in a shop",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A cat lived in a shop."
+   },
+   {
+    "WHO": "The cat",
+    "DID": "lived",
+    "WHAT": "in a shop",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The cat lived in a shop."
+   },
+   {
+    "WHO": "Instead she slept",
+    "DID": "on",
+    "WHAT": "the flour sacks",
+    "WHERE": "all day",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Instead she slept on the flour sacks all day."
+   },
+   {
+    "WHO": "the mice",
+    "DID": "chewed",
+    "WHAT": "through every sack",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "the mice chewed through every sack"
+   },
+   {
+    "WHO": "the grocer",
+    "DID": "put",
+    "WHAT": "the cat",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "the grocer put the cat out in the street"
+   },
+   {
+    "WHO": "the grocer",
+    "DID": "caught",
+    "WHAT": "mice",
+    "WHERE": "in the alley",
+    "WHEN": "just",
+    "WHY": "to eat",
+    "sent": "After that she caught mice in the alley."
+   },
+   {
+    "WHO": "the grocer",
+    "DID": "caught",
+    "WHAT": "mice",
+    "WHERE": "in the alley",
+    "WHEN": "just",
+    "WHY": "to eat",
+    "sent": "She caught mice in the alley."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where did the cat live at first?",
+    "gold": [
+     "in a grocer's shop",
+     "a grocer's shop",
+     "grocer's shop"
+    ],
+    "qline": {
+     "WHO": "the cat",
+     "DID": "live",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What was the cat supposed to catch?",
+    "gold": [
+     "mice"
+    ],
+    "qline": {
+     "WHO": "the cat",
+     "DID": "was",
+     "WHAT": "supposed to catch",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What chewed through every sack?",
+    "gold": [
+     "the mice",
+     "mice"
+    ],
+    "qline": {
+     "WHO": "the chew",
+     "DID": "chew",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who put the cat out?",
+    "gold": [
+     "the grocer",
+     "grocer"
+    ],
+    "qline": {
+     "WHO": "the cat",
+     "DID": "put",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did the cat catch mice at the end?",
+    "gold": [
+     "in the alley",
+     "the alley",
+     "alley"
+    ],
+    "qline": {
+     "WHO": "the cat",
+     "DID": "catch",
+     "WHAT": "mice",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f24": {
+  "lines": [
+   {
+    "WHO": "Elif",
+    "DID": "took",
+    "WHAT": "her grandmother's clock",
+    "WHERE": "from their flat",
+    "WHEN": "on Sunday",
+    "WHY": "to a repair shop on Bridge Street",
+    "sent": "Elif took her grandmother's clock from their flat to a repair shop on Bridge Street."
+   },
+   {
+    "WHO": "The repairman",
+    "DID": "kept",
+    "WHAT": "it",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The repairman, Mr Varela, kept it for a week."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Whose clock was it?",
+    "gold": [
+     "her grandmother's",
+     "grandmother's"
+    ],
+    "qline": null,
+    "qline13b": null
+   },
+   {
+    "q": "What did Elif take to the repair shop?",
+    "gold": [
+     "her grandmother's clock",
+     "clock"
+    ],
+    "qline": {
+     "WHO": "Elif",
+     "DID": "take",
+     "WHAT": "to the repair shop",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who kept the clock for a week?",
+    "gold": [
+     "mr varela",
+     "varela",
+     "the repairman"
+    ],
+    "qline": {
+     "WHO": "the clock",
+     "DID": "keep",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who collected the clock?",
+    "gold": [
+     "elif's uncle",
+     "uncle"
+    ],
+    "qline": {
+     "WHO": "the clock",
+     "DID": "collect",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where is the clock now?",
+    "gold": [
+     "above the fireplace",
+     "the fireplace",
+     "fireplace"
+    ],
+    "qline": {
+     "WHO": "the clock",
+     "DID": "be",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f25": {
+  "lines": [
+   {
+    "WHO": "Mr Dlamini",
+    "DID": "carried",
+    "WHAT": "his neighbour's groceries",
+    "WHERE": "up nine flights of stairs",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Mr Dlamini carried his neighbour's groceries up nine flights of stairs."
+   },
+   {
+    "WHO": "The neighbour",
+    "DID": "invited",
+    "WHAT": "him",
+    "WHERE": "in",
+    "WHEN": "for soup",
+    "WHY": null,
+    "sent": "The neighbour invited him in for soup."
+   },
+   {
+    "WHO": "The neighbour",
+    "DID": "invited",
+    "WHAT": "him",
+    "WHERE": "in for soup",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The neighbour is a retired teacher."
+   },
+   {
+    "WHO": "The neighbour",
+    "DID": "discovered",
+    "WHAT": "that she had once taught his mother",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She discovered that she had once taught his mother."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Why did Mr Dlamini carry the groceries up the stairs?",
+    "gold": [
+     "the lift was broken",
+     "lift was broken"
+    ],
+    "qline": {
+     "WHO": "Mr Dlamini",
+     "DID": "carry",
+     "WHAT": "the groceries",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Mr Dlamini",
+     "DID": "carry",
+     "WHAT": "the groceries",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Mr Dlamini carry up the stairs?",
+    "gold": [
+     "his neighbour's groceries",
+     "groceries"
+    ],
+    "qline": {
+     "WHO": "Mr Dlamini",
+     "DID": "carry",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who was the retired teacher?",
+    "gold": [
+     "ottilie"
+    ],
+    "qline": {
+     "WHO": "the retired teacher",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Ottilie invite him in for?",
+    "gold": [
+     "soup"
+    ],
+    "qline": {
+     "WHO": "Ottilie",
+     "DID": "invite",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who had Ottilie once taught?",
+    "gold": [
+     "his mother",
+     "mother"
+    ],
+    "qline": {
+     "WHO": "Ottilie",
+     "DID": "once",
+     "WHAT": "taught",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f26": {
+  "lines": [
+   {
+    "WHO": "The donkey",
+    "DID": "slipped",
+    "WHAT": "in a river",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The donkey slipped in a river."
+   },
+   {
+    "WHO": "The donkey",
+    "DID": "lay down",
+    "WHAT": "in the river",
+    "WHERE": "on purpose",
+    "WHEN": "the next day",
+    "WHY": "loaded with sponges",
+    "sent": "he lay down in the river"
+   },
+   {
+    "WHO": "The sponges",
+    "DID": "soak up",
+    "WHAT": "the water",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The sponges soaked up the water, and the donkey could hardly walk home."
+   }
+  ],
+  "qs": [
+   {
+    "q": "What did the donkey carry the first day?",
+    "gold": [
+     "salt"
+    ],
+    "qline": {
+     "WHO": "the donkey",
+     "DID": "carry",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did the donkey slip?",
+    "gold": [
+     "in a river",
+     "a river",
+     "river"
+    ],
+    "qline": {
+     "WHO": "the donkey",
+     "DID": "slip",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What soaked up the water?",
+    "gold": [
+     "the sponges",
+     "sponges"
+    ],
+    "qline": {
+     "WHO": "the water",
+     "DID": "soak",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the donkey do the next day?",
+    "gold": [
+     "lay down"
+    ],
+    "qline": {
+     "WHO": "the donkey",
+     "DID": "do",
+     "WHAT": "the next day",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What melted in the river?",
+    "gold": [
+     "the salt",
+     "salt"
+    ],
+    "qline": {
+     "WHO": "the river",
+     "DID": "melt",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f27": {
+  "lines": [
+   {
+    "WHO": "The red kite",
+    "DID": "was",
+    "WHAT": "in Hana's garden",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "In the morning the red kite was in Hana's garden, tangled in the plum tree."
+   },
+   {
+    "WHO": "Her friend Cosmin",
+    "DID": "climbed up",
+    "WHAT": "and freed it",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Her friend Cosmin climbed up and freed it."
+   },
+   {
+    "WHO": "Her friend Cosmin",
+    "DID": "flew",
+    "WHAT": "it",
+    "WHERE": "on the hill behind the church",
+    "WHEN": "all afternoon",
+    "WHY": "until the string snapped | WHY: and the wind carried the kite into the farmer's pond",
+    "sent": "They flew it on the hill behind the church all afternoon."
+   },
+   {
+    "WHO": "The wind",
+    "DID": "carried",
+    "WHAT": "the kite",
+    "WHERE": "into the farmer's pond",
+    "WHEN": "all afternoon",
+    "WHY": null,
+    "sent": "The wind carried the kite into the farmer's pond."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where was the kite in the morning?",
+    "gold": [
+     "in the plum tree",
+     "the plum tree",
+     "plum tree"
+    ],
+    "qline": {
+     "WHO": "the kite",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who freed the kite?",
+    "gold": [
+     "cosmin",
+     "her friend"
+    ],
+    "qline": {
+     "WHO": "the kite",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What carried the kite into the pond?",
+    "gold": [
+     "the wind",
+     "wind"
+    ],
+    "qline": {
+     "WHO": "the kite",
+     "DID": "carry",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the kite at the end?",
+    "gold": [
+     "the farmer's pond",
+     "pond"
+    ],
+    "qline": {
+     "WHO": "the kite",
+     "DID": "be",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What snapped?",
+    "gold": [
+     "the string",
+     "string"
+    ],
+    "qline": {
+     "WHO": "the snap",
+     "DID": "snap",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f28": {
+  "lines": [
+   {
+    "WHO": "Gulnara",
+    "DID": "worked",
+    "WHAT": "at the paint factory",
+    "WHERE": "for a month",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Gulnara worked at the paint factory for a month."
+   },
+   {
+    "WHO": "Gulnara",
+    "DID": "noticed",
+    "WHAT": "a leak",
+    "WHERE": "in a pipe",
+    "WHEN": "a month",
+    "WHY": null,
+    "sent": "She noticed a leak in a pipe."
+   },
+   {
+    "WHO": "Gulnara",
+    "DID": "had worked",
+    "WHAT": "at the paint factory",
+    "WHERE": "for a month",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She had worked at the paint factory for a month."
+   },
+   {
+    "WHO": "Gulnara",
+    "DID": "told",
+    "WHAT": "the foreman",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She told the foreman."
+   },
+   {
+    "WHO": "Gulnara",
+    "DID": "shut",
+    "WHAT": "the valve",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She shut the valve herself."
+   },
+   {
+    "WHO": "Gulnara",
+    "DID": "wrote",
+    "WHAT": "to the manager",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She wrote to the manager."
+   },
+   {
+    "WHO": "Mr Ashworth",
+    "DID": "promoted",
+    "WHAT": "her",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Mr Ashworth promoted her."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who was the young chemist?",
+    "gold": [
+     "gulnara"
+    ],
+    "qline": {
+     "WHO": "the young chemist",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Gulnara notice?",
+    "gold": [
+     "a leak",
+     "leak"
+    ],
+    "qline": {
+     "WHO": "Gulnara",
+     "DID": "notice",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who ignored Gulnara?",
+    "gold": [
+     "the foreman",
+     "foreman"
+    ],
+    "qline": {
+     "WHO": "Gulnara",
+     "DID": "ignore",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Gulnara do after the foreman ignored her?",
+    "gold": [
+     "shut the valve herself",
+     "shut the valve"
+    ],
+    "qline": {
+     "WHO": "Gulnara",
+     "DID": "do",
+     "WHAT": "after",
+     "WHERE": "the foreman",
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who promoted Gulnara?",
+    "gold": [
+     "mr ashworth",
+     "ashworth",
+     "the manager"
+    ],
+    "qline": {
+     "WHO": "Gulnara",
+     "DID": "promote",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f29": {
+  "lines": [
+   {
+    "WHO": "Two goats",
+    "DID": "met",
+    "WHAT": "on a narrow bridge",
+    "WHERE": "over a deep gorge",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Two goats met on a narrow bridge over a deep gorge."
+   },
+   {
+    "WHO": "Neither",
+    "DID": "would step back",
+    "WHAT": "butted heads",
+    "WHERE": "until both fell into the water",
+    "WHEN": "until both fell into the water",
+    "WHY": "until both fell into the water",
+    "sent": "Both fell into the water."
+   },
+   {
+    "WHO": "Two other goats",
+    "DID": "met",
+    "WHAT": "on a bridge",
+    "WHERE": "just as narrow",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Further down the valley, two other goats met on a bridge just as narrow."
+   },
+   {
+    "WHO": "The other",
+    "DID": "stepped",
+    "WHAT": "carefully",
+    "WHERE": "over her back",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The other stepped carefully over her back."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where did the first two goats meet?",
+    "gold": [
+     "on a narrow bridge",
+     "a narrow bridge",
+     "bridge"
+    ],
+    "qline": {
+     "WHO": "the first two goats",
+     "DID": "meet",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the first two goats do?",
+    "gold": [
+     "butted heads"
+    ],
+    "qline": {
+     "WHO": "the first two goats",
+     "DID": "do",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the first two goats fall into?",
+    "gold": [
+     "the water",
+     "water"
+    ],
+    "qline": {
+     "WHO": "the first two goats",
+     "DID": "fall",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did one of the other goats do?",
+    "gold": [
+     "knelt down",
+     "knelt"
+    ],
+    "qline": {
+     "WHO": "one of the other goats",
+     "DID": "do",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the other goat step over?",
+    "gold": [
+     "her back"
+    ],
+    "qline": {
+     "WHO": "the other goat",
+     "DID": "step",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f30": {
+  "lines": [
+   {
+    "WHO": "Umar",
+    "DID": "loaded",
+    "WHAT": "forty loaves",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He loaded forty loaves."
+   },
+   {
+    "WHO": "Umar",
+    "DID": "drive",
+    "WHAT": "to the harbour",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He drove on to the harbour."
+   },
+   {
+    "WHO": "Umar",
+    "DID": "drive",
+    "WHAT": "to the hospital kitchen",
+    "WHERE": "to the hospital kitchen",
+    "WHEN": "by eight",
+    "WHY": "to deliver them to the hospital kitchen",
+    "sent": "He drove to the hospital kitchen."
+   },
+   {
+    "WHO": "Umar",
+    "DID": "drive",
+    "WHAT": "to the harbour",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He drove to the harbour."
+   },
+   {
+    "WHO": "a gull",
+    "DID": "stole",
+    "WHAT": "a sardine",
+    "WHERE": "from the open crate",
+    "WHEN": "while he was at the harbour",
+    "WHY": null,
+    "sent": "While he was at the harbour, a gull stole a sardine from the open crate."
+   },
+   {
+    "WHO": "A gull",
+    "DID": "stole",
+    "WHAT": "a sardine",
+    "WHERE": "from the open crate",
+    "WHEN": "while he was at the harbour",
+    "WHY": null,
+    "sent": "A gull stole a sardine from the open crate."
+   },
+   {
+    "WHO": "The chef",
+    "DID": "counted",
+    "WHAT": "one fish",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The chef counted one fish short."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where was the van at dawn?",
+    "gold": [
+     "outside the bakery",
+     "the bakery",
+     "bakery"
+    ],
+    "qline": {
+     "WHO": "the van",
+     "DID": "be",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who delivered the loaves to the hospital kitchen?",
+    "gold": [
+     "umar"
+    ],
+    "qline": {
+     "WHO": "the loaves",
+     "DID": "deliver",
+     "WHAT": "to the hospital kitchen",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What stole a sardine?",
+    "gold": [
+     "a gull",
+     "gull"
+    ],
+    "qline": {
+     "WHO": "the sardine",
+     "DID": "steal",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "How many loaves did Umar load?",
+    "gold": [
+     "forty"
+    ],
+    "qline": {
+     "WHO": "Umar",
+     "DID": "load",
+     "WHAT": "loaves",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Umar",
+     "DID": "load",
+     "WHAT": "loaves",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Umar collect at the harbour?",
+    "gold": [
+     "fish"
+    ],
+    "qline": {
+     "WHO": "Umar",
+     "DID": "collect",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f31": {
+  "lines": [
+   {
+    "WHO": "Orla",
+    "DID": "wrote",
+    "WHAT": "to a radio station",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Orla wrote to a radio station."
+   },
+   {
+    "WHO": "A listener",
+    "DID": "offered",
+    "WHAT": "his late wife's piano",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A listener in the city, Mr Castellanos, offered his late wife's piano for free."
+   },
+   {
+    "WHO": "Six farmers",
+    "DID": "drove",
+    "WHAT": "it",
+    "WHERE": "up the mountain road",
+    "WHEN": "on a hay cart",
+    "WHY": "the choir sang at the spring festival",
+    "sent": "Six farmers drove it up the mountain road."
+   },
+   {
+    "WHO": "Six farmers",
+    "DID": "drove",
+    "WHAT": "it",
+    "WHERE": "up the mountain road",
+    "WHEN": "on a hay cart",
+    "WHY": "the choir sang at the spring festival",
+    "sent": "They drove it up the mountain road."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who led the choir?",
+    "gold": [
+     "orla"
+    ],
+    "qline": {
+     "WHO": "the choir",
+     "DID": "led",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the choir not have?",
+    "gold": [
+     "piano"
+    ],
+    "qline": {
+     "WHO": "the choir",
+     "DID": "not have",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who offered the piano?",
+    "gold": [
+     "mr castellanos",
+     "castellanos"
+    ],
+    "qline": {
+     "WHO": "the piano",
+     "DID": "offer",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did the choir sing?",
+    "gold": [
+     "at the spring festival",
+     "spring festival"
+    ],
+    "qline": {
+     "WHO": "the choir",
+     "DID": "sing",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the choir",
+     "DID": "sing",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who drove the piano up the mountain road?",
+    "gold": [
+     "six farmers",
+     "farmers"
+    ],
+    "qline": {
+     "WHO": "the piano",
+     "DID": "drive",
+     "WHAT": "up the mountain road",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f32": {
+  "lines": [
+   {
+    "WHO": "A sparrow",
+    "DID": "warned",
+    "WHAT": "the other birds",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A sparrow warned the other birds."
+   },
+   {
+    "WHO": "The birds",
+    "DID": "laughed",
+    "WHAT": "kept eating the seeds",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The birds laughed and kept eating the seeds."
+   },
+   {
+    "WHO": "The sparrow",
+    "DID": "went",
+    "WHAT": "to live near the houses",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The sparrow went to live near the houses."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who warned the other birds?",
+    "gold": [
+     "a sparrow",
+     "sparrow"
+    ],
+    "qline": {
+     "WHO": "the other birds",
+     "DID": "warn",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What was the farmer sowing?",
+    "gold": [
+     "flax"
+    ],
+    "qline": {
+     "WHO": "the farmer",
+     "DID": "sow",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What would the flax become?",
+    "gold": [
+     "nets"
+    ],
+    "qline": {
+     "WHO": "the flax",
+     "DID": "become",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did the sparrow go to live?",
+    "gold": [
+     "near the houses",
+     "the houses"
+    ],
+    "qline": {
+     "WHO": "the sparrow",
+     "DID": "go",
+     "WHAT": "to live",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the birds keep eating?",
+    "gold": [
+     "the seeds",
+     "seeds"
+    ],
+    "qline": {
+     "WHO": "the birds",
+     "DID": "keep",
+     "WHAT": "eating",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f33": {
+  "lines": [
+   {
+    "WHO": "Wiremu",
+    "DID": "locked",
+    "WHAT": "the golden mask",
+    "WHERE": "in the safe",
+    "WHEN": "at half past six",
+    "WHY": null,
+    "sent": "Wiremu locked the golden mask in the safe at half past six."
+   },
+   {
+    "WHO": "Wiremu",
+    "DID": "locked",
+    "WHAT": "the golden mask",
+    "WHERE": "in the safe",
+    "WHEN": "at half past six",
+    "WHY": "the night guard",
+    "sent": "Wiremu locked the golden"
+   },
+   {
+    "WHO": "At midnight",
+    "DID": "heard",
+    "WHAT": "a noise",
+    "WHERE": "in the east hall",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "At midnight he heard a noise in the east hall."
+   },
+   {
+    "WHO": "The director",
+    "DID": "moved",
+    "WHAT": "the mask",
+    "WHERE": "from the safe",
+    "WHEN": "in the morning",
+    "WHY": "for the new exhibition",
+    "sent": "In the morning, the director moved the mask from the safe to a glass case."
+   },
+   {
+    "WHO": "The director",
+    "DID": "moved",
+    "WHAT": "the mask",
+    "WHERE": "from the safe",
+    "WHEN": "in the morning",
+    "WHY": "for the new exhibition",
+    "sent": "The director moved the mask from the safe to a glass case."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where was the mask at midnight?",
+    "gold": [
+     "in the safe",
+     "the safe",
+     "safe"
+    ],
+    "qline": {
+     "WHO": "the mask",
+     "DID": "be",
+     "WHAT": "at",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who locked the mask in the safe?",
+    "gold": [
+     "wiremu",
+     "the night guard"
+    ],
+    "qline": {
+     "WHO": "the mask",
+     "DID": "lock",
+     "WHAT": "the safe",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What made the noise in the east hall?",
+    "gold": [
+     "a cat",
+     "cat"
+    ],
+    "qline": {
+     "WHO": "the noise",
+     "DID": "make",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who moved the mask in the morning?",
+    "gold": [
+     "dr sandoval",
+     "sandoval",
+     "the director"
+    ],
+    "qline": {
+     "WHO": "the mask",
+     "DID": "move",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the mask at the end?",
+    "gold": [
+     "a glass case",
+     "glass case"
+    ],
+    "qline": {
+     "WHO": "the mask",
+     "DID": "be",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f34": {
+  "lines": [
+   {
+    "WHO": "The farmer Svetlana",
+    "DID": "found",
+    "WHAT": "that her cows had wandered three miles downstream",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "After the flood, the farmer Svetlana found that her cows had wandered three miles downstream."
+   },
+   {
+    "WHO": "The farmer Svetlana",
+    "DID": "found",
+    "WHAT": "that her cows had wandered three miles downstream",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The farmer Svetlana found that her cows had wandered three miles downstream."
+   },
+   {
+    "WHO": "The farmer Svetlana",
+    "DID": "found",
+    "WHAT": "that her cows",
+    "WHERE": "had wandered three miles downstream",
+    "WHEN": "after the flood",
+    "WHY": null,
+    "sent": "The farmer Svetlana found that her cows"
+   },
+   {
+    "WHO": "A boy",
+    "DID": "had kept",
+    "WHAT": "them",
+    "WHERE": "in his father's barn",
+    "WHEN": "overnight",
+    "WHY": null,
+    "sent": "A boy from the next village, Yaw, had kept them in his father's barn overnight."
+   },
+   {
+    "WHO": "Svetlana",
+    "DID": "paid",
+    "WHAT": "a wheel of cheese",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Svetlana paid him with a wheel of cheese."
+   },
+   {
+    "WHO": "Svetlana",
+    "DID": "paid",
+    "WHAT": "him",
+    "WHERE": "with a wheel of cheese",
+    "WHEN": "with a wheel of cheese",
+    "WHY": "with a wheel of cheese",
+    "sent": "Her cows walked home behind his bicycle."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who kept the cows overnight?",
+    "gold": [
+     "yaw",
+     "a boy"
+    ],
+    "qline": {
+     "WHO": "the cows",
+     "DID": "keep",
+     "WHAT": "overnight",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who paid Yaw?",
+    "gold": [
+     "svetlana",
+     "the farmer"
+    ],
+    "qline": {
+     "WHO": "Yaw",
+     "DID": "pay",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Svetlana pay Yaw with?",
+    "gold": [
+     "a wheel of cheese",
+     "cheese"
+    ],
+    "qline": {
+     "WHO": "Svetlana",
+     "DID": "pay",
+     "WHAT": "Yaw",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "How far had the cows wandered?",
+    "gold": [
+     "three miles"
+    ],
+    "qline": {
+     "WHO": "the cows",
+     "DID": "wander",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the cows",
+     "DID": "wander",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did the cows wander downstream?",
+    "gold": [
+     "after the flood"
+    ],
+    "qline": {
+     "WHO": "the cows",
+     "DID": "wander",
+     "WHAT": "downstream",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the cows",
+     "DID": "wander",
+     "WHAT": "downstream",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f35": {
+  "lines": [
+   {
+    "WHO": "A frog",
+    "DID": "wanted",
+    "WHAT": "to be as big as the ox in the meadow",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A frog wanted to be as big as the ox in the meadow."
+   },
+   {
+    "WHO": "The frog",
+    "DID": "wanted",
+    "WHAT": "to be as big as the ox in the meadow",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The frog wanted to be as big as the ox in the meadow."
+   },
+   {
+    "WHO": "The frog",
+    "DID": "puffed",
+    "WHAT": "herself",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She puffed herself up."
+   },
+   {
+    "WHO": "The frog",
+    "DID": "puffed herself up",
+    "WHAT": "asked her children",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "She asked her children."
+   },
+   {
+    "WHO": "The frog",
+    "DID": "puff",
+    "WHAT": "harder and harder",
+    "WHERE": "until she burst",
+    "WHEN": "until she burst",
+    "WHY": "because they said no",
+    "sent": "She puffed harder and harder."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who wanted to be as big as the ox?",
+    "gold": [
+     "a frog",
+     "frog"
+    ],
+    "qline": {
+     "WHO": "the ox",
+     "DID": "want",
+     "WHAT": "to be",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the ox?",
+    "gold": [
+     "in the meadow",
+     "the meadow",
+     "meadow"
+    ],
+    "qline": {
+     "WHO": "the ox",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who did the frog ask?",
+    "gold": [
+     "her children",
+     "children"
+    ],
+    "qline": {
+     "WHO": "the frog",
+     "DID": "ask",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did the frog do to look bigger?",
+    "gold": [
+     "puffed herself up",
+     "puffed"
+    ],
+    "qline": {
+     "WHO": "the frog",
+     "DID": "do",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What happened to the frog in the end?",
+    "gold": [
+     "she burst",
+     "burst"
+    ],
+    "qline": {
+     "WHO": "the frog",
+     "DID": "happen",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f36": {
+  "lines": [
+   {
+    "WHO": "Mateus",
+    "DID": "left",
+    "WHAT": "his bicycle",
+    "WHERE": "at the swimming pool",
+    "WHEN": "on Friday evening",
+    "WHY": null,
+    "sent": "Mateus left his bicycle at the swimming pool."
+   },
+   {
+    "WHO": "Mateus",
+    "DID": "left",
+    "WHAT": "his bicycle",
+    "WHERE": "at the swimming pool",
+    "WHEN": "on Friday evening",
+    "WHY": "and walked home with friends",
+    "sent": "Mateus walked home with friends."
+   },
+   {
+    "WHO": "His mother",
+    "DID": "drove",
+    "WHAT": "him",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "On Saturday his mother drove him back."
+   },
+   {
+    "WHO": "A cleaner",
+    "DID": "had already taken",
+    "WHAT": "the bicycle",
+    "WHERE": "to the police station",
+    "WHEN": "on Saturday",
+    "WHY": null,
+    "sent": "A cleaner had already taken the bicycle to the police station."
+   },
+   {
+    "WHO": "Mateus",
+    "DID": "fetched",
+    "WHAT": "it",
+    "WHERE": "from the station",
+    "WHEN": "that afternoon",
+    "WHY": "and rode it to his grandfather's farm",
+    "sent": "Mateus fetched it from the station"
+   },
+   {
+    "WHO": "Mateus",
+    "DID": "fetched",
+    "WHAT": "it",
+    "WHERE": "from the station",
+    "WHEN": "that afternoon",
+    "WHY": "and rode it to his grandfather's farm",
+    "sent": "Mateus fetched it from the station that afternoon"
+   },
+   {
+    "WHO": "Mateus",
+    "DID": "fetched",
+    "WHAT": "it",
+    "WHERE": "from the station",
+    "WHEN": "that afternoon",
+    "WHY": "and rode it to his grandfather's farm",
+    "sent": "Mateus fetched it from the station that afternoon and rode it to his grandfather's farm"
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where did Mateus leave his bicycle?",
+    "gold": [
+     "at the swimming pool",
+     "the swimming pool",
+     "pool"
+    ],
+    "qline": {
+     "WHO": "Mateus",
+     "DID": "leave",
+     "WHAT": "his bicycle",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who took the bicycle to the police station?",
+    "gold": [
+     "a cleaner",
+     "cleaner"
+    ],
+    "qline": {
+     "WHO": "the bicycle",
+     "DID": "take",
+     "WHAT": "to the police station",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who drove Mateus back on Saturday?",
+    "gold": [
+     "his mother",
+     "mother"
+    ],
+    "qline": {
+     "WHO": "Mateus",
+     "DID": "drive",
+     "WHAT": "back",
+     "WHERE": "on Saturday",
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Mateus leave at the swimming pool?",
+    "gold": [
+     "his bicycle",
+     "bicycle"
+    ],
+    "qline": {
+     "WHO": "Mateus",
+     "DID": "leave",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did Mateus ride the bicycle?",
+    "gold": [
+     "to his grandfather's farm",
+     "his grandfather's farm",
+     "grandfather's farm"
+    ],
+    "qline": {
+     "WHO": "Mateus",
+     "DID": "ride",
+     "WHAT": "the bicycle",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f37": {
+  "lines": [
+   {
+    "WHO": "Emil",
+    "DID": "read",
+    "WHAT": "it",
+    "WHERE": "while she ran up the stairs",
+    "WHEN": "while she ran up the stairs",
+    "WHY": "while she ran up the stairs",
+    "sent": "while she ran up the stairs"
+   },
+   {
+    "WHO": "The sports presenter",
+    "DID": "read",
+    "WHAT": "it",
+    "WHERE": "while she ran up the stairs",
+    "WHEN": "while she ran up the stairs",
+    "WHY": "while she ran up the stairs",
+    "sent": "The sports presenter, Emil, read it instead while she ran up the stairs."
+   },
+   {
+    "WHO": "Viewers",
+    "DID": "wrote",
+    "WHAT": "in to say",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "Viewers wrote in to say that Emil's forecast was the funniest they had ever heard."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Who was the weather reporter?",
+    "gold": [
+     "kirra walsh",
+     "kirra"
+    ],
+    "qline": {
+     "WHO": "the weather reporter",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Why was Kirra late?",
+    "gold": [
+     "stuck in traffic",
+     "traffic"
+    ],
+    "qline": {
+     "WHO": "Kirra",
+     "DID": "was",
+     "WHAT": "late",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Kirra",
+     "DID": "was",
+     "WHAT": "late",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who read the forecast instead?",
+    "gold": [
+     "emil",
+     "the sports presenter"
+    ],
+    "qline": {
+     "WHO": "the forecast",
+     "DID": "read",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When was the forecast meant to be read?",
+    "gold": [
+     "at seven",
+     "seven"
+    ],
+    "qline": {
+     "WHO": "the forecast",
+     "DID": "meant",
+     "WHAT": "to be read",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the forecast",
+     "DID": "meant",
+     "WHAT": "to be read",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Whose forecast was the funniest?",
+    "gold": [
+     "emil's"
+    ],
+    "qline": {
+     "WHO": "the forecast",
+     "DID": "was",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "the forecast",
+     "DID": "was",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f38": {
+  "lines": [
+   {
+    "WHO": "A hungry wolf",
+    "DID": "found",
+    "WHAT": "a dog",
+    "WHERE": "in a yard",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "A hungry wolf found a dog chained in a yard."
+   },
+   {
+    "WHO": "The dog",
+    "DID": "said",
+    "WHAT": "his master",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The dog said his master gave him meat."
+   },
+   {
+    "WHO": "His master",
+    "DID": "gave",
+    "WHAT": "meat",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "His master gave him meat."
+   },
+   {
+    "WHO": "His master",
+    "DID": "gave",
+    "WHAT": "meat",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "His master gave him meat every day."
+   },
+   {
+    "WHO": "The wolf",
+    "DID": "saw",
+    "WHAT": "the mark",
+    "WHERE": "on the dog's neck",
+    "WHEN": null,
+    "WHY": null,
+    "sent": "When the wolf saw the mark that the chain had worn on the dog's neck, he decided he would rather stay hungry and free."
+   },
+   {
+    "WHO": "The wolf",
+    "DID": "saw",
+    "WHAT": "the mark",
+    "WHERE": "on the dog's neck",
+    "WHEN": "the wolf saw the mark",
+    "WHY": "he decided he would rather stay hungry and free",
+    "sent": "He went back to the forest."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where was the dog chained?",
+    "gold": [
+     "in a yard",
+     "a yard",
+     "yard"
+    ],
+    "qline": {
+     "WHO": "the dog",
+     "DID": "be chained",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who gave the dog meat?",
+    "gold": [
+     "his master",
+     "master"
+    ],
+    "qline": {
+     "WHO": "the dog",
+     "DID": "give",
+     "WHAT": "meat",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What had worn a mark on the dog's neck?",
+    "gold": [
+     "the chain",
+     "chain"
+    ],
+    "qline": null
+   },
+   {
+    "q": "Where did the wolf go at the end?",
+    "gold": [
+     "back to the forest",
+     "the forest",
+     "forest"
+    ],
+    "qline": {
+     "WHO": "the wolf",
+     "DID": "go",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who found the dog?",
+    "gold": [
+     "a hungry wolf",
+     "the wolf",
+     "wolf"
+    ],
+    "qline": {
+     "WHO": "the dog",
+     "DID": "find",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f39": {
+  "lines": [
+   {
+    "WHO": "It",
+    "DID": "was",
+    "WHAT": "put on the wrong plane",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "It was put on the wrong plane."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Where was the suitcase at noon?",
+    "gold": [
+     "the airport in budapest",
+     "budapest"
+    ],
+    "qline": {
+     "WHO": "the suitcase",
+     "DID": "be",
+     "WHAT": "at",
+     "WHERE": "?",
+     "WHEN": "noon",
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where did the suitcase spend the night?",
+    "gold": [
+     "in oslo",
+     "oslo"
+    ],
+    "qline": {
+     "WHO": "the suitcase",
+     "DID": "spend",
+     "WHAT": "the night",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who sent the suitcase on to Madrid?",
+    "gold": [
+     "jun",
+     "an airline clerk"
+    ],
+    "qline": {
+     "WHO": "the suitcase",
+     "DID": "sent",
+     "WHAT": "on to Madrid",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did Jun send the suitcase on?",
+    "gold": [
+     "the next morning",
+     "next morning"
+    ],
+    "qline": {
+     "WHO": "Jun",
+     "DID": "send",
+     "WHAT": "the suitcase",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Jun",
+     "DID": "send",
+     "WHAT": "the suitcase",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Where was the suitcase by evening?",
+    "gold": [
+     "in ilona's hotel room",
+     "ilona's hotel room",
+     "hotel room"
+    ],
+    "qline": {
+     "WHO": "the suitcase",
+     "DID": "be",
+     "WHAT": "by evening",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ },
+ "f40": {
+  "lines": [
+   {
+    "WHO": "The dog",
+    "DID": "escaped",
+    "WHAT": "through the back gate",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "The dog escaped through the back gate."
+   },
+   {
+    "WHO": "The dog",
+    "DID": "was",
+    "WHAT": "seen",
+    "WHERE": "stealing a sausage",
+    "WHEN": "from the butcher",
+    "WHY": null,
+    "sent": "He was seen stealing a sausage from the butcher."
+   },
+   {
+    "WHO": "The dog",
+    "DID": "was",
+    "WHAT": "seen",
+    "WHERE": null,
+    "WHEN": null,
+    "WHY": null,
+    "sent": "He was seen running across the square."
+   }
+  ],
+  "qs": [
+   {
+    "q": "Whose dog was Smoke?",
+    "gold": [
+     "the librarian's",
+     "librarian's"
+    ],
+    "qline": {
+     "WHO": "Smoke",
+     "DID": "was",
+     "WHAT": "dog",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Smoke",
+     "DID": "was",
+     "WHAT": "dog",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "What did Smoke steal?",
+    "gold": [
+     "a sausage",
+     "sausage"
+    ],
+    "qline": {
+     "WHO": "Smoke",
+     "DID": "steal",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who was the butcher?",
+    "gold": [
+     "mr abara",
+     "abara"
+    ],
+    "qline": {
+     "WHO": "the butcher",
+     "DID": "was",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "When did Smoke escape?",
+    "gold": [
+     "on market day",
+     "market day"
+    ],
+    "qline": {
+     "WHO": "Smoke",
+     "DID": "escape",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    },
+    "qline13b": {
+     "WHO": "Smoke",
+     "DID": "escape",
+     "WHAT": null,
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   },
+   {
+    "q": "Who caught Smoke?",
+    "gold": [
+     "luca and magnus",
+     "luca",
+     "magnus"
+    ],
+    "qline": {
+     "WHO": "Smoke",
+     "DID": "catch",
+     "WHAT": "?",
+     "WHERE": null,
+     "WHEN": null,
+     "WHY": null
+    }
+   }
+  ]
+ }
+}
