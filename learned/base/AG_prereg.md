@@ -385,3 +385,9 @@ ag15_q.py: every question of the untouched dev block gets a new line from the 1.
 / where, AG13b prompt for when / why / whose / how), verifier as AG13c (zero or one '?', provenance), syntax rule
 places the '?'; story lines = AG14's. The scale run is paused for it (one 1.5B model fits in memory) and resumed
 after. PASS if untouched right > 33 at precision >= 0.89.
+
+## AG15 result -- PASS (narrow); the question side is no longer the block
+200 question lines regenerated (3,118 s): 194 kept (AG10: 114), 6 none, 5 invented, 1 double blank. Untouched
+val_fresh2: **34 right / 4 wrong / 162 silent, fitness +22, precision 0.89** (AG14: 33 / 3, 0.92). Eighty more
+question lines bought one more right answer and one more wrong: the silences are now on the story side (no story
+line with the question's verb, mostly copular and 'had' questions) and in the matching.
