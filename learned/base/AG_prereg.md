@@ -391,3 +391,33 @@ after. PASS if untouched right > 33 at precision >= 0.89.
 val_fresh2: **34 right / 4 wrong / 162 silent, fitness +22, precision 0.89** (AG14: 33 / 3, 0.92). Eighty more
 question lines bought one more right answer and one more wrong: the silences are now on the story side (no story
 line with the question's verb, mostly copular and 'had' questions) and in the matching.
+
+## AG15 story-side audit (69 silent questions whose verb has no story line)
+Question verb present in prose and in the clauses but no slot line carries it: 26 (10 copular / have); present in the
+prose only, dropped by the clause loop: 20 (8 copular); absent from the prose, the question paraphrases: 23 (11
+copular / have, e.g. 'Who had the ring at the end?', 'Where was the lending library?'). Also found: a question DID of
+two words ('go home') is matched by its last word, so 'went' never matches.
+
+## AG16 registration (DID matched by any shared word lemma; no model runs)
+answer(): the question's DID and the line's DID match when any content word lemma is shared (was 'last word only').
+Scored on AG15's lines. PASS if untouched right > 34 at precision >= 0.89.
+
+## AG17 registration (the state rules over the slot lines, for the questions the matcher cannot reach)
+ag17_world.py: World3 (R25-cz-t: the R19 world state with the emerged verb rules) reads the AG4 canonical text with a
+reader that returns, for each clause, the AG15 slot lines written from it as events (agent WHO, verb DID, patient
+WHAT); it answers the registered state questions (where was X at the end / at <time>, who had X at the end / after
+Y, who arrived first ...). Route: AG16's answer first, World3 where it is silent. Untouched val_fresh2, scored once.
+PASS if the route beats AG16 on right at precision >= 0.89.
+
+## AG16 result -- FAIL (no change)
+Any-lemma DID matching: untouched 34 / 4, identical to AG15. The two-word DID cases had no matching line anyway.
+
+## AG17 result -- FAIL
+World3 over the slot lines fills 7 of the silent questions: 3 right / 4 wrong; route 37 / 8 (precision 0.82). The
+'who had X at the end' answers name an earlier holder: the slot lines carry the first transfers but not the later
+ones (dropped clauses), so the timeline ends early. The state rules are fine; their input is incomplete.
+
+## AG18 registration (a third writing of the story lines, from the raw sentences; no model runs)
+Story lines = AG14's (clauses alone, clauses + sentence) plus AG10's lines written from the raw sentences
+(ag10_lines.json), duplicates dropped; question lines AG15's; syntax rule; AG16 matching. Untouched val_fresh2 once.
+PASS if right > 34 at precision >= 0.89.

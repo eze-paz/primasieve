@@ -140,9 +140,12 @@ def match(filler, span):
 def answer(lines, qd):
     asked = next((k for k, v in qd.items() if v == "?"), None)
     if asked is None or not qd.get("DID"): return None
-    v = A.lemma(qd["DID"].split()[-1])
+    qv = {A.lemma(w) for w in qd["DID"].lower().split() if w not in STOP and A.lemma(w) not in ("be", "do", "have") or len(qd["DID"].split()) == 1}
+    if not qv: qv = {A.lemma(qd["DID"].split()[-1])}
     for d in lines:
-        if not d.get("DID") or A.lemma(d["DID"].split()[-1]) != v: continue
+        if not d.get("DID"): continue
+        dv = {A.lemma(w) for w in d["DID"].lower().split()}
+        if not (qv & dv): continue                                                     # AG16: any shared word lemma
         if all(match(qd[k], d.get(k)) for k in SLOTS if k != asked and qd.get(k)):
             a = d.get(asked)
             if a and ent(a) and ent(a) not in PRON: return a
