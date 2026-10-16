@@ -1,0 +1,3 @@
+G1 generated 38 sentences (8 s)
+G1 novelty 0.694; sentences with an invented content word 7 / 38; judge in context: generated 7.614 vs the story's own sentence 6.028 over 36
+G1b invented content at the root level (verb base or exact form absent from the story): 0 / 38

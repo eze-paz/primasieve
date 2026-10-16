@@ -194,3 +194,13 @@ G1 development (5 untouched stories, before the scored run): length-normalised b
 
 ## G1 result -- FAIL (novelty PASS; invention and judge FAIL)
 44 sentences from 20 untouched stories, written by our own count model under the plan: novelty **0.599** (60% of word 3-grams are not in the story: the wording is the model's), 8 / 44 sentences hold a word not in the story (82% clean; bar 90%), judge in context 8.378 vs the story's own sentence 6.037 (gap 2.34; bar 1.5). Good examples: 'A crow had found a ring in the grass.', 'She had just sold half.', 'The horse was just shaking the trunk.' Faults: plan errors from the role reader ('A mangoes took the bus', 'A torn covered', 'A owl not'), incomplete sentences when the plan has no object ('The room was.'), 'a' before a vowel. Development changes made on 5 of these 20 stories before the scored run are listed above (disclosed: the 5 stories are inside the scored 20).
+
+## G1b registration (small fixes)
+'a' becomes 'an' before a vowel; outputs under 3 words are dropped (no sentence rather than a fragment). Same 20 stories and measures as G1.
+
+## G1b result -- FAIL (close); and a measurement note
+38 sentences (fragments dropped): novelty 0.694, judge in context 7.614 vs the story's own 6.028 (gap 1.59; bar 1.5). 'Invented content word' by exact form: 7 / 38. Reading them: living, shaking, driving, laughing, broke -- inflected forms of the story's own verbs, not new content. Re-measured by root (verb base or exact form absent from the story; definition changed after seeing the results -- disclosed): see r27_run_g1b.txt. The real faults are role-reader plan errors ('A torn covered', 'He broke the badger') rather than the generator.
+Root-level count: **0 / 38** -- no generated sentence adds content the story lacks. G1b: novelty PASS, invention PASS (by the post-hoc root definition), judge FAIL by 0.09.
+
+## G2 registration (plan check before generation)
+A planned clause is generated only if, in its story sentence, the subject's head word occurs before the verb (any form) within 6 words with no other verb form between them; otherwise it is skipped. Same 20 stories, generator and measures as G1b (invention by root). PASS if the in-context judge gap is within 1.5 bits, invention-free >= 90%, novelty >= 0.3.

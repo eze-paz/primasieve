@@ -97,7 +97,10 @@ def requirements(r):
 def realise_words(words, text):
     names = {w.lower(): w for w in re.findall(r"(?<=[a-z,;] )[A-Z][a-z]+", text)}
     out = [names.get(w, w) if not (i == 0) else w for i, w in enumerate(words)]
-    s = " ".join(names.get(w, w) for w in words); return s[0].upper() + s[1:] + "."
+    ws = [names.get(w, w) for w in words]
+    ws = ["an" if (w == "a" and i + 1 < len(ws) and ws[i + 1][0].lower() in "aeiou") else w for i, w in enumerate(ws)]
+    if len(ws) < 3: return None
+    s = " ".join(ws); return s[0].upper() + s[1:] + "."
 if __name__ == "__main__":
     st_ = json.load(open("val_all13.json", encoding="utf-8"))["stories"]; qn = 0; un = []
     for k, s in enumerate(st_):
@@ -113,7 +116,9 @@ if __name__ == "__main__":
             req, vi, gaps = rq; w = generate(req, vi=vi, gaps=gaps)
             if not w: continue
             src = next((s for s in RT.T.SENT.split(text) if str(r["subj"]).split()[-1] in s and (r.get("do") or "").split()[0] in s), None) if r.get("do") else None
-            rows.append(dict(k=k, req=req, gen=realise_words(w, text), src=src, plan=f"{r['subj']} | {r['verb']} | {r.get('obj')} | {r.get('place')}"))
+            g_ = realise_words(w, text)
+            if not g_: continue
+            rows.append(dict(k=k, req=req, gen=g_, src=src, plan=f"{r['subj']} | {r['verb']} | {r.get('obj')} | {r.get('place')}"))
     json.dump(rows, open("r27_g1_outputs.json", "w", encoding="utf-8"), indent=0)
     print(f"G1 generated {len(rows)} sentences ({time.time() - t0:.0f} s)")
     for r in rows[:15]: print(f"  PLAN {r['plan']}\n   GEN {r['gen']}\n   SRC {r['src']}")
