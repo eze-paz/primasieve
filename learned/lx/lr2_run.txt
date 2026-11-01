@@ -1,0 +1,10 @@
+trigger table 3..100: 107,616 rules of 3,180,000 pairs (2 s)
+features built (9 s)
+fold A (fit dev, score scored): gain over the stack (idea 1; triggers move only the group factor): full beta 7.95 +0.1293 [+0.1196,+0.1399]; rules beta 9.08 +0.1028 [+0.0928,+0.1129] (45 s)
+fold B (fit scored, score dev): gain over the stack (idea 1; triggers move only the group factor): full beta 7.36 +0.0961 [+nan,+nan]; rules beta 8.23 +0.0750 [+nan,+nan] (64 s)
+   'sea' earlier -> sea/sun/wind x5.6, river/hill/mountain x3.5, ship/boat/carriage x3.2, water/wood/snow x3.1
+   'war' earlier -> war/society/literature x5.8, england/france/europe x4.0, public/political/military x2.8, english/french/german x2.8
+   'church' earlier -> church/hall/garden x4.4, town/city/village x2.2, god/heaven/christ x2.1, king/duke/minister x1.6
+   'horse' earlier -> horse/sword/pipe x6.2, ran/walked/started x2.3, road/wall/bank x2.1, ship/boat/carriage x2.0
+   'money' earlier -> money/food/mercy x4.6, miles/dollars/francs x3.0, hundred/thousand/per x2.4, ask/show/pay x1.9
+   'love' earlier -> love/hate/haf x7.5, weep/recoil/smite x2.7, heart/soul/brain x2.5, dear/darling/beloved x2.1

@@ -1,0 +1,15 @@
+K=4: training bits saved over one topic 0.0695/word; MDL total 13.197 MB (3 s)
+K=16: training bits saved over one topic 0.1158/word; MDL total 13.133 MB (3 s)
+K=64: training bits saved over one topic 0.1530/word; MDL total 13.117 MB (3 s)
+MDL chose K=64; topic rules kept 14,067 of 40,704 cells (3 s)
+   topic 0 (share 0.02): horsemen/noisily x4.1, horses/houses x3.9, trees/walls x3.1, gold/stone x3.0
+   topic 1 (share 0.02): madame/monsieur x7.0, de/du x5.1, doctor/prince x3.6, henry/henri x3.5
+   topic 2 (share 0.03): cowperwood/rowland x3.8, rose/looks x3.6, love/hate x3.3, thank/forgive x3.2
+   topic 3 (share 0.02): departments/players x5.8, miss/mount x2.9, she/twill x2.4, michael/claude x2.4
+   topic 4 (share 0.02): ole/architectural x14.3, afore/troubling x7.9, thee/ye x7.2, agin/hitting x6.0
+   topic 5 (share 0.02): sir/madam x2.8, myself/yourself x2.3, matter/subject x2.2, am/fanned x2.2
+   topic 6 (share 0.02): cowperwood/rowland x4.8, miles/dollars x4.6, mr/grannis x4.4, tom/paul x4.0
+   topic 7 (share 0.02): lying/crumpled x2.7, door/window x2.1, smoke/rain x2.0, stood/sat x2.0
+registers built (7 s)
+fold A (fit dev, score scored): triggers alone +0.1028; topics full (nu 20): alone +0.1254 [+0.1168,+0.1347], on top of triggers +0.0319 [+0.0278,+0.0360] betas [5.53, 0.81]; rules (nu 20): alone +0.1220 [+0.1132,+0.1313], on top of triggers +0.0290 [+0.0253,+0.0328] betas [5.8, 0.79] (188 s)
+fold B (fit scored, score dev): triggers alone +0.0750; topics full (nu 20): alone +0.0759 [+nan,+nan], on top of triggers +0.0158 [+nan,+nan] betas [3.83, 0.9]; rules (nu 20): alone +0.0714 [+nan,+nan], on top of triggers +0.0128 [+nan,+nan] betas [3.98, 0.91] (102 s)

@@ -1,0 +1,5 @@
+timescale registers built (2 s)
+fold A: recency gain over no register: plain (inf) +0.2678; best single tau 2000 +0.2795; mixture global +0.2731, per group +0.2686, rules +0.2742 (7 exceptions); idea 6 = rules - plain +0.0063 [+0.0004,+0.0119]; global weights [0.0, 0.023, 0.055, 0.067, 0.121] (3 s)
+fold B: recency gain over no register: plain (inf) +0.1540; best single tau 2000 +0.1572; mixture global +0.1536, per group +0.1309, rules +0.1534 (6 exceptions); idea 6 = rules - plain -0.0005 [+nan,+nan]; global weights [0.001, 0.061, 0.071, 0.06, 0.13] (4 s)
+fold A: idea 5, gain over the plain register: paragraph (999 boundaries, q None, phi 0.5) -0.0455 [-0.0540,-0.0371]; surprise (131 boundaries, q 0.997, phi 0.5) -0.0043 [-0.0113,+0.0029]; random (131 boundaries, q None, phi 0.5) -0.0032 [-0.0100,+0.0038] (11 s)
+fold B: idea 5, gain over the plain register: paragraph (1519 boundaries, q None, phi 0.5) -0.0531 [+nan,+nan]; surprise (97 boundaries, q 0.997, phi 0.5) +0.0058 [+nan,+nan]; random (97 boundaries, q None, phi 0.5) -0.0020 [+nan,+nan] (16 s)

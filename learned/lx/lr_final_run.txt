@@ -1,0 +1,11 @@
+registers built (14 s)
+fold A (fit dev, score scored): word bits base 8.9368 -> stack 8.4745 (+0.4623 [+0.4363,+0.4890]); language model 6.0261: gap closed 15.9%; betas [1.0, 0.51] (40 s)
+   speaking, local model alone: asserts 0.06% (right 0.871); top-3 statements: truth among the three 0.255 vs stated 0.291; calibration error 0.0122
+   speaking, integrated stack: asserts 0.21% (right 0.792); top-3 statements: truth among the three 0.272 vs stated 0.324; calibration error 0.0175
+   after 'overflowing': local of 0.11; and 0.08; the 0.07 | stack of 0.15; the 0.07; and 0.06   [truth revenue]
+   after 'hath': local been/loosely 0.27; appeared/happened/proved 0.15; yet/consequently/ushered 0.06 | stack been/loosely 0.26; appeared/happened/proved 0.15; yet/consequently/ushered 0.06   [truth gone]
+   after 'that': local is/trudged/sallied 0.21; was 0.10; will/ankle/embroidery 0.02 | stack is/trudged/sallied 0.28; was 0.10; i 0.05   [truth which]
+   after 'serf': local of 0.20; and 0.08; in 0.02 | stack of 0.27; and 0.06; abel/montriveau/bray 0.03   [truth chained]
+   after 'ay': local le/nonsense/ay 0.11; he 0.09; cried/replied/exclaimed 0.09 | stack get/git/reconcile 0.11; cried/replied/exclaimed 0.10; now/mebbe/ow 0.10   [truth a]
+   after 'i': local am/fanned/bracing 0.08; have/hev/masterful 0.08; know/expiate/uz 0.05 | stack am/fanned/bracing 0.14; have/hev/masterful 0.08; know/expiate/uz 0.07   [truth would]
+fold B (fit scored, score dev): word bits base 8.4599 -> stack 8.1864 (+0.2736 [+nan,+nan]); betas [0.93, 0.61] (61 s)

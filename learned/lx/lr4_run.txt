@@ -1,0 +1,23 @@
+training: 282,776 pronouns attributed to a capitalised mention; female share 0.294; name-gender rules kept 346 (e.g. mr 0.18, mrs 0.64, king 0.15, he 0.16, john 0.18, m 0.16, michael 0.16, pecksniff 0.16) (1 s)
+scored: gendered-pronoun predictions 1,264; with a referent slot 51.0%; referent never seen in training 8.9% (2 s)
+dev: gendered-pronoun predictions 5,713; with a referent slot 35.9%; referent never seen in training 11.5% (5 s)
+fold A (fit dev, score scored): bits gained per gendered-pronoun position over the stack (ideas 1+2), [on referents never seen in training], (per word overall), weights (23 s)
+   pronoun cache                +0.1853  [+0.1156]  (+0.00467/word)  w=[0.74]
+   slots, training priors only  +0.0013  [+0.0000]  (+0.00003/word)  w=[0.55]
+   slots, in-book only          +0.0307  [-0.0014]  (+0.00077/word)  w=[0.71]
+   slots, priors + in-book      +0.0316  [-0.0011]  (+0.00080/word)  w=[0.7]
+   cache + slots priors only    +0.1863  [+0.1154]  (+0.00470/word)  w=[0.74, 0.43]
+   cache + slots in-book        +0.1862  [+0.1001]  (+0.00470/word)  w=[0.68, 0.34]
+   post hoc soft: in-book only  +0.0650  [+0.0374]  (+0.00164/word)  w=[0.72]
+   post hoc soft: priors + in-book +0.0653  [+0.0398]  (+0.00165/word)  w=[0.72]
+   post hoc soft: cache + slots +0.1864  [+0.1163]  (+0.00470/word)  w=[0.65, 0.27]
+fold B (fit scored, score dev): bits gained per gendered-pronoun position over the stack (ideas 1+2), [on referents never seen in training], (per word overall), weights (35 s)
+   pronoun cache                +0.0836  [-0.0609]  (+0.00478/word)  w=[1.45]
+   slots, training priors only  +0.0018  [+0.0000]  (+0.00010/word)  w=[0.41]
+   slots, in-book only          +0.0390  [+0.0478]  (+0.00223/word)  w=[0.73]
+   slots, priors + in-book      +0.0386  [+0.0474]  (+0.00221/word)  w=[0.76]
+   cache + slots priors only    +0.0842  [-0.0610]  (+0.00481/word)  w=[1.45, 0.48]
+   cache + slots in-book        +0.0890  [-0.0653]  (+0.00508/word)  w=[1.41, 0.21]
+   post hoc soft: in-book only  +0.0446  [+0.0342]  (+0.00255/word)  w=[1.28]
+   post hoc soft: priors + in-book +0.0360  [+0.0384]  (+0.00206/word)  w=[1.38]
+   post hoc soft: cache + slots +0.0752  [-0.0724]  (+0.00430/word)  w=[1.34, 0.51]

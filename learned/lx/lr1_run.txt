@@ -1,0 +1,5 @@
+scored: recency register built; group seen before in the book at 96.6% of predictions, word itself seen at 82.0% (1 s)
+dev: recency register built; group seen before in the book at 96.7% of predictions, word itself seen at 83.4% (2 s)
+fold A (fit dev, score scored): base 8.9368 bits/word; gains: one global r +0.2650 [+0.2462,+0.2843]; r per group (full) +0.2574 [+0.2397,+0.2758]; rules (MDL: global default + exceptions) +0.2678 [+0.2489,+0.2871]; exception rules kept 16 groups + 1 default (2 s)
+   strongest recency rules (group: examples, r): lee/francisco/horn 0.94; thee/ye/em 0.89; son/brother/daughter 0.84; lord/master/uncle 0.80; nothing/nowhere/naught 0.78; priest/clerk/poet 0.76; english/french/german 0.71; father/mother/husband 0.71; indeed/truly/tis 0.69; king/duke/minister 0.68; boy/child/dog 0.66; business/marriage/meeting 0.66
+fold B (fit scored, score dev): base 8.4599 bits/word; gains: one global r +0.1535 [+nan,+nan]; r per group (full) +0.1297 [+nan,+nan]; rules (MDL: global default + exceptions) +0.1540 [+nan,+nan]; exception rules kept 15 groups + 1 default (2 s)

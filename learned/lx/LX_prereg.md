@@ -281,3 +281,72 @@ Reading: defeasible multi-outcome rules are the right representation (calibrated
 two words of context leave most of the next word open. What closes the rest is context beyond two words (what the
 story is about, who is present) -- which is where the network and the language model earn their lead (R25-cu: 84 %
 of the LLM's lead is on words already used earlier in the text).
+
+## LR -- long-range context: which ideas are worth integrating? (registered 2026-11-01, before any LR run)
+Data (lx_docs.py, lr_base.py): the same 50,114 scored predictions (first 1,000 held-out paragraphs = 3 books, read in
+order), and a dev set of 99,999 predictions from 7 other held-out books. Every long-range statistic (lifts, topics,
+name priors) is counted on the 358 training books; the few mixing weights are fitted on one held-out set and scored
+on the other, both ways (fold A: fit dev -> score the scored text; fold B: fit scored -> score dev).
+Metric: held-out **word** bits = next word's group under the stack + the word inside its group. Base = MX3's full
+local count model (group bits 6.9485) + Witten-Bell word-in-group on the previous word: 8.9368 word bits (fold A).
+For scale only: the 0.4B language model, book scope, 6.026 bits/word on the same predictions (our unknown-word cost
+is understated, so the true gap is larger than 2.91 bits).
+Order of testing (my preference): 1 recency, 2 triggers, 4 entity slots, 3 topics, 6 timescales, 5 scene
+boundaries, 7 scripts, 8 invention from residuals. Each idea is added to the stack of ideas already accepted.
+**Worth integrating** (all must hold):
+- stand-alone ideas (1, 2, 3, 7, 8): gain over the current stack >= 0.02 bits/word on both folds, and the paired
+  bootstrap over paragraphs (fold A) 95 % interval excludes 0;
+- where an idea has a full-statistics version and an MDL rules version, the rules keep >= 80 % of the full gain
+  (the integrated idea is the rules version);
+- modifiers of the recency register (5, 6): >= 0.005 bits/word over the plain register on both folds, and 5 must
+  also beat random boundaries of the same number;
+- 4 entity slots (the scratch memory: an entity opens a slot, its gender is unknown until pronouns resolve it): on
+  gendered-pronoun positions, slots with in-book updating beat a pronoun-recency cache alone by >= 0.05 bits per
+  pronoun position on both folds, and in-book updating beats training priors only on referents never seen in
+  training (the "unknown established later" case);
+- 7 scripts: ordered previous-sentence lifts must also beat the same lifts made symmetric by >= 0.005 (else it is
+  topic, not script);
+- 8 invention: the greedy search over a menu of register features (including ones not in 1-7) must select at least
+  one feature outside 1-7 that earns >= 0.02 on both folds.
+Final integrated stack: report word bits, share of the gap to the language model closed, and how it speaks (the MX3
+rule: assert if p >= 0.9, else top 3 with probabilities) with calibration error <= 0.03 required.
+
+## LR results (2026-11-01)
+Logs: lr1_run.txt, lr2_run.txt, lr4_run.txt, lr3_run.txt, lr56_run.txt, lr7_run.txt, lr8_run.txt, lr_final_run.txt.
+Gains are held-out bits/word; fold A = scored text (3 books, 95 % paragraph-bootstrap interval), fold B = dev (7 books).
+Post hoc changes, all disclosed in the scripts: idea 1's rules became "global default r + per-group exceptions" (the
+first form gave groups without a rule no recency at all; first run: rules +0.213 / +0.091); idea 3's nu grid widened
+when 20 sat at its edge (20 was still chosen); idea 4 got a soft-referent variant after it failed. Bugs fixed before
+any result was read: NaN from groups never seen as targets (ideas 2, 3).
+
+| idea | gain over the stack, fold A | fold B | rules | verdict |
+|---|---|---|---|---|
+| 1 recency register (word reused in its book) | +0.268 [+0.249,+0.287] | +0.154 | 1 default + 16 exceptions; >= full | **PASS** |
+| 2 trigger words (3-100 back) | +0.103 [+0.093,+0.113] | +0.075 | 107,616; 79.5 % / 78 % of full | FAIL (rules bar, narrowly) |
+| 3 invented topics (K = 64 by MDL) | +0.122 [+0.113,+0.131] | +0.071 | 14,067 cells; 97 % / 94 % of full | **PASS** |
+| 4 entity slots (scratch memory) | +0.001 per pronoun over a pronoun cache | +0.005 | -- | FAIL |
+| 6 several timescales | +0.006 [+0.000,+0.012] | -0.001 | -- | FAIL |
+| 5 scene boundaries | surprise -0.004 vs random -0.003; paragraph -0.046 | +0.006 vs -0.002; -0.053 | -- | FAIL |
+| 7 scripts (ordered sentence -> sentence) | +0.010; ordered - symmetric +0.0002 | +0.014; +0.0005 | 28,545 | FAIL |
+| 8 engine picks registers | + group recency by distance +0.073 [+0.067,+0.078] | +0.048 | 7 x 636 lift table | **PASS** |
+Ideas 2 and 3 measure the same thing: on top of triggers, topics add +0.029 / +0.013; on top of topics, triggers add
++0.010 / +0.016 (and idea 8's greedy search took triggers only on fold A, scoring +0.002 there). Topics do it with
+7.6 x fewer rules and pass the rules bar, so topics stay and triggers go.
+Idea 4 detail: in-book updating does settle names never seen in training (+0.04 bits per pronoun where training priors
+give 0) -- the scratch-memory mechanism works -- but a plain recency cache of the pronouns themselves gets the same
+bits (+0.185 / +0.084 per pronoun), and gendered pronouns are 2.5 % of predictions (ceiling ~0.01 bits/word).
+Idea 5/6 detail: forgetting hurts. The register is best book-long and undecayed; resetting at paragraphs costs 0.05.
+Idea 8 detail: the menu's best register was one not in 1-7: for each group, how long since one of its words appeared
+in this book (7 distance buckets). Position in sentence / paragraph never paid 0.005.
+
+**Integrated stack** (1 + 3 + 8's pick), lr_final_run.txt: word bits 8.9368 -> 8.4745 (+0.462 [+0.436,+0.489]) on
+fold A, 8.4599 -> 8.1864 (+0.274) on fold B; 15.9 % of the gap to the 0.4B language model closed (6.026; the true gap
+is larger, our unknown-word cost is understated). Speaking (group level): calibration error 0.0175 (bar 0.03 --
+PASS), but the long-range weights, fitted on other books, make it over-confident: top-3 statements stated 0.324,
+observed 0.272 (local model alone: 0.291 vs 0.255); asserts on 0.21 % of positions, right 0.79.
+
+Reading: three registers are worth integrating -- a book-long memory of the words used (which word of a group), what
+the text is about (64 invented topics), and how recently each kind of word appeared. All three are cheap counts with
+a few fitted weights, all generalise across books, and the engine found the third itself. The scratch memory for
+entities works as a mechanism but earns nothing beyond the word memory at this scale. Together they close a sixth of
+the gap to the language model; the remaining gap is not in any long-range register tried here.

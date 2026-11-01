@@ -1,0 +1,5 @@
+script lifts: 28,545 ordered rules of 404,496; asymmetry |Lo - Lo.T| mean 0.094 (5 s)
+registers built (17 s)
+fold A: gain over the stack (idea 1 + topics): ordered +0.0104 [+0.0079,+0.0130] betas [1.09, 1.9]; symmetric +0.0102 [+0.0077,+0.0127] betas [1.09, 1.88]; ordered rules +0.0071 [+0.0046,+0.0096] betas [1.14, 1.84]; ordered - symmetric +0.0002 [-0.0001,+0.0005] (107 s)
+fold B: gain over the stack (idea 1 + topics): ordered +0.0139 [+nan,+nan] betas [1.1, 1.63]; symmetric +0.0134 [+nan,+nan] betas [1.09, 1.65]; ordered rules +0.0105 [+nan,+nan] betas [1.16, 1.49]; ordered - symmetric +0.0005 [+nan,+nan] (155 s)
+   most directional rules (a in previous sentence -> g now, lift, reverse lift): mrs/tiptoe -> hood/travers x12.3 (rev x1.9); m/dr -> hood/travers x12.3 (rev x3.1); mr/grannis -> hood/travers x3.4 (rev x0.9); mrs/tiptoe -> butler/coventry x6.5 (rev x1.9); mrs/tiptoe -> else/mudge x9.7 (rev x3.0); m/dr -> else/mudge x7.0 (rev x2.3); mr/grannis -> lee/francisco x4.8 (rev x1.5); mr/grannis -> butler/coventry x4.9 (rev x1.7)
