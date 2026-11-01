@@ -113,3 +113,122 @@ the surface string -- text whose consequences can be checked (generated worlds, 
 code with its execution), where an operator is "sentence -> state change" and rejection is a failed check against
 the world. Discriminating next test: R24-f's rule emergence on real (not generated) text of that kind; PASS if state
 rules emerge there as they did on generator stories.
+
+# MX -- statistics to rules by compression (registered 2026-11-01, before any run)
+
+Owner, 2026-11-01: "it learnt something. can you check if epistemically there was enough flexibility for it to learn
+as much as possible? ... give it the counts model, and give it the task to optimize by compressing as much as
+possible ... convert statistics to empirical rules (unsupervised). you can allow the model more search time."
+
+## Audit: what LX did not let the engine do
+1. Acceptance was exceptionless (zero counterexamples). Language rules have exceptions (went, mice); a rule with
+   10 exceptions in 5,000 was rejected outright, so the engine could only keep what never fails.
+2. GENERATE kept the 40 commonest rewrites; rarer families (stop -> stopped = ""->"ped", ""->"ted", ...) were
+   invisible, so they could never become residuals or be generalized.
+3. Invention could only come from residuals inside an operator's scope, and only from a fixed menu of three deeper
+   primitives (double / drop-e / y->i) -- the engine did not anti-unify families of rewrites itself.
+4. Conditions were fixed (last 1-2 letters, consonant/vowel shape); no search over condition shapes.
+5. Paradigm membership needed 80 % co-attestation, with no notion of an accidental gap (a form unseen because the
+   text is finite).
+6. Nothing traded rule size against coverage: there was no objective that says one general rule with a few
+   exceptions beats a hundred narrow rules.
+7. Search budget: every LX run took 14-140 s.
+MX replaces 1, 5 and 6 by one objective -- minimum description length (total bits to state the rules plus the data
+given the rules, exceptions included) -- and 2-3 by searching all rewrites with >= 10 pairs and letting the engine
+anti-unify rewrite families into new primitives. Budget: up to 5 minutes per run (about 20x LX2).
+
+## MX1 -- morphology by MDL: invention by anti-unification, paradigms with accidental gaps
+Data: training words with count >= 3. Candidate operators: every suffix rewrite with >= 10 pairs, plus primitives
+the engine invents by anti-unifying rewrite families ""->c+s whose varying letter c equals a fixed function of the
+stem (last letter, second-last letter, first letter: searched, not given; a family is generalized only if the
+function holds for >= 90 % of its pairs). Decoy: the same anti-unification over pairs with shuffled stems must
+invent nothing. Each word gets at most one parent (word -> word by one operator); operators are kept greedily while
+they lower total bits (operator spelling + per-derived-word pointer and operator code, against spelling the word).
+Each stem's signature = the operators its children use; then each stem may move to a frequent larger signature
+(used by >= 20 stems, at most 2 more operators) if the bits for choosing that signature plus coding its gaps are
+fewer -- the gaps are the engine's predictions ("this form exists, I just have not seen it").
+Gold as LX2b (WordNet maps the form back to the lemma; attested in either corpus, or not displaced by an irregular
+of the same kind); recall on the same 900 novel forms from the 400 extra books.
+**PASS if precision >= 0.90 and recall >= 0.30 on novel forms, and the doubling primitive is invented by
+anti-unification (not given), with the decoy empty.** Reported: bits saved vs spelling every word, operators kept,
+invented primitives, precision of all gap predictions on a 300-sample, and the dumb baseline (every kept operator on
+every lemma).
+
+## MX2 -- how rule-like is the count model? (single-outcome rules with exceptions, chosen by MDL)
+Target: the next word's learned group (634 groups; the word inside its group is the same unigram share for every
+model, so group bits rank models exactly as word bits would). A rule = context -> one group with its own probability
+p, everything else backs off to the next level (exceptions are paid in bits, not forbidden). Contexts, most specific
+first: previous two groups, previous word (top 5,000), previous group. Rules are chosen greedily per level by
+training-bits saved minus a rule cost of 2 x log2(#candidate contexts) + 16 bits. Measured on the held-out 50,114:
+group bits/word for the best N rules, N in {10, 100, 1,000, 10,000, all chosen}, against (i) group unigram,
+(ii) the full count model over the same contexts (interpolated, all entries). Reported: N at which the rules reach
+50 / 80 / 90 % of (ii)'s gain over (i), and how many entries (ii) uses.
+**Reading, not a pass/fail:** if <= 10,000 rules reach 80 % of the full model's gain, the count model's knowledge is
+mostly rule-like and an MDL rule engine can hold it explicitly; if 80 % needs most of the entries, the statistics are
+a long tail of cases and rules cannot summarize them.
+
+### MX1 -- FAIL as registered (0 predictions on the novel forms)
+mx1_run.txt (41 s). Compression itself works: 538 of 3,205 rewrites kept, 32,143 of 51,460 words derived from
+another word, the vocabulary costs 29.6 % fewer bits than spelling it. But nothing was invented and only one stem
+moved into a larger signature. Three causes, all in my set-up:
+- Invention gate: the doubling family ""->c+"ed" holds c = last letter in 335 of 879 pairs (38 %): real, but the
+  family also holds pairs from word fragments in the vocabulary (ado -> adored, alle -> alleged), so the 90 % rule
+  rejected it. MDL, not purity, should decide whether a primitive pays.
+- Parents: each word took the parent whose operator was most used, so paradigms split along chains
+  (walk -> walked -> walking via ed->ing, 2,741 uses) and signatures fragmented (3,930 signatures).
+- Gap cost ignored frequency: an unseen -ing form of a word met 3 times is expected, of a word met 3,000 times is
+  telling; the registered cost was the same for both, so MDL never paid for a gap.
+
+## MX1b registration (follow-up after seeing MX1; disclosed as post hoc)
+Changes, nothing else: (1) a primitive is proposed when its function holds for >= 30 pairs and at >= 3x the chance
+rate of the family (chance = sum over letters of P(varying letter) x P(function's letter)); the decoy uses the same
+rule; MDL then keeps or drops it like any operator. (2) Parent = the shortest attested parent, then the most-used
+operator. (3) The counts enter the gap cost: a gap operator o at stem b costs lambda x log2 e bits, lambda = count(b)
+x median over training stems of count(o(stem)) / count(stem) (the expected number of sightings missed); the prior of
+a signature is P(signature | the stem's learned group), smoothed toward the global usage (weight 5), so words with no
+attested children (signature empty) can also move. A stem moves to the signature that most raises log prior minus
+gap cost. Same gold, same bars as MX1.
+
+### MX1b -- invention PASS, prediction FAIL (0 gap predictions)
+mx1b_run.txt (28 s). With the chance-based proposal and MDL deciding, the engine **invented consonant doubling**
+itself: "last letter + ed / ing / er / ers / en / led / le / ie" (335 / 296 / 114 / 64 / 42 / 32 / 53 / 38 pairs,
+each >= 3x chance), MDL kept all eight (last letter+ed used 325 times, +ing 296), the decoy (varying letter shuffled)
+invented nothing. Compression 27.2 % (a little under MX1: shortest-parent assignment costs bits but keeps
+paradigms whole). No stem moved: the signature prior was estimated from observed signatures, which are themselves
+full of accidental gaps (rare stems show 1-2 forms), so small signatures look common and filling a gap never pays.
+
+## MX1c registration (follow-up; post hoc)
+One change: the prior P(signature | group) is estimated only from stems seen >= 50 times (where a real form would
+have been expected several times, so an observed signature is close to the true one), smoothed toward the same
+stems' global usage; then every stem is scored as in MX1b. Same gold and bars.
+
+### MX1c -- FAIL on recall (precision and invention pass)
+mx1c_run.txt (91 s). 223 stems moved into a larger signature -> 244 predicted forms. On the 900 novel forms:
+26 outputs, **precision 1.00**, recall 0.022 (bar 0.30). Over all 244 predictions (300-cap sample = all): precision
+0.93 by the gold; most of the "wrong" are real words WordNet lacks (relights, unships, kilting, misdoubts,
+effervescently), the clear errors are few (jines, doiting). The dumb baseline (every kept operator on every lemma):
+precision 0.0075 at recall 0.98. Misses are mostly rare nouns' plurals (cottontails, panaceas) whose lemma has no
+attested child and often no learned group: the prior has nothing to go on.
+
+### MX2 -- reading: the count model is NOT rule-like in single-outcome form
+mx2_run.txt (19 s). Group unigram 8.1773 bits, full count model over the same three context levels 6.9485
+(4,834,895 entries, gain 1.2288). MDL kept 11,131 single-outcome rules (600 / 1,826 / 8,705 by level); the best
+10 / 100 / 1,000 / 10,000 / all reach 2.7 / 10.7 / 22.2 / 29.5 / 29.7 % of the full model's gain. Under the
+registered reading (<= 10,000 rules for 80 %), the count model's knowledge is not a set of "context -> one outcome"
+rules: 70 % of what it knows is in the spread over several outcomes. The pruned-entry curve appended to
+mx2_run.txt (--prune) is INVALID: pruned entries' mass was not returned to the backoff, so it scores worse than the
+unigram; not a result.
+
+## Reading of the MX line (what more flexibility bought)
+- Every LX/MX gate I set too strictly was a real limit on what the engine could learn. Loosened to MDL plus a
+  chance-based proposal, the engine **invented consonant doubling itself** (8 related primitives, decoy empty) and
+  predicted unseen word forms at precision 0.93-1.00. That is the original engine's E5 behaviour on language data,
+  unsupervised: it transfers.
+- What it still cannot do is guess boldly: compression only fills a gap where the counts say the form should have
+  been seen, so recall stays at 2 %. Bold generalization needs a prior that knows what kind of word a rare word is,
+  which is exactly what our groups lack for rare words.
+- At the sentence level, explicit single-outcome rules hold 30 % of the count model's knowledge. The rest is graded
+  (several likely continuations). A deterministic engine for language therefore needs rules whose consequence is a
+  small set of weighted alternatives (E14's CONJECTURE-with-evidence, not VERIFIED), not single-outcome rules.
+Next discriminating test, if wanted: MX2 with k-outcome rules (context -> up to k groups with weights), k = 2..5;
+if ~10,000 such rules reach 80 %, defeasible multi-outcome rules are the representation to build the engine on.

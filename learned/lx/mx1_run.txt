@@ -1,0 +1,12 @@
+GENERATE: 123,640 rewrites, 3205 with >= 10 pairs (21 s)
+INVENT: []   decoy: []
+COMPRESS: 538 operators kept, 32,143 of 51,460 words derived; 264 kB spelled -> 186 kB (29.6% saved) (29 s)
+   kept invented: []
+   top operators: [('->s', 7400), ('ed->ing', 2741), ('->ed', 2064), ('->ly', 1478), ('->d', 1326), ('->er', 698), ('->e', 660), ('->y', 548), ('->ness', 469), ('y->ies', 451), ('->t', 395), ('ed->ion', 374), ('->ing', 348), ('->n', 298), ('e->y', 274)]
+SIGNATURES: 3,930 signatures over 17,984 stems; 1 stems moved into a larger signature -> 2 gap predictions
+MX1 on the 900 novel forms: outputs 0, precision 0.0000, recall 0.0000
+   all gap predictions, 300-sample precision 0.0000; wrong examples [('feck', 'fecks'), ('feck', 'fecked')]
+   right examples []
+   baseline (every kept operator on every lemma): outputs 253,903, precision 0.0111, recall 0.9744
+   missed examples [('presage', 'presaging'), ('foot', 'foots'), ('retribution', 'retributions'), ('plight', 'plights'), ('spat', 'spatted'), ('mina', 'minae'), ('revile', 'reviles'), ('batter', 'batters'), ('excommunication', 'excommunications'), ('utilitarian', 'utilitarians'), ('magneto', 'magnetos'), ('corpus', 'corpora'), ('there', 'theres'), ('joy', 'joyes'), ('vigour', 'vigours')]
+done (41 s)
