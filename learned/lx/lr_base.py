@@ -2,14 +2,16 @@
 held-out text and the dev text. Local = MX3's Witten-Bell chain over the next word's group (previous group, previous
 word, previous two groups), kept as a full distribution over all groups; word inside its group = Witten-Bell on the
 previous word, backing off to the group's unigram (unknown words share the rare group's singleton mass).
-Writes lr_base.npz (untracked cache). Run: py -3.12 lr_base.py"""
+Writes lr_base.npz (untracked cache). Run: py -3.12 lr_base.py  [--frac f: train on the first f of the books] [--classes file.json: other groups]  (both print only)"""
 import os, json, time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); BASE = os.path.join(os.path.dirname(HERE), "base")
 t0 = time.time(); DEVMAX = 100_000
 z = np.load(os.path.join(HERE, "lx_tokens.npz")); d = np.load(os.path.join(HERE, "lx_docs.npz"))
 V = json.load(open(os.path.join(HERE, "lx_vocab.json"), encoding="utf-8")); words = V["words"]; NW = len(words) + 2
-cls = json.load(open(os.path.join(BASE, "r25_classes.json"), encoding="utf-8")); G0 = max(cls.values()) + 2
+import sys
+CLS = sys.argv[sys.argv.index("--classes") + 1] if "--classes" in sys.argv else None                 # C5: other groups (print only)
+cls = json.load(open(os.path.join(HERE, CLS) if CLS else os.path.join(BASE, "r25_classes.json"), encoding="utf-8")); G0 = max(cls.values()) + 2
 gid = np.full(NW, G0, np.int64); gid[0] = G0 + 1
 for i, w in enumerate(words):
     if w in cls: gid[i + 1] = cls[w] + 1
@@ -21,6 +23,9 @@ def contexts(tok, sid):
     g2 = np.where(m2, gid[np.r_[0, 0, tok[:-2]]], G0 + 1)[m]
     return m, [g1, NG + w1, (NG + 6000) + g2 * NG + g1]
 tr, trs = z["tr"].astype(np.int64), z["trs"]
+import sys
+FRAC = float(sys.argv[sys.argv.index("--frac") + 1]) if "--frac" in sys.argv else 1.0                 # C3 data curve: first FRAC of the training books
+if FRAC < 1: keep = d["trb"] < int(round(FRAC * (d["trb"].max() + 1))); tr, trs = tr[keep], trs[keep]
 mtr, Ctr = contexts(tr, trs); ytr = gid[tr][mtr]
 P0 = np.bincount(ytr, minlength=NG) + 0.5; P0 = P0 / P0.sum()
 stats = []
@@ -35,6 +40,9 @@ cw = np.bincount(tr, minlength=NW).astype(float); cg = np.bincount(gid[tr], weig
 n1 = np.bincount(gid[np.nonzero(cw == 1)[0]], minlength=NG)
 Pu = cw / np.maximum(cg[gid], 1); UNK = NW - 1
 Pu[gid == G0] *= 1 - n1[G0] / cg[G0]; Pu[UNK] = n1[G0] / cg[G0]
+if FRAC < 1:                                                                                      # words unseen in this fraction share their group's singleton mass, like unknown words
+    zero = (cw == 0); zero[0] = zero[UNK] = False; nz = np.bincount(gid[zero], minlength=NG); share = (n1 + 1) / (cg + 1)
+    has = nz[gid] > 0; Pu = np.where(zero, share[gid] / np.maximum(nz[gid], 1), np.where(has & (gid != G0), Pu * (1 - share[gid]), Pu))
 pw_tr = tr[:-1][mtr[1:]] * NW + tr[1:][mtr[1:]]                                                 # (previous word, word) inside sentences
 up, kp = np.unique(pw_tr, return_counts=True)
 pg = (up // NW) * NG + gid[up % NW]; upg, st = np.unique(pg, return_index=True)
@@ -70,6 +78,6 @@ mdv0 = np.r_[False, dvs[1:] == dvs[:-1]]; cut = np.searchsorted(np.cumsum(mdv0),
 mdv, ydv, PLdv, pwdv, ppdv = build(dv, dvs)
 for nm, y, PL, pw in (("scored", yte, PLte, pwte), ("dev", ydv, PLdv, pwdv)):
     bg = -np.log2(PL[np.arange(len(y)), gid[y]]); print(f"{nm}: {len(y):,} predictions; local group bits {bg.mean():.4f}, word-in-group bits {(-np.log2(pw)).mean():.4f}, word bits {(bg - np.log2(pw)).mean():.4f}")
-np.savez(os.path.join(HERE, "lr_base.npz"), gid=gid, P0=P0, Pu=Pu, mte=mte, yte=yte, PLte=PLte, pwte=pwte, ppte=ppte,
+if FRAC == 1 and not CLS: np.savez(os.path.join(HERE, "lr_base.npz"), gid=gid, P0=P0, Pu=Pu, mte=mte, yte=yte, PLte=PLte, pwte=pwte, ppte=ppte,
          mdv=mdv, ydv=ydv, PLdv=PLdv, pwdv=pwdv, ppdv=ppdv, dvcut=cut, PR=np.array(PR))
 print(f"done ({time.time() - t0:.0f} s)")

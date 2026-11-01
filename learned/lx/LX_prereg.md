@@ -359,3 +359,82 @@ the text is about (64 invented topics), and how recently each kind of word appea
 a few fitted weights, all generalise across books, and the engine found the third itself. The scratch memory for
 entities works as a mechanism but earns nothing beyond the word memory at this scale. Together they close a sixth of
 the gap to the language model; the remaining gap is not in any long-range register tried here.
+
+## TH -- thinking in the moment, and the LR follow-ups (registered 2026-11-01, before any TH run)
+Starting point (absolute word bits): stack (recency + topics + group recency by distance) 8.4745 fold A, 8.1864 fold
+B; local model alone 8.9368 / 8.4599; language model 6.026 (fold A).
+**TH1 deliberation.** At every position where the engine does not assert (probability mode), it first diagnoses why
+it is uncertain, from its own state: (u1) the previous word is unknown or rare (< 5 training uses); (u2) the local
+context is rare (two-group context seen < 5 times); (u3) the group is clear (top group >= 0.5) but the word inside it
+is open; (u4) none of these -- a genuinely open choice, where research is not expected to help. Then it acts:
+- library lookup (u1, u2, u3): find the longest stretch of the current sentence (3-6 words) in a reference library
+  (the 358 training books + the 400 extra books; no held-out book; duplicate check by 8-gram overlap reported) and
+  read off what followed it there;
+- dictionary (u1): WordNet (local) gives the unknown word's part of speech and lemma; the engine predicts as after
+  known words with the same part of speech and ending.
+Lookup evidence is mixed in with weights fitted on the other fold, per diagnosis and per match length.
+Bars: stack + deliberation <= 8.4545 (fold A) and <= 8.1664 (fold B); calibration error <= 0.03; deliberation on
+u4 positions must not be needed (if allowed there, it must not do better than on u1-u3 per position -- otherwise
+the diagnosis is not what drives the gain). Reported: bits on each diagnosis class, lookups per position, examples
+with the stated reason.
+**TH2 online dictionary.** For unknown previous words WordNet lacks, look the word up in Wiktionary (online; one
+word per request, cached; a dictionary cannot contain the book's continuation). Bar: on those positions, bits with
+the online part of speech below bits without it, both folds. (Open web search for the sentence is not tested: these
+books are online, so a phrase search returns the continuation itself -- a lookup of the answer, not research.)
+**C1 breakdown.** Stack vs language model, bits per word kind (repeat in book / function word / content word /
+unknown). Descriptive.
+**C2 copy register** ("what followed this word earlier in the book"): stack + copy <= 8.4545 / 8.1664.
+**C3 data curve:** local model word bits trained on 1/8, 1/4, 1/2, all of the training books. Descriptive: if the
+1/2 -> all step lowers bits by >= 0.10, the count model is data-limited.
+**C4 PCA (SVD) on the count tables:** the rare two-group contexts' log-ratio rows projected onto the top r = 16, 64,
+256 directions (weighted SVD of the training table), used as a register; control = the same rows unprojected. Bar:
+best SVD version's local group bits <= control - 0.02 on both folds.
+**C5 finer groups from SVD:** k-means (k = 2,000) on SVD word vectors replaces the 634 groups in the local model.
+Bar: local word bits <= 8.9168 (fold A) and <= 8.4399 (fold B).
+
+## TH results (2026-11-01), absolute word bits (fold A scored / fold B dev)
+Logs: lx_library.py output (below), lr_think_lib_run.txt, lr_think_run.txt, lr_wikt_run.txt, lr_c12_run.txt,
+lr_c3_run.txt, lr_c4_run.txt, lr_c5_run.txt. Post hoc / fixes (disclosed): Wiktionary lookups switched to curl and
+then to the batch API after HTTP 429 refusals had been cached as "no entry" (all re-fetched); the data curve gives
+words unseen in a fraction the group's unseen-word share (first run gave infinite bits).
+Library: 17,669,866 tokens (400 extra books); share of held-out 8-grams found in it 0.0005 (training books 0.0086):
+no duplicated book. Lookup finds the sentence's last 6 / 5 / 4 / 3 / 2 words (>= 2 matches) at 0.3 / 1.6 / 8.6 /
+27.9 / 40.1 % of fold-A positions.
+**TH1 deliberation -- FAIL as designed.** Diagnosis shares (fold A): u1 1.3 %, u2 4.0 %, u3 4.3 %, u4 90.3 %.
+| model | fold A | fold B |
+|---|---|---|
+| stack | 8.4745 | 8.1864 |
+| + WordNet dictionary (u1) | 8.4735 | 8.1856 |
+| + lookup on diagnosed positions (u1-u3) | 8.4687 | 8.1798 |
+| + lookup everywhere (control) | 8.3634 | 8.0534 |
+By diagnosis, stack -> with lookup (fold A): u1 8.8366 -> 8.7273 (dictionary alone 8.7574); u2 8.7355 -> 8.7249;
+u3 4.8839 -> 4.7913; u4 8.6303 -> 8.5138 (fold B: u1 8.9823 -> 8.9295, u2 8.5547 -> 8.5349, u3 4.5268 -> 4.3785,
+u4 8.2962 -> 8.1585). The diagnosed version misses the bar (8.4545 / 8.1664); looking up everywhere passes it, but
+u4 ("open choice", no diagnosed reason) gains as much per position as u1-u3 -- so the engine's diagnosis of *why* it
+is uncertain is not what makes research pay; the library helps wherever it has a match. Speaking (group level,
+fold A): stack ECE 0.0175, asserts 0.21 % right 0.792, top-3 truth 0.272 vs stated 0.324; with diagnosed lookup ECE
+0.0173, asserts 0.14 % right 0.899, top-3 truth 0.273 vs stated 0.325.
+**TH2 online dictionary -- PASS.** Wiktionary (batch API) gave an English part of speech for 381 of the 784 unknown
+words WordNet lacks (mostly proper nouns). Positions after such a word: 9.5071 -> 9.3209 bits (119 positions, fold A),
+8.8689 -> 8.8474 (446, fold B).
+**C2 copy register -- PASS.** stack + copy 8.2561 / 8.1159 (bar 8.4545 / 8.1664); stack + lookup everywhere + copy
+8.1507 / 7.9887.
+**C1 breakdown (fold A, mean bits [total bits]; local / stack / + lookup + copy / language model):** repeat in book
+41,100 positions 7.760 [318,921] / 7.082 [291,083] / 6.725 [276,401] / 4.994 [205,257]; function word not yet used
+in the book 425: 7.411 / 8.156 / 7.960 / 6.208; content word not yet used 8,279: 14.841 [122,867] / 15.370 [127,244]
+/ 15.246 [126,219] / 10.857 [89,887]; unknown 310: 9.428 / 9.350 / 7.933 / 13.580. All 50,114: 8.937 [447,860] /
+8.475 [424,692] / 8.151 [408,463] / 6.026 [301,992].
+**C3 data curve (local model word bits, groups fixed):** 1/8 of the training books 9.7067 / 9.1741; 1/4 9.2930 /
+8.8096; 1/2 9.0919 / 8.6177; all 8.9368 / 8.4599. Half -> all lowers bits by 0.155 / 0.158: data-limited by the bar.
+**C4 PCA on the count tables -- FAIL.** Local group bits: local model 6.9485 / 6.7025; + rare-context rows
+unprojected 6.8766 / 6.6471; projected r = 16 6.9482 / 6.7023, r = 64 6.9365 / 6.6947, r = 256 6.9049 / 6.6680.
+Projection never beats the raw rows. Side finding: the fitted weight is negative (-0.5): the Witten-Bell local
+model trusts rare contexts too much; damping them gives 6.8766 / 6.6471 (a smoothing fix, e.g. Kneser-Ney style).
+**C5 finer groups from SVD -- FAIL.** 2,000 k-means groups on SVD word vectors (clean: king/doctor/prince/duke;
+paris/england/london) give local word bits 9.1781 / 8.7694 (group 6.0587, word-in-group 3.1194) vs 8.9368 / 8.4599
+with the 634 groups (bar 8.9168 / 8.4399).
+Reading: research pays when it means *more text* -- the library (another 17.7M words) and the book's own past
+(copy) -- and the dictionary pays where the engine meets a word it has never seen. The engine's self-diagnosis did
+not find where lookups pay; a lookup is cheap and worth doing everywhere. PCA did not help in either form tested.
+Best system so far: stack + lookup everywhere + copy, 8.1507 / 7.9887 (language model 6.026 on fold A); the gap is
+mostly words already used in the book (276,401 vs 205,257 total bits) and new content words (126,219 vs 89,887).

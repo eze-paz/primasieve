@@ -1,0 +1,12 @@
+== training fraction 0.125
+scored: 50,114 predictions; local group bits 7.5054, word-in-group bits 2.2013, word bits 9.7067
+dev: 99,999 predictions; local group bits 7.2618, word-in-group bits 1.9123, word bits 9.1741
+== training fraction 0.25
+scored: 50,114 predictions; local group bits 7.2259, word-in-group bits 2.0671, word bits 9.2930
+dev: 99,999 predictions; local group bits 6.9752, word-in-group bits 1.8344, word bits 8.8096
+== training fraction 0.5
+scored: 50,114 predictions; local group bits 7.0603, word-in-group bits 2.0316, word bits 9.0919
+dev: 99,999 predictions; local group bits 6.8278, word-in-group bits 1.7900, word bits 8.6177
+== training fraction 1
+scored: 50,114 predictions; local group bits 6.9485, word-in-group bits 1.9883, word bits 8.9368
+dev: 99,999 predictions; local group bits 6.7025, word-in-group bits 1.7574, word bits 8.4599

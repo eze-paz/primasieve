@@ -1,0 +1,9 @@
+copy register built (2 s)
+fold A (fit dev, score scored) word bits: stack 8.4745; stack + copy 8.2561; stack + library lookup 8.3634; stack + lookup + copy 8.1507; copy weights by followers seen [0.0, 0.047, 0.055, 0.055, 0.075, 0.119] (2 s)
+fold B (fit scored, score dev) word bits: stack 8.1864; stack + copy 8.1159; stack + library lookup 8.0534; stack + lookup + copy 7.9887; copy weights by followers seen [0.0, 0.084, 0.095, 0.105, 0.13, 0.182] (2 s)
+C1 breakdown, fold A, mean word bits [total bits]:
+   repeat in book  41,100 positions: local 7.760 [318,921]; stack 7.082 [291,083]; + lookup + copy 6.725 [276,401]; language model 4.994 [205,257]
+   function word      425 positions: local 7.411 [3,150]; stack 8.156 [3,466]; + lookup + copy 7.960 [3,383]; language model 6.208 [2,638]
+   content word     8,279 positions: local 14.841 [122,867]; stack 15.370 [127,244]; + lookup + copy 15.246 [126,219]; language model 10.857 [89,887]
+   unknown            310 positions: local 9.428 [2,923]; stack 9.350 [2,899]; + lookup + copy 7.933 [2,459]; language model 13.580 [4,210]
+   all             50,114 positions: local 8.937 [447,860]; stack 8.475 [424,692]; + lookup + copy 8.151 [408,463]; language model 6.026 [301,992]

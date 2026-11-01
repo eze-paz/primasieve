@@ -1,0 +1,6 @@
+order 6: 106,198 contexts wanted, 4,356 library matches; found (>= 2) at scored 0.3%, dev 0.2% (83 s)
+order 5: 113,485 contexts wanted, 35,498 library matches; found (>= 2) at scored 1.6%, dev 1.8% (124 s)
+order 4: 119,697 contexts wanted, 353,886 library matches; found (>= 2) at scored 8.6%, dev 9.8% (141 s)
+order 3: 115,779 contexts wanted, 3,071,330 library matches; found (>= 2) at scored 27.9%, dev 30.0% (170 s)
+order 2: 72,321 contexts wanted, 13,829,710 library matches; found (>= 2) at scored 40.1%, dev 39.1% (197 s)
+done (197 s)

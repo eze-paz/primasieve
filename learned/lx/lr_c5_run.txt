@@ -1,0 +1,9 @@
+41,195 words embedded in 100 dimensions (21 s)
+k-means: 2000 groups, 2000 non-empty (27 s)
+   group of 'king': king, doctor, prince, count, duke, queen, minister, baron, officer, president
+   group of 'walked': went, walked, moved, drove, glanced, rode, hurried, swept, pushed, flew
+   group of 'red': white, black, dark, red, blue, green, brown, soft, gray, thick
+   group of 'london': paris, england, london, heaven, france, europe, berlin, rome, america, spain
+   group of 'quickly': slowly, quickly, quietly, gently, rapidly, softly, slightly, hastily, steadily, lightly
+scored: 50,114 predictions; local group bits 6.0587, word-in-group bits 3.1194, word bits 9.1781
+dev: 99,999 predictions; local group bits 5.7070, word-in-group bits 3.0625, word bits 8.7694

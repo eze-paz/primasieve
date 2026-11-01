@@ -1,0 +1,4 @@
+294,193 two-group contexts; variance in the top 16 / 64 / 256 directions: 0.450 / 0.580 / 0.810 (37 s)
+registers built (42 s)
+fold A (fit dev, score scored) local group bits: local model 6.9485 [rare-context positions (9,139) 7.2020]; control (unprojected) 6.8766 [rare-context positions 6.8076] beta -0.51; r=16 6.9482 [rare-context positions 7.2003] beta -0.17; r=64 6.9365 [rare-context positions 7.1365] beta -0.89; r=256 6.9049 [rare-context positions 6.9629] beta -0.83 (212 s)
+fold B (fit scored, score dev) local group bits: local model 6.7025 [rare-context positions (16,953) 6.8713]; control (unprojected) 6.6471 [rare-context positions 6.5447] beta -0.58; r=16 6.7023 [rare-context positions 6.8703] beta -0.23; r=64 6.6947 [rare-context positions 6.8249] beta -1.06; r=256 6.6680 [rare-context positions 6.6680] beta -0.92 (265 s)

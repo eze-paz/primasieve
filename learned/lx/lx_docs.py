@@ -40,5 +40,6 @@ m = tep_all < 1000; assert np.array_equal(te_all[m], z["te"]) and np.array_equal
 used = set(teb_all[m].tolist()); dm = (tep_all >= 1000) & ~np.isin(teb_all, list(used))
 print(f"training {len(tr):,} tokens in {trb.max() + 1} books; scored held-out {int(m.sum()):,} tokens in {len(used)} books "
       f"(tokens per book {np.bincount(teb_all[m])[sorted(used)].tolist()}); dev {int(dm.sum()):,} tokens in {len(set(teb_all[dm].tolist()))} books ({time.time() - t0:.0f} s)")
+json.dump(sorted(EXT, key=EXT.get), open(os.path.join(HERE, "lx_ext_words.json"), "w", encoding="utf-8"))   # held-out words unseen in training, in id order
 np.savez_compressed(os.path.join(HERE, "lx_docs.npz"), trp=trp, trb=trb, trc=trc, teb=teb_all[m], tec=tec_all[m], tex=tex_all[m], dvx=tex_all[dm],
                     dv=te_all[dm], dvs=tes_all[dm], dvp=tep_all[dm], dvb=teb_all[dm], dvc=tec_all[dm])
