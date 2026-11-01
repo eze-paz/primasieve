@@ -1,0 +1,15 @@
+20,824 words; 168,096 pairs within 2 edits (8 s)
+same-role pairs 3,362; operators invented 6; decoy (random 2%) invents 0: [] (18 s)
+    <-> s              294 same-role pairs of  2613  e.g. expense/expenses, attention/attentions, flowers/flower, foundation/foundations
+   r <-> ur             20 same-role pairs of    28  e.g. ardor/ardour, clamour/clamor, splendor/splendour, rigor/rigour
+    <-> es              10 same-role pairs of   135  e.g. class/classes, weakness/weaknesses, process/processes, bush/bushes
+   ed <-> t              6 same-role pairs of    35  e.g. burned/burnt, dreamed/dreamt, leaped/leapt, learned/learnt
+    <-> i                5 same-role pairs of    12  e.g. xviii/xvii, xxvii/xxvi, xxxii/xxxiii, xxii/xxiii
+   se <-> ze             5 same-role pairs of     6  e.g. realize/realise, apologize/apologise, sympathize/sympathise, recognize/recognise
+share of books using both words, among books using either: invented-operator pairs (340) 0.377; same-role pairs not covered (3022) 0.329; all pairs (168,096) 0.135 (20 s)
+   both spellings in one book, ' <-> s': 0.412 (294 pairs)
+   both spellings in one book, 'r <-> ur': 0.008 (20 pairs)
+   both spellings in one book, ' <-> es': 0.360 (10 pairs)
+   both spellings in one book, 'ed <-> t': 0.136 (6 pairs)
+   both spellings in one book, ' <-> i': 0.479 (5 pairs)
+   both spellings in one book, 'se <-> ze': 0.007 (5 pairs)

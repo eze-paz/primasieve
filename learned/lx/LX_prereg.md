@@ -438,3 +438,53 @@ Reading: research pays when it means *more text* -- the library (another 17.7M w
 not find where lookups pay; a lookup is cheap and worth doing everywhere. PCA did not help in either form tested.
 Best system so far: stack + lookup everywhere + copy, 8.1507 / 7.9887 (language model 6.026 on fold A); the gap is
 mostly words already used in the book (276,401 vs 205,257 total bits) and new content words (126,219 vs 89,887).
+
+## NC -- reading as inverse problems (registered 2026-11-01, before any NC run)
+Generate candidates from what is seen, let the learned model reject (the original engine's GENERATE -> REJECT on
+language). Both folds as before; absolute numbers reported.
+**NC1 typo recovery.** 2,000 sampled held-out positions per fold whose true word is a known non-function word (not
+among the 150 most frequent) of >= 4 letters. Corruptions: (a) two adjacent inner letters swapped ("smoking" ->
+"somking"); (b) all inner letters shuffled (first and last kept). Candidates: known words (>= 2 training uses) with
+the same first letter, last letter and letter multiset. Choosers: letters only (most frequent candidate); letters +
+local model (left context); letters + stack + copy register (left context; library lookup excluded -- it would need a
+library scan per candidate); the same + right context (P(next word | candidate), word bigram). Reported: candidates
+per position, share with > 1 candidate, accuracy overall and on the ambiguous positions.
+Bar: on ambiguous positions, letters + stack + copy (+ right context) beats letters only, both corruptions, both
+folds.
+**NC3 invented spelling operators.** Word pairs (>= 20 training uses each, >= 4 letters) within edit distance 2;
+context = left and right neighbour groups; "same role" = the 2 % of pairs with the most similar contexts
+(Jensen-Shannon). The difference of each same-role pair, after stripping the common prefix and suffix, is a rewrite
+(e.g. "our" -> "or"); an operator is invented when it covers >= 5 same-role pairs and is >= 3 times as frequent
+there as among all pairs. Decoy: the same procedure on a random 2 % of pairs must invent (almost) nothing. Outside
+check, no labels: true spelling variants are in complementary distribution -- a book uses one spelling -- so the
+invented operators' pairs must co-occur in the same training book less often than all edit-distance pairs (both
+words used in a book: absolute rates). Bar: decoy invents <= 1/5 as many operators, and the co-occurrence rate of
+invented-operator pairs is below that of all pairs.
+**NC2 sentence unscrambling.** 2,000 held-out sentences of 5-8 known words per fold, words shuffled; beam search
+(width 64) over orders scored by the local model (left to right, sentence start included). Reported: exact order
+recovered, share of word pairs in the right order (random: 0.5), and model error vs search error (the true order
+scores higher than the found one = search error). Descriptive: how much syntax the counts hold.
+
+## NC results (2026-11-01), absolute numbers (fold A scored / fold B dev)
+Logs: lr_typo_run.txt, lr_spell_run.txt, lr_unscr_run.txt.
+**NC1 typo recovery -- PASS as registered.** Same-letters candidates: 1.05 candidates per word, ambiguous 0.043 /
+0.050 of words; (a) swap and (b) shuffle give identical numbers because both keep the letter set (the registered
+candidate rule ignores letter positions). Accuracy on ambiguous words: letters only 0.706 / 0.856; + local model
+0.835 / 0.938; + stack + copy 0.965 / 0.948; + right context 0.965 / 0.959.
+Post hoc harder variant (disclosed): spell-checker candidates = known words within 2 edits of the corrupted string,
+letter channel 0.01 ** edits; 50.87-67.61 candidates per word, ambiguous 0.90-0.94. Accuracy on ambiguous words,
+letters only / + local / + stack + copy / + right context:
+(a) swap: 0.872 / 0.863 / 0.903 / 0.918 (A); 0.837 / 0.869 / 0.879 / 0.888 (B).
+(b) shuffle: 0.478 / 0.566 / 0.640 / 0.671 (A); 0.452 / 0.581 / 0.600 / 0.643 (B) -- true word among the candidates
+only 0.528 / 0.569 (a full shuffle is often > 2 edits away).
+**NC3 invented spelling operators -- FAIL on the pooled outside check.** 20,824 words, 168,096 pairs within 2 edits,
+3,362 same-role pairs; invented 6 operators, decoy invents 0 (bar passes): "" <-> s (294 pairs), r <-> ur (20:
+ardor/ardour, rigor/rigour), "" <-> es (10), ed <-> t (6: burned/burnt, learned/learnt), "" <-> i (5: Roman
+numerals), se <-> ze (5: realise/realize). Share of books using both words of a pair: invented-operator pairs 0.377,
+all pairs 0.135 -> the registered check fails (plurals dominate). Per operator (descriptive, added after): r <-> ur
+0.008, se <-> ze 0.007, ed <-> t 0.136, "" <-> s 0.412, "" <-> es 0.360, "" <-> i 0.479 -- true spelling variants
+almost never meet in one book, inflections do: book-level complementary distribution separates the two without labels.
+**NC2 unscrambling (descriptive).** Only 467 / 737 held-out sentences have 5-8 words, all known (fewer than the
+registered 2,000). Exact order recovered 0.206 / 0.267 (5 words 0.296 / 0.420, 8 words 0.065 / 0.144; random 0.0083
+to 0.00002); word pairs in the right order 0.689 / 0.731 (random 0.5). Misses: the model scores the wrong order at
+least as high as the true one in 361 of 371 / 524 of 540 -- the limit is the model, not the search.

@@ -1,0 +1,13 @@
+scored: 5-word sentences 125: exact 0.296 (random 0.00833) (5 s)
+scored: 6-word sentences 120: exact 0.233 (random 0.00139) (6 s)
+scored: 7-word sentences 115: exact 0.209 (random 0.00020) (6 s)
+scored: 8-word sentences 107: exact 0.065 (random 0.00002) (8 s)
+scored: 467 sentences: exact order 0.206; word pairs in the right order 0.689 (random 0.5); misses 371: model prefers the wrong order 361, search missed a better-scoring true order 10 (8 s)
+   that i tell nay i say there was  <-  nay say that i was there i tell
+   i believe it true he has better principles  <-  i believe he has true principles it better
+   the noted french economist may well be quoted  <-  well may be noted the french economist quoted
+dev: 5-word sentences 150: exact 0.420 (random 0.00833) (8 s)
+dev: 6-word sentences 205: exact 0.322 (random 0.00139) (9 s)
+dev: 7-word sentences 187: exact 0.214 (random 0.00020) (10 s)
+dev: 8-word sentences 195: exact 0.144 (random 0.00002) (13 s)
+dev: 737 sentences: exact order 0.267; word pairs in the right order 0.731 (random 0.5); misses 540: model prefers the wrong order 524, search missed a better-scoring true order 16 (13 s)

@@ -1,0 +1,27 @@
+   (a2) 'ronuds' candidates ['sounds', 'mounds', 'ponds', 'rinds', 'bounds']: letters -> round, context -> rounds  [truth rounds]
+   (a2) 'bolw' candidates ['cole', 'boot', 'boa', 'sol', 'wolf']: letters -> now, context -> blow  [truth blow]
+   (a2) 'inetrests' candidates ['intrusts', 'interest', 'interests']: letters -> interest, context -> interests  [truth interests]
+   (a2) 'propetry' candidates ['propter', 'poetry', 'property', 'properly', 'popery']: letters -> property, context -> property  [truth property]
+   (a2) 'absobred' candidates ['abhorred', 'absorbed', 'absolved']: letters -> absorbed, context -> absorbed  [truth absorbed]
+   (a2) 'uinon' candidates ['pinos', 'winn', 'sidon', 'minon', 'upton']: letters -> upon, context -> union  [truth union]
+   (a2) 'prat' candidates ['ral', 'that', 'tra', 'pest', 'prix']: letters -> that, context -> part  [truth part]
+   (a2) 'wnats' candidates ['wands', 'chats', 'was', 'enacts', 'cants']: letters -> was, context -> wants  [truth wants]
+   (a2) 'grnad' candidates ['glad', 'grenada', 'gunda', 'grant', 'gnat']: letters -> great, context -> grand  [truth grand]
+   (a2) 'btoh' candidates ['boot', 'boa', 'bish', 'bah', 'tod']: letters -> too, context -> both  [truth both]
+   (b2) 'rnduos' candidates ['indios', 'indus']: letters -> indus, context -> indus  [truth rounds]
+   (b2) 'bolw' candidates ['cole', 'boot', 'boa', 'sol', 'wolf']: letters -> now, context -> blow  [truth blow]
+   (b2) 'inetrests' candidates ['intrusts', 'interest', 'interests']: letters -> interest, context -> interests  [truth interests]
+   (b2) 'uonin' candidates ['loin', 'bonn', 'sorin', 'ronsin', 'tonic']: letters -> robin, context -> union  [truth union]
+   (b2) 'prat' candidates ['ral', 'that', 'tra', 'pest', 'prix']: letters -> that, context -> part  [truth part]
+   (b2) 'wtnas' candidates ['wands', 'annas', 'was', 'teas', 'wants']: letters -> was, context -> was  [truth wants]
+   (b2) 'chtinya' candidates ['chiny', 'china']: letters -> china, context -> china  [truth cynthia]
+   (b2) 'gnrad' candidates ['glad', 'gord', 'gnat', 'grat', 'inroad']: letters -> glad, context -> gad  [truth grand]
+   (b2) 'btoh' candidates ['boot', 'boa', 'bish', 'bah', 'tod']: letters -> too, context -> both  [truth both]
+fold A (scored), corruption (a) adjacent inner swap, candidates same letters, first, last (registered): 1973 words, true word among candidates 0.987, candidates per word 1.05, ambiguous 0.043; accuracy: letters only 0.987 [ambiguous 0.706]; + local model 0.993 [ambiguous 0.835]; + stack + copy 0.998 [ambiguous 0.965]; + stack + copy + right context 0.998 [ambiguous 0.965] (103 s)
+fold A (scored), corruption (a) adjacent inner swap, candidates within 2 edits (post hoc): 1969 words, true word among candidates 0.981, candidates per word 50.87, ambiguous 0.929; accuracy: letters only 0.879 [ambiguous 0.872]; + local model 0.871 [ambiguous 0.863]; + stack + copy 0.908 [ambiguous 0.903]; + stack + copy + right context 0.922 [ambiguous 0.918] (103 s)
+fold A (scored), corruption (b) inner letters shuffled, candidates same letters, first, last (registered): 1973 words, true word among candidates 0.987, candidates per word 1.05, ambiguous 0.043; accuracy: letters only 0.987 [ambiguous 0.706]; + local model 0.993 [ambiguous 0.835]; + stack + copy 0.998 [ambiguous 0.965]; + stack + copy + right context 0.998 [ambiguous 0.965] (103 s)
+fold A (scored), corruption (b) inner letters shuffled, candidates within 2 edits (post hoc): 1316 words, true word among candidates 0.528, candidates per word 67.61, ambiguous 0.904; accuracy: letters only 0.469 [ambiguous 0.478]; + local model 0.548 [ambiguous 0.566]; + stack + copy 0.616 [ambiguous 0.640]; + stack + copy + right context 0.643 [ambiguous 0.671] (103 s)
+fold B (dev), corruption (a) adjacent inner swap, candidates same letters, first, last (registered): 1950 words, true word among candidates 0.974, candidates per word 1.05, ambiguous 0.050; accuracy: letters only 0.992 [ambiguous 0.856]; + local model 0.996 [ambiguous 0.938]; + stack + copy 0.997 [ambiguous 0.948]; + stack + copy + right context 0.997 [ambiguous 0.959] (201 s)
+fold B (dev), corruption (a) adjacent inner swap, candidates within 2 edits (post hoc): 1946 words, true word among candidates 0.969, candidates per word 53.63, ambiguous 0.940; accuracy: letters only 0.846 [ambiguous 0.837]; + local model 0.876 [ambiguous 0.869]; + stack + copy 0.885 [ambiguous 0.879]; + stack + copy + right context 0.894 [ambiguous 0.888] (201 s)
+fold B (dev), corruption (b) inner letters shuffled, candidates same letters, first, last (registered): 1950 words, true word among candidates 0.974, candidates per word 1.05, ambiguous 0.050; accuracy: letters only 0.992 [ambiguous 0.856]; + local model 0.996 [ambiguous 0.938]; + stack + copy 0.997 [ambiguous 0.948]; + stack + copy + right context 0.997 [ambiguous 0.959] (201 s)
+fold B (dev), corruption (b) inner letters shuffled, candidates within 2 edits (post hoc): 1413 words, true word among candidates 0.569, candidates per word 65.20, ambiguous 0.923; accuracy: letters only 0.443 [ambiguous 0.452]; + local model 0.562 [ambiguous 0.581]; + stack + copy 0.580 [ambiguous 0.600]; + stack + copy + right context 0.620 [ambiguous 0.643] (201 s)
