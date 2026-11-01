@@ -483,3 +483,7 @@ position sample). Same-book counts (Stack's copy register) were derived and sele
 ST4 shrink toward the prior: chosen a = 0, 7 refuted. ST4b sharpening: chosen g = 1.1, 3 refuted (stated 0.0-0.3,
 overstated by 0.010-0.016). ST4c histogram binning learned on the fit positions: 2 refuted (stated 0.365 -> 0.340;
 0.688 -> 0.647). The fit (dev books) rates do not transfer to the scored (test) books at bounds of 0.007-0.03.
+**ST4 diagnosis, post hoc (2026-11-02).** Histogram binning learned on two test books, checked on the third:
+book 0 (6,520 positions) 0 refuted, largest |stated - observed| 0.028; book 1 (26,943) 2 refuted, 0.061 -> 0.051;
+book 2 (16,651) 1 refuted, 0.061. Calibration of form claims differs from book to book by up to 0.061, so no fixed
+correction learned on other books can pass bounds of 0.007-0.03; a correction would have to adapt within each book.

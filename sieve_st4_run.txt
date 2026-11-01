@@ -56,3 +56,7 @@ ST4b: chosen g = 1.1 on fit9; eval refuted bins 3 (28 s)
       stated 0.8-0.9:    229 claims, stated 0.897, observed 0.803, bound 0.108 -> standing
       stated 0.9-1.0:     16 claims, stated 1.000, observed 0.688, bound 0.407 -> standing
 ST4c: eval refuted bins 2 (30 s)
+post hoc (ST4c diagnosis): histogram binning learned on 2 test books, checked on the third
+   held-out book 0: 6,520 positions, refuted bins 0, largest |stated - observed| 0.028
+   held-out book 1: 26,943 positions, refuted bins 2, largest |stated - observed| 0.051
+   held-out book 2: 16,651 positions, refuted bins 1, largest |stated - observed| 0.061
