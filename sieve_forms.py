@@ -3,7 +3,7 @@
 forms is chosen by MDL (class-bigram bits on the training text + k^2 x 8 bits). Outside checks, WordNet never used to
 build: (1) nouns (WordNet-noun-only words) in the same form share their first sense's lexicographer file more often
 than nouns in different forms; (2) rarer nouns (5-20 uses) placed in the form of their nearest centroid get the form's
-majority lexicographer file. Both against forms built from shuffled text. Run: py -3.12 -W ignore sieve_forms.py"""
+majority lexicographer file. Both against forms built from shuffled text. Run: py -3.12 -W ignore sieve_forms.py [--save: write the real-text forms, learned/lx/sieve_forms_labels.npy]"""
 import os, sys, json, math, collections
 import numpy as np
 import sieve_count as SC
@@ -71,7 +71,7 @@ def run(s, sid, label):
     return lab, k
 cnt = np.bincount(TR, minlength=len(words) + 2)
 lab, k = run(TR, TRS, "real text")
-for f in range(k)[:0]: pass
+if "--save" in sys.argv: np.save(os.path.join(SC.LX, "sieve_forms_labels.npy"), lab); log(f"saved {k} forms for words 1..{NV}"); sys.exit(0)   # SQ3/SQ9: forms as attributes
 ex = collections.defaultdict(list)
 for i, f in enumerate(lab): ex[f].append(words[i])
 for f in sorted(ex, key=lambda f: -len(ex[f]))[:8]: print(f"   form ({len(ex[f])} words): {', '.join(ex[f][:12])}")

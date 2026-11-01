@@ -12,7 +12,10 @@ Z = np.load(os.path.join(SC.LX, "lx_tokens.npz")); DD = np.load(os.path.join(SC.
 NWD = len(json.load(open(os.path.join(SC.LX, "lx_vocab.json"), encoding="utf-8"))["words"]); Vt = NWD + 2
 def mk(tok, sid): tok = tok.astype(np.int64); b = np.nonzero(sid[1:] != sid[:-1])[0] + 1; return np.insert(tok, b, 0)
 tr = mk(Z["tr"], Z["trs"]); NT = len(tr)
-fit_s = np.r_[tr, mk(DD["dv"][:6000], DD["dvs"][:6000])]; Tf = np.arange(NT + 1, len(fit_s)); Tf = Tf[(fit_s[Tf] != 0) & (fit_s[Tf - 1] != 0)][:3000]
+SPREAD = "--spread" in sys.argv                                                                 # SQ2: fit positions spread evenly over all 7 dev books
+NDV = len(DD["dv"]) if SPREAD else 6000; fit_s = np.r_[tr, mk(DD["dv"][:NDV], DD["dvs"][:NDV])]; Tf = np.arange(NT + 1, len(fit_s)); Tf = Tf[(fit_s[Tf] != 0) & (fit_s[Tf - 1] != 0)]
+Tf = Tf[np.linspace(0, len(Tf) - 1, 3000).astype(int)] if SPREAD else Tf[:3000]
+FT = "fit2" if SPREAD else "fit"; BJ = "sieve_fullsearch_best_sq2.json" if SPREAD else "sieve_fullsearch_best.json"
 ev_s = np.r_[tr, mk(Z["te"], Z["tes"])]; Te = np.arange(NT + 1, len(ev_s)); Te = Te[(ev_s[Te] != 0) & (ev_s[Te - 1] != 0)]
 def argmax_by(x, y):
     o = np.lexsort((y, x)); xs, ys = x[o], y[o]; brk = np.r_[True, (xs[1:] != xs[:-1]) | (ys[1:] != ys[:-1])]
@@ -37,6 +40,18 @@ def static(src_stream, st):
 def comp(stream, T, c):
     """(matched, P(true), n, distinct) at positions T"""
     st, src, term = c; ne = np.zeros(len(T), bool); P = np.zeros(len(T)); N = np.zeros(len(T)); TD = np.zeros(len(T))
+    if term == "recency" and not st:                                                                  # any position: same values as scanning, by each word's position list
+        lo0 = max(0, int(T.min()) - src); seg = stream[lo0:int(T.max())]; o = np.argsort(seg, kind="stable"); ws = seg[o]; Hs = np.cumsum(1 / (1 + np.arange(src + 1)))
+        cnt = collections.Counter(); a = b = 0
+        for i, t in enumerate(T):
+            t = int(t); y = stream[t]; l, h = np.searchsorted(ws, y), np.searchsorted(ws, y, "right"); pos = o[l:h] + lo0; pos = pos[(pos < t) & (pos >= t - src)]
+            n = min(src, t); ne[i] = True; N[i] = n; P[i] = (1 / (1 + (t - pos))).sum() / (Hs[n] - 1) if len(pos) else 0
+            while b < t - lo0: cnt[int(seg[b])] += 1; b += 1
+            while a < t - src - lo0:
+                v = int(seg[a]); cnt[v] -= 1; a += 1
+                if cnt[v] == 0: del cnt[v]
+            TD[i] = len(cnt)
+        return ne, P, N, TD
     if term == "recency":
         r = SMM.build(stream, T, (st, src), AT, Vt); return r[0], r[1][1], r[2], r[3]
     key = SMM.keyarr(stream, st, AT); mask = np.int64((1 << 46) - 1)
@@ -62,13 +77,13 @@ def cached(tag, stream, T, i):
     f = os.path.join(CD, f"{tag}_{i}.npz")
     if not os.path.exists(f): ne, P, N, TD = comp(stream, T, COMPS[i]); np.savez(f, ne=ne, P=P, N=N, TD=TD)
     z = np.load(f); return z["ne"], z["P"], z["N"], z["TD"]
-mode = sys.argv[1] if len(sys.argv) > 1 else "search"
+mode = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "search") if __name__ == "__main__" else ""   # importable (sieve_full2.py)
 if mode.startswith("fit"):
     idx = [i for i, c in enumerate(COMPS) if (c[1] == "library") == (mode == "fit-lib")]
-    for i in idx: cached("fit", fit_s, Tf, i)
+    for i in idx: cached(FT, fit_s, Tf, i)
     log(f"{mode}: {len(idx)} components cached on {len(Tf)} fit positions")
 elif mode == "search":
-    F = [cached("fit", fit_s, Tf, i) for i in range(len(COMPS))]; seen = {}; keep = []
+    F = [cached(FT, fit_s, Tf, i) for i in range(len(COMPS))]; seen = {}; keep = []
     for i, (ne, P, N, TD) in enumerate(F):
         sig = (ne.tobytes(), np.round(P, 12).tobytes())
         if sig in seen: continue
@@ -79,9 +94,9 @@ elif mode == "search":
     sc, b, e = progs[best]
     print(f"   {len(COMPS)} components, {len(keep)} distinct; MDL-best: " + cname(COMPS[keep[best[0][0]]]) + "".join(ST.cbname(cb) + cname(COMPS[keep[c]]) for c, cb in best[1:]) +
           f" (escape {e}) -- fit {b / len(Tf):.4f} bits/word, description {sc - b:.1f} bits")
-    json.dump(dict(chain=[[keep[c], cb] for c, cb in best], escape=e), open(os.path.join(HERE, "sieve_fullsearch_best.json"), "w")); log("search done")
-else:
-    prog = json.load(open(os.path.join(HERE, "sieve_fullsearch_best.json"))); ids = [i for i, _ in prog["chain"]]
+    json.dump(dict(chain=[[keep[c], cb] for c, cb in best], escape=e), open(os.path.join(HERE, BJ), "w")); log("search done")
+elif mode:
+    prog = json.load(open(os.path.join(HERE, BJ))); ids = [i for i, _ in prog["chain"]]
     R = {i: cached("eval", ev_s, Te, i) for i in ids}; idx = {i: j for j, i in enumerate(ids)}
     NE, PP, NN, TT = (np.array([R[i][j] for i in ids]) for j in range(4))
     chain = [(idx[i], None if cb is None else tuple(cb)) for i, cb in prog["chain"]]; m, p = ST.run(chain, NE, PP, NN, TT); e = prog["escape"]

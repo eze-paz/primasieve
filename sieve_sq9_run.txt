@@ -1,0 +1,45 @@
+real: program bits on the fit positions 6.0972; 250 residual positions (mean 11.3162 bits) (11 s)
+   real: id of the answer in the past 50: residual answers 0.092, same answers at a far position 0.048
+   real: id of the answer in the past 1000: residual answers 0.452, same answers at a far position 0.312
+   real: id of the answer in the past book: residual answers 0.912, same answers at a far position 0.808
+   real: mff of the answer in the past 50: residual answers 0.760, same answers at a far position 0.764
+   real: mff of the answer in the past 1000: residual answers 0.940, same answers at a far position 0.936
+   real: mff of the answer in the past book: residual answers 0.992, same answers at a far position 0.996
+   real: form of the answer in the past 50: residual answers 0.468, same answers at a far position 0.400
+   real: form of the answer in the past 1000: residual answers 0.824, same answers at a far position 0.796
+   real: form of the answer in the past book: residual answers 0.980, same answers at a far position 0.968
+real: proposed primitive (largest excess): 'id of the answer occurred in the past 1000' -- 0.452 vs chance 0.312 (33 s)
+global: program bits on the fit positions 5.8877; 250 residual positions (mean 11.1853 bits) (16 s)
+   global: id of the answer in the past 50: residual answers 0.112, same answers at a far position 0.052
+   global: id of the answer in the past 1000: residual answers 0.440, same answers at a far position 0.460
+   global: id of the answer in the past book: residual answers 0.896, same answers at a far position 0.916
+   global: mff of the answer in the past 50: residual answers 0.824, same answers at a far position 0.816
+   global: mff of the answer in the past 1000: residual answers 0.964, same answers at a far position 0.964
+   global: mff of the answer in the past book: residual answers 0.992, same answers at a far position 0.992
+   global: form of the answer in the past 50: residual answers 0.484, same answers at a far position 0.448
+   global: form of the answer in the past 1000: residual answers 0.864, same answers at a far position 0.848
+   global: form of the answer in the past book: residual answers 0.988, same answers at a far position 0.972
+global: proposed primitive (largest excess): 'id of the answer occurred in the past 50' -- 0.112 vs chance 0.052 (39 s)
+within: program bits on the fit positions 6.0557; 250 residual positions (mean 11.4363 bits) (14 s)
+   within: id of the answer in the past 50: residual answers 0.084, same answers at a far position 0.052
+   within: id of the answer in the past 1000: residual answers 0.424, same answers at a far position 0.356
+   within: id of the answer in the past book: residual answers 0.888, same answers at a far position 0.860
+   within: mff of the answer in the past 50: residual answers 0.808, same answers at a far position 0.804
+   within: mff of the answer in the past 1000: residual answers 0.944, same answers at a far position 0.948
+   within: mff of the answer in the past book: residual answers 1.000, same answers at a far position 1.000
+   within: form of the answer in the past 50: residual answers 0.460, same answers at a far position 0.432
+   within: form of the answer in the past 1000: residual answers 0.852, same answers at a far position 0.808
+   within: form of the answer in the past book: residual answers 0.984, same answers at a far position 0.968
+within: proposed primitive (largest excess): 'id of the answer occurred in the past 1000' -- 0.424 vs chance 0.356 (36 s)
+--- MDL search, SP0's matcher components + 18 factored components (sieve_longrange.py search) ---
+   real: MDL-best: [token(t-1), in the library] count MIX0.7 [any position] recency MIX0.7 [token(t-1) & token(t-2), in the library] count (escape 0.02) -- training 6.1264, description 30.7 bits
+   real: best without factored components: training 6.1264, total 6157.1 bits vs 6157.1
+real: long-range factored components selected: [] (232 s)
+   global: MDL-best: [token(t-1), in the library] count MIX[(n/(n+T))] [any position] recency MIX0.7 [token(t-1) & token(t-2), in the library] count (escape 0.05) -- training 5.8893, description 42.0 bits
+   global: best without factored components: training 5.8893, total 5931.3 bits vs 5931.3
+global: long-range factored components selected: [] (232 s)
+--- diagnosis (inline script, real stream): factored components in place of / beside SP0's chain ---
+SP0 program total 6157.1 bits, training 6.1264
+best with a factored component: fac_id_book_recency in place of [any position] recency: total 6166.2, training 6.1344
+best added as a 4th component: fac_id_book_count MIX0.9: total 6170.6, training 6.1316
+single factored components, training bits/token: form 1000 count 7.4419, form book count 7.3836, id book count 7.3478, id 1000 count 7.5364, mff book count 7.4381

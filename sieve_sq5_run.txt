@@ -1,0 +1,6 @@
+training tokens 17,456,276
+scored: 50,114 predictions; local group bits 6.8819, word-in-group bits 1.9757, word bits 8.8576
+training tokens 21,873,726
+scored: 50,114 predictions; local group bits 6.8341, word-in-group bits 1.9461, word bits 8.7802
+data curve (Counter-style, scored 50,114 positions, bits/word): 6,239,442 tokens 9.0919; 13,038,810 8.9368; 17,456,276 8.8576; 21,873,726 8.7802; 30,708,676 8.7003
+log-linear fit: 0.1722 bits/word lower per doubling; extrapolated 1e8 tokens 8.413, 1e9 7.841, 4e9 7.497; power law (best exponent at the grid floor 0.02): 1e8 8.423, 1e9 7.886, 4e9 7.574

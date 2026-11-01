@@ -27,7 +27,9 @@ import sys
 FRAC = float(sys.argv[sys.argv.index("--frac") + 1]) if "--frac" in sys.argv else 1.0                 # C3 data curve: first FRAC of the training books
 if FRAC < 1: keep = d["trb"] < int(round(FRAC * (d["trb"].max() + 1))); tr, trs = tr[keep], trs[keep]
 if "--addlib" in sys.argv:                                                                        # SP1: the 400 library books as extra training text (print only)
-    X = np.load(os.path.join(HERE, "lx_library.npz")); tr = np.r_[tr, X["lib"].astype(np.int64)]; trs = np.r_[trs, X["libs"].astype(np.int64) + int(trs.max()) + 1]
+    X = np.load(os.path.join(HERE, "lx_library.npz")); LF = float(sys.argv[sys.argv.index("--libfrac") + 1]) if "--libfrac" in sys.argv else 1.0   # SQ5: first LF of the library tokens
+    nl = int(np.searchsorted(X["libs"], X["libs"][int(LF * (len(X["libs"]) - 1))])) if LF < 1 else len(X["libs"])
+    tr = np.r_[tr, X["lib"][:nl].astype(np.int64)]; trs = np.r_[trs, X["libs"][:nl].astype(np.int64) + int(trs.max()) + 1]; print(f"training tokens {len(tr):,}")
 mtr, Ctr = contexts(tr, trs); ytr = gid[tr][mtr]
 P0 = np.bincount(ytr, minlength=NG) + 0.5; P0 = P0 / P0.sum()
 stats = []

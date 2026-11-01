@@ -350,3 +350,33 @@ scale, SN5's program plus the selected component(s) < 8.7812 bits/word on the 50
 **SQ5 more text.** C:\ has 28 GB free; all of Gutenberg (tens of GB) is not downloaded. Instead the data curve is
 measured on fractions of the library (Counter-style, lr_base.py --addlib with the first 1/4 and 1/2 of the library
 books) and extrapolated to Gutenberg's ~4 billion tokens. Descriptive.
+
+## SQ results (2026-11-01), absolute numbers
+Logs: sieve_sq2_run.txt, sieve_sq3_run.txt, sieve_sq4_run.txt, sieve_sq5_run.txt, sieve_sq9_run.txt.
+**SQ2 -- PASS.** Fit positions spread over all 7 dev books: MDL-best [token(t-1), in the library] count MIX0.7 [any
+position] recency MIX0.7 [token(t-1) & token(t-2)] count (escape 0.02), fit 7.9385 bits/word; on the 50,114 positions
+8.3411 bits/word (bar 8.7812; Counter 8.9368, Counter + library 8.7003, Stack 8.1507, LM 6.026). Execution change,
+disclosed: [any position] recency at full scale is computed from each word's position list (checked equal to the scan,
+max difference 1.8e-16 on 200 positions).
+**SQ3 -- FAIL.** 802 components (748 distinct); search budget: the 250 best single components enter the beam
+(disclosed; the full beam exceeded five minutes). MDL-best [token(t-1), in the library] count MIX0.5 [graded
+identity+form, offset weights 2,2,2,0,0, top 1,000] MIX0.7 [token(t-1) & mfp(t-2), in the library] count: training
+6.1167, held-out 6.2461 bits/token (bar 6.1598). Forms were selected (identity+form agreement), offsets 4-5 were not.
+Likely cause: SP7's forms were built from all 13.85M training tokens, which include this 300k-token fit stream.
+**SQ4 -- FAIL.** Mixture of experts (150 best single experts as candidates): 4 experts selected by MDL (library
+token(t-1) count, graded identity+form 2,2,1,0,0, library token(t-1) & mfp(t-2) count, mff(t-1) & mfp(t-1) count), none
+with per-trust-bin weights; training 6.0928, held-out 6.2244 bits/token (bar 6.1598).
+**SQ5 (descriptive).** Data curve, Counter-style, bits/word on the 50,114 positions: 6.24M tokens 9.0919; 13.04M
+8.9368; 17.46M 8.8576; 21.87M 8.7802; 30.71M 8.7003. Extrapolated to Gutenberg's ~4 billion tokens: 7.497
+(log-linear) / 7.574 (power law). No sign of flattening within 6-31M tokens. Not downloaded (28 GB free on C:).
+**SQ9.** (1) PASS: on real text the top residual relation is long-range -- 'the answer occurred in the past 1,000
+tokens': 0.452 of residual answers vs 0.312 for the same answers at a far position. (3) PASS for long-range: on the
+decoy (sentences shuffled across books) the long-range excesses are <= 0.016 (id 1,000: 0.440 vs 0.460); the decoy's
+top relation is short-range (id in the past 50: 0.112 vs 0.052), which sentence shuffling keeps. Control (shuffled
+within books): id in the past 1,000 0.424 vs 0.356 -- long-range survives, as expected. (2) FAIL: MDL selected no
+factored component on real text (nor on the decoy); the selected program is SP0's, whose [any position] recency over
+the 50,000-token memory (derived in SC) already is the identity-level long-range concept. Form-level (topic-like)
+factored components lose: best chain with one 6.1316-6.1344 vs 6.1264 training bits/token. (4) not run (nothing
+selected). Diagnosis -- the flexibility gap: Sieve's combinators only ADD distributions (orelse, mix); a topic is a
+REWEIGHTING of the local distribution (P(y) ~ P_local(y) x boost(form(y))), which needs a product combinator with
+normalisation over the vocabulary -- and the component cache stores only P(answer), not full distributions.

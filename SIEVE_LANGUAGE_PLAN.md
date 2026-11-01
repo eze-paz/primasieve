@@ -71,3 +71,12 @@ depend on what the library holds. 2 failed (narrow fit sample) -- redo with fit 
 4 failed (log-linear 6.2647) -- revisit with mixture-of-experts instead of products. 5 waiting for the owner's OK to
 download. 6 entity atom not selected. 7 passed: 400 forms by MDL that agree with WordNet (0.327 vs 0.068 across) --
 next: forms as matcher atoms and as graded-agreement attributes (item 3).
+
+## Status after the second pass (2026-11-01; numbers in sieve_lang_prereg.md "SQ results")
+2 passed: full-scale search with fit spread over all dev books, 8.3411 bits/word (Sieve now below Counter 8.9368 and
+Counter + library 8.7003; Stack 8.1507). 3 failed (6.2461; forms selected, longer offsets not; forms were built on text
+that contains the fit stream -- rebuild forms without it). 4 failed (mixture 6.2244). 5: curve extrapolates to
+7.497-7.574 bits/word for Counter at Gutenberg scale; not downloaded (28 GB free). 9: the long-range relation was
+found unaided in the residuals (0.452 vs 0.312, decoy clean), but MDL kept the existing recency cache; topic-level
+components need a reweighting (product) combinator, which the engine lacks -- next: a generic "reweight by attribute"
+combinator over full distributions, then rerun 9 and 3 at full scale.
