@@ -1,0 +1,15 @@
+oracle: 20,982 of 32,859 candidate 2-grams attested (6 s)
+oracle: 28,943 of 196,897 candidate 3-grams attested (16 s)
+oracle: 7,930 of 827,098 candidate 4-grams attested (35 s)
+scored: 467 sentences; true order survives the pair channel in 254 (42 s)
+  Sieve                  n    467  CONFAB 0.5589  abstain 0.3790  EM 0.0621  precision 0.1000
+   singleton 290, empty 155, several left 16, over the 20,000 cap 6; orders generated 606,987; lookups 33,702
+dev: 737 sentences; true order survives the pair channel in 462 (12 s)
+  Sieve, n-grams <= 4    n    737  CONFAB 0.5224  abstain 0.4003  EM 0.0773  precision 0.1290
+   singleton 442, empty 226, several left 40, over the 20,000 cap 29; orders generated 1,448,416; lookups 59,215
+scored: 467 sentences; true order survives the pair channel in 254 (4 s)
+  Sieve, n-grams <= 2    n    467  CONFAB 0.0128  abstain 0.9872  EM 0.0000  precision 0.0000
+   singleton 6, empty 64, several left 391, over the 20,000 cap 6; orders generated 606,987; lookups 0
+scored: 467 sentences; true order survives the pair channel in 254 (7 s)
+  Sieve, n-grams <= 3    n    467  CONFAB 0.3790  abstain 0.6039  EM 0.0171  precision 0.0432
+   singleton 185, empty 155, several left 121, over the 20,000 cap 6; orders generated 606,987; lookups 31,696

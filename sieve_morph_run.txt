@@ -1,0 +1,17 @@
+51,239 words; 483,306 pairs ending in the 10 most frequent endings ['ed', 'er', 'es', 'le', 'ly', 'ng', 'ns', 'on', 'rs', 'ts'] (6 s)
+Sieve: 2142 operators adopted (2133 base); residual after the base grammar 155,437 pairs; invented from the residual 9: drop 1 + second-last(x) + 'med' (78); drop 1 + second-last(x) + 'ming' (75); drop 1 + second-last(x) + 'led' (73); drop 1 + second-last(x) + 'per' (63); drop 1 + second-last(x) + 'dle' (57); drop 1 + second-last(x) + 'ing' (56); drop 1 + second-last(x) + 'ker' (55); drop 1 + second-last(x) + 'ded' (52); drop 2 + first(x) + 'ently' (51) (17 s)
+   base operators (most used): drop 2 + 'ing' (5671); drop 0 + 's' (5025); drop 1 + 'ed' (3638); drop 1 + 'ing' (2986); drop 0 + 'ed' (2064); drop 0 + 'ing' (1895); drop 0 + 'ly' (1478); drop 1 + 'er' (1337); drop 2 + 'ers' (1262); drop 2 + 'les' (1240); drop 2 + 'cked' (1150); drop 2 + 'lly' (1125)
+   drop 1 + second-last(x) + 'med': e.g. beset->beseemed, blot->bloomed, blow->bloomed, boa->boomed, bob->boomed, bog->boomed
+   drop 1 + second-last(x) + 'ming': e.g. blot->blooming, blow->blooming, boa->booming, bob->booming, bog->booming, bon->booming
+   drop 1 + second-last(x) + 'led': e.g. ada->addled, add->addled, ado->addled, ads->addled, cob->cooled, cod->cooled
+   drop 1 + second-last(x) + 'per': e.g. cob->cooper, cod->cooper, cog->cooper, col->cooper, com->cooper, con->cooper
+   drop 1 + second-last(x) + 'dle': e.g. boa->boodle, bob->boodle, bog->boodle, bon->boodle, boo->boodle, bow->boodle
+   drop 1 + second-last(x) + 'ing': e.g. boa->booing, bob->booing, bog->booing, bon->booing, bow->booing, box->booing
+   still unexplained 154,877, e.g. aback->abandons, abaft->abandons, abase->abandons, abate->abandons, abb->abandon, abb->abased, abb->abashed, abb->abbots
+S2, the 900 held-out novel forms (lemma + wanted ending):
+  Sieve (guarded)        n    900  CONFAB 0.0000  abstain 1.0000  EM 0.0000  precision 1.0000
+  most frequent op (baseline) n    900  CONFAB 0.4122  abstain 0.2344  EM 0.3533  precision 0.4615
+   rows only an invented operator explains: 0; Sieve committed correctly on 0
+   confabulations, e.g. []
+DECOY: residual 156,612; invented 9: drop 1 + second-last(x) + 'med' (78); drop 1 + second-last(x) + 'ming' (75); drop 1 + second-last(x) + 'led' (73); drop 1 + second-last(x) + 'per' (63); drop 1 + second-last(x) + 'dle' (57); drop 1 + second-last(x) + 'ing' (56); drop 1 + second-last(x) + 'ker' (55); drop 1 + second-last(x) + 'ded' (52); last-letter operators 0 (34 s)
+SHUFFLE: residual 483,306; invented 0: ; last-letter operators 0 (38 s)

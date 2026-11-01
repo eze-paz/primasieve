@@ -4,15 +4,16 @@
 record; it is not an architecture. `README.md`, `NEXT.md`, `HANDOFF.md`, `METAPLAN.md`,
 `GENERAL_REASONER_PLAN.md` are per-arc plans. This file is the one that says what the code *is*.
 
-## Model names (agreed 2026-11-01) -- use these, never mix them
+## Model names (agreed 2026-11-01) -- use these, never mix them: Sieve, Counter, Stack, LM
 
 - **Sieve** -- the original deterministic operator deriver: the rejection-first loop GENERATE -> REJECT -> COMPRESS ->
   COMPOSE -> PROPOSE -> COLLECT that invents operators from residuals (`meta_*.py`, E1-E15). The README's "Primasieve
   Engine".
 - **Counter** -- the count model of language (Witten-Bell chain over learned word groups, `learned/base/r25_*`,
   `r25_classes.json`; base of `learned/lx/lr_base.py`).
-- **Ledger** -- rules and memory registers on top of Counter (`learned/lx/`: MX3 rules, recency, topics, library
+- **Stack** -- rules and memory registers on top of Counter (`learned/lx/`: MX3 rules, recency, topics, library
   lookup, copy). Borrows Sieve's ideas (MDL, invention, decoys) in numpy; it is not Sieve.
+  (Named Stack, not Ledger, to avoid `core/ledger.py` and this file's "consolidation ledger".)
 - **LM** -- the neural language models (RWKV-7 0.4B reference, the small attention networks).
 - `core/` is hand-written rules, not a model. `primasieve` is the repo holding all of them.
 

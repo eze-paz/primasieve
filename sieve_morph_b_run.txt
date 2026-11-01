@@ -1,0 +1,22 @@
+51,239 words; 156,931 pairs ending in the 10 most frequent endings ['ed', 'er', 'es', 'le', 'ly', 'ng', 'ns', 'on', 'rs', 'ts'] (3 s)
+Sieve: 521 operators adopted (507 base); residual after the base grammar 64,436 pairs; invented from the residual 14: drop 1 + second-last(x) + 'ed' (526); drop 1 + second-last(x) + 'ing' (499); drop 0 + last(x) + 'ed' (209); drop 1 + second-last(x) + 'er' (188); drop 0 + last(x) + 'ing' (180); drop 1 + second-last(x) + 'ers' (90); drop 1 + second-last(x) + 'ied' (81); drop 1 + second-last(x) + 'on' (71); drop 1 + second-last(x) + 'led' (66); drop 1 + second-last(x) + 'ying' (66); drop 1 + second-last(x) + 'ier' (63); drop 1 + second-last(x) + 'ies' (60) (8 s)
+   base operators (most used): drop 2 + 'ing' (5374); drop 0 + 's' (4876); drop 1 + 'ed' (3400); drop 1 + 'ing' (2920); drop 0 + 'ed' (1961); drop 0 + 'ing' (1772); drop 0 + 'ly' (1430); drop 1 + 'er' (1182); drop 2 + 'ers' (980); drop 1 + 'es' (847); drop 2 + 'ion' (748); drop 1 + 'ies' (715)
+   drop 1 + second-last(x) + 'ed': e.g. abhors->abhorred, abuts->abutted, admits->admitted, avers->averred, avert->averred, avery->averred
+   drop 1 + second-last(x) + 'ing': e.g. abuts->abutting, admits->admitting, avers->averring, avert->averring, avery->averring, barb->barring
+   drop 0 + last(x) + 'ed': e.g. abet->abetted, abhor->abhorred, acquit->acquitted, admit->admitted, allot->allotted, annul->annulled
+   drop 1 + second-last(x) + 'er': e.g. band->banner, bane->banner, bang->banner, bank->banner, begins->beginner, bibl->bibber
+   drop 0 + last(x) + 'ing': e.g. abet->abetting, acquit->acquitting, admit->admitting, annul->annulling, aver->averring, befit->befitting
+   drop 1 + second-last(x) + 'ers': e.g. band->banners, bane->banners, bang->banners, bank->banners, begins->beginners, calf->callers
+   still unexplained 64,436, e.g. aback->abandoned, aback->abandons, abaft->abandoned, abaft->abandons, abase->abandoned, abase->abandons, abate->abandoned, abate->abandons
+   guard = last 1 letters + consonant/vowel shape: leave-one-out on training EM 0.0002, confabulation 0.0010
+   guard = last 2 letters + consonant/vowel shape: leave-one-out on training EM 0.0022, confabulation 0.0087
+   guard = last 3 letters + consonant/vowel shape: leave-one-out on training EM 0.0231, confabulation 0.0437
+   guard = last 4 letters + consonant/vowel shape: leave-one-out on training EM 0.0825, confabulation 0.1216
+   chosen: last 3 letters
+S2, the 900 held-out novel forms (lemma + wanted ending):
+  Sieve (guarded)        n    900  CONFAB 0.0144  abstain 0.9478  EM 0.0378  precision 0.7234
+  most frequent op (baseline) n    900  CONFAB 0.3944  abstain 0.2344  EM 0.3711  precision 0.4848
+   rows only an invented operator explains: 20; Sieve committed correctly on 1
+   confabulations, e.g. [('fly', 'flyes', 'flies'), ('bus', 'busses', 'buses'), ('burke', 'burkes', 'buries'), ('gas', 'gassed', 'gged'), ('gas', 'gassing', 'gging'), ('hie', 'hieing', 'hing'), ('dun', 'dunner', 'dier'), ('gun', 'gunned', 'gged'), ('clerk', 'clerkes', 'clerches'), ('thorpe', 'thorpes', 'thorpies')]
+DECOY: residual 65,148; invented 12: drop 1 + second-last(x) + 'ed' (526); drop 1 + second-last(x) + 'ing' (499); drop 1 + second-last(x) + 'er' (188); drop 1 + second-last(x) + 'ers' (90); drop 1 + second-last(x) + 'ied' (81); drop 1 + second-last(x) + 'on' (71); drop 1 + second-last(x) + 'led' (66); drop 1 + second-last(x) + 'ying' (66); last-letter operators 0 (20 s)
+SHUFFLE: residual 156,931; invented 0: ; last-letter operators 0 (22 s)
