@@ -380,3 +380,28 @@ factored components lose: best chain with one 6.1316-6.1344 vs 6.1264 training b
 selected). Diagnosis -- the flexibility gap: Sieve's combinators only ADD distributions (orelse, mix); a topic is a
 REWEIGHTING of the local distribution (P(y) ~ P_local(y) x boost(form(y))), which needs a product combinator with
 normalisation over the vocabulary -- and the component cache stores only P(answer), not full distributions.
+
+## SR -- ten improvements, all at full scale (registered 2026-11-01, before any SR run)
+Everything is selected on the 3,000 fit positions spread over the 7 dev books (SQ2) and scored once on the 50,114
+positions; reference SQ2 8.3411 bits/word (Stack 8.1507, LM 6.026). New runner sieve_fs2.py.
+**SR2 distributions.** Every component also states its distribution over forms (SP7's 400 forms + 'other' for words
+outside the 2,000 + '<s>'): Q[position, form]. Mixes and escapes act on Q as on P. Check: Q sums to 1 (|1 - sum| <=
+1e-6) and Q[form of the answer] >= P(answer) at every position.
+**SR1 reweight combinator.** A final stage P'(y) = P(y) b(form(y)) / sum_f Q[f] b(f), b(f) = ((Pwin(f) + 1e-4) /
+Pglob(f))^beta, Pwin = form shares of the past W tokens (W in 200, 1,000, 5,000), Pglob = training shares, beta in
+0.25, 0.5, 1; program bits 1 + log2 3 + log2 3. Bar: MDL selects a reweight stage and the 50,114 score < the same
+program without it.
+**SR3 forms without leak.** At full scale the fit (dev) and scored (test) text were never seen by the forms (built on
+training). Graded components (identity, form, identity+form; offset weights 221, 22200, 22100, 2210; top 1,000) at full
+scale are offered. Descriptive: selected or not.
+**SR4 full-scale selection** (all of SR runs this way). **SR5 longer chains**: up to 5 components, MDL stops.
+**SR6 residual-steered search**: at each extension only the 20 candidates with the most bits saved on the worst quarter
+of the beam program's positions are scored. **SR7 residual rounds**: after each search, the residual relation with the
+largest excess over chance ("form of the answer in the past W", "the answer follows an earlier occurrence of the last
+k >= 3 words in the history / library") names the component family offered next round; rounds stop when a round
+adopts nothing (max 3). **SR8 long-match lookup**: longest matching context (k from 8 down to 3) in the training+prefix
+history or in the library, count of the answer after it. **SR9 library as history**: count components over training
++ library + prefix. **SR10 calibration filter**: the selected program is the MDL-best one whose form-level claims
+(top-3 forms with Q) have no refuted Hoeffding bin (>= 30 claims, 0.01) on the fit positions.
+Bar for the whole pass: the selected program < 8.3411 bits/word on the 50,114 positions. Descriptive per idea:
+selected or not, and the score without it.
