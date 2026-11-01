@@ -430,3 +430,20 @@ component: fit 7.6872 (MDL-best) / 7.7560 (calibrated); scored 8.1726 / 8.2072 -
 **SR10 calibration filter -- FAIL as a reliability guard.** Round 0: all 210 top programs refuted >= 3 form-claim bins
 (fell back to the MDL-best); round 1: a program with escape 0.1 passed on the fit positions, but on the 50,114
 positions it refutes 5 bins (MDL-best: 6) and costs bits (8.1979 vs 8.1519).
+
+## ST -- cooking the SR conclusions (registered 2026-11-02, before any ST run)
+**ST1 Sieve vs Stack, per position.** Stack's best (stack + lookup everywhere + copy, 8.1507) per-position bits saved
+by lr_c12.py; aligned to Sieve's 50,114 positions (answers checked equal). Bootstrap over paragraphs (2,000 resamples,
+seed 0): 95% interval of each model's mean bits. "Level" stands only if each model's mean lies inside the other's
+interval; otherwise the lower one is ahead. Also per word kind (repeat in book / function / content / unknown) means.
+**ST2 decoy for the reweight stage.** Dev sentences shuffled across all dev books (fit stream = training + shuffled
+dev); the SR selected chain's components recomputed on it; MDL chooses among no reweight and the 9 reweights. Bar: no
+reweight selected on the decoy (on real dev text it was selected).
+**ST3 more fit positions, longer chains.** 9,000 fit positions spread over the 7 dev books; all families offered
+(count, recency, graded identity, long-match, reweight); chains up to 8, MDL stops; scored once. Bars: (a) scored <
+8.1519; (b) if long-match is selected, its scored effect (with vs without) is reported -- the SR8 overfitting claim
+stands only if it again hurts.
+**ST4 calibration.** Diagnose: per bin stated vs observed form claims of the ST3 (or SR) program on the 50,114
+positions (direction of the error). Fix (generic, one parameter): stated form distribution Qc = (1 - a) Q + a PG,
+a in {0, 0.05, 0.1, 0.2, 0.3, 0.5}, chosen on the fit positions by the fewest refuted bins, then the least form-claim
+log loss. Bar: 0 refuted bins on the 50,114 positions.
