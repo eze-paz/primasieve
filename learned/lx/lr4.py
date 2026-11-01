@@ -92,6 +92,6 @@ for fold, Ff, Fs in FOLDS:
         s = Fs.name; off = out[s][sel[s]]; z = off + P[s]["X"][sel[s]][:, cols] @ w; y = yy[s][sel[s]]
         lp = lambda zz: np.where(y == 1, -np.logaddexp(0, -zz), -np.logaddexp(0, zz)) / math.log(2)
         gain = lp(z) - lp(off); nov = P[s]["novel"][sel[s]]
-        res.append((nm, gain.mean(), gain[nov].mean() if nov.any() else np.nan, gain.sum() / Fs.n, w))
-    log(f"fold {fold} (fit {Ff.name}, score {Fs.name}): bits gained per gendered-pronoun position over the stack (ideas 1+2), [on referents never seen in training], (per word overall), weights")
-    for nm, gm, gn, gw, w in res: print(f"   {nm:28s} {gm:+.4f}  [{gn:+.4f}]  ({gw:+.5f}/word)  w={np.round(w, 2).tolist()}")
+        res.append((nm, -lp(z).mean(), -lp(z)[nov].mean() if nov.any() else np.nan, -lp(off).mean(), -lp(off)[nov].mean(), w))
+    log(f"fold {fold} (fit {Ff.name}, score {Fs.name}): he/she choice, bits per gendered-pronoun position; stack (ideas 1+2) {res[0][3]:.4f} [referents never seen in training {res[0][4]:.4f}]")
+    for nm, gm, gn, _, _, w in res: print(f"   {nm:32s} {gm:.4f}  [{gn:.4f}]  w={np.round(w, 2).tolist()}")

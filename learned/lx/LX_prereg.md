@@ -319,29 +319,38 @@ first form gave groups without a rule no recency at all; first run: rules +0.213
 when 20 sat at its edge (20 was still chosen); idea 4 got a soft-referent variant after it failed. Bugs fixed before
 any result was read: NaN from groups never seen as targets (ideas 2, 3).
 
-| idea | gain over the stack, fold A | fold B | rules | verdict |
+Held-out word bits (absolute; lower is better). Fold A = scored text, 95 % paragraph-bootstrap interval of the
+change in brackets; fold B = dev. Language model on fold A: 6.026.
+
+| model | fold A | fold B | rules | verdict |
 |---|---|---|---|---|
-| 1 recency register (word reused in its book) | +0.268 [+0.249,+0.287] | +0.154 | 1 default + 16 exceptions; >= full | **PASS** |
-| 2 trigger words (3-100 back) | +0.103 [+0.093,+0.113] | +0.075 | 107,616; 79.5 % / 78 % of full | FAIL (rules bar, narrowly) |
-| 3 invented topics (K = 64 by MDL) | +0.122 [+0.113,+0.131] | +0.071 | 14,067 cells; 97 % / 94 % of full | **PASS** |
-| 4 entity slots (scratch memory) | +0.001 per pronoun over a pronoun cache | +0.005 | -- | FAIL |
-| 6 several timescales | +0.006 [+0.000,+0.012] | -0.001 | -- | FAIL |
-| 5 scene boundaries | surprise -0.004 vs random -0.003; paragraph -0.046 | +0.006 vs -0.002; -0.053 | -- | FAIL |
-| 7 scripts (ordered sentence -> sentence) | +0.010; ordered - symmetric +0.0002 | +0.014; +0.0005 | 28,545 | FAIL |
-| 8 engine picks registers | + group recency by distance +0.073 [+0.067,+0.078] | +0.048 | 7 x 636 lift table | **PASS** |
+| base: local count model + word-in-group | 8.9368 | 8.4599 | | |
+| base + 1 recency register | 8.6690 [change -0.287..-0.249] | 8.3059 | 1 default + 16 exceptions (full per-group r: 8.6794 / 8.3302) | **PASS** |
+| 1 + 2 triggers, rules | 8.5662 [-0.113..-0.093] | 8.2309 | 107,616 (full table: 8.5397 / 8.2098) | FAIL (rules bar) |
+| 1 + 3 topics, rules | 8.5470 [-0.131..-0.113] | 8.2345 | 14,067 cells (full: 8.5436 / 8.2300) | **PASS** |
+| 1 + 2 + 3 | 8.5372 | 8.2181 | | 2 adds < 0.02 over 3 |
+| 1 with 6 multi-timescale register | 8.6626 [-0.012..-0.000] | 8.3065 | | FAIL |
+| 1 with 6 best single decay (2,000 words) | 8.6573 | 8.3027 | | (not the registered test) |
+| 1 with 5 resets at paragraphs / surprise / random | 8.7145 / 8.6733 / 8.6722 | 8.3590 / 8.3001 / 8.3079 | | FAIL |
+| 1 + 3 + 7 scripts ordered / symmetric | 8.5366 / 8.5368 | 8.2206 / 8.2211 | 28,545 | FAIL |
+| 1 + 3 + 8 group recency by distance | **8.4745** [-0.078..-0.067] | **8.1864** | 7 x 636 lift table | **PASS** |
+
+Idea 4 (he/she choice only, bits per gendered-pronoun position; 1,264 positions fold A, 5,713 fold B):
+stack 0.6562 / 0.8830; pronoun cache 0.4710 / 0.7994; slots priors+in-book 0.6247 / 0.8443; cache + slots
+0.4701 / 0.7940 (soft variant 0.4698 / 0.8077). Referents never seen in training: stack 0.7541 / 0.8274, slots with
+priors only 0.7541 / 0.8274, slots with in-book updating 0.7552 / 0.7800 (soft 0.7143 / 0.7890). FAIL.
 Ideas 2 and 3 measure the same thing: on top of triggers, topics add +0.029 / +0.013; on top of topics, triggers add
 +0.010 / +0.016 (and idea 8's greedy search took triggers only on fold A, scoring +0.002 there). Topics do it with
 7.6 x fewer rules and pass the rules bar, so topics stay and triggers go.
-Idea 4 detail: in-book updating does settle names never seen in training (+0.04 bits per pronoun where training priors
-give 0) -- the scratch-memory mechanism works -- but a plain recency cache of the pronouns themselves gets the same
-bits (+0.185 / +0.084 per pronoun), and gendered pronouns are 2.5 % of predictions (ceiling ~0.01 bits/word).
+Idea 4 detail: in-book updating settles names never seen in training (soft: 0.7143 vs 0.7541 bits per pronoun on fold
+A) -- the scratch-memory mechanism works -- but a pronoun cache alone reaches the same level (0.4710), and gendered
+pronouns are 1,264 of 50,114 predictions.
 Idea 5/6 detail: forgetting hurts. The register is best book-long and undecayed; resetting at paragraphs costs 0.05.
 Idea 8 detail: the menu's best register was one not in 1-7: for each group, how long since one of its words appeared
 in this book (7 distance buckets). Position in sentence / paragraph never paid 0.005.
 
-**Integrated stack** (1 + 3 + 8's pick), lr_final_run.txt: word bits 8.9368 -> 8.4745 (+0.462 [+0.436,+0.489]) on
-fold A, 8.4599 -> 8.1864 (+0.274) on fold B; 15.9 % of the gap to the 0.4B language model closed (6.026; the true gap
-is larger, our unknown-word cost is understated). Speaking (group level): calibration error 0.0175 (bar 0.03 --
+**Integrated stack** (1 + 3 + 8's pick), lr_final_run.txt: word bits 8.4745 on fold A (base 8.9368, language model
+6.026; our unknown-word cost is understated), 8.1864 on fold B (base 8.4599). Speaking (group level): calibration error 0.0175 (bar 0.03 --
 PASS), but the long-range weights, fitted on other books, make it over-confident: top-3 statements stated 0.324,
 observed 0.272 (local model alone: 0.291 vs 0.255); asserts on 0.21 % of positions, right 0.79.
 
