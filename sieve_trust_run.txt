@@ -1,0 +1,11 @@
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+real: 176 components, 24 combinators (13 s)
+   MDL-best: [token(t-1) & mfp(t-1)] count MIX[(n/(n+T))] [mff(t-1)] count MIX0.9 [mff(t-2) & mfp(t-1)] recency (escape 0.1) -- training 6.4803 bits/token, description 42.9 bits
+   best without a trust term: [mff(t-1)] count MIX0.5 [token(t-1) & mfp(t-1)] count MIX0.9 [mff(t-2) & mfp(t-1)] recency (escape 0.1) -- training 6.5261 bits/token, description 31.5 bits
+real: MDL-best uses a trust term: True; components 3 (53 s)
+   held-out MDL-best: 6.7892 bits/token (SM best 6.8362, Witten-Bell 6.6939, same positions)
+   held-out best without a trust term: 6.8362 bits/token (SM best 6.8362, Witten-Bell 6.6939, same positions)
+determ: 176 components, 24 combinators (9 s)
+   MDL-best: [token(t-1) & token(t-2)] count (escape 0.01) -- training 0.0138 bits/token, description 10.3 bits
+   best without a trust term: [token(t-1) & token(t-2)] count (escape 0.01) -- training 0.0138 bits/token, description 10.3 bits
+determ: MDL-best uses a trust term: False; components 1 (34 s)

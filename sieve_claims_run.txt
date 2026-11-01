@@ -1,0 +1,24 @@
+Sieve (SN1-best program): held-out 6.7892 bits/token; top-3 contains the truth 0.340, stated 0.322
+   stated 0.0-0.1:  1735 claims, stated 0.060, observed 0.057, bound 0.039 -> standing
+   stated 0.1-0.2:   919 claims, stated 0.133, observed 0.157, bound 0.054 -> standing
+   stated 0.2-0.3:   265 claims, stated 0.240, observed 0.264, bound 0.100 -> standing
+   stated 0.3-0.4:    41 claims, stated 0.336, observed 0.390, bound 0.254 -> standing
+   stated 0.4-0.5:    27 claims, stated 0.433, observed 0.148, bound 0.313 -> standing
+   stated 0.5-0.6:     7 claims, stated 0.538, observed 0.714, bound 0.615 -> standing
+   stated 0.6-0.7:     3 claims, stated 0.621, observed 0.333, bound 0.940 -> standing
+   stated 0.7-0.8:     1 claims, stated 0.726, observed 0.000, bound 1.628 -> standing
+   stated 0.8-0.9:     1 claims, stated 0.802, observed 1.000, bound 1.628 -> standing
+   stated 0.9-1.0:     1 claims, stated 0.900, observed 0.000, bound 1.628 -> standing
+Sieve (SN1-best program): bins with >= 30 claims refuted: 0 (2 s)
+Witten-Bell trigram: held-out 6.6939 bits/token; top-3 contains the truth 0.364, stated 0.457
+   stated 0.0-0.1:  1255 claims, stated 0.064, observed 0.063, bound 0.046 -> standing
+   stated 0.1-0.2:  1097 claims, stated 0.141, observed 0.116, bound 0.049 -> standing
+   stated 0.2-0.3:   318 claims, stated 0.239, observed 0.182, bound 0.091 -> standing
+   stated 0.3-0.4:   154 claims, stated 0.350, observed 0.325, bound 0.131 -> standing
+   stated 0.4-0.5:    77 claims, stated 0.441, observed 0.325, bound 0.185 -> standing
+   stated 0.5-0.6:    66 claims, stated 0.530, observed 0.167, bound 0.200 -> REFUTED
+   stated 0.6-0.7:    23 claims, stated 0.633, observed 0.348, bound 0.339 -> standing
+   stated 0.7-0.8:     6 claims, stated 0.753, observed 0.500, bound 0.664 -> standing
+   stated 0.8-0.9:     3 claims, stated 0.866, observed 0.667, bound 0.940 -> standing
+   stated 0.9-1.0:     1 claims, stated 0.954, observed 1.000, bound 1.628 -> standing
+Witten-Bell trigram: bins with >= 30 claims refuted: 1 (2 s)

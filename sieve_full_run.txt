@@ -1,0 +1,9 @@
+full stream 13,852,837 tokens; vocabulary 94,503; scored positions 50,114 (1 s)
+   program: {'chain': [[[['id', 1], ['mfp', 1]], 50000, 0, None], [[['mff', 1]], 50000, 0, ['term', 14]], [[['mff', 2], ['mfp', 1]], 50000, 1, ['fixed', 0.9]]], 'escape': 0.1}
+component (('id', 1), ('mfp', 1)) count: matched 1.000 of positions (18 s)
+component (('mff', 1),) count: matched 1.000 of positions (24 s)
+component (('mff', 2), ('mfp', 1)) recency: matched 0.972 of positions (71 s)
+FULL SCALE, 50,114 positions: Sieve 8.7941 bits/word (Counter 8.9368, Stack 8.1507, LM 6.026 on these positions) (71 s)
+   first 1 component(s): 9.4995 bits/word
+   first 2 component(s): 8.9926 bits/word
+   first 3 component(s): 8.7941 bits/word

@@ -204,3 +204,46 @@ Reading: Sieve derives a context matcher -- word classes from its own counting -
 exact-word context, generalising better (6.8362 vs 6.8795 held-out); still behind Witten-Bell (6.6939), whose
 smoothing over all history Sieve's chains approximate only with fixed mixing weights. Still given: the atom grammar
 (equality, two derived attributes, offsets 1-2), normalisation, MDL.
+
+## SN -- adaptive trust, full scale, wider matchers, checked probabilities (registered 2026-11-01, before any SN run)
+**SN1 adaptive trust (sieve_trust.py).** SM's components (44 matchers x 4 terms, same 1,000 positions). New
+combinator mix(term): the weight on the earlier component is a TERM over that component's own evidence at the
+position -- n (matched positions), T (distinct followers) and 1, with + * / (size <= 5, values in [0,1] on every
+position, deduplicated by behaviour) -- beside orelse and the fixed 0.5/0.7/0.9. Program bits: log2 of the choices
+at each node. Bars: the MDL-best program uses a mix(term), and its held-out bits/token on SM's 1,000 positions is
+<= 6.7439 (Witten-Bell 6.6939 + 0.05; SM's best was 6.8362). Decoy: on the deterministic stream the MDL-best still
+needs no mixing.
+**SN2 full scale (sieve_full.py).** Sieve's SN1-best program, run unchanged on the full vocabulary (every training
+word + one unknown id, the ids Counter uses) with count terms over all 13M training tokens + the held-out prefix
+(recency terms keep the 50,000-token memory they were derived with), scored on the same 50,114 positions as Counter
+(8.9368), Stack (8.1507) and the LM (6.026). Descriptive; derived attributes recomputed by counting on the full text.
+**SN3 wider matchers (sieve_wide.py).** SM's grammar plus: offsets up to 3 (longer contexts); a bound "same book"
+(the book memory / copy register = token(t-1) within the book); and a LIBRARY source -- matches counted in the first
+2,000,000 tokens of the 400 extra books (the library lookup). Same 1,000 positions as SM. Bar: the MDL-best uses at
+least one of the new atoms or sources and has lower held-out bits/token than SN1's best on the same positions.
+**SN4 probabilities as checked claims (sieve_claims.py).** On the 1,000 held-out positions, the SN1-best program
+states its top 3 tokens with probabilities. Claims are grouped by stated probability (10 bins), aggregated first
+(core/tolerance: denoise, then one bound), and each bin's claim "these occur at the stated mean rate" is checked
+with a Hoeffding bound eps = sqrt(ln(2/0.01) / (2 n)) -- an upper bound, not an estimate. Verdict per bin: standing
+(within eps) or REFUTED. Bar: no bin with >= 30 claims is refuted; reported beside: the same for the local
+Witten-Bell trigram.
+
+## SN results (2026-11-01), absolute numbers
+Logs: sieve_trust_run.txt, sieve_full_run.txt, sieve_wide_run.txt, sieve_claims_run.txt.
+**SN1 adaptive trust -- the trust term is derived, the bits bar FAILS.** 20 trust terms valid in [0,1]. MDL-best:
+[token(t-1) & mfp(t-1)] count MIX[n/(n+T)] [mff(t-1)] count MIX0.9 [mff(t-2) & mfp(t-1)] recency, training 6.4803
+bits/token -- n/(n+T) is Witten-Bell's own weight (matched count over matched count + distinct followers), selected
+by compression from 20 candidates. Held-out (SM's 1,000 positions): 6.7892 (without a trust term 6.8362;
+Witten-Bell 6.6939; bar 6.7439 -- missed). Decoy (deterministic): one component, no mixing (0.0138). PASS.
+**SN2 full scale (descriptive).** The SN1 program, unchanged, on the full vocabulary (94,503 ids) and all 13.85M
+tokens, the 50,114 positions: Sieve 8.7941 bits/word (first component alone 9.4995, two 8.9926). Same positions:
+Counter 8.9368, Stack 8.1507, LM 6.026.
+**SN3 wider matchers -- PASS.** 183 matchers x 2 terms. MDL-best: [token(t-1) & mff(t-1), in the library] count
+MIX0.7 [mff(t-1) & mff(t-2)] count MIX0.7 [token(t-1) & token(t-2), in the library] count, training 6.1288; held-out
+6.1871 bits/token (best without the new sources 6.9103; SN1 6.7892; Witten-Bell without library 6.6939). The library
+source was selected; "same book" and offset-3 atoms were not. Latest/exists terms were dropped for time (disclosed).
+**SN4 checked probabilities -- PASS.** Sieve's top-3 claims on 1,000 held-out positions: no bin with >= 30 claims
+refuted (bins 0-0.1: stated 0.060 / observed 0.057; 0.1-0.2: 0.133 / 0.157; 0.2-0.3: 0.240 / 0.264; 0.3-0.4: 0.336
+/ 0.390); top-3 holds the truth 0.340 vs stated 0.322. Witten-Bell: 1 bin refuted (0.5-0.6: stated 0.530, observed
+0.167, 66 claims, bound 0.200); top-3 holds the truth 0.364 vs stated 0.457. Bins with few claims have wide bounds
+and test little.
