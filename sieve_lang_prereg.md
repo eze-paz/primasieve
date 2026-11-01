@@ -451,3 +451,7 @@ log loss. Bar: 0 refuted bins on the 50,114 positions.
 (6.711 vs 6.880) and Sieve ahead on content words (14.473 vs 15.220). Stack's edge there is its copy register; Sieve's
 full-scale grammar has no same-book source (the small-scale one had). Added to ST3's grammar: count components over
 the same book's earlier text (all 21 atom sets). Descriptive: selected or not; repeat-in-book mean bits reported.
+**ST4b (registered 2026-11-02, after ST4's diagnosis, before running).** ST4 showed the stated form distribution too
+flat (stated 0.445 -> observed 0.520; stated 0.072 -> 0.060), so shrinking toward the prior cannot fix it. Sharpening
+instead: Qc ~ Q^g normalised, g in {1, 1.1, 1.2, 1.3, 1.5, 1.75, 2}, chosen on the 9,000 fit positions by fewest
+refuted bins, then least form-claim loss. Bar: 0 refuted bins on the 50,114 positions.
