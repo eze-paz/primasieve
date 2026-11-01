@@ -322,3 +322,31 @@ come/go/came/went/get/got/looked.
 program); Counter 8.9368; Counter-style + library 8.7003. Small scale (1,000 positions, 2,000 words, bits/token): Sieve
 graded chain 6.1598; Sieve SP0 6.1638; Witten-Bell (no library) 6.6939. Reliability (SN4): Sieve 0 of 4 well-filled
 calibration bins refuted, Witten-Bell 1 of 6.
+
+## SQ -- second pass of SIEVE_LANGUAGE_PLAN.md (registered 2026-11-01, before any SQ run)
+**SQ2 search at full scale, redo.** As SP2, but the 3,000 fit positions are spread evenly over all 7 dev books
+(every k-th sentence-internal position of the 231k dev tokens; history = all training text + the dev text before the
+position). Bar: the selected program on the 50,114 positions < 8.7812 bits/word.
+**SQ3 graded matching widened (items 3 + 7).** SP3's graded component with offsets 1-5 (weights {0,1,2} at offsets
+1-3, {0,1} at 4-5), top 1,000, and agreement attribute in {identity, most frequent follower, form (SP7's 400 MDL forms),
+identity+form (agreement per offset = same token + same form)}. Offered beside SP3's components; MDL picks. Bar: MDL
+selects a graded component that uses offset 4/5 or forms, and held-out < 6.1598 bits/token (SP3, same positions).
+**SQ4 mixture of experts.** Cached components as experts: P(y) = sum_c w_c p'_c(y) over the experts that match at the
+position (+ uniform), weights renormalised over those present; variant: weights per trust bin (log2 of the expert's
+matched count, 4 bins). Experts added greedily while training bits saved exceed the expert's program bits + 8 bits per
+weight; weights by EM. Bar: held-out < the best chain of SP3/SQ3 on the same positions.
+**SQ9 long-range concepts emerge from residuals (E5).** Fit: the best small-scale program's per-position bits on the
+1,000 fit positions. Residuals = the quarter of positions with the most bits. For each generic relation "attr(y)
+occurred among the past W tokens" (attr in identity, mff, form; W in 50, 1,000, same book) the fraction of residual
+answers for which it holds vs the same fraction for a stand-in answer drawn from the unigram distribution (chance).
+The relation with the largest absolute excess is proposed as a primitive and instantiated generically as an
+attribute-factored component P(y) = P_window(attr(y)) x P(y | attr(y)) (window term count or recency over the past W;
+P(y | attr) by counts); all (attr, W, term) instances are offered to the MDL search beside SP3's components.
+Decoy: the same with sentences shuffled across all books (no long-range structure); positive control: sentences
+shuffled within each book (topic survives, order does not). Bars: (1) the top residual relation is long-range (W >=
+1,000) on real text; (2) MDL selects a long-range factored component (form-level = topic-like); (3) on the decoy the
+excess is <= 0.02 and no long-range factored component is selected; (4) held-out < the best chain so far, and at full
+scale, SN5's program plus the selected component(s) < 8.7812 bits/word on the 50,114 positions (Stack 8.1507).
+**SQ5 more text.** C:\ has 28 GB free; all of Gutenberg (tens of GB) is not downloaded. Instead the data curve is
+measured on fractions of the library (Counter-style, lr_base.py --addlib with the first 1/4 and 1/2 of the library
+books) and extrapolated to Gutenberg's ~4 billion tokens. Descriptive.
