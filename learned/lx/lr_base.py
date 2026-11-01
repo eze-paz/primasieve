@@ -26,6 +26,8 @@ tr, trs = z["tr"].astype(np.int64), z["trs"]
 import sys
 FRAC = float(sys.argv[sys.argv.index("--frac") + 1]) if "--frac" in sys.argv else 1.0                 # C3 data curve: first FRAC of the training books
 if FRAC < 1: keep = d["trb"] < int(round(FRAC * (d["trb"].max() + 1))); tr, trs = tr[keep], trs[keep]
+if "--addlib" in sys.argv:                                                                        # SP1: the 400 library books as extra training text (print only)
+    X = np.load(os.path.join(HERE, "lx_library.npz")); tr = np.r_[tr, X["lib"].astype(np.int64)]; trs = np.r_[trs, X["libs"].astype(np.int64) + int(trs.max()) + 1]
 mtr, Ctr = contexts(tr, trs); ytr = gid[tr][mtr]
 P0 = np.bincount(ytr, minlength=NG) + 0.5; P0 = P0 / P0.sum()
 stats = []
@@ -78,6 +80,6 @@ mdv0 = np.r_[False, dvs[1:] == dvs[:-1]]; cut = np.searchsorted(np.cumsum(mdv0),
 mdv, ydv, PLdv, pwdv, ppdv = build(dv, dvs)
 for nm, y, PL, pw in (("scored", yte, PLte, pwte), ("dev", ydv, PLdv, pwdv)):
     bg = -np.log2(PL[np.arange(len(y)), gid[y]]); print(f"{nm}: {len(y):,} predictions; local group bits {bg.mean():.4f}, word-in-group bits {(-np.log2(pw)).mean():.4f}, word bits {(bg - np.log2(pw)).mean():.4f}")
-if FRAC == 1 and not CLS: np.savez(os.path.join(HERE, "lr_base.npz"), gid=gid, P0=P0, Pu=Pu, mte=mte, yte=yte, PLte=PLte, pwte=pwte, ppte=ppte,
+if FRAC == 1 and not CLS and "--addlib" not in sys.argv: np.savez(os.path.join(HERE, "lr_base.npz"), gid=gid, P0=P0, Pu=Pu, mte=mte, yte=yte, PLte=PLte, pwte=pwte, ppte=ppte,
          mdv=mdv, ydv=ydv, PLdv=PLdv, pwdv=pwdv, ppdv=ppdv, dvcut=cut, PR=np.array(PR))
 print(f"done ({time.time() - t0:.0f} s)")

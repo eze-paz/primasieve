@@ -263,3 +263,62 @@ component 9.5575, two 8.9464). Beside: SN2 8.7941, Counter 8.9368, Stack 8.1507,
 Reading: the library, decisive at 300k tokens (6.1871 vs 6.7892), adds little once the training text is 13.85M
 tokens; and this program has no recency component (SN2's had one) and fixed 0.7 mixing. Programs selected at 300k
 tokens with 2,000 words are not the programs full scale wants: the search itself has to run at full scale.
+
+## SP -- SIEVE_LANGUAGE_PLAN.md items (registered 2026-11-01, before any SP run)
+**SP0 harness fixes.** Matchers deduplicated by behaviour (simplest kept), program bits per atom, deterministic tie
+order. Bar: sieve_wide.py gives the identical program under two different PYTHONHASHSEED values, held-out <= 6.1971.
+**SP1 ceiling (descriptive).** (a) Counter-style local model (lr_base.py) trained on the 13.85M training tokens +
+the 18.6M library tokens: word bits on the 50,114 positions beside 9.0919 (half) and 8.9368 (all training).
+(b) LM vs Stack per position, split by the longest library match of the sentence's last 2-6 words (lr_think_lib):
+mean bits each.
+**SP2 search at full scale.** Fit positions: the first 3,000 sentence-internal positions of the dev books, history =
+all training text + the dev prefix (+ the whole library for library matchers); count terms over all history, recency
+over the 50,000-token memory for the two simplest matchers; trust combinators; MDL beam. The selected program is run
+on the 50,114 positions. Bar: < 8.7812 bits/word.
+**SP3 graded matching (+ SP6 entity atom).** Small scale (SM's 1,000 positions). A graded component: every past
+position j in memory scored by agreement of the last 4 tokens with t's, attr in {identity, mff, mfp} per offset,
+weights per offset from {0, 1, 2}, follower weight = 2^(agreement) among the top-K agreeing positions (K in 10, 100,
+1000); the grid is the grammar, MDL picks. SP6 adds an atom: "the most recent capitalised mid-sentence word (an
+entity, <= 30 tokens back) is the same". Both offered beside SP0's components. Bar SP3: MDL selects a graded
+component and held-out < the same search without it. SP6: descriptive (selected or not; bits).
+**SP4 many cues, log-linear.** The 30 best single components (by MDL) as features of a log-linear model
+P(y) ~ prod p_c(y)^beta_c (smoothed), features added greedily while training bits saved exceed 8 bits per weight.
+Bar: held-out < SP3's best on the same positions.
+**SP5 all of Gutenberg** needs a large download -- asked of the owner, not run.
+**SP7 forms.** Words (2,000 most frequent) described by left/right neighbour distributions; agglomerative
+average-linkage merging gives a hierarchy; the number of forms is chosen by MDL (class-bigram bits of a fit stream +
+k^2 x 8 bits). Outside checks (no labels used to build): nouns in the same form share a WordNet lexicographer file
+(noun.person, noun.animal, ...) more often than nouns in different forms, and more than with forms built from
+shuffled text; rarer words (5-20 uses, not in the 2,000) placed in the form of their nearest centroid share the
+form's majority lexicographer file more often than under shuffled forms. Bar: both checks above the shuffled control.
+**SP8 scoreboard**: absolute bits and reliability (calibration bins, confabulation) for every model.
+
+## SP results (2026-11-01), absolute numbers
+Logs: sieve_sp0_run.txt, sieve_sp1_run.txt, sieve_sp2_run.txt, sieve_sp3_run.txt, sieve_sp4_run.txt, sieve_sp7_run.txt.
+**SP0 -- PASS.** 24 of 183 matchers were behavioural duplicates. Under PYTHONHASHSEED 1 and 2 the identical program:
+[token(t-1), in the library] count MIX0.7 [any position] recency MIX0.7 [token(t-1) & token(t-2), in the library]
+count; held-out 6.1638 bits/token (bar 6.1971).
+**SP1 (descriptive).** (a) Local model word bits on the 50,114 positions: half the training books 9.0919; all
+(13.85M tokens) 8.9368; all + library (32.5M tokens) 8.7003. (b) By the longest library match of the sentence's
+last words, Stack + lookup / LM mean bits: none 8.484 / 6.167 (10,800 positions); 2 words 8.376 / 5.981; 3 words
+8.274 / 6.010; 4 words 8.296 / 5.945; 5 words 8.411 / 6.006; 6 words 8.063 / 5.871 -- the LM's lead is the same
+whatever the library holds: it is not missing text.
+**SP2 -- FAIL.** Search at full scale (44 components, 36 distinct; fit = first 3,000 dev positions): MDL-best
+token(t-1) & token(t-2) count MIX0.9 [mff(t-1), in the library] count MIX0.9 token(t-1) count, fit 6.5543
+bits/word; on the 50,114 positions 9.0344 (SN5 8.7812). The fit sample (the start of the dev books) was too narrow
+and the selected program has no recency.
+**SP3 -- PASS (narrowly).** MDL selected a graded component ([graded identity, offset weights 2,2,1, top 1,000]) in
+place of the recency one: held-out 6.1598 vs the same search without graded/entity components 6.1638 bits/token.
+**SP6 (descriptive).** The entity atom was offered and not selected.
+**SP4 -- FAIL.** Log-linear over 7 greedily selected features (graded + 6 count components): fit 6.1487, held-out
+6.2647 bits/token (SP3's chain 6.1598).
+**SP5 -- not run** (needs a large download; asked of the owner).
+**SP7 -- PASS.** MDL chose 400 forms on real text (14.621 MB; 25 forms on shuffled text). Nouns sharing a WordNet
+lexicographer file: within a form 0.327, across forms 0.068 (shuffled: 0.078 / 0.069). Rarer nouns (5-20 uses)
+placed by nearest form: majority lexicographer file right 0.271 (shuffled 0.153). Forms include man/men/people/woman
+/father/mother/lady/friend/king; power/interest/change/number/strength/force/desire; the/a/his/her/my/this/their;
+come/go/came/went/get/got/looked.
+**SP8 scoreboard (the 50,114 positions, bits/word):** LM 6.026; Stack 8.1507; Sieve 8.7812 (SN5, small-scale-selected
+program); Counter 8.9368; Counter-style + library 8.7003. Small scale (1,000 positions, 2,000 words, bits/token): Sieve
+graded chain 6.1598; Sieve SP0 6.1638; Witten-Bell (no library) 6.6939. Reliability (SN4): Sieve 0 of 4 well-filled
+calibration bins refuted, Witten-Bell 1 of 6.

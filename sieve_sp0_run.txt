@@ -1,0 +1,12 @@
+[seed 1] 183 matchers (24 duplicates by behaviour dropped) x 2 terms = 318 components (59 s)
+[seed 1]    MDL-best: [token(t-1), in the library] count MIX0.7 [any position] recency MIX0.7 [token(t-1) & token(t-2), in the library] count (escape 0.02) -- training 6.1264 bits/token, description 30.7 bits
+[seed 1]    best without the new atoms/sources: [mff(t-1)] count MIX0.5 [token(t-1)] count (escape 0.1) -- training 6.6045 bits/token, description 20.3 bits
+[seed 1] MDL-best uses new atoms/sources: ['token(t-1), in the library', 'token(t-1) & token(t-2), in the library'] (117 s)
+[seed 1]    held-out MDL-best: 6.1638 bits/token (SN1 6.7892, Witten-Bell 6.6939)
+[seed 1]    held-out best without the new atoms/sources: 6.9103 bits/token (SN1 6.7892, Witten-Bell 6.6939)
+[seed 2] 183 matchers (24 duplicates by behaviour dropped) x 2 terms = 318 components (59 s)
+[seed 2]    MDL-best: [token(t-1), in the library] count MIX0.7 [any position] recency MIX0.7 [token(t-1) & token(t-2), in the library] count (escape 0.02) -- training 6.1264 bits/token, description 30.7 bits
+[seed 2]    best without the new atoms/sources: [mff(t-1)] count MIX0.5 [token(t-1)] count (escape 0.1) -- training 6.6045 bits/token, description 20.3 bits
+[seed 2] MDL-best uses new atoms/sources: ['token(t-1), in the library', 'token(t-1) & token(t-2), in the library'] (129 s)
+[seed 2]    held-out MDL-best: 6.1638 bits/token (SN1 6.7892, Witten-Bell 6.6939)
+[seed 2]    held-out best without the new atoms/sources: 6.9103 bits/token (SN1 6.7892, Witten-Bell 6.6939)

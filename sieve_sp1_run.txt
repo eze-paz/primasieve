@@ -1,0 +1,10 @@
+training contexts counted (6 s)
+scored: 50,114 predictions; local group bits 6.7846, word-in-group bits 1.9158, word bits 8.7003
+dev: 99,999 predictions; local group bits 6.5791, word-in-group bits 1.7011, word bits 8.2802
+SP1b: mean bits by the longest library match of the sentence's last words (0 = none, >= 2 matches needed)
+   match 0: 10,800 positions; Stack (no lookup) 8.488; Stack + lookup 8.484; LM 6.167; total bits Stack+lookup 91,625 vs LM 66,607
+   match 2: 20,114 positions; Stack (no lookup) 8.500; Stack + lookup 8.376; LM 5.981; total bits Stack+lookup 168,465 vs LM 120,298
+   match 3: 13,958 positions; Stack (no lookup) 8.423; Stack + lookup 8.274; LM 6.010; total bits Stack+lookup 115,488 vs LM 83,887
+   match 4:  4,312 positions; Stack (no lookup) 8.459; Stack + lookup 8.296; LM 5.945; total bits Stack+lookup 35,774 vs LM 25,635
+   match 5:    779 positions; Stack (no lookup) 8.666; Stack + lookup 8.411; LM 6.006; total bits Stack+lookup 6,552 vs LM 4,679
+   match 6:    151 positions; Stack (no lookup) 8.292; Stack + lookup 8.063; LM 5.871; total bits Stack+lookup 1,217 vs LM 887

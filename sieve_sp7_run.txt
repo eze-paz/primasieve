@@ -1,0 +1,28 @@
+   real text: k=25: description 14.927 MB
+   real text: k=50: description 14.798 MB
+   real text: k=100: description 14.707 MB
+   real text: k=200: description 14.639 MB
+   real text: k=400: description 14.621 MB
+   real text: k=800: description 14.883 MB
+   real text: k=1600: description 16.526 MB
+real text: MDL chose 400 forms (18 s)
+   real text: 387 nouns; same lexicographer file: within a form 0.327, across forms 0.068
+   real text: 2119 rarer nouns placed by nearest centroid: form's majority lexicographer file right 0.271
+   form (93 words): way, life, place, things, love, thing, mind, world, heart, work, voice, name
+   form (81 words): do, know, see, say, think, make, take, tell, let, give, find, believe
+   form (65 words): come, go, came, went, get, got, looked, put, going, turned, looking, brought
+   form (62 words): power, interest, change, number, effect, pleasure, strength, distance, force, desire, attention, fortune
+   form (52 words): the, a, his, her, my, this, no, their, your, some, any, our
+   form (50 words): man, men, people, woman, father, mother, lady, friend, girl, wife, king, women
+   form (48 words): and, of, in, with, for, at, but, on, by, which, there, or
+   form (47 words): was, had, is, not, be, have, were, are, been, then, now, has
+   shuffled text: k=25: description 15.329 MB
+   shuffled text: k=50: description 15.331 MB
+   shuffled text: k=100: description 15.338 MB
+   shuffled text: k=200: description 15.369 MB
+   shuffled text: k=400: description 15.492 MB
+   shuffled text: k=800: description 15.989 MB
+   shuffled text: k=1600: description 17.938 MB
+shuffled text: MDL chose 25 forms (45 s)
+   shuffled text: 387 nouns; same lexicographer file: within a form 0.078, across forms 0.069
+   shuffled text: 1572 rarer nouns placed by nearest centroid: form's majority lexicographer file right 0.153

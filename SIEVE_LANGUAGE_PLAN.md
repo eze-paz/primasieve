@@ -52,3 +52,11 @@ slots, e.g. "the X of the Y").
 ## 8. Second scoreboard: reliability
 Beside bits: calibration of Sieve's stated probabilities (Hoeffding-checked bins; Sieve 0 refuted, Witten-Bell 1),
 abstention vs confabulation on committed answers. A deterministic AI may win on reliability at equal bits.
+
+## Status after the first pass (2026-11-01; numbers in sieve_lang_prereg.md "SP results")
+0 done (deterministic, deduplicated). 1 done: more text helps (8.7003 with the library) but the LM's lead does not
+depend on what the library holds. 2 failed (narrow fit sample) -- redo with fit positions spread over all dev books.
+3 passed narrowly (graded component selected, 6.1598 vs 6.1638) -- widen: longer contexts, form-level agreement.
+4 failed (log-linear 6.2647) -- revisit with mixture-of-experts instead of products. 5 waiting for the owner's OK to
+download. 6 entity atom not selected. 7 passed: 400 forms by MDL that agree with WordNet (0.327 vs 0.068 across) --
+next: forms as matcher atoms and as graded-agreement attributes (item 3).

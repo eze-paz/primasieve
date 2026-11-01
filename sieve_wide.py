@@ -16,8 +16,8 @@ def ins(tok, sid, extra=None):
     b = np.nonzero(sid[1:] != sid[:-1])[0] + 1; t = np.insert(tok, b, 0)
     return t if extra is None else (t, np.insert(extra, b, extra[np.maximum(b - 1, 0)]))
 def vmap(t): t = t.astype(np.int64); return np.where(t <= SC.TOPV, t, SC.TOPV + 1)
-s, sbook = ins(vmap(Z["tr"][:SC.NTR]), Z["trs"][:SC.NTR], D["trb"][:SC.NTR].astype(np.int64))
-held, hbook = ins(vmap(Z["te"][:60_000]), Z["tes"][:60_000], D["teb"][:60_000].astype(np.int64) + 100_000)
+s, sbook = ins(vmap(Z["tr"][:SC.NTR]), Z["trs"][:SC.NTR], D["trb"][:SC.NTR].astype(np.int64)); _, scap = ins(vmap(Z["tr"][:SC.NTR]), Z["trs"][:SC.NTR], D["trc"][:SC.NTR].astype(np.int64))
+held, hbook = ins(vmap(Z["te"][:60_000]), Z["tes"][:60_000], D["teb"][:60_000].astype(np.int64) + 100_000); _, hcap = ins(vmap(Z["te"][:60_000]), Z["tes"][:60_000], D["tec"][:60_000].astype(np.int64))
 lib = ins(vmap(X["lib"][:2_000_000]), X["libs"][:2_000_000])
 Vt = SC.TOPV + 2
 def build(s, book, T, m, AT):
@@ -45,29 +45,33 @@ def build(s, book, T, m, AT):
 def mname(m):
     st, B = m; a = " & ".join(f"{'token' if at == 'id' else at}(t-{o})" for at, o in st) or "any position"
     return a + {SC.H: "", 1000: ", within 1000", "book": ", same book", "library": ", in the library"}[B]
-rng = np.random.default_rng(1); T = np.sort(rng.choice(np.arange(len(s) // 2, len(s)), NSC, replace=False)); AT = SMM.attrs(s, Vt)
-COMP, NE, PP, NN, TT = [], [], [], [], []
-for m in MATCHERS:
-    ne, P, N, TD = build(s, sbook, T, m, AT)
-    for ti in range(2): COMP.append((m, ti)); NE.append(ne); PP.append(P[ti]); NN.append(N); TT.append(TD)
-NE, PP, NN, TT = map(np.array, (NE, PP, NN, TT)); log(f"{len(MATCHERS)} matchers x 2 terms = {len(COMP)} components")
-DLc = lambda c: math.log2(len(SETS)) + math.log2(len(BOUNDS)) + 1
-progs = ST.search(NE, PP, NN, TT, Vt, DLc, len(COMP)); rank = sorted(progs, key=lambda q: progs[q][0])
-desc = lambda c: f"[{mname(COMP[c][0])}] {TERMS[COMP[c][1]]}"
-pd = lambda q: desc(q[0][0]) + "".join(ST.cbname(cb) + desc(c) for c, cb in q[1:]) + f" (escape {progs[q][2]})"
-new = lambda c: COMP[c][0][1] in ("book", "library") or any(o == 3 for _, o in COMP[c][0][0])
-best = rank[0]; bo = next(q for q in rank if not any(new(c) for c, _ in q))
-for nm, q in (("MDL-best", best), ("best without the new atoms/sources", bo)):
-    sc, b, e = progs[q]; print(f"   {nm}: {pd(q)} -- training {b / NSC:.4f} bits/token, description {sc - b:.1f} bits")
-log(f"MDL-best uses new atoms/sources: {[mname(COMP[c][0]) for c, _ in best if new(c)]}")
-import json; json.dump(dict(chain=[[list(COMP[c][0][0]), COMP[c][0][1], ["count", "recency"][COMP[c][1]], cb] for c, cb in best], escape=progs[best][2]),
-                       open(os.path.join(SC.HERE, "sieve_wide_best.json"), "w"))                         # for SN5 (sieve_full.py --prog)
-full = np.r_[s, held]; fbook = np.r_[sbook, hbook]; Th = np.arange(len(s) + 2, len(s) + 2 + NSC)
-for nm, q in (("MDL-best", best), ("best without the new atoms/sources", bo)):
-    n = len(COMP); NEh = np.zeros((n, NSC), bool); PPh = np.zeros((n, NSC)); NNh = np.zeros((n, NSC)); TTh = np.zeros((n, NSC)); done = {}
-    for c, _ in q:
-        m, ti = COMP[c]
-        if m not in done: done[m] = build(full, fbook, Th, m, AT)
-        NEh[c], PPh[c], NNh[c], TTh[c] = done[m][0], done[m][1][ti], done[m][2], done[m][3]
-    mm, p = ST.run(list(q), NEh, PPh, NNh, TTh); e = progs[q][2]
-    print(f"   held-out {nm}: {(-np.log2(np.where(mm, (1 - e) * p + e / Vt, 1 / Vt))).mean():.4f} bits/token (SN1 6.7892, Witten-Bell 6.6939)")
+if __name__ == "__main__":
+    rng = np.random.default_rng(1); T = np.sort(rng.choice(np.arange(len(s) // 2, len(s)), NSC, replace=False)); AT = SMM.attrs(s, Vt)
+    COMP, NE, PP, NN, TT = [], [], [], [], []; seen = set(); dup = 0
+    for m in MATCHERS:                                                                                  # SETS are ordered by size: the first of a behaviour is the simplest
+        ne, P, N, TD = build(s, sbook, T, m, AT)
+        sig = (ne.tobytes(), np.round(P, 12).tobytes(), N.tobytes())
+        if sig in seen: dup += 1; continue                                                              # SP0: matchers deduplicated by behaviour
+        seen.add(sig)
+        for ti in range(2): COMP.append((m, ti)); NE.append(ne); PP.append(P[ti]); NN.append(N); TT.append(TD)
+    NE, PP, NN, TT = map(np.array, (NE, PP, NN, TT)); log(f"{len(MATCHERS)} matchers ({dup} duplicates by behaviour dropped) x 2 terms = {len(COMP)} components")
+    DLc = lambda c: 1 + len(COMP[c][0][0]) * math.log2(len(ATOMS)) + math.log2(len(BOUNDS)) + 1   # SP0: bits per atom
+    progs = ST.search(NE, PP, NN, TT, Vt, DLc, len(COMP)); rank = sorted(progs, key=lambda q: progs[q][0])
+    desc = lambda c: f"[{mname(COMP[c][0])}] {TERMS[COMP[c][1]]}"
+    pd = lambda q: desc(q[0][0]) + "".join(ST.cbname(cb) + desc(c) for c, cb in q[1:]) + f" (escape {progs[q][2]})"
+    new = lambda c: COMP[c][0][1] in ("book", "library") or any(o == 3 for _, o in COMP[c][0][0])
+    best = rank[0]; bo = next(q for q in rank if not any(new(c) for c, _ in q))
+    for nm, q in (("MDL-best", best), ("best without the new atoms/sources", bo)):
+        sc, b, e = progs[q]; print(f"   {nm}: {pd(q)} -- training {b / NSC:.4f} bits/token, description {sc - b:.1f} bits")
+    log(f"MDL-best uses new atoms/sources: {[mname(COMP[c][0]) for c, _ in best if new(c)]}")
+    import json; json.dump(dict(chain=[[list(COMP[c][0][0]), COMP[c][0][1], ["count", "recency"][COMP[c][1]], cb] for c, cb in best], escape=progs[best][2]),
+                           open(os.path.join(SC.HERE, "sieve_wide_best.json" if "--sp0" not in sys.argv else "sieve_wide_best_sp0.json"), "w"))                         # for SN5 (sieve_full.py --prog)
+    full = np.r_[s, held]; fbook = np.r_[sbook, hbook]; Th = np.arange(len(s) + 2, len(s) + 2 + NSC)
+    for nm, q in (("MDL-best", best), ("best without the new atoms/sources", bo)):
+        n = len(COMP); NEh = np.zeros((n, NSC), bool); PPh = np.zeros((n, NSC)); NNh = np.zeros((n, NSC)); TTh = np.zeros((n, NSC)); done = {}
+        for c, _ in q:
+            m, ti = COMP[c]
+            if m not in done: done[m] = build(full, fbook, Th, m, AT)
+            NEh[c], PPh[c], NNh[c], TTh[c] = done[m][0], done[m][1][ti], done[m][2], done[m][3]
+        mm, p = ST.run(list(q), NEh, PPh, NNh, TTh); e = progs[q][2]
+        print(f"   held-out {nm}: {(-np.log2(np.where(mm, (1 - e) * p + e / Vt, 1 / Vt))).mean():.4f} bits/token (SN1 6.7892, Witten-Bell 6.6939)")

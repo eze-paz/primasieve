@@ -51,7 +51,8 @@ def search(NE, PP, NN, TT, Vt, DLc, ncomp):
     progs = {}
     for c in range(ncomp):
         if NE[c].any(): progs[((c, None),)] = score([(c, None)], NE, PP, NN, TT, Vt, DLc)
-    beam = sorted(progs, key=lambda q: progs[q][0])[:SC.BEAM]
+    order = lambda q: (round(progs[q][0], 9), repr(q))                                 # SP0: deterministic tie order
+    beam = sorted(progs, key=order)[:SC.BEAM]
     for _ in range(2):
         new = []
         for ch in beam:
@@ -60,7 +61,7 @@ def search(NE, PP, NN, TT, Vt, DLc, ncomp):
                 for cb in COMBS:
                     q = ch + ((c, cb),)
                     if q not in progs: progs[q] = score(list(q), NE, PP, NN, TT, Vt, DLc); new.append(q)
-        beam = sorted(set(beam) | set(new), key=lambda q: progs[q][0])[:SC.BEAM]
+        beam = sorted(set(beam) | set(new), key=order)[:SC.BEAM]
     return progs
 def cbname(cb): return " ORELSE " if cb[0] == "orelse" else f" MIX{cb[1]} " if cb[0] == "fixed" else f" MIX[{LT[cb[1]][0]}] "
 def components(s, T, AT, Vt):
