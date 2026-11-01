@@ -455,3 +455,7 @@ the same book's earlier text (all 21 atom sets). Descriptive: selected or not; r
 flat (stated 0.445 -> observed 0.520; stated 0.072 -> 0.060), so shrinking toward the prior cannot fix it. Sharpening
 instead: Qc ~ Q^g normalised, g in {1, 1.1, 1.2, 1.3, 1.5, 1.75, 2}, chosen on the 9,000 fit positions by fewest
 refuted bins, then least form-claim loss. Bar: 0 refuted bins on the 50,114 positions.
+**ST4c (registered 2026-11-02, after ST4b, before running).** ST4b (g = 1.1) left 3 refuted bins, all at stated
+0.0-0.3 (overstated by 0.010-0.016). Generic fix: histogram binning -- each claim's stated probability is replaced by
+the observed rate of its stated-probability bin (10 bins, after g = 1.1) on the 9,000 fit positions; applied unchanged
+to the 50,114 positions, rebinned by the new stated values. Bar: 0 refuted bins.
