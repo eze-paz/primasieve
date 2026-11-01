@@ -94,3 +94,84 @@ attestation is sound only where it is uninformative (pairs: 0.0128 confabulation
 n-gram channel is informative but unsound (absence of a phrase is not evidence it is wrong), and confabulation jumps
 to 0.3790-0.5589. Language gives Sieve positive evidence only; a sound rejection channel for language is the open
 problem.
+
+## SC -- does Sieve derive counting? (registered 2026-11-01, before any SC run)
+Owner's question: Sieve should derive counting (and probabilities) as a method from its ability to learn; if it does
+not, the engine is not emergent enough and we must find why, with engine changes as domain-agnostic as possible.
+**Environment.** A token stream (words mapped to the 2,000 most frequent + one unknown id, a boundary token between
+sentences). Task at each scored position t: the next token. History = the previous 50,000 tokens (a fixed memory
+bound of the environment, not tuned). Training stream = first 300,000 training-book tokens, 3,000 scored positions
+sampled from its second half; held-out = 3,000 positions of the scored held-out text, history continuing from the
+training stream.
+**What Sieve is given (generic, typed primitives; no count model):** a context matcher (positions j < t whose k
+previous tokens equal t's, k in {0,1,2} -- equality + position lookup), the follower map j -> token[j], the distance
+d = t - j, a weight-term grammar over {1, d} with + * / (terms of size <= 5, deduplicated by normalised behaviour
+with core.generate.SignatureBank), aggregators over the matched followers -- last, first, set (uniform over distinct
+followers), group-sum of a weight term per distinct follower (normalised), argmax of that group-sum -- combinators
+orelse (next component only if the previous matched nothing) and mix(lambda in {.5,.7,.9}), and an escape to the
+uniform token (rate from {.5,.3,.2,.1,.05,.02,.01}). Counting = group-sum with weight term 1; it is one composition
+among recency-weighted sums (1/d, 1/(1+d), ...), sets, last/first occurrence and their argmaxes. Nothing ranks it.
+**Selection (agnostic, Sieve's COMPRESS):** minimum description length -- bits to encode the scored training tokens
+under the program (-log2 P(token)) + the program's own bits (log2 of the choices at each node). Search: chains of up
+to 3 components, beam 30, simplest first.
+**Sanity control first (core.gates rule 1):** a stream from a random 2nd-order Markov chain (200 tokens, each context
+with a random Dirichlet(0.3) follower distribution) -- the MDL-best program must use group-sum with weight 1 at
+k = 2. If this fails, the harness is broken and nothing else is read.
+**Bars on real text.** SC1 counting derived: the MDL-best program's weighted components use weight term 1, and on
+held-out text it beats the best program without any count component (absolute bits/word both reported). SC2 context:
+the MDL-best program uses k >= 1. SC3 decoy, shuffled real text: the MDL-best program uses no k >= 1 component. SC4
+decoy, deterministic generator (next token a fixed function of the previous two, 200 tokens): the MDL-best program
+uses no group-sum/argmax component (a simpler exact one suffices). SC5 COMPRESS: the plurality fragment across the
+top 20 programs (core.generate.compress_recurring) is a weight-1 group-sum. Reference: Witten-Bell trigram on the same
+streams (absolute bits/word).
+If SC1 fails, the next step is a diagnosis of which engine limit blocked it, and any engine change must be
+domain-agnostic.
+
+## SC6 -- counting without a group-sum primitive (registered 2026-11-01, after SC1-SC5, before SC6 runs)
+SC1-SC5 gave Sieve "group-sum of a weight term per distinct follower" as one aggregator node, so counting was one
+constant away. SC6 removes that: a candidate's score is a TERM over the matched list M (pairs follower, distance) and
+the candidate y, built from generic nodes -- lists M and filter(M, follower == y); numbers 1, len(L), sum(L, w) for a
+weight term w of the SC grammar, exists(L), [latest follower == y], [earliest follower == y]; and + * / between
+numbers; at most 5 nodes, deduplicated by behaviour (SignatureBank). Scores are normalised over all tokens (absent
+tokens take the term's value on an empty filter) -- the coding step of the channel, not a learned method. Program
+bits = log2 of the choices at each node. Same chains, combinators, escape, beam, 1,000 scored positions.
+Counting = len(filter(M, follower == y)) (3 nodes), one term among add-one counts, recency sums, set membership,
+last/first occurrence, ratios.
+Bars: SC6a sanity (Markov stream): the MDL-best k = 2 component's term behaves as counting. SC6b real text: the
+MDL-best program's k >= 1 components behave as counting (or a count-equivalent behaviour); held-out bits/token
+reported beside SC's 6.5839 and Witten-Bell's 6.5137.
+
+## SC results (2026-11-01), absolute numbers
+Logs: sieve_count_run.txt (SC1-SC5), sieve_count2_run.txt (SC6).
+Harness fixes, disclosed (each before the affected result was read): the generators first used 200 token types --
+40,000 contexts against a 50,000-token memory, so the sanity control learned nothing (7.6228 bits/token vs uniform
+7.64); changed to 20. Program bits first charged every weight term a flat log2(15) bits; changed to the registered
+"log2 of the choices at each node", which makes "1" cheaper than "d/(1+d)" (they tied in data bits). The
+deterministic decoy first restarted every 20 tokens (restart positions are random) and then was scored on rule-only
+positions (block ends still jump to the boundary token); the final decoy is one uninterrupted run of the rule.
+**SC (group-sum given as one aggregator):**
+- Sanity (Markov, 20 types): MDL-best "k=2 group-sum[1]" -- counting -- 3.0554 bits/token, 8.7 program bits; k=2
+  set 3.7576, k=2 last 4.5971, k=0 count 4.3195. COMPRESS: "k=2 sum[1]" in 20 of the top 20. PASS.
+- SC1 real text -- FAIL as registered. MDL-best: k=0 group-sum[1/(1+d)] MIX0.5 k=1 group-sum[1] MIX0.9 k=2
+  group-sum[1], training 6.4905 bits/token: counting for both context components, a RECENCY-weighted sum for the
+  context-free one (the book-recency register, found by Sieve). The bar demanded weight 1 everywhere. Held-out:
+  MDL-best 6.5839; best with no weight-1 component (uses 1 + 1/d, near-constant) 6.5803; best without context
+  7.1822; Witten-Bell trigram reference 6.5137 bits/token.
+- SC2 context: uses k >= 1. PASS. SC3 shuffled: MDL-best "k=0 group-sum[1]" only (7.2164). PASS.
+- SC4 deterministic (final, uninterrupted): MDL-best "k=2 last" (0.0138 bits/token, 6.7 program bits), no counting.
+  PASS (post hoc generator). SC5 COMPRESS on real text: plurality fragment "k=0 sum[1/(1+d)]" (20 of 20) -- FAIL
+  as registered (the recurring fragment is the recency sum, not a weight-1 count).
+**SC6 (no group-sum: terms from list / filter / len / sum / exists / latest / earliest / + * /):** 3,924 terms, 310
+(Markov) / 336 (real) distinct behaviours.
+- SC6a sanity: MDL-best "k=2 len(filter(M, f==y))" -- counting composed from generic nodes -- 2.9615 bits/token,
+  8.6 program bits. PASS.
+- SC6b real text: MDL-best k=1 len(filter(M, f==y)) MIX0.5 k=0 sum(filter(M, f==y), 1/(1+d)) MIX0.9 k=2
+  len(filter(M, f==y)), training 6.5973 bits/token; both context components are counting. PASS. Held-out 6.8795
+  bits/token on the first 1,000 held-out positions (a different sample from SC's 3,000 -- not comparable to 6.5839).
+Reading: Sieve derives counting. Given generic list operations it composes len(filter(M, follower == y)) and selects
+it by compression wherever the context is informative, keeps plain counting out of deterministic text (last
+occurrence suffices) and out of shuffled text's context components, and on real text prefers a recency-weighted sum
+over plain counts for the context-free part. Still GIVEN, not derived: the context matcher (which past positions
+count as "the same situation": k previous tokens equal), the normalisation of scores into a code, and MDL itself.
+The next emergence question is the matcher: whether Sieve can derive which positions are alike (word groups,
+topics, the book) the way it derived counting.

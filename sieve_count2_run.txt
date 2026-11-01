@@ -1,0 +1,19 @@
+markov: per-k rows built (k=0: 20,000, k=1: 20,000, k=2: 12,502) (4 s)
+terms: 3,924 enumerated, 310 distinct behaviours (5 s)
+930 components (5 s)
+   MDL-best: k=2 len(filter(M, f==y)) (escape 0.02) -- training 2.9615 bits/token, description 8.6 bits
+   best with no count-behaving component: k=2 (len(filter(M, f==y)) + [latest follower == y]) (escape 0.02) -- training 2.9620 bits/token, description 14.9 bits
+   best single components: k=2 len(filter(M, f==y)) 2.962; k=2 (len(filter(M, f==y)) + [latest follower == y]) 2.962; k=2 (len(filter(M, f==y)) + [earliest follower == y]) 2.964; k=2 sum(filter(M, f==y), (d/(1+d))) 2.962; k=2 sum(filter(M, f==y), (1+(1/d))) 2.962; k=2 (len(filter(M, f==y)) + exists(filter(M, f==y))) 2.968
+   k=1 counting alone: 4.1898 bits/token
+   k=2 counting alone: 2.9615 bits/token
+markov: MDL-best k>=1 components count-like: [True] (26 s)
+real: per-k rows built (k=0: 1,632,930, k=1: 248,725, k=2: 34,655) (8 s)
+terms: 3,924 enumerated, 336 distinct behaviours (17 s)
+1,008 components (22 s)
+   MDL-best: k=1 len(filter(M, f==y)) MIX0.5 k=0 sum(filter(M, f==y), (1/(1+d))) MIX0.9 k=2 len(filter(M, f==y)) (escape 0.05) -- training 6.5973 bits/token, description 35.2 bits
+   best with no count-behaving component: k=1 (len(filter(M, f==y)) + [latest follower == y]) MIX0.5 k=0 sum(filter(M, f==y), (1/(1+d))) MIX0.9 k=2 (len(filter(M, f==y)) + [latest follower == y]) (escape 0.05) -- training 6.5954 bits/token, description 47.9 bits
+   best single components: k=1 len(filter(M, f==y)) 7.242; k=1 (len(filter(M, f==y)) + [latest follower == y]) 7.237; k=1 sum(filter(M, f==y), (1+(1/d))) 7.241; k=1 (len(filter(M, f==y)) + [earliest follower == y]) 7.247; k=1 sum(filter(M, f==y), (d/(1+d))) 7.243; k=1 ([latest follower == y] + sum(filter(M, f==y), (1+(1/d)))) 7.237
+   k=1 counting alone: 7.2419 bits/token
+   k=2 counting alone: 8.9556 bits/token
+real: MDL-best k>=1 components count-like: [True, True] (48 s)
+   held-out MDL-best: 6.8795 bits/token (first 1000 held-out positions)

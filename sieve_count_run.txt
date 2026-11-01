@@ -1,0 +1,71 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+markov: stream 300,002 tokens, 21 token types; 99 components cached on 3000 positions (27 s)
+   single components, best 6: k=2 sum[1] 3.055; k=2 sum[(d/(1+d))] 3.055; k=2 sum[(1+(1/d))] 3.055; k=2 sum[d] 3.075; k=2 sum[(1+d)] 3.075; k=2 sum[(1+(1+d))] 3.075
+   k=2 sum[1]: 3.0554 bits/token
+   k=1 sum[1]: 4.2263 bits/token
+   k=0 sum[1]: 4.3195 bits/token
+   k=2 last: 4.5971 bits/token
+   k=2 set: 3.7576 bits/token
+   MDL-best: k=2 sum[1] (escape 0.05) -- training 3.0554 bits/token, description 8.7 bits
+   best without a count component: k=2 sum[(d/(1+d))] (escape 0.05) -- training 3.0554 bits/token, description 17.9 bits
+   best without context (k = 0 only): k=0 sum[d] (escape 0.01) -- training 4.3191 bits/token, description 8.7 bits
+   best without any group-sum/argmax: k=2 set MIX0.9 k=2 first (escape 0.05) -- training 3.6730 bits/token, description 12.6 bits
+   COMPRESS over the top 20 programs: recurring fragment 'k=2 sum[1]' in 20
+markov: MDL-best weighted components all weight 1 (counting): True; uses context k >= 1: True; uses any group-sum/argmax: True (33 s)
+real: stream 317,517 tokens, 2002 token types; 99 components cached on 3000 positions (28 s)
+   single components, best 6: k=1 sum[1] 7.163; k=1 sum[(1+(1/d))] 7.162; k=1 sum[(d/(1+d))] 7.163; k=0 sum[1] 7.268; k=0 sum[(1+(1/d))] 7.268; k=0 sum[(d/(1+d))] 7.269
+   k=2 sum[1]: 8.8160 bits/token
+   k=1 sum[1]: 7.1627 bits/token
+   k=0 sum[1]: 7.2682 bits/token
+   k=2 last: 10.6919 bits/token
+   k=2 set: 9.3717 bits/token
+   MDL-best: k=0 sum[(1/(1+d))] MIX0.5 k=1 sum[1] MIX0.9 k=2 sum[1] (escape 0.05) -- training 6.4905 bits/token, description 33.7 bits
+   best without a count component: k=1 sum[(1+(1/d))] MIX0.5 k=0 sum[(1/(1+d))] MIX0.9 k=2 sum[(1/d)] (escape 0.05) -- training 6.4896 bits/token, description 47.5 bits
+   best without context (k = 0 only): k=0 sum[1] MIX0.7 k=0 sum[(1/(1+d))] (escape 0.02) -- training 7.1738 bits/token, description 25.8 bits
+   best without any group-sum/argmax: k=1 set (escape 0.3) -- training 8.8747 bits/token, description 6.7 bits
+   COMPRESS over the top 20 programs: recurring fragment 'k=0 sum[(1/(1+d))]' in 20
+real: MDL-best weighted components all weight 1 (counting): False; uses context k >= 1: True; uses any group-sum/argmax: True (35 s)
+   held-out MDL-best: 6.5839 bits/token
+   held-out best without a count component: 6.5803 bits/token
+   held-out best without context: 7.1822 bits/token
+   held-out reference, Witten-Bell trigram (all history): 6.5137 bits/token
+shuffled: stream 317,517 tokens, 2002 token types; 99 components cached on 3000 positions (36 s)
+   single components, best 6: k=0 sum[1] 7.216; k=0 sum[(d/(1+d))] 7.216; k=0 sum[(1+(1/d))] 7.216; k=0 sum[d] 7.223; k=0 sum[(1+d)] 7.223; k=0 sum[(1+(1+d))] 7.223
+   k=2 sum[1]: 10.1736 bits/token
+   k=1 sum[1]: 8.3949 bits/token
+   k=0 sum[1]: 7.2164 bits/token
+   k=2 last: 11.2663 bits/token
+   k=2 set: 10.4408 bits/token
+   MDL-best: k=0 sum[1] (escape 0.02) -- training 7.2164 bits/token, description 8.7 bits
+   best without a count component: k=0 sum[(d/(1+d))] (escape 0.02) -- training 7.2163 bits/token, description 17.9 bits
+   best without context (k = 0 only): k=0 sum[1] (escape 0.02) -- training 7.2164 bits/token, description 8.7 bits
+   best without any group-sum/argmax: k=1 set MIX0.5 k=2 set (escape 0.5) -- training 9.5820 bits/token, description 12.6 bits
+   COMPRESS over the top 20 programs: recurring fragment 'k=0 sum[1]' in 20
+shuffled: MDL-best weighted components all weight 1 (counting): True; uses context k >= 1: False; uses any group-sum/argmax: True (41 s)
+determ: stream 300,000 tokens, 21 token types; 99 components cached on 3000 positions (20 s)
+   single components, best 6: k=2 sum[1] 0.680; k=2 sum[(d/(1+d))] 0.680; k=2 sum[(1+(1/d))] 0.680; k=2 sum[d] 0.683; k=2 sum[(1+d)] 0.683; k=2 sum[(1+(1+d))] 0.683
+   k=2 sum[1]: 0.6799 bits/token
+   k=1 sum[1]: 2.8786 bits/token
+   k=0 sum[1]: 4.2567 bits/token
+   k=2 last: 1.4685 bits/token
+   k=2 set: 1.1049 bits/token
+   MDL-best: k=2 sum[1] (escape 0.01) -- training 0.6799 bits/token, description 8.7 bits
+   best without a count component: k=2 sum[(d/(1+d))] (escape 0.01) -- training 0.6799 bits/token, description 17.9 bits
+   best without context (k = 0 only): k=0 sum[d] (escape 0.02) -- training 4.2566 bits/token, description 8.7 bits
+   best without any group-sum/argmax: k=2 set MIX0.5 k=2 first (escape 0.01) -- training 0.9244 bits/token, description 12.6 bits
+   COMPRESS over the top 20 programs: recurring fragment 'k=2 sum[1]' in 17
+determ: MDL-best weighted components all weight 1 (counting): True; uses context k >= 1: True; uses any group-sum/argmax: True (25 s)
+(superseded: --clean first meant 'score rule-only positions' of the block generator; 'last' 0.5775 vs argmax[1] 0.0138 bits -- blocks end in the boundary token, so the next token depended on position)
+determ --clean: stream 300,000 tokens, 21 token types; 99 components cached on 3000 positions (18 s)
+   single components, best 6: k=2 last 0.014; k=2 first 0.014; k=2 set 0.014; k=2 sum[1] 0.014; k=2 sum[d] 0.014; k=2 argmax[1] 0.014
+   k=2 sum[1]: 0.0138 bits/token
+   k=1 sum[1]: 1.0636 bits/token
+   k=0 sum[1]: 3.6527 bits/token
+   k=2 last: 0.0138 bits/token
+   k=2 set: 0.0138 bits/token
+   MDL-best: k=2 last (escape 0.01) -- training 0.0138 bits/token, description 6.7 bits
+   best without a count component: k=2 last (escape 0.01) -- training 0.0138 bits/token, description 6.7 bits
+   best without context (k = 0 only): k=0 sum[d] (escape 0.01) -- training 3.6524 bits/token, description 8.7 bits
+   best without any group-sum/argmax: k=2 last (escape 0.01) -- training 0.0138 bits/token, description 6.7 bits
+   COMPRESS over the top 20 programs: recurring fragment 'k=2 last' in 14
+determ --clean: MDL-best weighted components all weight 1 (counting): False; uses context k >= 1: True; uses any group-sum/argmax: False (22 s)
