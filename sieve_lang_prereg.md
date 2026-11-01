@@ -447,3 +447,7 @@ stands only if it again hurts.
 positions (direction of the error). Fix (generic, one parameter): stated form distribution Qc = (1 - a) Q + a PG,
 a in {0, 0.05, 0.1, 0.2, 0.3, 0.5}, chosen on the fit positions by the fewest refuted bins, then the least form-claim
 log loss. Bar: 0 refuted bins on the 50,114 positions.
+**ST3 amendment (2026-11-02, after ST1, before any ST3 run).** ST1 showed Stack ahead on words repeated in the book
+(6.711 vs 6.880) and Sieve ahead on content words (14.473 vs 15.220). Stack's edge there is its copy register; Sieve's
+full-scale grammar has no same-book source (the small-scale one had). Added to ST3's grammar: count components over
+the same book's earlier text (all 21 atom sets). Descriptive: selected or not; repeat-in-book mean bits reported.
