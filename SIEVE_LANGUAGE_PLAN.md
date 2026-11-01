@@ -53,6 +53,17 @@ slots, e.g. "the X of the Y").
 Beside bits: calibration of Sieve's stated probabilities (Hoeffding-checked bins; Sieve 0 refuted, Witten-Bell 1),
 abstention vs confabulation on committed answers. A deterministic AI may win on reliability at equal bits.
 
+## 9. Long-range concepts emerge epistemically
+Stack beats Sieve (8.1507 vs 8.7812) through hand-built long-range registers (recency, copy, topic, library lookup);
+Sieve's matchers see only the last 1-3 words. Sieve must invent them itself via E5: collect positions where the best
+short-context program fails, find what those residuals share across the past stream (e.g. "the answer occurred earlier
+in this book, d tokens back"; "the answer's form is frequent in the recent window"), propose a primitive, keep it only if
+MDL pays and its calibration claims survive Hoeffding. Engine additions stay domain-agnostic: residual-commonality search
+over the past stream + running summaries over any attribute. Decoys: sentences shuffled across books, and within a book
+-- no long-range concept may emerge there. Bars: (1) a recency/copy concept invented unaided, (2) a topic-like concept
+over forms, (3) none on the decoys, (4) held-out on the 50,114 positions moves from 8.7812 toward 8.1507. If (1) or
+(2) fails, the residuals show what Sieve could not express -- that is the flexibility gap to fix.
+
 ## Status after the first pass (2026-11-01; numbers in sieve_lang_prereg.md "SP results")
 0 done (deterministic, deduplicated). 1 done: more text helps (8.7003 with the library) but the LM's lead does not
 depend on what the library holds. 2 failed (narrow fit sample) -- redo with fit positions spread over all dev books.
