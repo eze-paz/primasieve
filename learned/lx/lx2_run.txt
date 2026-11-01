@@ -1,0 +1,29 @@
+GENERATE: 123,640 rewrites seen; top 40 kept (1 s)
+MERGE: 11 abstract operators
+   [ 13921 pairs] ->s | ed->s | d->s | ->es | y->ies | ->ness | er->s | ly->ness | ->ers | d->rs | y->s | e->s | r->s
+   [  8431 pairs] ed->ing | ->ing | s->ing | e->ing | es->ing | er->ing
+   [  6987 pairs] ->ed | ->d | s->ed | s->d | r->d | rs->d
+   [  2435 pairs] ->er | d->r | ->r | s->er | s->r
+   [  1478 pairs] ->ly
+   [  1253 pairs] ->y | e->y | s->y
+   [   952 pairs] ->e | s->e
+   [   395 pairs] ->t
+   [   374 pairs] ed->ion
+   [   364 pairs] y->e
+   [   300 pairs] ->n
+   ->s | ed->s | d->s | ->es | y->ies | ->ness | er->s | ly->ne lemmas 12423 admitted sub-rules   26 residual 12169  invented [('drop_e', 'es', 1820)]  decoy invented []
+   ed->ing | ->ing | s->ing | e->ing | es->ing | er->ing        lemmas  8400 admitted sub-rules  162 residual  4920  invented [('drop_e', 'ing', 75)]  decoy invented []
+   ->ed | ->d | s->ed | s->d | r->d | rs->d                     lemmas  6876 admitted sub-rules  127 residual  3634  invented [('drop_e', 'ed', 22)]  decoy invented []
+   ->er | d->r | ->r | s->er | s->r                             lemmas  2426 admitted sub-rules  114 residual  1214  invented [('drop_e', 'er', 118)]  decoy invented []
+   ->ly                                                         lemmas  1478 admitted sub-rules   87 residual     0  invented []  decoy invented []
+   ->y | e->y | s->y                                            lemmas  1242 admitted sub-rules   91 residual   634  invented [('drop_e', 'y', 331)]  decoy invented []
+   ->e | s->e                                                   lemmas   941 admitted sub-rules  101 residual   216  invented []  decoy invented []
+   ->t                                                          lemmas   395 admitted sub-rules   65 residual     0  invented []  decoy invented []
+   ed->ion                                                      lemmas   374 admitted sub-rules    4 residual     0  invented []  decoy invented []
+   y->e                                                         lemmas   364 admitted sub-rules   21 residual     0  invented []  decoy invented []
+   ->n                                                          lemmas   300 admitted sub-rules   44 residual     1  invented []  decoy invented []
+EVAL: 900 novel attested forms (in extra books >= 3, never in training) of 871 training lemmas (13 s)
+LX2 outputs 32  precision 0.8125  (6 wrong)   recall of novel forms 0.0033  lemmas with no output 844
+   sample wrong: [('work', 'worked'), ('seed', 'seeded'), ('combat', 'combated'), ('combat', 'combating'), ('rub', 'rubing'), ('win', 'wining')]
+   sample missed: [('hunch', 'hunches'), ('evacuation', 'evacuations'), ('think', 'thinkes'), ('slat', 'slatted'), ('purloin', 'purloining'), ('host', 'hosting'), ('war', 'waring'), ('threepence', 'threepences'), ('displace', 'displaces'), ('trance', 'tranced'), ('locate', 'locates'), ('synagogue', 'synagogues'), ('fog', 'fogged'), ('slake', 'slakes'), ('dribble', 'dribbling'), ('outbid', 'outbidding'), ('curtis', 'curtiss'), ('rating', 'ratings'), ('parcel', 'parceled'), ('marat', 'marats'), ('confute', 'confutes'), ('bracing', 'bracings'), ('quantum', 'quanta'), ('sponsor', 'sponsored'), ('bladder', 'bladders')]
+done (14 s)

@@ -1,0 +1,28 @@
+LX1 words -> next word  (39 s)
+   k=3    coverage  0.76%  precision 0.7395  (380 fire, 99 wrong)  content words among covered 13.4%  LLM p(true) covered 0.645 / rest 0.196
+   k=10   coverage  0.15%  precision 0.9589  (73 fire, 3 wrong)  content words among covered  5.5%  LLM p(true) covered 0.889 / rest 0.198
+   k=30   coverage  0.02%  precision 1.0000  (9 fire, 0 wrong)  content words among covered  0.0%  LLM p(true) covered 0.924 / rest 0.199
+   k=100  coverage  0.00%  precision 1.0000  (1 fire, 0 wrong)  content words among covered  0.0%  LLM p(true) covered 1.000 / rest 0.199
+C:\Users\aezequiel\Desktop\AI_Projects\primasieve\learned\lx\lx1.py:51: RuntimeWarning: Mean of empty slice
+  f"  content words among covered {content[fire].mean():5.1%}  LLM p(true) covered {llm[fire].mean():.3f} / rest {llm[~fire].mean():.3f}", flush=True)
+C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\_core\_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+   k=300  coverage  0.00%  precision nan  (0 fire, 0 wrong)  content words among covered  nan%  LLM p(true) covered nan / rest 0.199
+LX3a words -> next word's group  (72 s)
+   k=3    coverage  0.78%  precision 0.7359  (390 fire, 103 wrong)  content words among covered 15.1%  LLM p(true) covered 0.641 / rest 0.196
+   k=10   coverage  0.15%  precision 0.9589  (73 fire, 3 wrong)  content words among covered  5.5%  LLM p(true) covered 0.889 / rest 0.198
+   k=30   coverage  0.02%  precision 1.0000  (9 fire, 0 wrong)  content words among covered  0.0%  LLM p(true) covered 0.924 / rest 0.199
+   k=100  coverage  0.00%  precision 1.0000  (1 fire, 0 wrong)  content words among covered  0.0%  LLM p(true) covered 1.000 / rest 0.199
+   k=300  coverage  0.00%  precision nan  (0 fire, 0 wrong)  content words among covered  nan%  LLM p(true) covered nan / rest 0.199
+LX3b groups -> next word's group  (105 s)
+   k=3    coverage  0.50%  precision 0.6560  (250 fire, 86 wrong)  content words among covered 14.8%  LLM p(true) covered 0.611 / rest 0.197
+   k=10   coverage  0.07%  precision 0.9091  (33 fire, 3 wrong)  content words among covered 12.1%  LLM p(true) covered 0.828 / rest 0.199
+   k=30   coverage  0.01%  precision 1.0000  (4 fire, 0 wrong)  content words among covered  0.0%  LLM p(true) covered 0.887 / rest 0.199
+   k=100  coverage  0.00%  precision nan  (0 fire, 0 wrong)  content words among covered  nan%  LLM p(true) covered nan / rest 0.199
+   k=300  coverage  0.00%  precision nan  (0 fire, 0 wrong)  content words among covered  nan%  LLM p(true) covered nan / rest 0.199
+LX3c groups -> next word  (138 s)
+   k=3    coverage  0.48%  precision 0.6626  (243 fire, 82 wrong)  content words among covered 12.8%  LLM p(true) covered 0.604 / rest 0.197
+   k=10   coverage  0.07%  precision 0.9091  (33 fire, 3 wrong)  content words among covered 12.1%  LLM p(true) covered 0.828 / rest 0.199
+   k=30   coverage  0.01%  precision 1.0000  (4 fire, 0 wrong)  content words among covered  0.0%  LLM p(true) covered 0.887 / rest 0.199
+   k=100  coverage  0.00%  precision nan  (0 fire, 0 wrong)  content words among covered  nan%  LLM p(true) covered nan / rest 0.199
+   k=300  coverage  0.00%  precision nan  (0 fire, 0 wrong)  content words among covered  nan%  LLM p(true) covered nan / rest 0.199
