@@ -247,3 +247,19 @@ refuted (bins 0-0.1: stated 0.060 / observed 0.057; 0.1-0.2: 0.133 / 0.157; 0.2-
 / 0.390); top-3 holds the truth 0.340 vs stated 0.322. Witten-Bell: 1 bin refuted (0.5-0.6: stated 0.530, observed
 0.167, 66 claims, bound 0.200); top-3 holds the truth 0.364 vs stated 0.457. Bins with few claims have wide bounds
 and test little.
+
+## SN5 -- SN3's program at full scale (registered 2026-11-01, before the run)
+SN3's MDL-best program (library + class matchers; trust terms were available in that search and not chosen), run
+unchanged at full scale: full vocabulary, count terms over all 13.85M training tokens + the held-out prefix, the
+LIBRARY = all 17.7M tokens of the 400 extra books (SN3 used the first 2M), scored on the 50,114 positions.
+Descriptive, absolute bits/word beside Counter 8.9368, Stack 8.1507 (its best used the same library by lookup), LM
+6.026, and SN2's 8.7941.
+
+## SN5 result (2026-11-01) -- log sieve_full_run.txt (second block)
+SN3's program re-derived on rerun with its first component matching [token(t-1) & mfp(t-1), in the library] (the
+first run printed mff(t-1); same held-out 6.1871 -- a tie) and saved to sieve_wide_best.json. At full scale (library =
+all 400 books, 18,649,916 tokens with sentence marks): Sieve 8.7812 bits/word on the 50,114 positions (first
+component 9.5575, two 8.9464). Beside: SN2 8.7941, Counter 8.9368, Stack 8.1507, LM 6.026.
+Reading: the library, decisive at 300k tokens (6.1871 vs 6.7892), adds little once the training text is 13.85M
+tokens; and this program has no recency component (SN2's had one) and fixed 0.7 mixing. Programs selected at 300k
+tokens with 2,000 words are not the programs full scale wants: the search itself has to run at full scale.

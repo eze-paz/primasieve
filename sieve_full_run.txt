@@ -7,3 +7,13 @@ FULL SCALE, 50,114 positions: Sieve 8.7941 bits/word (Counter 8.9368, Stack 8.15
    first 1 component(s): 9.4995 bits/word
    first 2 component(s): 8.9926 bits/word
    first 3 component(s): 8.7941 bits/word
+full stream 13,852,837 tokens; vocabulary 94,503; scored positions 50,114 (1 s)
+library: 18,649,916 tokens (all 400 books) (12 s)
+   program: {'chain': [[[['id', 1], ['mfp', 1]], 'library', 'count', None], [[['mff', 1], ['mff', 2]], 50000, 'count', ['fixed', 0.7]], [[['id', 1], ['id', 2]], 'library', 'count', ['fixed', 0.7]]], 'escape': 0.05}
+component (('id', 1), ('mfp', 1)) count: matched 0.999 of positions (40 s)
+component (('mff', 1), ('mff', 2)) count: matched 0.996 of positions (49 s)
+component (('id', 1), ('id', 2)) count: matched 0.875 of positions (60 s)
+FULL SCALE (sieve_wide_best.json), 50,114 positions: Sieve 8.7812 bits/word (Counter 8.9368, Stack 8.1507, LM 6.026 on these positions) (60 s)
+   first 1 component(s): 9.5575 bits/word
+   first 2 component(s): 8.9464 bits/word
+   first 3 component(s): 8.7812 bits/word

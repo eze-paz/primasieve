@@ -1,6 +1,6 @@
-183 matchers x 2 terms = 366 components (58 s)
-   MDL-best: [token(t-1) & mff(t-1), in the library] count MIX0.7 [mff(t-1) & mff(t-2)] count MIX0.7 [token(t-1) & token(t-2), in the library] count (escape 0.05) -- training 6.1288 bits/token, description 34.7 bits
+183 matchers x 2 terms = 366 components (87 s)
+   MDL-best: [token(t-1) & mfp(t-1), in the library] count MIX0.7 [mff(t-1) & mff(t-2)] count MIX0.7 [token(t-1) & token(t-2), in the library] count (escape 0.05) -- training 6.1288 bits/token, description 34.7 bits
    best without the new atoms/sources: [mff(t-1)] count MIX0.5 [token(t-1)] count (escape 0.1) -- training 6.6045 bits/token, description 23.0 bits
-MDL-best uses new atoms/sources: ['token(t-1) & mff(t-1), in the library', 'token(t-1) & token(t-2), in the library'] (121 s)
+MDL-best uses new atoms/sources: ['token(t-1) & mfp(t-1), in the library', 'token(t-1) & token(t-2), in the library'] (215 s)
    held-out MDL-best: 6.1871 bits/token (SN1 6.7892, Witten-Bell 6.6939)
    held-out best without the new atoms/sources: 6.9103 bits/token (SN1 6.7892, Witten-Bell 6.6939)

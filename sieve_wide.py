@@ -60,6 +60,8 @@ best = rank[0]; bo = next(q for q in rank if not any(new(c) for c, _ in q))
 for nm, q in (("MDL-best", best), ("best without the new atoms/sources", bo)):
     sc, b, e = progs[q]; print(f"   {nm}: {pd(q)} -- training {b / NSC:.4f} bits/token, description {sc - b:.1f} bits")
 log(f"MDL-best uses new atoms/sources: {[mname(COMP[c][0]) for c, _ in best if new(c)]}")
+import json; json.dump(dict(chain=[[list(COMP[c][0][0]), COMP[c][0][1], ["count", "recency"][COMP[c][1]], cb] for c, cb in best], escape=progs[best][2]),
+                       open(os.path.join(SC.HERE, "sieve_wide_best.json"), "w"))                         # for SN5 (sieve_full.py --prog)
 full = np.r_[s, held]; fbook = np.r_[sbook, hbook]; Th = np.arange(len(s) + 2, len(s) + 2 + NSC)
 for nm, q in (("MDL-best", best), ("best without the new atoms/sources", bo)):
     n = len(COMP); NEh = np.zeros((n, NSC), bool); PPh = np.zeros((n, NSC)); NNh = np.zeros((n, NSC)); TTh = np.zeros((n, NSC)); done = {}

@@ -1,0 +1,1 @@
+{"chain": [[[["id", 1], ["mfp", 1]], "library", "count", null], [[["mff", 1], ["mff", 2]], 50000, "count", ["fixed", 0.7]], [[["id", 1], ["id", 2]], "library", "count", ["fixed", 0.7]]], "escape": 0.05}
