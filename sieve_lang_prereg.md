@@ -405,3 +405,28 @@ history or in the library, count of the answer after it. **SR9 library as histor
 (top-3 forms with Q) have no refuted Hoeffding bin (>= 30 claims, 0.01) on the fit positions.
 Bar for the whole pass: the selected program < 8.3411 bits/word on the 50,114 positions. Descriptive per idea:
 selected or not, and the score without it.
+
+## SR results (2026-11-01), absolute numbers (log: sieve_sr_run.txt; state: sieve_fs2_state_r1.json / sieve_fs2_state.json)
+**Whole pass -- PASS.** Selected program (round 1, after the calibration filter): token(t-1) in history + library count
+MIX0.5 token(t-1) & token(t-2) in history + library count MIX0.9 any-position recency MIX0.9 graded identity 2,2,1
+MIX0.9 mff(t-1) & mff(t-2) in history + library count, escape 0.1, REWEIGHT by form shares of the past 1,000 tokens,
+beta 0.25: fit 7.7917, on the 50,114 positions 8.1979 bits/word (bar 8.3411). The MDL-best program before the
+calibration filter (same chain, escape 0.02): fit 7.7335, scored 8.1519 (Stack 8.1507, LM 6.026).
+**SR1 reweight -- PASS.** Selected by MDL in round 1. Scored with / without the reweight stage: 8.1979 / 8.2275
+(selected); 8.1519 / 8.1860 (MDL-best).
+**SR2 distributions -- PASS.** Q summed to 1 and Q[form of the answer] >= P(answer) at every matched position of all
+79 fit components and 6 scored components (asserted on caching). Counts reproduce SQ2's cache exactly (max |P diff| 0).
+**SR3 forms at full scale.** Graded identity/form/identity+form offered; graded identity 2,2,1 selected; no form-level
+graded component selected.
+**SR4/SR5/SR6.** Selection at full scale; chains grew to the 5-component limit (MDL total 25,669.6 -> 24,486.3 ->
+23,556.1 -> 23,413.0 -> 23,304.8 bits; still falling at 5); residual-steered search over 76 components took 26-40 s.
+**SR7 residual rounds.** Round 0 top relation: form of the answer in the past 200 tokens, 0.781 vs 0.745 -> reweight
+offered and adopted in round 1. Round 1 top relation again form-level (past 5,000: 0.963 vs 0.943; tie at 0.020 with
+the history copy relation 0.024 vs 0.004, broken by name) -> stop. Long-match was never named by the rounds.
+**SR8 long-match (post hoc round 2, offered by hand).** MDL selected longest match (3-8 words) in the history as a 4th
+component: fit 7.6872 (MDL-best) / 7.7560 (calibrated); scored 8.1726 / 8.2072 -- worse than round 1 (8.1519 /
+8.1979): it overfits the fit positions.
+**SR9 library as history -- selected.** All three count components chosen count over training + library + prefix.
+**SR10 calibration filter -- FAIL as a reliability guard.** Round 0: all 210 top programs refuted >= 3 form-claim bins
+(fell back to the MDL-best); round 1: a program with escape 0.1 passed on the fit positions, but on the 50,114
+positions it refutes 5 bins (MDL-best: 6) and costs bits (8.1979 vs 8.1519).

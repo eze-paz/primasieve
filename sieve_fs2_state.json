@@ -1,0 +1,182 @@
+{
+ "families": [
+  "count",
+  "recency",
+  "graded",
+  "reweight",
+  "long_hist",
+  "long_library"
+ ],
+ "rounds": [
+  {
+   "round": 0,
+   "offered": [
+    "count",
+    "recency",
+    "graded"
+   ],
+   "adopted": [
+    "count_0_all+lib",
+    "count_6_all+lib",
+    "recency",
+    "graded_id_221",
+    "count_15_all+lib"
+   ],
+   "program": {
+    "chain": [
+     [
+      "count_0_all+lib",
+      null
+     ],
+     [
+      "count_6_all+lib",
+      [
+       "fixed",
+       0.5
+      ]
+     ],
+     [
+      "recency",
+      [
+       "fixed",
+       0.9
+      ]
+     ],
+     [
+      "graded_id_221",
+      [
+       "fixed",
+       0.9
+      ]
+     ],
+     [
+      "count_15_all+lib",
+      [
+       "fixed",
+       0.9
+      ]
+     ]
+    ],
+    "escape": 0.02,
+    "reweight": null
+   },
+   "top_relation": "form of the answer in the past 200",
+   "excess": 0.03600000000000003
+  },
+  {
+   "round": 1,
+   "offered": [
+    "reweight"
+   ],
+   "adopted": [
+    "count_0_all+lib",
+    "count_6_all+lib",
+    "recency",
+    "graded_id_221",
+    "count_15_all+lib",
+    "reweight"
+   ],
+   "program": {
+    "chain": [
+     [
+      "count_0_all+lib",
+      null
+     ],
+     [
+      "count_6_all+lib",
+      [
+       "fixed",
+       0.5
+      ]
+     ],
+     [
+      "recency",
+      [
+       "fixed",
+       0.9
+      ]
+     ],
+     [
+      "graded_id_221",
+      [
+       "fixed",
+       0.9
+      ]
+     ],
+     [
+      "count_15_all+lib",
+      [
+       "fixed",
+       0.9
+      ]
+     ]
+    ],
+    "escape": 0.1,
+    "reweight": [
+     1000,
+     0.25
+    ]
+   },
+   "top_relation": "form of the answer in the past 5000",
+   "excess": 0.020000000000000018
+  },
+  {
+   "round": 2,
+   "offered": [
+    "long_hist",
+    "long_library"
+   ],
+   "adopted": [
+    "count_0_all+lib",
+    "count_6_all+lib",
+    "recency",
+    "long_hist",
+    "graded_id_221",
+    "reweight"
+   ],
+   "program": {
+    "chain": [
+     [
+      "count_0_all+lib",
+      null
+     ],
+     [
+      "count_6_all+lib",
+      [
+       "fixed",
+       0.5
+      ]
+     ],
+     [
+      "recency",
+      [
+       "fixed",
+       0.9
+      ]
+     ],
+     [
+      "long_hist",
+      [
+       "fixed",
+       0.9
+      ]
+     ],
+     [
+      "graded_id_221",
+      [
+       "fixed",
+       0.9
+      ]
+     ]
+    ],
+    "escape": 0.1,
+    "reweight": [
+     200,
+     0.25
+    ]
+   },
+   "top_relation": "form of the answer in the past 1000",
+   "excess": 0.03066666666666673
+  }
+ ]
+}

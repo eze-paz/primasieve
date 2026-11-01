@@ -80,3 +80,10 @@ that contains the fit stream -- rebuild forms without it). 4 failed (mixture 6.2
 found unaided in the residuals (0.452 vs 0.312, decoy clean), but MDL kept the existing recency cache; topic-level
 components need a reweighting (product) combinator, which the engine lacks -- next: a generic "reweight by attribute"
 combinator over full distributions, then rerun 9 and 3 at full scale.
+
+## Status after the third pass, SR (2026-11-01; numbers in sieve_lang_prereg.md "SR results")
+Sieve at full scale: 8.1979 bits/word (selected, calibration-filtered) / 8.1519 (MDL-best) on the 50,114 positions --
+level with Stack (8.1507); LM 6.026. Adopted: the reweight-by-form-shares combinator (topic, found via residuals),
+library counted as history, longer chains (5, still improving), graded identity matching. Long-match overfits;
+form-claim calibration does not hold on held-out text. Next: chains beyond 5; more fit positions (3,000 limits what
+MDL can afford); reweight by more attributes than forms; calibrate stated form probabilities (Q) per component.
