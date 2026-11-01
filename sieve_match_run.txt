@@ -1,0 +1,21 @@
+real: 44 matchers x 4 terms = 176 components on 1000 positions (10 s)
+   MDL-best: [token(t-1)] count MIX0.5 [mff(t-1)] count MIX0.9 [mff(t-2) & mfp(t-1)] recency (escape 0.1) -- training 6.5261 bits/token, description 29.2 bits
+   best with plain token-equality matchers only: [any position] recency MIX0.5 [token(t-1)] count MIX0.9 [token(t-1) & token(t-2)] count (escape 0.05) -- training 6.5973 bits/token, description 29.2 bits
+real: MDL-best uses a derived-attribute atom: True; uses the 1,000-token bound: False (13 s)
+   induced class 'most frequent follower = <s>' (481 words): him, me, said, them, man, now, time, know, here, mr, us, himself
+   induced class 'most frequent follower = ?' (450 words): the, and, to, a, he, that, was, his, you, had, her, not
+   induced class 'most frequent follower = of' (258 words): one, out, way, think, thought, because, heart, side, course, days, part, name
+   induced class 'most frequent follower = to' (136 words): come, go, how, came, back, nothing, got, seemed, going, enough, want, dear
+   induced class 'most frequent follower = the' (132 words): of, in, with, for, at, but, on, by, all, from, up, into
+   held-out MDL-best: 6.8362 bits/token
+   held-out plain token-equality only: 6.8795 bits/token
+   held-out reference, Witten-Bell trigram (all history), same positions: 6.6939 bits/token
+shuffled: 44 matchers x 4 terms = 176 components on 1000 positions (24 s)
+   MDL-best: [any position] count (escape 0.02) -- training 7.3087 bits/token, description 10.3 bits
+   best with plain token-equality matchers only: [any position] count (escape 0.02) -- training 7.3087 bits/token, description 10.3 bits
+shuffled: MDL-best uses a derived-attribute atom: False; uses the 1,000-token bound: False (28 s)
+   induced class 'most frequent follower = ?' (1318 words): the, and, of, to, a, in, i, he, that, was, it, his
+   induced class 'most frequent follower = <s>' (202 words): miss, thou, care, rose, john, answer, person, fellow, window, possible, doing, ah
+   induced class 'most frequent follower = the' (177 words): next, business, sure, hope, really, thousand, manner, general, yourself, happy, daughter, stand
+   induced class 'most frequent follower = and' (63 words): pretty, husband, front, play, easy, giving, opinion, watch, fool, evidently, walls, anybody
+   induced class 'most frequent follower = of' (46 words): th, thinking, chance, forget, ladies, changed, noble, threw, surprised, curious, vain, wine

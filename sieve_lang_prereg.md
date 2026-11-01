@@ -175,3 +175,32 @@ over plain counts for the context-free part. Still GIVEN, not derived: the conte
 count as "the same situation": k previous tokens equal), the normalisation of scores into a code, and MDL itself.
 The next emergence question is the matcher: whether Sieve can derive which positions are alike (word groups,
 topics, the book) the way it derived counting.
+
+## SM -- does Sieve derive the context matcher? (registered 2026-11-01, before any SM run)
+Until now "which past positions count as the same situation" was given: the k previous tokens are equal. SM gives
+Sieve a matcher GRAMMAR instead: a matcher = a set of <= 2 equality atoms + a distance bound. Atom = attr(token at
+t - a) == attr(token at j - a), a in {1, 2}, attr in {identity, most frequent follower, most frequent predecessor}
+-- the two derived attributes are Sieve's own counting (SC6) applied to each word over the training stream, so
+equality of them is an induced word class nobody listed. Distance bound: j within the 50,000-token memory, or within
+1,000 tokens. 22 atom sets x 2 bounds = 44 matchers; each with 4 terms from SC6's selected behaviours (count
+len(filter), recency sum(filter, 1/(1+d)), latest, exists); chains as before, MDL, beam 30. Same real stream and
+1,000 scored positions as SC6; held-out = the first 1,000 held-out positions.
+Bars: SM1 the MDL-best program uses a matcher outside plain token equality (a derived-attribute atom or the 1,000-token
+bound) AND has lower held-out bits/token than the best program restricted to plain token-equality matchers (SC6's
+matcher space) on the same positions. SM2 decoy, shuffled text: the MDL-best uses no derived-attribute atom. Reported
+beside them: Witten-Bell trigram on the same held-out positions, and examples of the induced classes.
+
+## SM results (2026-11-01), absolute numbers -- log sieve_match_run.txt
+**SM1 -- PASS.** MDL-best on real text: [token(t-1)] count MIX0.5 [mff(t-1)] count MIX0.9 [mff(t-2) & mfp(t-1)]
+recency, training 6.5261 bits/token (program 29.2 bits). Best with plain token-equality matchers only: [any position]
+recency MIX0.5 [token(t-1)] count MIX0.9 [token(t-1) & token(t-2)] count, training 6.5973. Held-out, same 1,000
+positions: derived matchers 6.8362, plain matchers 6.8795, Witten-Bell trigram 6.6939 bits/token. The 1,000-token
+bound was not selected. Induced classes (equal most-frequent-follower): prepositions of/in/with/for/at/on/by/from/
+into (-> "the"); come/go/came/back/got/seemed/going/want (-> "to"); sentence-final him/me/said/them/now/here/us (->
+sentence end); the 450 words whose most frequent follower is a rare (unknown) word (the/and/to/a/he/that/was) form
+one coarse class.
+**SM2 -- PASS.** Shuffled text: MDL-best [any position] count (7.3087), no derived-attribute atom.
+Reading: Sieve derives a context matcher -- word classes from its own counting -- and prefers it by compression over
+exact-word context, generalising better (6.8362 vs 6.8795 held-out); still behind Witten-Bell (6.6939), whose
+smoothing over all history Sieve's chains approximate only with fixed mixing weights. Still given: the atom grammar
+(equality, two derived attributes, offsets 1-2), normalisation, MDL.
