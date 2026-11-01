@@ -1,0 +1,58 @@
+   eval, a = 0 (diagnosis):
+      stated 0.0-0.1:  32235 claims, stated 0.072, observed 0.060, bound 0.009 -> REFUTED
+      stated 0.1-0.2:  61411 claims, stated 0.144, observed 0.137, bound 0.007 -> REFUTED
+      stated 0.2-0.3:  27034 claims, stated 0.243, observed 0.258, bound 0.010 -> REFUTED
+      stated 0.3-0.4:  14640 claims, stated 0.347, observed 0.391, bound 0.013 -> REFUTED
+      stated 0.4-0.5:   9416 claims, stated 0.445, observed 0.520, bound 0.017 -> REFUTED
+      stated 0.5-0.6:   3862 claims, stated 0.541, observed 0.611, bound 0.026 -> REFUTED
+      stated 0.6-0.7:   1350 claims, stated 0.639, observed 0.735, bound 0.044 -> REFUTED
+      stated 0.7-0.8:    311 claims, stated 0.740, observed 0.830, bound 0.092 -> standing
+      stated 0.8-0.9:     83 claims, stated 0.829, observed 0.735, bound 0.179 -> standing
+   a = 0: fit refuted 3, form-claim loss 3.5452; eval refuted 7, loss 3.5721
+   a = 0.05: fit refuted 5, form-claim loss 3.5588; eval refuted 6, loss 3.5790
+   a = 0.1: fit refuted 5, form-claim loss 3.5780; eval refuted 6, loss 3.5927
+   a = 0.2: fit refuted 4, form-claim loss 3.6271; eval refuted 6, loss 3.6321
+   a = 0.3: fit refuted 5, form-claim loss 3.6886; eval refuted 6, loss 3.6841
+   a = 0.5: fit refuted 4, form-claim loss 3.8497; eval refuted 5, loss 3.8250
+ST4: chosen a = 0 on fit9; eval refuted bins 7 (20 s)
+   eval at the chosen a:
+      stated 0.0-0.1:  32235 claims, stated 0.072, observed 0.060, bound 0.009 -> REFUTED
+      stated 0.1-0.2:  61411 claims, stated 0.144, observed 0.137, bound 0.007 -> REFUTED
+      stated 0.2-0.3:  27034 claims, stated 0.243, observed 0.258, bound 0.010 -> REFUTED
+      stated 0.3-0.4:  14640 claims, stated 0.347, observed 0.391, bound 0.013 -> REFUTED
+      stated 0.4-0.5:   9416 claims, stated 0.445, observed 0.520, bound 0.017 -> REFUTED
+      stated 0.5-0.6:   3862 claims, stated 0.541, observed 0.611, bound 0.026 -> REFUTED
+      stated 0.6-0.7:   1350 claims, stated 0.639, observed 0.735, bound 0.044 -> REFUTED
+      stated 0.7-0.8:    311 claims, stated 0.740, observed 0.830, bound 0.092 -> standing
+      stated 0.8-0.9:     83 claims, stated 0.829, observed 0.735, bound 0.179 -> standing
+   g = 1: fit refuted 3, form-claim loss 3.5452; eval refuted 7, loss 3.5721
+   g = 1.1: fit refuted 1, form-claim loss 3.5497; eval refuted 3, loss 3.5848
+   g = 1.2: fit refuted 3, form-claim loss 3.5884; eval refuted 7, loss 3.6320
+   g = 1.3: fit refuted 7, form-claim loss 3.6531; eval refuted 9, loss 3.7054
+   g = 1.5: fit refuted 8, form-claim loss 3.8385; eval refuted 9, loss 3.9079
+   g = 1.75: fit refuted 9, form-claim loss 4.1395; eval refuted 10, loss 4.2296
+   g = 2: fit refuted 9, form-claim loss 4.4882; eval refuted 10, loss 4.5979
+ST4b: chosen g = 1.1 on fit9; eval refuted bins 3 (28 s)
+   eval at the chosen g:
+      stated 0.0-0.1:  31435 claims, stated 0.069, observed 0.059, bound 0.009 -> REFUTED
+      stated 0.1-0.2:  55696 claims, stated 0.145, observed 0.129, bound 0.007 -> REFUTED
+      stated 0.2-0.3:  27104 claims, stated 0.244, observed 0.232, bound 0.010 -> REFUTED
+      stated 0.3-0.4:  14587 claims, stated 0.346, observed 0.340, bound 0.013 -> standing
+      stated 0.4-0.5:  10221 claims, stated 0.448, observed 0.448, bound 0.016 -> standing
+      stated 0.5-0.6:   7122 claims, stated 0.545, observed 0.552, bound 0.019 -> standing
+      stated 0.6-0.7:   2967 claims, stated 0.641, observed 0.647, bound 0.030 -> standing
+      stated 0.7-0.8:    965 claims, stated 0.738, observed 0.755, bound 0.052 -> standing
+      stated 0.8-0.9:    229 claims, stated 0.839, observed 0.803, bound 0.108 -> standing
+      stated 0.9-1.0:     16 claims, stated 0.916, observed 0.688, bound 0.407 -> standing
+   ST4c eval, stated = the fit rate of the claim's bin:
+      stated 0.0-0.1:  31435 claims, stated 0.066, observed 0.059, bound 0.009 -> standing
+      stated 0.1-0.2:  55696 claims, stated 0.129, observed 0.129, bound 0.007 -> standing
+      stated 0.2-0.3:  27104 claims, stated 0.241, observed 0.232, bound 0.010 -> standing
+      stated 0.3-0.4:  14587 claims, stated 0.365, observed 0.340, bound 0.013 -> REFUTED
+      stated 0.4-0.5:  10221 claims, stated 0.432, observed 0.448, bound 0.016 -> standing
+      stated 0.5-0.6:   7122 claims, stated 0.548, observed 0.552, bound 0.019 -> standing
+      stated 0.6-0.7:   2967 claims, stated 0.688, observed 0.647, bound 0.030 -> REFUTED
+      stated 0.7-0.8:    965 claims, stated 0.781, observed 0.755, bound 0.052 -> standing
+      stated 0.8-0.9:    229 claims, stated 0.897, observed 0.803, bound 0.108 -> standing
+      stated 0.9-1.0:     16 claims, stated 1.000, observed 0.688, bound 0.407 -> standing
+ST4c: eval refuted bins 2 (30 s)

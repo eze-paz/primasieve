@@ -459,3 +459,27 @@ refuted bins, then least form-claim loss. Bar: 0 refuted bins on the 50,114 posi
 0.0-0.3 (overstated by 0.010-0.016). Generic fix: histogram binning -- each claim's stated probability is replaced by
 the observed rate of its stated-probability bin (10 bins, after g = 1.1) on the 9,000 fit positions; applied unchanged
 to the 50,114 positions, rebinned by the new stated values. Bar: 0 refuted bins.
+
+## ST results (2026-11-02), absolute numbers (logs: sieve_st1_run.txt ... sieve_st4_run.txt)
+**ST1 Sieve vs Stack.** 95% intervals (paragraph bootstrap) on the 50,114 positions: Stack 8.1507 (8.0842-8.2178);
+Sieve SR MDL-best 8.1519 (8.0931-8.2102) -- level; Sieve SR selected 8.1979 (8.1428-8.2536) -- level; Sieve ST3
+8.0208 (7.9512-8.0911) -- ahead of Stack (each mean outside the other's interval); LM 6.0261 (5.9471-6.1100). By word
+kind (Stack / SR MDL-best / ST3 / LM): repeat in book (40,984) 6.711 / 6.880 / 6.693 / 4.979; function word (447)
+7.920 / 7.451 / 7.503 / 6.234; content word (8,373) 15.220 / 14.473 / 14.599 / 10.858; unknown (310) 7.933 / 6.626 /
+6.661 / 13.580.
+**ST2 decoy -- PASS.** SR chain on real dev text: no reweight 7.7527, best reweight 7.7335 -> MDL chooses reweight
+(1,000, 0.25); on dev sentences shuffled across books: no reweight 7.9831, best reweight 7.9849 -> MDL chooses none.
+**ST3 -- PASS (a), (b) reverses SR8.** 9,000 fit positions, 91 components, chains up to 8 (MDL total still falling at
+8: 77,534.0 -> 73,552.3 -> 70,779.7 -> 70,037.4 -> 69,375.0 -> 69,043.4 -> 68,789.0 -> 68,601.2 bits). Selected (no
+program among the top 40 passed the calibration filter -> MDL-best): token(t-1) history+library count MIX0.5 token(t-1)
+& token(t-2) history+library count MIX0.9 any-position recency MIX0.9 token(t-1) earlier in this book count MIX0.9
+longest match history MIX0.9 token(t-2) count MIX0.9 longest match library MIX0.9 token(t-1) & token(t-2) earlier in
+this book count, escape 0.02, reweight (1,000, 0.25); fit 7.5992. Scored on the 50,114 positions: 8.0208 (without
+reweight 8.0487); dropping longest match in history 8.0334, in the library 8.0255, token(t-1) earlier in this book
+8.0968. With 9,000 fit positions the long-match components help on held-out text (SR8's overfitting was the 3,000-
+position sample). Same-book counts (Stack's copy register) were derived and selected; repeat-in-book 6.693 (Stack 6.711).
+**ST4 calibration -- FAIL (all three fixes).** Diagnosis on the 50,114 positions: form claims too flat at the top
+(stated 0.445 -> observed 0.520; 0.541 -> 0.611) and overstated at the bottom (0.072 -> 0.060): 7 bins refuted.
+ST4 shrink toward the prior: chosen a = 0, 7 refuted. ST4b sharpening: chosen g = 1.1, 3 refuted (stated 0.0-0.3,
+overstated by 0.010-0.016). ST4c histogram binning learned on the fit positions: 2 refuted (stated 0.365 -> 0.340;
+0.688 -> 0.647). The fit (dev books) rates do not transfer to the scored (test) books at bounds of 0.007-0.03.

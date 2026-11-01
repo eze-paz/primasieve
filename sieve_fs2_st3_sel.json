@@ -1,0 +1,1 @@
+{"chain": [["count_0_all+lib", null], ["count_6_all+lib", ["fixed", 0.5]], ["recency", ["fixed", 0.9]], ["count_0_book", ["fixed", 0.9]], ["long_hist", ["fixed", 0.9]], ["count_1_all", ["fixed", 0.9]], ["long_library", ["fixed", 0.9]], ["count_6_book", ["fixed", 0.9]]], "escape": 0.02, "reweight": [1000, 0.25]}

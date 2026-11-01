@@ -1,0 +1,10 @@
+aligned: 50,114 positions, answers equal
+   Stack (stack + lookup + copy): mean 8.1507 bits/word, 95% interval 8.0842 - 8.2178
+   LM (RWKV-7 0.4B): mean 6.0261 bits/word, 95% interval 5.9471 - 6.1100
+   Sieve SR selected (calibration-filtered): mean 8.1979 bits/word, 95% interval 8.1428 - 8.2536
+   Sieve SR MDL-best: mean 8.1519 bits/word, 95% interval 8.0931 - 8.2102
+   Sieve ST3: mean 8.0208 bits/word, 95% interval 7.9512 - 8.0911
+   repeat in book  40,984 positions: Stack 6.711; LM 4.979; Sieve SR selected 6.998; Sieve SR MDL-best 6.880; Sieve ST3 6.693
+   function word      447 positions: Stack 7.920; LM 6.234; Sieve SR selected 7.577; Sieve SR MDL-best 7.451; Sieve ST3 7.503
+   content word     8,373 positions: Stack 15.220; LM 10.858; Sieve SR selected 14.158; Sieve SR MDL-best 14.473; Sieve ST3 14.599
+   unknown            310 positions: Stack 7.933; LM 13.580; Sieve SR selected 6.751; Sieve SR MDL-best 6.626; Sieve ST3 6.661

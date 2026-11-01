@@ -1,0 +1,4 @@
+   fit: no reweight 7.7527 bits/word; best reweight 7.7335 (1000, 0.25)
+ST2 fit: MDL chooses reweight (1000, 0.25) (11 s)
+   decoy: no reweight 7.9831 bits/word; best reweight 7.9849 (5000, 0.25)
+ST2 decoy: MDL chooses no reweight (43 s)

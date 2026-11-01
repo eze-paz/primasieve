@@ -37,6 +37,7 @@ for fold, Ff, Fs in FOLDS:
     out[Fs.name] = row
     log(f"fold {fold} (fit {Ff.name}, score {Fs.name}) word bits: stack {row['stack'].mean():.4f}; stack + copy {row['stack + copy'].mean():.4f}; "
         f"stack + library lookup {row['lookall'].mean():.4f}; stack + lookup + copy {row['lookall + copy'].mean():.4f}; copy weights by followers seen {np.round(lam, 3).tolist()}")
+np.savez(os.path.join(HERE, "lr_c12_bits_scored.npz"), best=out["scored"]["lookall + copy"], llm=LLM, y=FA.y, para=FA.ppara, book=FA.book[FA.pos])   # ST1: per-position bits
 F = FA; r = out["scored"]; n, c, seen = CS["scored"]; base = base_bits(F)
 kind = np.where(F.y == UNK, "unknown", np.where(seen, "repeat in book", np.where(F.y <= 150, "function word", "content word")))
 print("C1 breakdown, fold A, mean word bits [total bits]:")

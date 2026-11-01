@@ -87,3 +87,11 @@ level with Stack (8.1507); LM 6.026. Adopted: the reweight-by-form-shares combin
 library counted as history, longer chains (5, still improving), graded identity matching. Long-match overfits;
 form-claim calibration does not hold on held-out text. Next: chains beyond 5; more fit positions (3,000 limits what
 MDL can afford); reweight by more attributes than forms; calibrate stated form probabilities (Q) per component.
+
+## Status after ST (2026-11-02; numbers in sieve_lang_prereg.md "ST results")
+Sieve 8.0208 bits/word on the 50,114 positions, ahead of Stack (8.1507) by non-overlapping intervals; LM 6.026.
+Everything in the program is derived and selected by MDL: counts over history + library, recency, same-book counts
+(copy register), long-match lookup, and the topic reweight (which a shuffled-book decoy rejects). The SR overfitting
+of long-match was the small fit sample. Chains still improve at 8 components. Open: form-level calibration does not
+transfer from dev to test books (2-7 refuted bins whatever the one-step fix). Next: chains beyond 8 with more fit
+positions; the LM's lead is on content words (10.858 vs 14.599) and repeats (4.979 vs 6.693).
