@@ -232,3 +232,52 @@ unigram; not a result.
   small set of weighted alternatives (E14's CONJECTURE-with-evidence, not VERIFIED), not single-outcome rules.
 Next discriminating test, if wanted: MX2 with k-outcome rules (context -> up to k groups with weights), k = 2..5;
 if ~10,000 such rules reach 80 %, defeasible multi-outcome rules are the representation to build the engine on.
+
+# MX3 -- defeasible multi-outcome rules that state probabilities (registered 2026-11-01, before any run)
+Owner, 2026-11-01: "continue. also, we need to ensure the model can handle probabilities. i.e. when a single answer
+isnt asserted, well have it state the X most probable outcomes with their assigned probabilities ... maybe start
+with 3."
+
+Rule form: context -> up to k outcomes (next word's group) each with its probability; the rest of the mass backs off
+to the level below, renormalised over the other groups (exceptions are paid, not forbidden). Per context the engine
+chooses k in 1..5 by MDL: training bits saved minus 2 x log2(#contexts) + k x (log2(#groups) + 8) bits. Same three
+levels, data and held-out 50,114 as MX2. Also run with k fixed at 1 (must reproduce MX2) and at 3.
+How the engine speaks at each held-out position: the most specific rule that fires states its outcomes. If its top
+outcome has p >= 0.9 it **asserts** that one answer; otherwise it states its **top 3 outcomes with their
+probabilities** (and the remaining mass as "other").
+Gates:
+- MX3a representation: the best <= 10,000 rules (k free) reach >= 80 % of the full count model's gain (MX2: 29.7 %
+  with k = 1). Also reported: total outcomes stored, and the curve for N = 10 .. all.
+- MX3b honesty of the stated probabilities on held-out text: expected calibration error (10 bins over every stated
+  outcome probability) <= 0.03; asserted answers right >= 90 % of the time; for top-3 statements, the observed rate
+  at which the truth is among the three within 0.03 of the stated total.
+A pass on both says: a deterministic, inspectable rule set can hold most of what the counts know and state it
+honestly as "one answer" or "these three, with these odds".
+
+## MX3 results (2026-11-01)
+mx3_run.txt (k chosen by MDL, 174 s), mx3_k1_run.txt (sanity: reproduces MX2's 29.7 %; 10,916 vs 11,131 rules because
+the k = 1 cost here is 17.3 bits per outcome against MX2's 16), mx3_k3_run.txt.
+
+| rules | k by MDL | k = 3 | k = 1 |
+|---|---|---|---|
+| best 1,000 | 39.8 % | 33.7 % | 22.1 % |
+| best 10,000 | 52.3 % | 44.6 % | 29.5 % |
+| all kept | 53.2 % (12,810 rules, 45,078 outcomes) | 45.1 % (11,594) | 29.7 % (10,916) |
+(share of the full count model's held-out gain over the group unigram; the full model holds 4,834,895 entries.)
+MDL chose 5 outcomes for most rules where the context has many (level 0: 550 of 632), fewer where it does not.
+
+**MX3a -- FAIL** (53.2 % < 80 %). Multi-outcome rules nearly double what single-outcome rules hold (29.7 -> 53.2 %)
+with about 1 % of the full model's entries; the other half sits in the 285,000 two-group contexts MDL finds too
+rare to pay for a rule (the long tail).
+
+**MX3b -- PASS** (honest probabilities). Calibration error over every stated probability 0.0096 (bar 0.03); asserted
+answers (p >= 0.9) right 0.913 (bar 0.90), but it asserts on only 0.09 % of positions; top-3 statements contain the
+truth 0.245 of the time vs a stated 0.272 (gap 0.027, bar 0.03). Mild over-confidence in the 0.3-0.6 and 0.8-0.9
+bins (e.g. stated 0.84 -> observed 0.67, 107 statements). The engine says "I don't know which, here are the odds"
+almost everywhere, and the odds are right; the statements are weak because the next word's group is genuinely
+uncertain from two words of context (truth in the top 3 one time in four).
+
+Reading: defeasible multi-outcome rules are the right representation (calibrated, inspectable, 100x smaller), but
+two words of context leave most of the next word open. What closes the rest is context beyond two words (what the
+story is about, who is present) -- which is where the network and the language model earn their lead (R25-cu: 84 %
+of the LLM's lead is on words already used earlier in the text).

@@ -1,0 +1,11 @@
+level 0: 634 contexts, 629 rules, outcomes per rule [0, 0, 629, 0, 0] (6 s)
+level 1: 5,001 contexts, 2,406 rules, outcomes per rule [0, 0, 2406, 0, 0] (30 s)
+level 2: 294,193 contexts, 8,559 rules, outcomes per rule [0, 0, 8559, 0, 0] (198 s)
+held-out group bits: unigram 8.1773; full count model 6.9485 (4,834,895 entries)
+   best      10 rules (30 outcomes): 8.1089 bits (  5.6% of the full model's gain)
+   best     100 rules (300 outcomes): 7.9656 bits ( 17.2% of the full model's gain)
+   best   1,000 rules (3,000 outcomes): 7.7635 bits ( 33.7% of the full model's gain)
+   best  10,000 rules (30,000 outcomes): 7.6291 bits ( 44.6% of the full model's gain)
+   best  11,594 rules (34,782 outcomes): 7.6236 bits ( 45.1% of the full model's gain)
+SPEAKING on 50,114 held-out positions: rule fired 99.9%; asserted one answer 0.09% (right 0.913); top-3 statements 99.9%: truth among the three 0.250 vs stated total 0.279; calibration error over all stated probabilities 0.0095
+done (202 s)

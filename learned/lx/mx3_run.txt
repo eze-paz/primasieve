@@ -1,0 +1,30 @@
+level 0: 634 contexts, 632 rules, outcomes per rule [2, 4, 18, 58, 550] (8 s)
+level 1: 5,001 contexts, 2,683 rules, outcomes per rule [279, 300, 388, 572, 1144] (34 s)
+level 2: 294,193 contexts, 9,495 rules, outcomes per rule [1922, 1323, 1147, 1543, 3560] (171 s)
+held-out group bits: unigram 8.1773; full count model 6.9485 (4,834,895 entries)
+   best      10 rules (50 outcomes): 8.0959 bits (  6.6% of the full model's gain)
+   best     100 rules (498 outcomes): 7.9160 bits ( 21.3% of the full model's gain)
+   best   1,000 rules (4,743 outcomes): 7.6880 bits ( 39.8% of the full model's gain)
+   best  10,000 rules (37,635 outcomes): 7.5344 bits ( 52.3% of the full model's gain)
+   best  12,810 rules (45,078 outcomes): 7.5236 bits ( 53.2% of the full model's gain)
+SPEAKING on 50,114 held-out positions: rule fired 100.0%; asserted one answer 0.09% (right 0.913); top-3 statements 99.9%: truth among the three 0.245 vs stated total 0.272; calibration error over all stated probabilities 0.0096
+   stated 0.0-0.1: 105,030 statements, stated mean 0.055, observed 0.049
+   stated 0.1-0.2: 26,570 statements, stated mean 0.137, observed 0.126
+   stated 0.2-0.3:  7,001 statements, stated mean 0.246, observed 0.231
+   stated 0.3-0.4:  2,893 statements, stated mean 0.344, observed 0.274
+   stated 0.4-0.5:  1,127 statements, stated mean 0.447, observed 0.381
+   stated 0.5-0.6:    746 statements, stated mean 0.554, observed 0.477
+   stated 0.6-0.7:    519 statements, stated mean 0.645, observed 0.642
+   stated 0.7-0.8:    207 statements, stated mean 0.746, observed 0.676
+   stated 0.8-0.9:    107 statements, stated mean 0.841, observed 0.673
+   stated 0.9-1.0:     46 statements, stated mean 0.947, observed 0.913
+examples (previous words -> statement):
+   after 'as': a 0.08; he 0.07; the 0.07; other 0.78   [truth: a]
+   after 'not': to 0.05; a 0.04; be/undergo/inspect 0.03; other 0.88   [truth: to]
+   after 'you': should/wrenched/shuts 0.05; have/hev/masterful 0.05; are/surround/awaits 0.05; other 0.84   [truth: know/expiate/uz]
+   after 'national': states/ages/nations 0.06; party/class/system 0.04; other 0.90   [truth: art/hast/wilt]
+   after 'the': king/duke/minister 0.15; doctor/prince/count 0.09; captain/colonel/queen 0.06; other 0.71   [truth: laws/powers/interests]
+   after 'this': is/trudged/sallied 0.06; was 0.04; time/commandment 0.04; other 0.87   [truth: different/various/direct]
+   after 'places': and 0.11; of 0.09; where/whence/whither 0.07; other 0.73   [truth: were/straws/allee]
+   after 'as': a 0.08; he 0.07; the 0.07; other 0.78   [truth: i]
+done (174 s)
