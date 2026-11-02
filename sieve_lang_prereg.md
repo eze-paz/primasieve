@@ -729,3 +729,5 @@ Added to SZ2's language (same algebra, search strategies, screening, bits rules)
   last 1,000 tokens.
 Run: up to 12 runs (about an hour) or 6 idle runs. Report: which primitives are accepted, fit, scored on the 50,114
 positions beside SZ2 (same start) and the hand-built 7.7205; drop-one-kind ablations on the scored positions.
+**SZ3 amendment (before running).** The token stream has no punctuation tokens (words only), so 5 becomes "position
+in the sentence" (0, 1, 2, 3-5, 6-10, 11+) as a structural position attribute.
