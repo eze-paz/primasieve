@@ -110,3 +110,6 @@ within-book calibration 0 refuted. Energy keeps paying; next: 90,000 fit positio
 More fit positions saturate (90,000: 7.8992 vs 30,000: 7.8984). Trigger components (words following recent rare words
 in training + library) pass: 7.8857 (content words 14.414; LM 10.858). Next: trigger variants (within-book source,
 form-level triggers), or the LM gap on repeats (6.568 vs 4.979).
+
+## Loop iteration 4 (2026-11-02): SX2
+Book triggers add little: 7.8834 (SX1 7.8857); repeats 6.564 (LM 4.979). Gains per idea are shrinking.

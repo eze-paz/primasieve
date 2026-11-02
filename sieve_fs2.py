@@ -55,6 +55,7 @@ def desc(n):
     if p[0] == "recency": return "any position recency"
     if p[0] == "graded": return f"graded {p[1]}, offset weights {p[2]}"
     if p[0] == "trig": return f"trigger: words within {p[1]} after recent words with count <= {p[2]}"
+    if p[0] == "btrig": return f"book trigger: words within {p[1]} after recent words (count <= {p[2]}) earlier in this book"
     return f"longest match (3-8 words) in the {'history' if p[1] == 'hist' else 'library'}"
 def dl(n):
     p = n.split("_"); b = math.log2(len(KINDS))

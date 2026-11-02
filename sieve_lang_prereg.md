@@ -560,3 +560,6 @@ Stack / LM): content word (8,373) 14.481 / 14.414 / 15.220 / 10.858; repeat in b
 R_t = distinct words among the last 50 tokens with training + library count <= thr, thr in {100, 1,000, any};
 W in {10, 50}: 6 components. Offered to the knob-free selection on 30,000 fit positions, resuming from SX1's
 selection; reweight stage refitted. Bar: scored < 7.8857; repeat-in-book and content-word means reported.
+**SX2 result -- PASS (narrow).** MDL added 1 book trigger (W 10, thr 1,000): fit 7.5053 (SX1 7.5071); reweight 1,000 /
+5,000 / 200, betas 0.119 / 0.178 / 0.045, fit 7.4894. Scored 7.8834 bits/word (without reweight 7.9145; bar 7.8857).
+Repeat in book 6.564 (SX1 6.568); content word 14.416 (SX1 14.414).
