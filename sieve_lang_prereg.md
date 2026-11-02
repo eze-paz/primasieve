@@ -857,3 +857,6 @@ count and Descend Votes: 0.7-1.3 s with the index on disk vs 6.5-15.2 s looped; 
 5-process pool for candidate evaluation (lazy derived attributes); screen-first offers (sieve_onto.py screen <idea>:
 the idea on the 1,000-position subsample, gains x 9, bits as on 9,000) -- O1's screen in ~4 min recommends promotion
 (4 pieces), matching its full offer.
+**SO final.** O8 scored 7.8179. All accepted pieces re-chosen greedily from the O0 base: added O3 node topic (book,
+depth 4) and O6 agreement first, then O5, O2 (both), O1 and O3 (window 1,000, depth 10): fit 7.4952 -> 7.3631;
+scored 7.7153 bits/word (O0 base 7.8446; hand-built SX10 7.7205; Stack 8.1507; LM 6.026). Overall bar (< 8.2659) PASS.
