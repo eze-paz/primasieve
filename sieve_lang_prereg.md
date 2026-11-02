@@ -711,3 +711,21 @@ proposal is first evaluated on 1,000 of the 9,000 fit positions (every 9th) -- i
 move loop (mix / lift / gate as SZ). Stop: 6 consecutive runs that accept nothing.
 Bars: P1 a static count Vote (joint token terms, span 1) is accepted; P3 scored < 8.9368 (Counter); descriptive: wins
 per strategy, every accepted program, scored beside SZ's 9.1298 and the hand-built 7.7205.
+
+## SZ3 -- seven non-counting primitives (registered 2026-11-02, before running; owner: "try all 1-7")
+Added to SZ2's language (same algebra, search strategies, screening, bits rules); search continues from SZ2's state.
+1 Similarity: a term sim(K) keeps the K anchors (K in 50, 500) whose signature -- the follower-form distribution of the
+  token at j, from training + library counts -- is most similar (cosine) to t's, weighted by that similarity.
+2 Self-made attributes: tokens clustered by the same signatures (k-means, k in 50, 200; words with >= 20 uses, the rest
+  by nearest centroid) -> attributes c50, c200 usable in any term.
+3 Registers: position attributes "last rare word (count <= 100 / <= 1,000) so far" and "last capitalised mid-sentence
+  word"; terms can require the anchor's register to equal t's, or the anchor token to equal t's register.
+4 Below the word: Spell(part, B) -- shortlist words sharing a 3-letter suffix or 4-letter prefix with tokens of the last
+  B (50, 1,000) get votes by how many share it.
+5 Structure: position attributes "parity of quote tokens / depth of open brackets since the sentence start", usable in
+  dynamic Votes.
+6 Finer weights: a move giving one mixture member a weight per c50 class of the previous token (50 numbers).
+7 Programs over the stream: Lag(m) -- predict token[t - p] for the m (1, 3) lags p <= 50 that agreed most often in the
+  last 1,000 tokens.
+Run: up to 12 runs (about an hour) or 6 idle runs. Report: which primitives are accepted, fit, scored on the 50,114
+positions beside SZ2 (same start) and the hand-built 7.7205; drop-one-kind ablations on the scored positions.

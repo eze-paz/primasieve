@@ -178,7 +178,7 @@ def golden(fn, lo, hi, it=22):
 def state():
     if not os.path.exists(CK): json.dump(dict(mem=[], lift=[], th=[0.0], ga=[0.0], be=[], gact=[0], evaluated=[], rejected=[], idle=0, run=0, log=[]), open(CK, "w"))
     return json.load(open(CK))
-mode = sys.argv[1] if len(sys.argv) > 1 else "search"
+mode = (sys.argv[1] if len(sys.argv) > 1 else "search") if __name__ == "__main__" else None      # importable (sieve_prim2.py)
 if mode == "search":
     st = state(); st["run"] += 1; rng = np.random.default_rng(st["run"]); M = Model(CX, st); M.gact = st["gact"]; n = M.n; half = 0.5 * math.log2(n); move = math.log2(4)
     cur = M.bits(); F.log(f"SZ run {st['run']}: {len(st['mem'])} Votes, {len(st['lift'])} lifts, {int(sum(st['gact']))} gates; fit {cur / n:.4f} bits/word")
