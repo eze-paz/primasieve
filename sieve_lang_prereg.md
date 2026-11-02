@@ -549,3 +549,8 @@ R_t = the distinct words among the last 50 tokens whose training + library count
 {1,000, 10,000}: 4 components (with Q over forms). Offered to the knob-free selection on 30,000 fit positions,
 resuming from SW2's 25 components (same rules), then the reweight stage refitted. Bar: scored < 7.8984; content-word
 mean bits reported (SW2 vs SX1).
+**SX1 result -- PASS.** Resuming SW2's selection, MDL added 3 trigger components (W 10 thr 100; W 10 thr 1,000; W 50
+thr 100) and token(t-2) & mfp(t-1) count: fit 7.5071 (SW2 7.5148); reweight windows 1,000 / 5,000 / 200, betas 0.118 /
+0.178 / 0.045, fit 7.4912. Scored: 7.8857 bits/word (without reweight 7.9171; bar 7.8984). By word kind (SW2 / SX1 /
+Stack / LM): content word (8,373) 14.481 / 14.414 / 15.220 / 10.858; repeat in book (40,984) 6.569 / 6.568 / 6.711 /
+4.979; function word (447) 7.513 / 7.506 / 7.920 / 6.234; unknown (310) 6.362 / 6.390 / 7.933 / 13.580.

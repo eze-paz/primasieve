@@ -11,6 +11,8 @@ import sieve_fs2 as F
 from sieve_rw2 import win
 MODE = sys.argv[1] if len(sys.argv) > 1 else "fit9"; CX = sys.argv[2] if MODE in ("rw", "eval") and len(sys.argv) > 2 else (MODE if MODE not in ("rw", "eval") else "fit9"); T0 = time.time()
 NAMES = F.names_of("count") + F.names_of("book") + F.names_of("recency") + [f"graded_id_{w}" for w in F.GW] + F.names_of("long")
+if os.path.exists(os.path.join(F.CD, f"{sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] in ('rw', 'eval') else (sys.argv[1] if len(sys.argv) > 1 else 'fit9')}_trig_10_100.npz")):
+    NAMES += [f"trig_{W}_{thr}" for W in (10, 50) for thr in (100, 1000)]                                # SX1: trigger components
 WS = (50, 200, 1000, 5000, "book")
 def mix_bits(th, P, M):
     """bits and gradient wrt log-weights; row 0 = uniform"""

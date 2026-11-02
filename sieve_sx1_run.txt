@@ -1,0 +1,25 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+SW on fit30: 95 components, 30,000 positions; uniform 16.5281 bits/word (9 s)
+   resumed with 25 components, fit 7.5148 (9 s)
+   + trigger: words within 10 after recent words with count <= 100: fit 7.5128 bits/word (26 components) (15 s)
+   + trigger: words within 10 after recent words with count <= 1000: fit 7.5098 bits/word (27 components) (21 s)
+   + trigger: words within 50 after recent words with count <= 100: fit 7.5077 bits/word (28 components) (26 s)
+   + token(t-2) & mfp(t-1) count: fit 7.5071 bits/word (29 components) (33 s)
+   time budget: checkpoint (35 rejected), rerun to resume (260 s)
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+SW on fit30: 95 components, 30,000 positions; uniform 16.5281 bits/word (9 s)
+   resumed with 29 components, fit 7.5071 (9 s)
+SW selected 29 components; fit 7.5071 bits/word, description 406.2 bits (146 s)
+   mixture outputs cached, rerun (13 s)
+   + reweight by form shares of 1000: betas [0.234], fit 7.4944 bits/word (59 s)
+   + reweight by form shares of 5000: betas [0.169, 0.166], fit 7.4925 bits/word (102 s)
+   + reweight by form shares of 200: betas [0.118, 0.178, 0.045], fit 7.4912 bits/word (151 s)
+SW reweight stage: 3 windows [1000, 5000, 200], betas [0.118, 0.178, 0.045]; fit 7.4912 bits/word (167 s)
+SW scored on the 50,114 positions: 7.8857 bits/word (without reweight 7.9171; SU1 chain 7.9517, Stack 8.1507, LM 6.026) (20 s)
+   repeat in book  40,984: SW2 6.569; SX1 6.568; Stack 6.711; LM 4.979
+   function word      447: SW2 7.513; SX1 7.506; Stack 7.920; LM 6.234
+   content word     8,373: SW2 14.481; SX1 14.414; Stack 15.220; LM 10.858
+   unknown            310: SW2 6.362; SX1 6.390; Stack 7.933; LM 13.580
+   all: SW2 7.8984; SX1 7.8857; Stack 8.1507; LM 6.0261

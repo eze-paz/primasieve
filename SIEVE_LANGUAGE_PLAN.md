@@ -105,3 +105,8 @@ forms for the reweight stage (mff classes); LM gap on content words (14.6 vs 10.
 Stacked reweight on the tuned chain failed (7.9539). The knob-free search (gradient order + MDL, every parameter
 fitted, (1/2) log2 n bits each) passed: 7.9240 on 9,000 fit positions, 7.8984 on 30,000 (Stack 8.1507, LM 6.026);
 within-book calibration 0 refuted. Energy keeps paying; next: 90,000 fit positions.
+
+## Loop iteration 3 (2026-11-02): SW3, SX1
+More fit positions saturate (90,000: 7.8992 vs 30,000: 7.8984). Trigger components (words following recent rare words
+in training + library) pass: 7.8857 (content words 14.414; LM 10.858). Next: trigger variants (within-book source,
+form-level triggers), or the LM gap on repeats (6.568 vs 4.979).

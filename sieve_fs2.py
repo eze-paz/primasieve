@@ -54,6 +54,7 @@ def desc(n):
     if p[0] == "count": return " & ".join(f"{'token' if a == 'id' else a}(t-{o})" for a, o in SETS[int(p[1])]) + {"all": "", "library": ", in the library", "all+lib": ", in history + library", "book": ", earlier in this book"}[p[2]] + " count"
     if p[0] == "recency": return "any position recency"
     if p[0] == "graded": return f"graded {p[1]}, offset weights {p[2]}"
+    if p[0] == "trig": return f"trigger: words within {p[1]} after recent words with count <= {p[2]}"
     return f"longest match (3-8 words) in the {'history' if p[1] == 'hist' else 'library'}"
 def dl(n):
     p = n.split("_"); b = math.log2(len(KINDS))
