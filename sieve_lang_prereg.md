@@ -798,3 +798,11 @@ O8 tree revision: leaves re-split where the SH2 model's fit bits concentrate (2-
 O9 tree candidates: shortlist + the 64 most frequent members of the node the previous token predicts; coverage reported;
   if coverage rises, SH2's program is re-evaluated on the new shortlist.
 Final: every accepted piece together, scored. Bars: descriptive per idea; overall bar: scored < 8.2659.
+**D0 result.** SH2 on the 50,114 positions: 414,235 bits. Answer in the shortlist 37,020 positions, 5.623 bits each
+(208,177); outside 13,094 positions, 15.737 bits each (206,058), of which 14.024 per position is the unigram spread of
+the rest bucket. Outside the shortlist: content words 0.844 of the time, repeats 0.146.
+**O0 (amendment, before any O-run): exact answer probabilities.** The rest bucket discards each Vote's own probability
+of an answer outside the shortlist (re-spread by unigram) -- a representation artefact. Every Vote now also carries its
+exact probability of the answer (an extra column, linear like the others; lifts on it use the rest column's lift); the
+unigram member carries u(answer). Shortlist distributions and normalisation are unchanged. SH2's program re-evaluated
+under O0 (same weights, then refit on the fit positions) is the new base for O1-O9.

@@ -1,0 +1,7 @@
+D0: all 50,114 positions: mean 8.2658 bits/word, total 414,235 bits
+   answer in shortlist: 37,020 positions, mean 5.623, total 208,177 bits; of which rest-spread part 0.000/position
+   answer outside shortlist: 13,094 positions, mean 15.737, total 206,058 bits; of which rest-spread part 14.024/position
+   repeat in book: 40,984 positions, mean 6.833, total 280,060 bits; outside shortlist 0.146
+   function word: 447 positions, mean 7.339, total 3,280 bits; outside shortlist 0.112
+   content word: 8,373 positions, mean 15.406, total 128,992 bits; outside shortlist 0.844
+   unknown: 310 positions, mean 6.134, total 1,901 bits; outside shortlist 0.000
