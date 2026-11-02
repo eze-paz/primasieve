@@ -689,3 +689,13 @@ dev positions.
 **Bars.** P1 it builds a count-like Vote (static, joint token terms, span 1) and a recency-like Vote (window, weight
 1/(1+d)); P2 it builds something trigger-like (bag term with span > 1) or a lift term; P3 scored (50,114 positions)
 < 8.9368 (Counter). Descriptive: every accepted program, which ones match no hand-made family, scored beside 7.7205.
+**SZ result.** Shortlist: K 309 (fit) / 321 (scored); answer inside 0.756 / 0.739. Representation check: unigram-only
+gives exactly -log2 u(answer) (10.0193 fit, 10.3118 scored). Search from nothing: 8 runs, 49 Votes evaluated, 12
+accepted, no lifts, no gates; stopped by the rule (3 idle runs). Accepted in order: any anchor, next 20, 1/(1+d), last
+1,000; mfp(j-1) & mff(j) in last 10, book; mff(j-1), last 1,000; any anchor, last 1,000; mff(j-1), book; form(j-1),
+last 1,000; rare id(j), next 5, 1/(1+d), last 1,000; id(j) in last 10, last 1,000; static bag of last 10 (count <= 100),
+next 5; form(j) & rare id(j-2), 1/(1+d), book; id(j), 1/(1+d), last 50,000 (fit 9.5237 -> 9.0630); mfp(j), book. Fit
+8.9972; scored 9.1298 bits/word. P1 FAIL (recency-like built; no static count Vote -- a single static bigram Vote
+alone fits 8.6944, it was never sampled); P2 PASS (static bag, span 5); P3 FAIL (9.1298 vs 8.9368). Diagnosis: the
+search, not the algebra -- about 6 Votes per five-minute run, drawn uniformly from the prior (valid static Votes are
+rare draws), no error-guided proposals; lifts and gates were never accepted at this stage.
