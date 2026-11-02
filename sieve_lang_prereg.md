@@ -503,3 +503,9 @@ Prefixes of the 11-component program, fit / scored bits/word: 1 8.6699 / 9.2327;
 this book; mff(t-1) & mff(t-2) history+library; token(t-1) & mff(t-2) history+library.
 **SU2 -- PASS.** Within-book adaptive calibration: 0 refuted bins on the 50,114 positions for the ST3 program (sharpened
 only: 3) and for the SU1 program (sharpened only: 5). Largest well-filled gap: stated 0.444 vs observed 0.448.
+
+## SV -- loop iteration 2 (registered 2026-11-02, before running)
+**SV1 stacked reweight.** SU1's 11-component chain fixed; the reweight stage chosen by MDL on the 9,000 fit positions
+among: none; one reweight (W in 50, 200, 1,000, 5,000, the whole book so far; beta in 0.25, 0.5, 1); or two stacked
+(product of two different windows, beta in 0.25, 0.5 each). Program bits: 1 + per reweight (1 + log2 5 + log2 3).
+Bar: scored < 7.9517 bits/word.
