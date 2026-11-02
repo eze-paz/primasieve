@@ -762,3 +762,8 @@ things / love / thing; for / at / on / by / from / about / like / upon / than; h
 screened ~80 proposals in 12 runs and SH2 stopped by "6 idle runs" after ~35. Fix: each run keeps drawing proposals
 (strategy chosen by the bandit's record) until its 115 s screening budget is used. SH2 continues from its state with
 the idle count reset; the right-view tree (hr1-hr10) joins its language.
+**SZ2 result (search stopped by me at run 30 to start SZ3; snapshot of 23 Votes, 3 gates).** From nothing: fit 8.0662;
+scored 8.3417 bits/word (SZ 9.1298; Counter 8.9368; Stack 8.1507; hand-built 7.7205). P1 PASS (static token count
+Vote accepted, found by crossover); P3 PASS. Accepted kinds: token and class (form, mff, mfp) counts, mixed token+form
+contexts (e.g. token(t-1) & form(t-2): fit 8.2653 -> 8.1829), recency, same-book counts, gates. Wins per strategy:
+levin 7, mutate 7, neighbourhood 4, crossover 4, prior 1. No lifts accepted.

@@ -1,0 +1,30 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cached Vote[form(j-0) in last 1; next 1; w=1; static] 239s
+cached Vote[form(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static] 115s
+cached Vote[form(j-0) in last 1 & mfp(j-0) in last 1; next 1; w=1; static] 161s
+cached Vote[id(j-0) in last 1; next 1; w=1; static] 75s
+cached Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1/(1+d); book] 11s
+cached Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; book] 11s
+cached Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static] 30s
+cached Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static] 38s
+cached Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static] 29s
+cached Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static] 32s
+cached Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1/(1+d); book] 7s
+cached Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; book] 6s
