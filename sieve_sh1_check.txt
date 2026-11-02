@@ -1,0 +1,8 @@
+left: 21,538 words, 132 leaves, depth min 2 median 8 max 13 (14 s)
+   leaf 000000: the, to, a, it, his, her, him, my, this, by
+   leaf 10000000: and, of, in, with, for, as, at, but, which, were
+   leaf 01: i, he, you, not, she, they, we, mr, why, miss
+   leaf 100001000: was, had, is, said, would, who, will, could, has, can
+   leaf 10100000: be, have, do, know, see, never, come, go, say, think
+   leaf 1000001: on, from, into, about, upon, over, down, through, under, between
+left: 5,677 WordNet-noun words; Spearman(tree LCA depth, WordNet path similarity) over 19,999 pairs = 0.139 (15 s)

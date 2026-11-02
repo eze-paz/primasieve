@@ -1,0 +1,6 @@
+SH1 left: 21,538 words, 42 nodes queued, 61 splits kept so far (62 s)
+SH1 left: 105 splits kept of 170 tried; depth 9; 37 nodes still queued (289 s)
+SH1 left: 21,538 words, 37 nodes queued, 105 splits kept so far (20 s)
+SH1 left: 130 splits kept of 232 tried; depth 12; 12 nodes still queued (1039 s)
+SH1 left: 21,538 words, 12 nodes queued, 130 splits kept so far (2155 s)
+SH1 left: 131 splits kept of 245 tried; depth 13; 0 nodes still queued -- tree complete (2167 s)

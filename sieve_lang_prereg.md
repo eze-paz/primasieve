@@ -744,3 +744,11 @@ way on shuffled text; and sample branches. Bars: the tree forms (depth > 3 somew
 **SH2 Sieve uses it.** Each tree depth becomes an attribute (left view hl_k, right view hr_k) usable in every Vote; a
 Descend Vote predicts the next word's class at depth k from a context and spreads it over the class's words by their
 counts. Search continues from SZ3's state (same rules). Bar: scored on the 50,114 positions below SZ3's.
+**SH1 result, left view (sieve_sh1_left.txt, sieve_sh1_check.txt).** On the training text 131 of 245 tried splits paid
+(e.g. 241,700 bits saved vs 1,792 cost; the last kept 373 vs 370): 21,538 words, 132 leaves, depth median 8, max 13.
+On shuffled text not one split paid (0 of 1): no tree forms. WordNet check: Spearman(depth of lowest common ancestor,
+WordNet path similarity) over 19,999 noun pairs = 0.139 (shuffled: no tree, so no ordering). Sample leaves: the / to /
+a / it / his / her / him / my / this / by; and / of / in / with / for / as / at / but / which; i / he / you / she /
+they / we / mr / miss; was / had / is / said / would / could / has / can; be / have / do / know / see / come / go /
+say / think; on / from / into / about / upon / over / down / through / under / between; house / world / room / door /
+side / end / country / town / war / family. Bars: tree forms (depth 13) PASS; real > shuffled PASS.

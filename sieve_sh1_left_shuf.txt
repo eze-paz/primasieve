@@ -1,0 +1,2 @@
+SH1 left_shuf: 21,538 words, 1 nodes queued, 0 splits kept so far (64 s)
+SH1 left_shuf: 0 splits kept of 1 tried; depth 0; 0 nodes still queued -- tree complete (74 s)
