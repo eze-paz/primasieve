@@ -752,3 +752,8 @@ a / it / his / her / him / my / this / by; and / of / in / with / for / as / at 
 they / we / mr / miss; was / had / is / said / would / could / has / can; be / have / do / know / see / come / go /
 say / think; on / from / into / about / upon / over / down / through / under / between; house / world / room / door /
 side / end / country / town / war / family. Bars: tree forms (depth 13) PASS; real > shuffled PASS.
+**SH1 result, right view.** 118 of 226 tried splits paid: 119 leaves, depth median 8, max 10. WordNet Spearman 0.067
+(left view 0.139). Sample leaves: the / of / a / in / that / his / with / her / my / this; and / was / had / is / be /
+have / were / are / been; i / you / they / we / would / will / could; time / day / life / nothing / house / place /
+things / love / thing; for / at / on / by / from / about / like / upon / than; him / them / out / up / down / come / go
+/ us / himself.

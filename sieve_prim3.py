@@ -212,13 +212,11 @@ def state():
     if not os.path.exists(CK):
         s2 = json.load(open(P2.CK)); s2.update(levin_i=0, neigh=[], idle=0, run=0, cg={}, log3=[], strat={s: [0, 0] for s in STRATS}); json.dump(s2, open(CK, "w"))
     return json.load(open(CK))
-mode = (sys.argv[1] if len(sys.argv) > 1 else "search") if __name__ == "__main__" else None
-if mode == "prep":
-    for k in (50, 200): clusters(k); F.log(f"c{k} attribute ready")
-elif mode == "search":
+def search_main():
+    """one checkpointed search run (SZ3 rules); state file CK, tag LABEL"""
     install(); st = state(); st["run"] += 1; rng = np.random.default_rng(5000 + st["run"]); half = 0.5 * math.log2(9000); move = math.log2(5)
     Ms = Model(SUB, st); Ms.gact = st["gact"]; scale = 9000 / Ms.n
-    F.log(f"SZ3 run {st['run']}: {len(st['mem'])} Votes, {len(st['lift'])} lifts, {int(sum(st['gact']))} gates, {len(st['cg'])} class-weights; bandit {st['strat']}")
+    F.log(f"{LABEL} run {st['run']}: {len(st['mem'])} Votes, {len(st['lift'])} lifts, {int(sum(st['gact']))} gates, {len(st['cg'])} class-weights; bandit {st['strat']}")
     r = {s: (st["strat"][s][1] + 1) / (st["strat"][s][0] + 2) for s in STRATS}; NP = 24; alloc = {s: max(2, round(NP * r[s] / sum(r.values()))) for s in STRATS}
     seen = set(st["screen"]) | set(st["evaluated"]); props = []
     def add(sp, s):
@@ -289,7 +287,12 @@ elif mode == "search":
         st["log3"].append(f"{kd} ({st['origin'].get(x, '-') if kd in ('mix', 'lift') else '-'}): {label} -> fit {cur / n:.4f}"); json.dump(st, open(CK, "w"))
         F.log(f"   + {kd} [{st['origin'].get(x, '-') if kd in ('mix', 'lift') else '-'}]: {label}: fit {cur / n:.4f} bits/word")
     st["idle"] = 0 if accepted else st["idle"] + 1; json.dump(st, open(CK, "w"))
-    F.log(f"SZ3 run {st['run']}: accepted {accepted}; idle {st['idle']}; fit {cur / n:.4f} bits/word")
+    F.log(f"{LABEL} run {st['run']}: accepted {accepted}; idle {st['idle']}; fit {cur / n:.4f} bits/word")
+LABEL = "SZ3"
+mode = (sys.argv[1] if len(sys.argv) > 1 else "search") if __name__ == "__main__" else None
+if mode == "prep":
+    for k in (50, 200): clusters(k); F.log(f"c{k} attribute ready")
+elif mode == "search": search_main()
 elif mode in ("eval", "ablate"):
     install(); st = json.load(open(sys.argv[2] if len(sys.argv) > 2 else CK)); M = Model("eval", st); M.gact = st["gact"]; b = M.bits()
     F.log(f"SZ3 scored on the {M.n:,} positions: {b / M.n:.4f} bits/word ({len(st['mem'])} Votes, {len(st['lift'])} lifts, {int(sum(st['gact']))} gates, {len(st.get('cg', {}))} class-weights)")

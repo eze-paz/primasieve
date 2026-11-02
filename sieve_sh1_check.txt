@@ -6,3 +6,11 @@ left: 21,538 words, 132 leaves, depth min 2 median 8 max 13 (14 s)
    leaf 10100000: be, have, do, know, see, never, come, go, say, think
    leaf 1000001: on, from, into, about, upon, over, down, through, under, between
 left: 5,677 WordNet-noun words; Spearman(tree LCA depth, WordNet path similarity) over 19,999 pairs = 0.139 (15 s)
+right: 21,538 words, 119 leaves, depth min 4 median 8 max 10 (18 s)
+   leaf 0000000000: the, of, a, in, that, his, with, her, my, this
+   leaf 10000000: and, was, had, is, be, have, were, are, been, now
+   leaf 10010: i, you, not, they, we, would, will, could, only, did
+   leaf 1110000: time, day, again, life, nothing, house, place, things, love, thing
+   leaf 011000000: for, at, on, by, from, about, like, upon, than, before
+   leaf 1101000: him, them, out, up, down, come, go, us, himself, came
+right: 5,677 WordNet-noun words; Spearman(tree LCA depth, WordNet path similarity) over 19,999 pairs = 0.067 (20 s)

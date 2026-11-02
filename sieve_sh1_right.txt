@@ -1,0 +1,4 @@
+SH1 right: 21,538 words, 1 nodes queued, 0 splits kept so far (17 s)
+SH1 right: 98 splits kept of 144 tried; depth 9; 46 nodes still queued (254 s)
+SH1 right: 21,538 words, 46 nodes queued, 98 splits kept so far (18 s)
+SH1 right: 118 splits kept of 226 tried; depth 10; 0 nodes still queued -- tree complete (120 s)
