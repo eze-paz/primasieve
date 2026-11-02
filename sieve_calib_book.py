@@ -12,7 +12,12 @@ def claims(Q, y):
     return np.take_along_axis(Q, top, 1), (top == F.FORM[y][:, None]).astype(float)
 prog = sys.argv[1] if len(sys.argv) > 1 else "sieve_fs2_st3_mdl"
 import json
-if prog.startswith("free_"):                                                                    # knob-free programs (sieve_free.py)
+if prog.startswith("gate7"):                                                                      # SX7 gated programs (sieve_gate.py)
+    sys.argv = [sys.argv[0], "eval", "7"]; import sieve_gate as SG7; st7 = json.load(open(SG7.CK)); s_, T_, _ = F.ctx("fit30"); yf = s_[T_]
+    pm_, Q_ = SG7.weights_q("fit30", np.array(st7["th"]), np.array(st7["ga"])); b_ = np.ones_like(Q_)
+    for W, be in zip(st7["ws"], st7["bs"]): b_ = b_ * ((SG7.SF.win("fit30", W) + 1e-4) / F.PG) ** be
+    Qf = Q_ * b_ / (Q_ * b_).sum(1, keepdims=True); prog = "gate7_fit30"
+elif prog.startswith("free_"):                                                                    # knob-free programs (sieve_free.py)
     import sieve_free as SF; P = json.load(open(os.path.join(F.HERE, f"sieve_{prog}.json"))); cx = P["cx"]; s_, T_, _ = F.ctx(cx); yf = s_[T_]
     _, Qf = SF.model(cx, P["sel"], np.array(P["th"]), P["ws"], P["bs"])
 else:

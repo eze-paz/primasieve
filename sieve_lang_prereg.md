@@ -607,3 +607,11 @@ pays. On SX4's 35 components, 30,000 fit positions; reweight refitted. Bar: scor
 again with its own gate: candidates in gradient order, each fitted with its log-weight and gate exponent jointly with
 the rest, added if it saves more than log2(131) + 2 x (1/2) log2 n bits; then gates re-offered on all; reweight
 refitted. Bar: scored < 7.7451.
+**SX7 result -- PASS.** 11 more components adopted with their gates (mostly factor components and book triggers):
+46 components, 23 gated, fit 7.3513; reweight 1,000 / book / 50 / 200 / 5,000, fit 7.3284. Scored 7.7280 bits/word
+(without reweight 7.7680; bar 7.7451). Within-book calibration: 0 refuted form-claim bins (sharpened only: 6).
+
+## SX8 -- loop iteration 10 (registered 2026-11-02, before running)
+**SX8 second gate feature.** Weight = w_c (n/(n+T))^g_c (1+n)^h_c: the evidence count itself as a second gate
+feature, h_c added component by component in gradient order (same rules: (1/2) log2 n + log2(46) bits each), on SX7's
+program; reweight refitted. Bar: scored < 7.7280.
