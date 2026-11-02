@@ -507,5 +507,17 @@ only: 3) and for the SU1 program (sharpened only: 5). Largest well-filled gap: s
 ## SV -- loop iteration 2 (registered 2026-11-02, before running)
 **SV1 stacked reweight.** SU1's 11-component chain fixed; the reweight stage chosen by MDL on the 9,000 fit positions
 among: none; one reweight (W in 50, 200, 1,000, 5,000, the whole book so far; beta in 0.25, 0.5, 1); or two stacked
-(product of two different windows, beta in 0.25, 0.5 each). Program bits: 1 + per reweight (1 + log2 5 + log2 3).
+(product of two different windows, beta in 0.25, 0.5 each). Program bits: 1 + per reweight (1 + log2 5 + log2 3); escape fixed at the chain's 0.02 (amended before any result, for time).
 Bar: scored < 7.9517 bits/word.
+**SV1 result -- FAIL.** MDL chose two stacked reweights (1,000 tokens beta 0.25 + the whole book so far beta 0.25):
+fit 7.5667 (single 1,000-token reweight 7.5673); scored 7.9539 vs 7.9517 (no reweight 7.9794).
+
+## SW -- no tuning buttons (registered 2026-11-02, before running; owner: "limits dimensionless, no tuning buttons")
+Model: the selected components + the uniform token mixed with weights renormalised over the components present at
+the position, then an optional reweight stage (product over chosen windows of ((Pwin + 1e-4)/Pglob)^beta). Every
+continuous parameter (log-weights, betas) fitted by gradient (betas by golden search) and charged (1/2) log2(n) bits,
+n = fit positions; every discrete choice log2 of its options (component: log2 91; window: log2 5). No beam, no top-K,
+no fixed mixing grid, no fixed escape: at each step every unused component's gradient at weight 0 is computed,
+candidates are fitted in gradient order, the first that saves more than its bits is added, stop when none does.
+Windows added the same way. Fit on SU1's 9,000 positions, 91 components. Bar: scored < 7.9517 bits/word. Then, if
+it holds, the same on more fit positions (energy): descriptive.
