@@ -776,3 +776,25 @@ trigram, Vote[token(t-1) & token(t-2) skip, static] -- both counting; no tree at
 9,000 positions (best screened tree Votes est. +300 bits on 1,000, rejected on 9,000). Fit 7.9603; scored 8.2659
 bits/word -- bar (below SZ3) PASS, but not from the tree. Drop-one ablations on the scored positions (no refit): without
 the c50 book Vote 8.2752, without Spell 8.2803 (full 8.2658).
+
+## SO -- using the ontology for prediction (registered 2026-11-02, before running; owner: "test them all")
+Base: SH2's program (8.2659 scored). D0 diagnostic: scored bits split by answer in / outside the shortlist and by word
+kind. Each idea is offered alone: all its instances evaluated on the 9,000 fit positions and given to the same move loop
+(mix / lift / gate; MDL, (1/2) log2 n per number); accepted pieces are scored on the 50,114 positions with and without.
+O1 rest by class: answers outside the shortlist get the rest mass spread by a Descend (context -> node -> words by count)
+  mixed with unigram (one weight fitted) instead of unigram alone.
+O2 hierarchical backoff: one component -- Witten-Bell recursion from the exact context through its tree ancestors at
+  depths 12, 8, 4 (left view), contexts token(t-1) or token(t-1) & token(t-2).
+O3 node topic: recency share of the answer's node (depth k) in the last W (200, 1,000, book), spread over node words.
+O4 class triggers: rare words (count <= 100 / 1,000) of the last 10 / 50 tokens predict the node (depth k) of the word
+  within the next 5 / 20, spread over node words.
+O5 context-placed rare words: for tokens with < 20 uses, the node attribute is replaced by the node the previous token
+  predicts (position attribute), usable in dynamic Votes and O2.
+O6 two-tree agreement: P(w) ~ P_left(node_l(w)) P_right(node_r(w)) u(w) / (u(node_l) u(node_r)), normalised over the vocab.
+O7 senses: occurrences of the 2,000 most frequent words split in two by 2-means on the left-node of the previous token;
+  "sense" position attribute usable in dynamic Votes.
+O8 tree revision: leaves re-split where the SH2 model's fit bits concentrate (2-means on right-view signatures), kept
+  if a Descend at the new depth pays by MDL in the model.
+O9 tree candidates: shortlist + the 64 most frequent members of the node the previous token predicts; coverage reported;
+  if coverage rises, SH2's program is re-evaluated on the new shortlist.
+Final: every accepted piece together, scored. Bars: descriptive per idea; overall bar: scored < 8.2659.
