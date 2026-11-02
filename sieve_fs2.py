@@ -283,9 +283,10 @@ if __name__ == "__main__":
     elif mode == "st3":                                                                                     # ST3: 9,000 fit positions, all families, chains up to 8
         names = names_of("count") + names_of("book") + names_of("recency") + [f"graded_id_{w}" for w in GW] + names_of("long")
         log(f"ST3: {len(names)} components on {len(ctx('fit9')[1]):,} fit positions")
-        r, r0, pf = search(names, budget=200, cx="fit9", maxlen=8, ncal=40)
+        ML = int(sys.argv[2]) if len(sys.argv) > 2 else 8; TAG = sys.argv[3] if len(sys.argv) > 3 else "st3"   # SU1: longer chains
+        r, r0, pf = search(names, budget=200, cx="fit9", maxlen=ML, ncal=40)
         for nm, q in (("MDL-best", r0), ("selected (calibration filter)", r)): print(f"   {nm}: {pdesc(names, q)} -- fit {q[1] / 9000:.4f} bits/word, description {q[0] - q[1]:.1f} bits")
-        for nm, q in (("st3_mdl", r0), ("st3_sel", r)): json.dump(dict(chain=[[names[c], cb] for c, cb in q[2]], escape=q[3], reweight=q[4]), open(os.path.join(HERE, f"sieve_fs2_{nm}.json"), "w"))
+        for nm, q in ((f"{TAG}_mdl", r0), (f"{TAG}_sel", r)): json.dump(dict(chain=[[names[c], cb] for c, cb in q[2]], escape=q[3], reweight=q[4]), open(os.path.join(HERE, f"sieve_fs2_{nm}.json"), "w"))
         log("ST3 search done")
     elif mode == "evalp":                                                                                   # score a saved program; optional: drop one component
         prog = json.load(open(os.path.join(HERE, sys.argv[2]))); drop = sys.argv[3] if len(sys.argv) > 3 else None

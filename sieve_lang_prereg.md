@@ -493,3 +493,13 @@ correction learned on other books can pass bounds of 0.007-0.03; a correction wo
 **SU2 within-book adaptive calibration.** ST3 program's form claims (sharpened g = 1.1, as chosen in ST4b); each
 claim's stated probability = the rate of its bin from (the fit-position binning as a prior worth 200 claims per bin +
 this book's own earlier claims in that bin) -- causal, positions in reading order. Bar: 0 refuted bins on the 50,114.
+
+## SU results (2026-11-02), absolute numbers (sieve_su1_run.txt, sieve_su2_run.txt)
+**SU1 -- PASS.** MDL total by chain length (9,000 fit positions): 77,534.0 / 73,552.3 / 70,779.7 / 70,037.4 / 69,375.0
+/ 69,043.4 / 68,789.0 / 68,601.2 / 68,450.7 / 68,362.7 / 68,352.3 / 68,352.3 (lengths 1-12): MDL stops at 11.
+Prefixes of the 11-component program, fit / scored bits/word: 1 8.6699 / 9.2327; 2 8.3040 / 8.9482; 3 8.2773 scored
+(fit 7.8442); 4 7.7698 / 8.1583; 5 7.6893 / 8.1202; 6 7.6492 / 8.0642; 7 7.6275 / 8.0600; 8 7.5992 / 8.0208; 9
+7.5835 / 7.9933; 10 7.5708 / 7.9569; 11 7.5673 / 7.9517 (without reweight 7.9794). Added at 9-11: mff(t-1) earlier in
+this book; mff(t-1) & mff(t-2) history+library; token(t-1) & mff(t-2) history+library.
+**SU2 -- PASS.** Within-book adaptive calibration: 0 refuted bins on the 50,114 positions for the ST3 program (sharpened
+only: 3) and for the SU1 program (sharpened only: 5). Largest well-filled gap: stated 0.444 vs observed 0.448.

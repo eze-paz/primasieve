@@ -1,0 +1,24 @@
+   sharpened only (ST4b):
+      stated 0.0-0.1:  31436 claims, stated 0.069, observed 0.060, bound 0.009 -> REFUTED
+      stated 0.1-0.2:  55685 claims, stated 0.145, observed 0.129, bound 0.007 -> REFUTED
+      stated 0.2-0.3:  27115 claims, stated 0.244, observed 0.232, bound 0.010 -> REFUTED
+      stated 0.3-0.4:  14587 claims, stated 0.346, observed 0.340, bound 0.013 -> standing
+      stated 0.4-0.5:  10217 claims, stated 0.448, observed 0.448, bound 0.016 -> standing
+      stated 0.5-0.6:   7124 claims, stated 0.545, observed 0.552, bound 0.019 -> standing
+      stated 0.6-0.7:   2968 claims, stated 0.641, observed 0.648, bound 0.030 -> standing
+      stated 0.7-0.8:    965 claims, stated 0.738, observed 0.756, bound 0.052 -> standing
+      stated 0.8-0.9:    229 claims, stated 0.839, observed 0.803, bound 0.108 -> standing
+      stated 0.9-1.0:     16 claims, stated 0.916, observed 0.688, bound 0.407 -> standing
+   within-book adaptive (SU2):
+      stated 0.0-0.1:  31436 claims, stated 0.061, observed 0.060, bound 0.009 -> standing
+      stated 0.1-0.2:  55685 claims, stated 0.128, observed 0.129, bound 0.007 -> standing
+      stated 0.2-0.3:  27115 claims, stated 0.233, observed 0.232, bound 0.010 -> standing
+      stated 0.3-0.4:  14657 claims, stated 0.339, observed 0.340, bound 0.013 -> standing
+      stated 0.4-0.5:  10147 claims, stated 0.444, observed 0.448, bound 0.016 -> standing
+      stated 0.5-0.6:   7124 claims, stated 0.556, observed 0.552, bound 0.019 -> standing
+      stated 0.6-0.7:   2968 claims, stated 0.657, observed 0.648, bound 0.030 -> standing
+      stated 0.7-0.8:    965 claims, stated 0.772, observed 0.756, bound 0.052 -> standing
+      stated 0.8-0.9:    229 claims, stated 0.878, observed 0.803, bound 0.108 -> standing
+      stated 0.9-1.0:     16 claims, stated 0.989, observed 0.688, bound 0.407 -> standing
+SU2: refuted bins 0 (ST4b 3) (20 s)
+SU2: refuted bins 0 (ST4b 5) (12 s)

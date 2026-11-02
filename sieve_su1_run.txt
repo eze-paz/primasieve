@@ -1,0 +1,30 @@
+ST3: 91 components on 9,000 fit positions (10 s)
+   depth 2: best total 73552.3 bits (was 77534.0) (18 s)
+   depth 3: best total 70779.7 bits (was 73552.3) (26 s)
+   depth 4: best total 70037.4 bits (was 70779.7) (34 s)
+   depth 5: best total 69375.0 bits (was 70037.4) (43 s)
+   depth 6: best total 69043.4 bits (was 69375.0) (52 s)
+   depth 7: best total 68789.0 bits (was 69043.4) (61 s)
+   depth 8: best total 68601.2 bits (was 68789.0) (70 s)
+   depth 9: best total 68450.7 bits (was 68601.2) (81 s)
+   depth 10: best total 68362.7 bits (was 68450.7) (93 s)
+   depth 11: best total 68352.3 bits (was 68362.7) (106 s)
+   depth 12: best total 68352.3 bits (was 68352.3) (114 s)
+   MDL-best: token(t-1), in history + library count MIX0.5 token(t-1) & token(t-2), in history + library count MIX0.9 any position recency MIX0.9 token(t-1), earlier in this book count MIX0.9 longest match (3-8 words) in the history MIX0.9 token(t-2) count MIX0.9 longest match (3-8 words) in the library MIX0.9 token(t-1) & token(t-2), earlier in this book count MIX0.9 mff(t-1), earlier in this book count MIX0.9 mff(t-1) & mff(t-2), in history + library count MIX0.9 token(t-1) & mff(t-2), in history + library count (escape 0.02) REWEIGHT by form shares of the past 1000 tokens, beta 0.25 -- fit 7.5673 bits/word, description 109.7 bits
+   selected (calibration filter): token(t-1), in history + library count MIX0.5 token(t-1) & token(t-2), in history + library count MIX0.9 any position recency MIX0.9 token(t-1), earlier in this book count MIX0.9 longest match (3-8 words) in the history MIX0.9 token(t-2) count MIX0.9 longest match (3-8 words) in the library MIX0.9 token(t-1) & token(t-2), earlier in this book count MIX0.9 mff(t-1), earlier in this book count MIX0.9 mff(t-1) & mff(t-2), in history + library count MIX0.9 token(t-1) & mff(t-2), in history + library count (escape 0.02) REWEIGHT by form shares of the past 1000 tokens, beta 0.25 -- fit 7.5673 bits/word, description 109.7 bits
+ST3 search done (199 s)
+SU1 chain prefixes (MDL-best order), bits/word: fit (9,000) / scored (50,114), with the reweight stage
+    1 components (+ token(t-1), in history + library count): fit 8.6699, scored 9.2327
+    2 components (+ token(t-1) & token(t-2), in history + library count): fit 8.3040, scored 8.9482
+    3 components (+ any position recency): fit 7.8442, scored 8.2773
+    4 components (+ token(t-1), earlier in this book count): fit 7.7698, scored 8.1583
+    5 components (+ longest match (3-8 words) in the history): fit 7.6893, scored 8.1202
+    6 components (+ token(t-2) count): fit 7.6492, scored 8.0642
+    7 components (+ longest match (3-8 words) in the library): fit 7.6275, scored 8.0600
+    8 components (+ token(t-1) & token(t-2), earlier in this book count): fit 7.5992, scored 8.0208
+    9 components (+ mff(t-1), earlier in this book count): fit 7.5835, scored 7.9933
+   10 components (+ mff(t-1) & mff(t-2), in history + library count): fit 7.5708, scored 7.9569
+   11 components (+ token(t-1) & mff(t-2), in history + library count): fit 7.5673, scored 7.9517
+done (47 s)
+sieve_fs2_su1_mdl_norw on the 50,114 positions: 7.9794 bits/word; form-claim bins refuted 6 (16 s)
+sieve_fs2_su1_mdl on the 50,114 positions: 7.9517 bits/word; form-claim bins refuted 7 (17 s)

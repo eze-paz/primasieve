@@ -95,3 +95,8 @@ Everything in the program is derived and selected by MDL: counts over history + 
 of long-match was the small fit sample. Chains still improve at 8 components. Open: form-level calibration does not
 transfer from dev to test books (2-7 refuted bins whatever the one-step fix). Next: chains beyond 8 with more fit
 positions; the LM's lead is on content words (10.858 vs 14.599) and repeats (4.979 vs 6.693).
+
+## Loop iteration 1 (2026-11-02): SU
+Chains: MDL stops at 11 components; scored 7.9517 bits/word (Stack 8.1507, LM 6.026). Within-book adaptive calibration
+gives 0 refuted form-claim bins. Next candidates: more fit positions (does MDL then afford > 11?); attributes beyond
+forms for the reweight stage (mff classes); LM gap on content words (14.6 vs 10.9).
