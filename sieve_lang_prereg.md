@@ -529,3 +529,10 @@ token(t-2) & mfp(t-1) library; token(t-2) & mfp(t-1) same book), fit 7.5437; rew
 5,000 (beta 0.195), fit 7.5292. Scored: 7.9240 bits/word (without reweight 7.9488; bar 7.9517).
 **SW2 energy (registered before running).** Same procedure on 30,000 fit positions spread over the 7 dev books (the
 selection checkpoints after each addition and resumes across runs, each under five minutes). Bar: scored < 7.9240.
+**SW2 result -- PASS.** 30,000 fit positions: gradient-order selection added 25 components (fit 7.5148), then reweight
+windows 1,000 / 5,000 / 200 with betas 0.110 / 0.183 / 0.046 (fit 7.4991). Scored: 7.8984 bits/word (without reweight
+7.9292; bar 7.9240). Within-book calibration: 0 refuted form-claim bins (sharpened only: 7). Execution notes: the
+selection and the reweight stage checkpoint and resume across runs (each < 5 min); a new window's beta is screened
+alone, then all betas refitted for the chosen window.
+**SW3 energy x3 (registered before running).** Same procedure on 90,000 fit positions spread over the 7 dev books.
+Bar: scored < 7.8984. Descriptive: the scored value against fit positions (3,000 / 9,000 / 30,000 / 90,000).

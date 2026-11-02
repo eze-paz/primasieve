@@ -12,9 +12,14 @@ def claims(Q, y):
     return np.take_along_axis(Q, top, 1), (top == F.FORM[y][:, None]).astype(float)
 prog = sys.argv[1] if len(sys.argv) > 1 else "sieve_fs2_st3_mdl"
 import json
-P = json.load(open(os.path.join(F.HERE, prog + ".json"))); names = [n for n, _ in P["chain"]]; chain = [(k, None if cb is None else tuple(cb)) for k, (_, cb) in enumerate(P["chain"])]
-C = {k: F.load("fit9", n, True) for k, n in enumerate(names)}; m, p, Q = F.run_q(chain, C); s_, T_, _ = F.ctx("fit9"); yf = s_[T_]
-_, Qf = F.final(m, p, Q, P["escape"], tuple(P["reweight"]) if P["reweight"] else None, "fit9", yf); sf, hf = claims(Qf, yf); bf = np.minimum((sf * 10).astype(int), 9)
+if prog.startswith("free_"):                                                                    # knob-free programs (sieve_free.py)
+    import sieve_free as SF; P = json.load(open(os.path.join(F.HERE, f"sieve_{prog}.json"))); cx = P["cx"]; s_, T_, _ = F.ctx(cx); yf = s_[T_]
+    _, Qf = SF.model(cx, P["sel"], np.array(P["th"]), P["ws"], P["bs"])
+else:
+    P = json.load(open(os.path.join(F.HERE, prog + ".json"))); names = [n for n, _ in P["chain"]]; chain = [(k, None if cb is None else tuple(cb)) for k, (_, cb) in enumerate(P["chain"])]
+    C = {k: F.load("fit9", n, True) for k, n in enumerate(names)}; m, p, Q = F.run_q(chain, C); s_, T_, _ = F.ctx("fit9"); yf = s_[T_]
+    _, Qf = F.final(m, p, Q, P["escape"], tuple(P["reweight"]) if P["reweight"] else None, "fit9", yf)
+sf, hf = claims(Qf, yf); bf = np.minimum((sf * 10).astype(int), 9)
 prior = np.array([hf[bf == b].mean() if (bf == b).any() else (b + 0.5) / 10 for b in range(10)])
 z = np.load(os.path.join(F.CD, f"bits_{prog}.npz")); se, he = claims(z["Qf"], z["y"]); book = np.load(os.path.join(F.LX if hasattr(F, "LX") else F.SC.LX, "lr_c12_bits_scored.npz"))["book"]
 stated = np.zeros_like(se); n_b = {}; h_b = {}

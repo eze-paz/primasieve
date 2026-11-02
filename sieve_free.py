@@ -25,7 +25,7 @@ def fit_w(P, M, th):
             lr *= 0.5
         else: break
     return th, b
-def fit_beta(pm, Q, m, ws, y, cx, betas):
+def fit_beta(pm, Q, m, ws, y, cx, betas, only_last=False):
     """bits of the reweight stage with windows ws; betas fitted by coordinate golden search"""
     fy = F.FORM[y]; ix = np.arange(len(y)); B = [((win(cx, W) + 1e-4) / F.PG) for W in ws]
     def bits(bs):
@@ -33,8 +33,8 @@ def fit_beta(pm, Q, m, ws, y, cx, betas):
         for Bi, be in zip(B, bs): b = b * Bi ** be
         return -np.log2(pm * b[ix, fy] / (Q * b).sum(1)).sum()
     bs = list(betas)
-    for _ in range(2 if len(bs) > 1 else 1):
-        for k in range(len(bs)):
+    for _ in range(1 if only_last or len(bs) == 1 else 2):
+        for k in ([len(bs) - 1] if only_last else range(len(bs))):
             lo, hi = -0.5, 2.0; g = (math.sqrt(5) - 1) / 2
             for _ in range(18):
                 a, c = hi - g * (hi - lo), lo + g * (hi - lo); fa = bits(bs[:k] + [a] + bs[k + 1:]); fc = bits(bs[:k] + [c] + bs[k + 1:])
@@ -55,8 +55,9 @@ if __name__ == "__main__" and MODE not in ("rw", "eval"):
     s, T, _ = F.ctx(CX); y = s[T]; n = len(T); half = 0.5 * math.log2(n); pick = math.log2(len(NAMES))
     C = {nm: F.load(CX, nm) for nm in NAMES}; sel = []; th = np.zeros(1); CK = os.path.join(F.HERE, f"sieve_free_{CX}_ckpt.json")
     P = np.full((1, n), 1 / F.Vt); M = np.ones((1, n), bool); cur = n * math.log2(F.Vt); F.log(f"SW on {CX}: {len(NAMES)} components, {n:,} positions; uniform {cur / n:.4f} bits/word")
+    rejected = set()                                                                                    # tried and not paying at the current selection
     if os.path.exists(CK):                                                                              # SW2: resume the selection across runs
-        ck = json.load(open(CK)); sel, th, cur = ck["sel"], np.array(ck["th"]), ck["cur"]
+        ck = json.load(open(CK)); sel, th, cur = ck["sel"], np.array(ck["th"]), ck["cur"]; rejected = set(ck.get("rejected", []))
         P = np.vstack([P] + [C[nm][1] for nm in sel]); M = np.vstack([M] + [C[nm][0] for nm in sel]); F.log(f"   resumed with {len(sel)} components, fit {cur / n:.4f}")
     while True:
         if time.time() - T0 > 240: F.log("   time budget: checkpoint saved, rerun to resume"); sys.exit(0)
@@ -65,25 +66,30 @@ if __name__ == "__main__" and MODE not in ("rw", "eval"):
         added = False
         for nm in sorted(grad, key=lambda k: (-grad[k], k)):
             if grad[nm] <= 0: break
+            if nm in rejected: continue
+            if time.time() - T0 > 250: json.dump(dict(sel=sel, th=th.tolist(), cur=float(cur), rejected=sorted(rejected)), open(CK, "w")); F.log(f"   time budget: checkpoint ({len(rejected)} rejected), rerun to resume"); sys.exit(0)
             P2 = np.vstack([P, C[nm][1]]); M2 = np.vstack([M, C[nm][0]]); t2, b2 = fit_w(P2, M2, np.r_[th, math.log(1e-3) + th.max()])
             if cur - b2 > pick + half:
-                sel.append(nm); P, M, th, cur = P2, M2, t2, b2; added = True; F.log(f"   + {F.desc(nm)}: fit {cur / n:.4f} bits/word ({len(sel)} components)")
-                json.dump(dict(sel=sel, th=th.tolist(), cur=float(cur)), open(CK, "w")); break
+                sel.append(nm); P, M, th, cur = P2, M2, t2, b2; added = True; rejected = set(); F.log(f"   + {F.desc(nm)}: fit {cur / n:.4f} bits/word ({len(sel)} components)")
+                json.dump(dict(sel=sel, th=th.tolist(), cur=float(cur), rejected=[]), open(CK, "w")); break
+            rejected.add(nm)
         if not added: break
     json.dump(dict(sel=sel, th=th.tolist(), ws=[], bs=[], fit=cur / n, cx=CX), open(os.path.join(F.HERE, f"sieve_free_{CX}.json"), "w"))
     F.log(f"SW selected {len(sel)} components; fit {cur / n:.4f} bits/word, description {len(sel) * (pick + half):.1f} bits")
 elif __name__ == "__main__" and MODE == "rw":                                                       # the reweight stage, a separate run (five-minute cap)
     prog = json.load(open(os.path.join(F.HERE, f"sieve_free_{CX}.json"))); sel, th = prog["sel"], np.array(prog["th"]); s, T, _ = F.ctx(CX); y = s[T]; n = len(T); half = 0.5 * math.log2(n)
-    ws, bs = [], []; pm_bits, Q = model(CX, sel, th, [], []); cur = pm_bits.sum()
+    RC = os.path.join(F.HERE, f"sieve_free_{CX}_rwckpt.json"); rc = json.load(open(RC)) if os.path.exists(RC) else dict(ws=[], bs=[], tried={})   # resumable
+    ws, bs = rc["ws"], rc["bs"]; pm_bits, Q = model(CX, sel, th, [], []); cur = pm_bits.sum() if not ws else rc["cur"]
     pm = 2.0 ** -pm_bits
     while True:
-        best = None
         for W in WS:
-            if W in ws: continue
-            b2s, b2 = fit_beta(pm, Q, None, ws + [W], y, CX, bs + [0.25])
-            if best is None or b2 < best[1]: best = (W, b2, b2s)
+            if W in ws or str(W) in rc["tried"]: continue
+            if time.time() - T0 > 230: json.dump(rc, open(RC, "w")); F.log("   time budget: reweight checkpoint saved, rerun to resume"); sys.exit(0)
+            b2s, b2 = fit_beta(pm, Q, None, ws + [W], y, CX, bs + [0.25], only_last=len(ws) > 0); rc["tried"][str(W)] = [b2, b2s]   # screening: the new beta alone
+        best = min(((W, *rc["tried"][str(W)]) for W in WS if str(W) in rc["tried"]), key=lambda r: r[1], default=None)
         if best is None or cur - best[1] <= math.log2(len(WS)) + half: break
-        ws.append(best[0]); bs = best[2]; cur = best[1]; F.log(f"   + reweight by form shares of {best[0]}: betas {np.round(bs, 3).tolist()}, fit {cur / n:.4f} bits/word")
+        W = best[0] if best[0] == "book" else int(best[0]); ws.append(W); bs, cur = fit_beta(pm, Q, None, ws, y, CX, best[2]) if len(ws) > 1 else (best[2], best[1]); rc.update(ws=ws, bs=bs, cur=cur, tried={}); json.dump(rc, open(RC, "w"))
+        F.log(f"   + reweight by form shares of {W}: betas {np.round(bs, 3).tolist()}, fit {cur / n:.4f} bits/word")
     prog.update(ws=ws, bs=bs, fit=cur / n); json.dump(prog, open(os.path.join(F.HERE, f"sieve_free_{CX}.json"), "w"))
     F.log(f"SW reweight stage: {len(ws)} windows {ws}, betas {np.round(bs, 3).tolist()}; fit {cur / n:.4f} bits/word")
 elif __name__ == "__main__":

@@ -100,3 +100,8 @@ positions; the LM's lead is on content words (10.858 vs 14.599) and repeats (4.9
 Chains: MDL stops at 11 components; scored 7.9517 bits/word (Stack 8.1507, LM 6.026). Within-book adaptive calibration
 gives 0 refuted form-claim bins. Next candidates: more fit positions (does MDL then afford > 11?); attributes beyond
 forms for the reweight stage (mff classes); LM gap on content words (14.6 vs 10.9).
+
+## Loop iteration 2 (2026-11-02): SV, SW
+Stacked reweight on the tuned chain failed (7.9539). The knob-free search (gradient order + MDL, every parameter
+fitted, (1/2) log2 n bits each) passed: 7.9240 on 9,000 fit positions, 7.8984 on 30,000 (Stack 8.1507, LM 6.026);
+within-book calibration 0 refuted. Energy keeps paying; next: 90,000 fit positions.
