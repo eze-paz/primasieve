@@ -563,3 +563,11 @@ selection; reweight stage refitted. Bar: scored < 7.8857; repeat-in-book and con
 **SX2 result -- PASS (narrow).** MDL added 1 book trigger (W 10, thr 1,000): fit 7.5053 (SX1 7.5071); reweight 1,000 /
 5,000 / 200, betas 0.119 / 0.178 / 0.045, fit 7.4894. Scored 7.8834 bits/word (without reweight 7.9145; bar 7.8857).
 Repeat in book 6.564 (SX1 6.568); content word 14.416 (SX1 14.414).
+
+## SX3 -- loop iteration 5 (registered 2026-11-02, before running)
+**SX3 factor combinator.** New generic components from two existing ones: P(y) = Q_A(form y) x P_B(y) / Q_B(form y),
+renormalised over the forms B covers (form from A, word within form from B); Q = Q_A restricted to B's forms.
+A in {token(t-1) history+library count, token(t-1) & token(t-2) history+library count}; B in {any-position recency,
+token(t-1) earlier in this book, trigger W 10 thr 100, book trigger W 10 thr 1,000}: 8 components. Offered to the
+knob-free selection on 30,000 fit positions resuming from SX2's selection; reweight refitted. Bar: scored < 7.8834;
+repeat-in-book mean reported.
