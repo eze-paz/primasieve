@@ -18,22 +18,23 @@ def win(cx, W):
             cnt += np.bincount(F.FORM[s[last:t]], minlength=F.NF); last = t; out[i] = cnt / max(cnt.sum(), 1)
         np.save(f, out)
     return np.load(f)
-P = json.load(open(os.path.join(F.HERE, "sieve_fs2_su1_mdl.json"))); names = [n for n, _ in P["chain"]]; ch = [(k, None if cb is None else tuple(cb)) for k, (_, cb) in enumerate(P["chain"])]
-RQ = {}
-def bits(cx, stage, e):
-    if cx not in RQ: C = {k: F.load(cx, n, True) for k, n in enumerate(names)}; RQ[cx] = F.run_q(ch, C)
-    m, p, Q = RQ[cx]; s, T, _ = F.ctx(cx); y = s[T]; fy = F.FORM[y]; ix = np.arange(len(y))
-    b = np.ones((len(y), F.NF))
-    for W, beta in stage: b = b * ((win(cx, W) + 1e-4) / F.PG) ** beta
-    pe = np.where(m, (1 - e) * p + e / F.Vt, 1 / F.Vt); Zn = np.where(m, (1 - e) * (Q * b).sum(1) + e * (F.U * b).sum(1), (F.U * b).sum(1))
-    return -np.log2(pe * b[ix, fy] / Zn)
-stages = [()] + [((W, b),) for W in WS for b in (0.25, 0.5, 1.0)] + [((W1, b1), (W2, b2)) for W1, W2 in itertools.combinations(WS, 2) for b1 in (0.25, 0.5) for b2 in (0.25, 0.5)]
-rows = []
-for st in stages:
-    bb = bits("fit9", st, P["escape"]).sum(); dlr = 1 + len(st) * (1 + math.log2(5) + math.log2(3)); rows.append((bb + dlr, bb, st))
-rows.sort(key=lambda r: (round(r[0], 9), repr(r[2])))
-for r in rows[:6]: print(f"   {r[2] or 'no reweight'}: fit {r[1] / 9000:.4f} bits/word, total {r[0]:.1f}")
-best = rows[0][2]; e = P["escape"]
-for st in ((), ((1000, 0.25),), best):
-    print(f"   scored {st or 'no reweight'}: {bits('eval', st, e).mean():.4f} bits/word")
-F.log(f"SV1: MDL chose {best}")
+if __name__ == "__main__":                                                                  # importable (sieve_free.py uses win)
+    P = json.load(open(os.path.join(F.HERE, "sieve_fs2_su1_mdl.json"))); names = [n for n, _ in P["chain"]]; ch = [(k, None if cb is None else tuple(cb)) for k, (_, cb) in enumerate(P["chain"])]
+    RQ = {}
+    def bits(cx, stage, e):
+        if cx not in RQ: C = {k: F.load(cx, n, True) for k, n in enumerate(names)}; RQ[cx] = F.run_q(ch, C)
+        m, p, Q = RQ[cx]; s, T, _ = F.ctx(cx); y = s[T]; fy = F.FORM[y]; ix = np.arange(len(y))
+        b = np.ones((len(y), F.NF))
+        for W, beta in stage: b = b * ((win(cx, W) + 1e-4) / F.PG) ** beta
+        pe = np.where(m, (1 - e) * p + e / F.Vt, 1 / F.Vt); Zn = np.where(m, (1 - e) * (Q * b).sum(1) + e * (F.U * b).sum(1), (F.U * b).sum(1))
+        return -np.log2(pe * b[ix, fy] / Zn)
+    stages = [()] + [((W, b),) for W in WS for b in (0.25, 0.5, 1.0)] + [((W1, b1), (W2, b2)) for W1, W2 in itertools.combinations(WS, 2) for b1 in (0.25, 0.5) for b2 in (0.25, 0.5)]
+    rows = []
+    for st in stages:
+        bb = bits("fit9", st, P["escape"]).sum(); dlr = 1 + len(st) * (1 + math.log2(5) + math.log2(3)); rows.append((bb + dlr, bb, st))
+    rows.sort(key=lambda r: (round(r[0], 9), repr(r[2])))
+    for r in rows[:6]: print(f"   {r[2] or 'no reweight'}: fit {r[1] / 9000:.4f} bits/word, total {r[0]:.1f}")
+    best = rows[0][2]; e = P["escape"]
+    for st in ((), ((1000, 0.25),), best):
+        print(f"   scored {st or 'no reweight'}: {bits('eval', st, e).mean():.4f} bits/word")
+    F.log(f"SV1: MDL chose {best}")

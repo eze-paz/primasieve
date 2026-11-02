@@ -521,3 +521,11 @@ no fixed mixing grid, no fixed escape: at each step every unused component's gra
 candidates are fitted in gradient order, the first that saves more than its bits is added, stop when none does.
 Windows added the same way. Fit on SU1's 9,000 positions, 91 components. Bar: scored < 7.9517 bits/word. Then, if
 it holds, the same on more fit positions (energy): descriptive.
+**SW result -- PASS.** Selected by gradient order + MDL, no buttons: 17 components (longest match history; token(t-1)
+& token(t-2) history+library; token(t-1) same book; token(t-1) library; token(t-2) & mff(t-2) same book; recency;
+token(t-1) history; graded identity 221; token(t-2) & mff(t-2) history; longest match library; token(t-2) & mff(t-2)
+library; mfp(t-2) same book; token(t-1) & token(t-2) same book; mff(t-1) same book; mff(t-1) & mff(t-2) library;
+token(t-2) & mfp(t-1) library; token(t-2) & mfp(t-1) same book), fit 7.5437; reweight windows 1,000 (beta 0.14) +
+5,000 (beta 0.195), fit 7.5292. Scored: 7.9240 bits/word (without reweight 7.9488; bar 7.9517).
+**SW2 energy (registered before running).** Same procedure on 30,000 fit positions spread over the 7 dev books (the
+selection checkpoints after each addition and resumes across runs, each under five minutes). Bar: scored < 7.9240.

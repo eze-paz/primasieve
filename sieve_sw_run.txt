@@ -1,0 +1,6 @@
+   + token(t-2) & mfp(t-1), earlier in this book count: fit 7.5437 bits/word (17 components) (38 s)
+SW selected 17 components; fit 7.5437 bits/word, description 222.3 bits (131 s)
+   + reweight by form shares of 1000: betas [0.233], fit 7.5311 bits/word (30 s)
+   + reweight by form shares of 5000: betas [0.14, 0.195], fit 7.5292 bits/word (137 s)
+SW reweight stage: 2 windows [1000, 5000], betas [0.14, 0.195]; fit 7.5292 bits/word (285 s)
+SW scored on the 50,114 positions: 7.9240 bits/word (without reweight 7.9488; SU1 chain 7.9517, Stack 8.1507, LM 6.026) (26 s)

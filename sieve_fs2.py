@@ -24,7 +24,7 @@ def decoy():
     """ST2: dev sentences shuffled across all dev books (book labels stay by position)"""
     d = fit_s[NT:]; st = np.unique(np.r_[0, np.nonzero(d == 0)[0]]); sents = np.split(d, st[1:]); o = np.random.default_rng(3).permutation(len(sents))
     s = np.r_[tr, np.concatenate([sents[i] for i in o])]; return s, spread(s, 3000), fit_b
-CTX = {"fit": (fit_s, Tf, fit_b), "eval": (ev_s, Te, ev_b), "fit9": (fit_s, spread(fit_s, 9000), fit_b)}
+CTX = {"fit": (fit_s, Tf, fit_b), "eval": (ev_s, Te, ev_b), "fit9": (fit_s, spread(fit_s, 9000), fit_b), "fit30": (fit_s, spread(fit_s, 30000), fit_b)}
 def ctx(name):
     if name not in CTX: CTX[name] = decoy()
     return CTX[name]
