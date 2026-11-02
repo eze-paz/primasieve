@@ -653,3 +653,17 @@ R3 a Gate is selected; R4 scored < 7.8984 (SW2, the same start without them). De
 hand-written grammar lacked (spans 1/2/5, B = 10, library-only bags, nested factors, factor pairs outside SX4's 30), and
 the score beside the hand-built 7.7205. Book-source bags are not in the language (each costs > 4 min at 30,000
 positions; book triggers gave 7.8834 vs 7.8857).
+**SY result (search stopped by the owner after 18 additions; gains had fallen to about 0.001 per step).** From SW2's 25
+components (fit 7.5148) the generator added, in order: Factor[token(t-1) & token(t-2) history+library | recency];
+Gate[token(t-1) & token(t-2) history+library]; Factor[token(t-1) history | token(t-2) & mff(t-2) library]; Gates on
+token(t-1) same book, longest match library, token(t-1) & token(t-2) same book, longest match history, token(t-1) &
+mff(t-2) history+library; Gather(bag of last 10, count <= 100, training+library, span 5); Gather(bag of last 10, count
+<= 1,000, training+library, span 50); Factor[longest match library | token(t-2) & mff(t-2)]; Factor[token(t-1) same
+book | recency]; Gate[token(t-1) library]; Factor[longest match history | mfp(t-1) same book];
+Factor[Factor[token(t-1) & token(t-2) history+library | recency] | mff(t-1) & mfp(t-1)] (nested); Factor[token(t-1)
+library | token(t-2) & mff(t-2)]; Gather(bag of last 10, count <= 1,000, library, span 1); Factor[token(t-1) library
+| mfp(t-1) same book]; Gate[Factor[token(t-1) | token(t-2) & mff(t-2) library]]. Fit 7.3563; reweight 1,000 / 50 /
+5,000 / 200, fit 7.3372. Scored 7.7455 bits/word (without reweight 7.7800).
+R1 PASS (bag Gathers with spans 5, 50 and 1 selected); R2 PASS (8 factors, one nested); R3 PASS (8 gates, one on a
+factor); R4 PASS (7.7455 < 7.8984). Hand-built program: 7.7205. Not in the hand-written grammar: bags of the last 10
+tokens, spans 1 and 5, a library-only bag, a nested factor, a gated factor, factor pairs outside SX4's 30.
