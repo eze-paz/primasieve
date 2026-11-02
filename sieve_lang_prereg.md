@@ -615,3 +615,9 @@ refitted. Bar: scored < 7.7451.
 **SX8 second gate feature.** Weight = w_c (n/(n+T))^g_c (1+n)^h_c: the evidence count itself as a second gate
 feature, h_c added component by component in gradient order (same rules: (1/2) log2 n + log2(46) bits each), on SX7's
 program; reweight refitted. Bar: scored < 7.7280.
+**SX8 result -- FAIL.** No count gate (1+n)^h paid its bits; program unchanged, scored 7.7280.
+
+## SX9 -- loop iteration 11 (registered 2026-11-02, before running)
+**SX9 confidence gate.** Second gate feature = minus the entropy (bits) of the component's own form distribution Q_c at
+the position (how sure it is of the kind of word next): weight = w_c (n/(n+T))^g_c 2^(-h_c H(Q_c)); h_c added in
+gradient order with the same rules, on SX7's program; reweight refitted. Bar: scored < 7.7280.
