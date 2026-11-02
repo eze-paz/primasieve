@@ -1,0 +1,19 @@
+SX10: 46 components; fit 7.3445 bits/word (77 s)
+   + trigger: words within 10 after recent words (last 200) with count <= 1000 (gated, g = 0.000): fit 7.3437 (230 s)
+SX10: 47 components; fit 7.3437 bits/word (97 s)
+   time budget: checkpoint (284 s)
+SX10: 47 components; fit 7.3437 bits/word (66 s)
+SX10: 47 components; fit 7.3437 bits/word (103 s)
+   mixture outputs cached, rerun (50 s)
+   + reweight 1000: betas [0.286], fit 7.3261 (149 s)
+   + reweight book: betas [0.222, 0.19], fit 7.3236 (239 s)
+   + reweight 50: betas [0.198, 0.189, 0.028], fit 7.3221 (141 s)
+   + reweight 200: betas [0.172, 0.186, 0.019, 0.039], fit 7.3214 (278 s)
+    o = [i for i in range(len(bs)) if i != k] + [k]; nb, b = fit_beta(pm, Q, m, [ws[i] for i in o], y, cx, [bs[i] for i in o], only_last=True); bs[k] = nb[-1]
+    def b1(be): return -(np.log2(pm * fy_fix) + be * By / math.log(2) - np.log2((QF * np.exp(be * Bn)).sum(1))).sum()
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 92.0 MiB for an array with shape (30000, 402) and data type float64
+MemoryError
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 105. MiB for an array with shape (13796088,) and data type int64
+   + reweight 5000: betas [0.129, 0.136, 0.018, 0.044, 0.138], fit 7.3204 (260 s)
+SX8 reweight: [1000, 'book', 50, 200, 5000]; fit 7.3204 bits/word (260 s)
+SX8 scored on the 50,114 positions: 7.7205 bits/word (without reweight 7.7614; SX7 7.7280, Stack 8.1507, LM 6.026) (213 s)

@@ -117,3 +117,10 @@ Book triggers add little: 7.8834 (SX1 7.8857); repeats 6.564 (LM 4.979). Gains p
 ## Loop iterations 5-8 (2026-11-02): SX3-SX6
 Factor combinator (form from one component, word within form from another): 7.8490 -> 7.8430 (SX4). Stage-2 factors
 from Sieve's own model: not selected. Trust-gated weights (n/(n+T))^g: 7.7451 (Stack 8.1507, LM 6.026).
+
+## Loop end (2026-11-02): SX7-SX10
+Selection under gating 7.7280; confidence gates 7.7213; longer-memory triggers 7.7205 (count gates: no change). Gains
+per idea fell to 0.0008 -- this grammar is exhausted. Final: Sieve 7.7205 bits/word on the 50,114 positions (Stack
+8.1507, LM 6.026), within-book calibration 0 refuted. Next: (1) an expression language for component families so
+Sieve generates and MDL-scores its own families (rediscovery test first: remove triggers/factor/gates and see whether
+it re-derives them); (2) score on fresh books -- the 50,114 positions have been reused for every idea.

@@ -629,3 +629,8 @@ wall time -- the PC slept mid-run; compute per run stayed within the five-minute
 **SX10 longer-memory triggers.** Library triggers (SX1) with the recent-word set taken from the last 200 or 1,000
 tokens instead of 50 (thr 100 / 1,000; W 10 / 50): 8 components, offered with their own gates to SX9's program
 (gradient order, log2 of the grammar + 2 x (1/2) log2 n bits each); reweight refitted. Bar: scored < 7.7213.
+**SX10 result -- PASS by 0.0008 (immaterial).** One longer-memory trigger adopted (last 200 tokens, W 10, thr 1,000;
+gated): fit 7.3437; reweight fit 7.3204. Scored 7.7205 bits/word (without reweight 7.7614; bar 7.7213). The paragraph
+bootstrap interval on these positions is about +-0.07, so SX8-SX10 (0, 0.0067, 0.0008) mark the end of this family of
+ideas. Loop stopped here (2026-11-02). Every idea since SP was scored on the same 50,114 positions; an untouched check
+needs fresh books.

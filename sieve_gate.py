@@ -34,7 +34,7 @@ def fit(th, ga, act, P, M, LG, iters=150):
 def weights_q(cx, th, ga):
     P, M, LG = arrays(cx); lw = th[:, None] + ga[:, None] * LG; w = np.exp(lw - lw.max(0)) * M; den = w.sum(0); pm = (w * P).sum(0) / den
     Q = w[0][:, None] * F.U[None, :]
-    for k, nme in enumerate(SEL): Q += w[k + 1][:, None] * F.load(cx, nme, True)[4]
+    for k, nme in enumerate(SEL): F.load(cx, nme, True); Q += w[k + 1][:, None] * F.MEMO.pop((cx, nme, True))[4]   # one at a time (memory)
     return pm, Q / den[:, None]
 mode = sys.argv[1] if len(sys.argv) > 1 else "gate"
 if mode == "more":                                                                                    # SX7: offer every unused component with its own gate

@@ -57,7 +57,7 @@ def desc(n):
     if p[0] == "mix1": return "Sieve's own stage-1 model (SX4 mixture)"
     if p[0] == "fact":
         import sieve_factor as SFa; return f"factor: forms from [{desc(SFa.AS[int(p[1])])}] x word within form from [{desc(SFa.BS[int(p[2])])}]"
-    if p[0] == "trig": return f"trigger: words within {p[1]} after recent words with count <= {p[2]}"
+    if p[0].startswith("trig"): return f"trigger: words within {p[1]} after recent words (last {p[0][4:] or 50}) with count <= {p[2]}"
     if p[0] == "btrig": return f"book trigger: words within {p[1]} after recent words (count <= {p[2]}) earlier in this book"
     return f"longest match (3-8 words) in the {'history' if p[1] == 'hist' else 'library'}"
 def dl(n):

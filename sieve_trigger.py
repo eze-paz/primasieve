@@ -6,7 +6,8 @@ text, thr in {100, 1,000, any} -> <ctx>_btrig_<W>_<thr>.npz. Run: py -3.12 -W ig
 import os, sys, time, collections
 import numpy as np
 import sieve_fs2 as F
-CX = sys.argv[1] if len(sys.argv) > 1 else "fit30"; WS = (10, 50); THR = (100, 1000); BACK = 50
+CX = sys.argv[1] if len(sys.argv) > 1 else "fit30"; WS = (10, 50); THR = (100, 1000); BACK = int(os.environ.get("TRIG_BACK", 50))   # SX10: 200 / 1000
+TAG = "trig" if BACK == 50 else f"trig{BACK}"
 S = np.r_[F.tr, F.lib()]; cnt = np.bincount(S, minlength=F.Vt)
 if len(sys.argv) > 2 and sys.argv[2] == "join":                                                       # assemble the book-trigger chunks
     s, T, book = F.ctx(CX); parts = sorted((int(f.split("part")[1][:-4]), f) for f in os.listdir(F.CD) if f.startswith(f"{CX}_btrig_part")); y = s[T]
@@ -69,5 +70,5 @@ for W in WS:
             tot = sum(stat[r][W][0] for r in rr); y = int(s[t])
             ne[i] = True; P[i] = sum(stat[r][W][2].get(y, 0) for r in rr) / tot; N[i] = tot; TD[i] = len(rr); Q[i] = sum(stat[r][W][1] for r in rr) / tot
         y = s[T]; assert np.all(np.abs(Q[ne].sum(1) - 1) <= 1e-4) and np.all(Q[ne, F.FORM[y[ne]]] >= P[ne] - 1e-4)        # SR2 checks
-        np.savez(os.path.join(F.CD, f"{CX}_trig_{W}_{thr}.npz"), ne=ne, P=P, N=N, TD=TD, Q=Q.astype(np.float16))
+        np.savez(os.path.join(F.CD, f"{CX}_{TAG}_{W}_{thr}.npz"), ne=ne, P=P, N=N, TD=TD, Q=Q.astype(np.float16))
         F.log(f"{CX}: trig W={W} thr={thr}: matched {ne.mean():.3f}, mean P(answer) where matched {P[ne].mean():.4f}")
