@@ -54,6 +54,7 @@ def desc(n):
     if p[0] == "count": return " & ".join(f"{'token' if a == 'id' else a}(t-{o})" for a, o in SETS[int(p[1])]) + {"all": "", "library": ", in the library", "all+lib": ", in history + library", "book": ", earlier in this book"}[p[2]] + " count"
     if p[0] == "recency": return "any position recency"
     if p[0] == "graded": return f"graded {p[1]}, offset weights {p[2]}"
+    if p[0] == "mix1": return "Sieve's own stage-1 model (SX4 mixture)"
     if p[0] == "fact":
         import sieve_factor as SFa; return f"factor: forms from [{desc(SFa.AS[int(p[1])])}] x word within form from [{desc(SFa.BS[int(p[2])])}]"
     if p[0] == "trig": return f"trigger: words within {p[1]} after recent words with count <= {p[2]}"

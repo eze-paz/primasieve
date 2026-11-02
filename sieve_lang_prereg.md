@@ -590,3 +590,11 @@ history+library x word from trigger W 10 thr 100) and 1 more: 35 components, fit
 **SX5 second stage (Sieve factors with its own model).** The SX4 mixture before reweight (stage 1) becomes a
 component A = mix1 (its P and Q over forms); new factor components forms-from-mix1 x word-within-form from B, B in
 SX4's six. Offered to the knob-free selection resuming from SX4; reweight refitted. Bar: scored < 7.8430.
+**SX5 result -- FAIL.** No stage-2 factor component (forms from Sieve's own SX4 mixture) paid its bits; the program
+is unchanged: scored 7.8430.
+
+## SX6 -- loop iteration 8 (registered 2026-11-02, before running)
+**SX6 trust-gated weights.** The knob-free mixture's weight of component c at a position becomes w_c (n/(n+T))^g_c,
+n = the component's matched count there, T = its distinct followers (the trust term Sieve derived in SN1); g_c fitted
+by gradient with the log-weights, (1/2) log2 n bits each, added component by component in gradient order while MDL
+pays. On SX4's 35 components, 30,000 fit positions; reweight refitted. Bar: scored < 7.8430.

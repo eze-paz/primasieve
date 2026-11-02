@@ -4,7 +4,7 @@ Matched where both match. Cached as <ctx>_fact_<a>_<b>.npz. Run: py -3.12 -W ign
 import os, sys
 import numpy as np
 import sieve_fs2 as F
-AS = ["count_0_all+lib", "count_6_all+lib", "count_15_all+lib", "long_hist", "long_library"]; BS = ["recency", "count_0_book", "trig_10_100", "btrig_10_1000", "count_6_book", "graded_id_221"]   # SX4: wider (SX3: first 2 x first 4)
+AS = ["count_0_all+lib", "count_6_all+lib", "count_15_all+lib", "long_hist", "long_library", "mix1"]; BS = ["recency", "count_0_book", "trig_10_100", "btrig_10_1000", "count_6_book", "graded_id_221"]   # SX4: wider (SX3: first 2 x first 4)
 if __name__ == "__main__":
     cx = sys.argv[1] if len(sys.argv) > 1 else "fit30"; s, T, _ = F.ctx(cx); y = s[T]; fy = F.FORM[y]; ix = np.arange(len(T))
     for a, A in enumerate(AS):
