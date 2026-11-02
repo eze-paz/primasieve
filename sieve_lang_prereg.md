@@ -487,3 +487,9 @@ overstated by 0.010-0.016). ST4c histogram binning learned on the fit positions:
 book 0 (6,520 positions) 0 refuted, largest |stated - observed| 0.028; book 1 (26,943) 2 refuted, 0.051;
 book 2 (16,651) 1 refuted, 0.061. Calibration of form claims differs from book to book by up to 0.061, so no fixed
 correction learned on other books can pass bounds of 0.007-0.03; a correction would have to adapt within each book.
+
+## SU -- loop iteration 1 (registered 2026-11-02, before any SU run)
+**SU1 chains beyond 8.** ST3's grammar and 9,000 fit positions, chains up to 12, MDL stops. Bar: scored < 8.0208.
+**SU2 within-book adaptive calibration.** ST3 program's form claims (sharpened g = 1.1, as chosen in ST4b); each
+claim's stated probability = the rate of its bin from (the fit-position binning as a prior worth 200 claims per bin +
+this book's own earlier claims in that bin) -- causal, positions in reading order. Bar: 0 refuted bins on the 50,114.
