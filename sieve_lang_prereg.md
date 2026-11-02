@@ -731,3 +731,16 @@ Run: up to 12 runs (about an hour) or 6 idle runs. Report: which primitives are 
 positions beside SZ2 (same start) and the hand-built 7.7205; drop-one-kind ablations on the scored positions.
 **SZ3 amendment (before running).** The token stream has no punctuation tokens (words only), so 5 becomes "position
 in the sentence" (0, 1, 2, 3-5, 6-10, 11+) as a structural position attribute.
+
+## SH -- an ontology that forms by itself (registered 2026-11-02, before running; owner: "trees should naturally form")
+**SH1 the tree.** Words with >= 20 uses (training + library) described by their left- and right-neighbour
+distributions (PPMI over the 5,000 most frequent neighbours; two views: left, right). Divisive tree: a node is split by
+spherical 2-means; the split is kept only if the class-bigram description of the training text (class of the previous
+word -> class of the word, word within class) saves more bits than the split costs (1 bit per word type in the node +
+(1/2) log2 n per new class parameter); recursion until no split pays. Rarer words attach to the nearest leaf. Nothing
+sets the depth or size. Outside check (never used to build): for pairs of WordNet-noun-only words, the depth of their
+lowest common ancestor vs WordNet path similarity of their first senses (Spearman), real text vs a tree grown the same
+way on shuffled text; and sample branches. Bars: the tree forms (depth > 3 somewhere), Spearman on real text > shuffled.
+**SH2 Sieve uses it.** Each tree depth becomes an attribute (left view hl_k, right view hr_k) usable in every Vote; a
+Descend Vote predicts the next word's class at depth k from a context and spreads it over the class's words by their
+counts. Search continues from SZ3's state (same rules). Bar: scored on the 50,114 positions below SZ3's.

@@ -44,7 +44,7 @@ def gains(M, c):
     _, bm = P.golden(lambda lw: M.bits(A + (np.exp(lw) * c[1])[:, None] * c[0], logL), -12, 6, 16)
     lgl = np.where(c[1][:, None], np.log((c[0] + M.Du) / (2 * M.Du + 1e-30)), 0); _, bl = P.golden(lambda be: M.bits(A, logL + be * lgl), -1, 2, 16)
     return cur - bm, cur - bl
-mode = sys.argv[1] if len(sys.argv) > 1 else "search"
+mode = (sys.argv[1] if len(sys.argv) > 1 else "search") if __name__ == "__main__" else None     # importable (sieve_prim3.py)
 if mode == "search":
     st = state(); st["run"] += 1; rng = np.random.default_rng(1000 + st["run"]); half = 0.5 * math.log2(9000); move = math.log2(4)
     Ms = P.Model(SUB, st); Ms.gact = st["gact"]; scale = 9000 / Ms.n
