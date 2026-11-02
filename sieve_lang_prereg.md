@@ -767,3 +767,12 @@ scored 8.3417 bits/word (SZ 9.1298; Counter 8.9368; Stack 8.1507; hand-built 7.7
 Vote accepted, found by crossover); P3 PASS. Accepted kinds: token and class (form, mff, mfp) counts, mixed token+form
 contexts (e.g. token(t-1) & form(t-2): fit 8.2653 -> 8.1829), recency, same-book counts, gates. Wins per strategy:
 levin 7, mutate 7, neighbourhood 4, crossover 4, prior 1. No lifts accepted.
+**SZ3 result (12 runs, ~80 proposals screened -- the proposal-budget defect).** Accepted: Vote[c50 class, 1/(1+d), book]
+(self-made attribute), Spell[4-letter prefix, last 50] (below the word), Vote[token(t-1) & token(t-2), static]
+(counting). Similarity, registers, sentence position, class weights, lags: never accepted. Fit 8.0152; scored 8.3099
+bits/word (SZ2 8.3417).
+**SH2 result (16 runs; 741 proposals screened after the fix, 98 of them Descend).** Accepted: Gate on the static
+trigram, Vote[token(t-1) & token(t-2) skip, static] -- both counting; no tree attribute or Descend Vote paid on the
+9,000 positions (best screened tree Votes est. +300 bits on 1,000, rejected on 9,000). Fit 7.9603; scored 8.2659
+bits/word -- bar (below SZ3) PASS, but not from the tree. Drop-one ablations on the scored positions (no refit): without
+the c50 book Vote 8.2752, without Spell 8.2803 (full 8.2658).
