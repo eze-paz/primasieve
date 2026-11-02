@@ -1,0 +1,2 @@
+L7 frame: 21,538 words; 1 queued; 0 splits kept (42 s)
+L7 frame: 21 splits kept of 43 tried; depth 9; 0 queued -- tree complete (85 s)

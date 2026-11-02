@@ -63,6 +63,11 @@ def install():
 def _init(env):
     os.environ.update(env); sys.argv = [sys.argv[0], "none"]
     import sieve_onto                                                                             # installs every kind; derived attributes are built lazily in _work
+    for v, c in (("scene", "s"), ("frame", "f")):                                                # L7 trees, when grown
+        f = os.path.join(F.SC.LX, "sieve_tree", f"attrs_{v}.npz")
+        if os.path.exists(f):
+            z = np.load(f)
+            for k in range(1, 14): F.AT[f"h{c}{k}"] = z[f"k{k}"]
     install()
 def _work(args):
     cx, k = args; t = time.time()

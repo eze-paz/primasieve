@@ -81,13 +81,13 @@ def describe(sp):
     return f"Descend[{tt} -> class of next word at depth {sp['k']} of the {'left' if sp['view'] == 'l' else 'right'} tree]"
 def vote(cx, sp):
     if P3.kind(sp) != "descend": return _vote3(cx, sp)
-    f = os.path.join(P.PD, f"{cx}_{__import__('hashlib').md5(P.key(sp).encode()).hexdigest()[:16]}.npz")
+    f = P.cname(cx, __import__('hashlib').md5(P.key(sp).encode()).hexdigest()[:16])
     if os.path.exists(f): z = np.load(f); return z["D"].astype(np.float32), z["ne"], z["N"], z["TD"]
     s, T, _ = F.ctx(cx); SL, ans = P.shortlist(cx); n, K = SL.shape; H = F.AT[f"h{sp['view']}{sp['k']}"]; S = P.corpus(); C = P.ccount().astype(float)
     nc = int(H.max()) + 1; cc = np.bincount(H, weights=C, minlength=nc)
     st = tuple((t[1], t[0] + 1) for t in sp["terms"]); kS = F.keys(S, st); ok = kS != -1; comb = np.sort(kS[ok] * np.int64(nc) + H[S[ok]])
     brk = np.r_[True, comb[1:] != comb[:-1]]; pairs = comb[brk]; cnt_ = np.diff(np.r_[np.nonzero(brk)[0], len(comb)]).astype(float); kq = F.keys(s, st)
-    D = np.zeros((n, K + 1), np.float32); N = np.zeros(n); TDn = np.zeros(n)
+    D = np.zeros((n, K + 1), np.float32); N = np.zeros(n); TDn = np.zeros(n); EX = np.zeros(n); yv = s[T]
     inSL = SL < F.Vt; slc = np.where(inSL, H[np.minimum(SL, F.Vt - 1)], 0); share = np.where(inSL, C[np.minimum(SL, F.Vt - 1)] / np.maximum(cc[slc], 1e-9), 0)
     for i, t in enumerate(T):
         k = kq[t]
@@ -95,7 +95,8 @@ def vote(cx, sp):
         lo, hi = np.searchsorted(pairs, k * nc), np.searchsorted(pairs, (k + 1) * nc)
         if hi == lo: continue
         cl = pairs[lo:hi] - k * nc; pc = np.zeros(nc); pc[cl] = cnt_[lo:hi]; tot = pc.sum(); pc /= tot
-        row = pc[slc[i]] * share[i]; D[i, :K] = row; D[i, K] = max(0.0, 1 - row.sum()); N[i] = tot; TDn[i] = hi - lo
+        row = pc[slc[i]] * share[i]; D[i, :K] = row; D[i, K] = max(0.0, 1 - row.sum()); N[i] = tot; TDn[i] = hi - lo; EX[i] = pc[H[yv[i]]] * C[yv[i]] / max(cc[H[yv[i]]], 1e-9)
+    if P.EXACT: D = P.exactify(D, EX, ans, K)
     ne = N > 0; np.savez(f, D=D.astype(np.float16), ne=ne, N=N, TD=TDn); return D, ne, N, TDn
 def state4():
     if not os.path.exists(CK4):

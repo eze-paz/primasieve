@@ -13,6 +13,17 @@ PD = os.path.join(F.SC.LX, "sieve_prim_cache"); os.makedirs(PD, exist_ok=True)
 F.AT["form"] = F.FORM
 ATTRS, AS, BS, THRS, SPANS, WTS, SRCS = ("id", "mff", "mfp", "form"), (0, 1, 2), (1, 10, 50), (None, 100, 1000), (1, 5, 20), ("1", "rec"), ("static", "w1000", "w50000", "book")
 SH = F.SH; _S = None; _C = None; _O = None
+EXACT = os.environ.get("SZ_EXACT") == "1"                                                           # SO O0: exact answer column (split rest bucket)
+def cname(cx, h): return os.path.join(PD, f"{cx}_{'x_' if EXACT else ''}{h}.npz")
+def exactify(D, exn, ans, K):
+    """(n, K+1) normalised + exact answer share -> (n, K+2): rest split into (rest without the answer, the answer)"""
+    D2 = np.zeros((D.shape[0], K + 2), np.float32); D2[:, :K + 1] = D; out = ans == K; e = np.minimum(np.maximum(exn, 0), D[:, K]); D2[out, K + 1] = e[out]; D2[out, K] = D[out, K] - e[out]; return D2
+def liftlog(D, Du):
+    """log((D + u)/(2u)) per column; with the exact column both rest columns take the lift of the unsplit rest bucket"""
+    L = np.log((D + Du) / (2 * Du + 1e-30))
+    if EXACT and D.shape[1] == Du.shape[1]:
+        K = D.shape[1] - 2; r = np.log((D[:, K] + D[:, K + 1] + Du[:, K] + Du[:, K + 1]) / (2 * (Du[:, K] + Du[:, K + 1]) + 1e-30)); L[:, K] = r; L[:, K + 1] = r
+    return L
 def corpus():
     global _S, _C
     if _S is None: _S = np.r_[F.tr, F.lib()]; _C = np.bincount(_S, minlength=F.Vt)
@@ -45,6 +56,7 @@ def base(cx):
     SL, ans = shortlist(cx); u = uni(); K = SL.shape[1]; uS = np.where(SL < F.Vt, u[np.minimum(SL, F.Vt - 1)], 0.0)
     Du = np.c_[uS, 1 - uS.sum(1)]; s, T, _ = F.ctx(cx); y = s[T]
     rest_extra = np.where(ans == K, np.log2(np.maximum(Du[:, K], 1e-300) / np.maximum(u[y], 1e-300)), 0.0)   # bits to name the answer inside the rest (-log2 of its share)
+    if EXACT: Du = exactify(Du, u[y], ans, K); rest_extra = np.zeros_like(rest_extra); ans = np.where(ans == K, K + 1, ans)
     return Du, ans, rest_extra
 # ---------------- the Vote primitive ----------------
 def key(sp): return json.dumps(sp, sort_keys=True)
@@ -81,12 +93,12 @@ def mutate(sp, rng):
         if valid(q) and key(q) != key(sp): return q
     return None
 def vote(cx, sp):
-    f = os.path.join(PD, f"{cx}_{hashlib.md5(key(sp).encode()).hexdigest()[:16]}.npz")
+    f = cname(cx, hashlib.md5(key(sp).encode()).hexdigest()[:16])
     if os.path.exists(f): z = np.load(f); return z["D"].astype(np.float32), z["ne"], z["N"], z["TD"]
-    s, T, book = F.ctx(cx); SL, ans = shortlist(cx); n, K = SL.shape; D = np.zeros((n, K + 1), np.float32); N = np.zeros(n); TD = np.zeros(n)
+    s, T, book = F.ctx(cx); SL, ans = shortlist(cx); n, K = SL.shape; D = np.zeros((n, K + 1), np.float32); N = np.zeros(n); TD = np.zeros(n); EX = np.zeros(n); yv = s[T]
     def put(i, toks, wts):
         c = np.searchsorted(SL[i], toks); cc = np.minimum(c, K - 1); hit = SL[i][cc] == toks
-        D[i, :K] = np.bincount(c[hit], wts[hit], minlength=K)[:K]; D[i, K] = wts[~hit].sum(); N[i] = wts.sum(); TD[i] = len(np.unique(toks))
+        D[i, :K] = np.bincount(c[hit], wts[hit], minlength=K)[:K]; D[i, K] = wts[~hit].sum(); N[i] = wts.sum(); TD[i] = len(np.unique(toks)); EX[i] = wts[toks == yv[i]].sum()
     tm, span = sp["terms"], sp["span"]
     if sp["src"] == "static" and all(t[2] == 1 and t[3] is None for t in tm):           # joint single-token terms, span 1: count index
         st = tuple((t[1], t[0] + 1) for t in tm); S = corpus(); uk, nN, nT, pairs, cnt_, _, _ = F.static(S, st); kq = F.keys(s, st)
@@ -127,6 +139,7 @@ def vote(cx, sp):
             if not len(e): continue
             put(i, s[e], np.ones(len(e)) if sp["w"] == "1" else 1.0 / (1 + (t - e)))
     ne = N > 0; D[ne] /= N[ne, None]
+    if EXACT: D = exactify(D, EX / np.maximum(N, 1e-12), ans, K)
     np.savez(f, D=D.astype(np.float16), ne=ne, N=N, TD=TD); return D, ne, N, TD
 def describe(sp):
     tt = " & ".join(f"{at}(j-{a}) in last {B}" + (f" (count<={thr})" if thr else "") for a, at, B, thr in sp["terms"]) or "any anchor"
@@ -144,7 +157,7 @@ class Model:
         for k, c in enumerate(s_.mem):
             w = np.exp(s_.th[k + 1] + s_.ga[k + 1] * s_.lg(c)) * c[1]; A += w[:, None] * c[0]; W.append(w)
         logL = np.zeros_like(A)
-        for k, c in enumerate(s_.lif): logL += s_.be[k] * np.where(c[1][:, None], np.log((c[0] + s_.Du) / (2 * s_.Du + 1e-30)), 0)
+        for k, c in enumerate(s_.lif): logL += s_.be[k] * np.where(c[1][:, None], liftlog(c[0], s_.Du), 0)
         return A, logL, W
     def bits(s_, A=None, logL=None):
         if A is None: A, logL, _ = s_.parts()
@@ -158,7 +171,7 @@ class Model:
             Ds = [s_.Du] + [c[0] for c in s_.mem]; LG = [np.zeros(s_.n)] + [s_.lg(c) for c in s_.mem]
             g = np.array([((W[k] * (Ds[k][s_.ix, s_.ans] / Aa - (Ds[k] * L).sum(1) / Z))).sum() for k in range(len(Ds))])
             gg = np.array([((W[k] * (Ds[k][s_.ix, s_.ans] / Aa - (Ds[k] * L).sum(1) / Z)) * LG[k]).sum() for k in range(len(Ds))])
-            gb = np.array([(np.where(c[1], np.log((c[0][s_.ix, s_.ans] + s_.Du[s_.ix, s_.ans]) / (2 * s_.Du[s_.ix, s_.ans])), 0) - np.where(c[1], (P * np.log((c[0] + s_.Du) / (2 * s_.Du + 1e-30))).sum(1), 0)).sum() for c in s_.lif])
+            gb = np.array([(np.where(c[1], liftlog(c[0], s_.Du)[s_.ix, s_.ans], 0) - np.where(c[1], (P * liftlog(c[0], s_.Du)).sum(1), 0)).sum() for c in s_.lif])
             return b, -g / math.log(2), -gg / math.log(2), -gb / math.log(2)
         b, gt, gg, gb = f(); lr = 1.0; act = np.array(s_.gact, float) if hasattr(s_, "gact") else np.zeros(len(s_.th))
         for _ in range(iters):
@@ -196,7 +209,7 @@ if mode == "search":
             c = vote(CX, json.loads(k)); sp = json.loads(k)
             if k not in st["mem"]: cand.append(("mix", k, (c[1] * (c[0][M.ix, M.ans] / Aa - (c[0] * L).sum(1) / Z)).sum(), move + bits_of(sp) + half))
             if k not in st["lift"]:
-                lgl = np.where(c[1][:, None], np.log((c[0] + M.Du) / (2 * M.Du + 1e-30)), 0); cand.append(("lift", k, abs((lgl[M.ix, M.ans] - (P * lgl).sum(1)).sum()), move + bits_of(sp) + half))
+                lgl = np.where(c[1][:, None], liftlog(c[0], M.Du), 0); cand.append(("lift", k, abs((lgl[M.ix, M.ans] - (P * lgl).sum(1)).sum()), move + bits_of(sp) + half))
         for i, k in enumerate(st["mem"]):
             if not st["gact"][i + 1] and f"gate:{k}" not in st["rejected"]:
                 c = M.mem[i]; cand.append(("gate", i + 1, abs((W[i + 1] * (c[0][M.ix, M.ans] / Aa - (c[0] * L).sum(1) / Z) * M.lg(c)).sum()), move + math.log2(max(1, len(st["mem"]))) + half))
@@ -206,7 +219,7 @@ if mode == "search":
                 if kd == "mix":
                     c = vote(CX, json.loads(x)); fn = lambda lw: M.bits(A + (np.exp(lw) * c[1])[:, None] * c[0], logL); xv, b2 = golden(fn, -12, 6)
                 elif kd == "lift":
-                    c = vote(CX, json.loads(x)); lgl = np.where(c[1][:, None], np.log((c[0] + M.Du) / (2 * M.Du + 1e-30)), 0); fn = lambda be: M.bits(A, logL + be * lgl); xv, b2 = golden(fn, -1, 2)
+                    c = vote(CX, json.loads(x)); lgl = np.where(c[1][:, None], liftlog(c[0], M.Du), 0); fn = lambda be: M.bits(A, logL + be * lgl); xv, b2 = golden(fn, -1, 2)
                 else:
                     c = M.mem[x - 1]; wk = W[x]; lgc = M.lg(c); fn = lambda ga: M.bits(A + ((wk * np.exp(ga * lgc)) - wk)[:, None] * c[0], logL); xv, b2 = golden(fn, -2, 3)
                 gain = cur - b2 - bb

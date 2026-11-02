@@ -25,13 +25,13 @@ def run(cx, sel, eta, data):
     ctx = np.zeros(n, np.int64) if sel is None else F.AT[f"hl{sel}"][s[T - 1]]; nc = int(ctx.max()) + 1; delta = np.zeros((nc, m)); bits = np.zeros(n)
     for i in range(n):
         D = Ds[:, i, :].astype(np.float32); w = np.exp(th + ga * LG[:, i] + delta[ctx[i]] - (th + ga * LG[:, i] + delta[ctx[i]]).max()) * NE[:, i]
-        L = np.exp(logL[i] - logL[i].max()); A = w @ D; Z = A[:K2 - 1] @ L[:K2 - 1]; a = ans[i]; pa = A[a] * L[a] / Z; bits[i] = -math.log2(max(pa, 1e-300))
-        if eta: g = w * (D[:, a] / max(A[a], 1e-300) - (D[:, :K2 - 1] @ L[:K2 - 1]) / Z); delta[ctx[i]] += eta * g
+        L = np.exp(logL[i] - logL[i].max()); A = w @ D; Z = A @ L; a = ans[i]; pa = A[a] * L[a] / Z; bits[i] = -math.log2(max(pa, 1e-300))
+        if eta: g = w * (D[:, a] / max(A[a], 1e-300) - (D @ L) / Z); delta[ctx[i]] += eta * g
     return bits
 fit = arrays("fit9"); F.log(f"L4: {len(ST['mem'])} members, {len(ST['lift'])} lifts; fit arrays ready")
 b0 = run("fit9", None, 0.0, fit).mean(); F.log(f"   static mixture (no online updates), fit {b0:.4f} bits/word"); grid = []
 for sel in (None, 4, 8):
-    for eta in (0.005, 0.02, 0.05, 0.1, 0.2):
+    for eta in (0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0):
         b = run("fit9", sel, eta, fit).mean(); grid.append((b, sel, eta)); print(f"   selector {sel}, eta {eta}: fit {b:.4f}", flush=True)
 best = min(grid); F.log(f"L4 chosen: selector {best[1]}, eta {best[2]} (fit {best[0]:.4f} vs static {b0:.4f}; grid cost {math.log2(len(grid)):.1f} bits)")
 del fit; ev = arrays("eval"); e0 = run("eval", None, 0.0, ev); e1 = run("eval", best[1], best[2], ev)

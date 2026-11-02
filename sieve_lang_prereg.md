@@ -867,3 +867,20 @@ less there than on the consecutive scored text.)
 **L6 result -- FAIL.** Four class HMMs (16 / 32 states over left-tree nodes at depth 4 / 6; Baum-Welch 12 iterations on
 400 x 1,000 training tokens, still improving) offered on top of the SO combination: none accepted; scored unchanged
 7.7153.
+**L4 correction.** sieve_online.py normalised over every column but the exact answer column, so its probabilities
+for answers outside the shortlist were too high (static 7.7142 vs the model's own 7.7153). Fixed (Z over all columns,
+gradient likewise) and rerun with eta extended to 0.5 and 1.0: fit static 7.3632; chosen selector left node depth 8,
+eta 0.2 (now interior: 0.5 gives 7.3629, 1.0 gives 7.3819), fit 7.3561; scored static 7.7153 -> online 7.6768
+bits/word. PASS stands.
+**L9 result -- weak.** First version: hypotheses = scene-tree nodes only (depth 5, 10 nodes; frame / pronoun / speaker
+hypotheses not built). Grid on fit: alpha 0.5, R 200 (fit 7.3631 -> 7.3619; alpha >= 1 hurts). Scored by budget:
+B=0 7.7153; B=1 7.7134; B=4 7.7096; B=16 7.7096; B=64 7.7096. Bits fall with budget up to 4, then flat (10 nodes:
+nothing more to search). The scene tree is too coarse for deliberation to matter; same normaliser fix applied.
+**L7 result -- trees PASS, prediction small.** After the objective fix (each offset's cost includes both marginals):
+scene tree 8 splits, depth 5, 9 leaves (one leaf is dialogue: i / you / my / me / said / if / what / will / do / your);
+frame tree 21 splits, depth 9, 22 leaves; shuffled text grows no scene tree. Offered on the SO combination (26
+pieces: scene node topic depth 2-5 x last 200 / 1,000 / book; frame Descend depth 3 / 6 / 9 x 1-2 words; frame class
+triggers): one accepted -- NodeTopic[scene depth 5; last 200] as a lift; fit 7.3631 -> 7.3536; scored 7.7119
+bits/word (SO all 7.7153). Two more passes (forward and reversed candidate order) accept nothing.
+**L4 + L7.** Online mixing on the L7 program: fit static 7.3536 -> 7.3468 (selector left node depth 8, eta 0.2);
+scored static 7.7119 -> online 7.6727 bits/word -- best so far (Stack 8.1507, LM 6.026).

@@ -1,0 +1,21 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+L9 (scene depth 5, 10 nodes): fit without deliberation 7.3631 (74 s)
+   alpha 0.5, R 20, B 16: fit 7.3630
+   alpha 0.5, R 50, B 16: fit 7.3628
+   alpha 0.5, R 200, B 16: fit 7.3619
+   alpha 1.0, R 20, B 16: fit 7.3660
+   alpha 1.0, R 50, B 16: fit 7.3675
+   alpha 1.0, R 200, B 16: fit 7.3676
+   alpha 2.0, R 20, B 16: fit 7.3832
+   alpha 2.0, R 50, B 16: fit 7.3866
+   alpha 2.0, R 200, B 16: fit 7.3796
+   alpha 4.0, R 20, B 16: fit 7.4303
+   alpha 4.0, R 50, B 16: fit 7.4262
+   alpha 4.0, R 200, B 16: fit 7.4048
+L9 chosen alpha 0.5, R 200 (fit 7.3619) (79 s)
+L9 scored on the 50,114 positions by thinking budget: B=0: 7.7153; B=1: 7.7134; B=4: 7.7096; B=16: 7.7096; B=64: 7.7096 (97 s)
+
+real	1m38.136s
+user	0m0.076s
+sys	0m0.077s

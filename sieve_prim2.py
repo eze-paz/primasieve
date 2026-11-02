@@ -42,7 +42,7 @@ def gains(M, c):
     """best 1-D mix and lift gains (bits) of a Vote under model M"""
     A, logL, W = M.parts(); cur = M.bits(A, logL)
     _, bm = P.golden(lambda lw: M.bits(A + (np.exp(lw) * c[1])[:, None] * c[0], logL), -12, 6, 16)
-    lgl = np.where(c[1][:, None], np.log((c[0] + M.Du) / (2 * M.Du + 1e-30)), 0); _, bl = P.golden(lambda be: M.bits(A, logL + be * lgl), -1, 2, 16)
+    lgl = np.where(c[1][:, None], P.liftlog(c[0], M.Du), 0); _, bl = P.golden(lambda be: M.bits(A, logL + be * lgl), -1, 2, 16)
     return cur - bm, cur - bl
 mode = (sys.argv[1] if len(sys.argv) > 1 else "search") if __name__ == "__main__" else None     # importable (sieve_prim3.py)
 if mode == "search":
@@ -87,7 +87,7 @@ if mode == "search":
             c = P.vote(CX, json.loads(k)); sp = json.loads(k)
             if k not in st["mem"]: cand.append(("mix", k, (c[1] * (c[0][M.ix, M.ans] / Aa - (c[0] * Lx).sum(1) / Z)).sum(), move + P.bits_of(sp) + half))
             if k not in st["lift"]:
-                lgl = np.where(c[1][:, None], np.log((c[0] + M.Du) / (2 * M.Du + 1e-30)), 0); cand.append(("lift", k, abs((lgl[M.ix, M.ans] - (Pm * lgl).sum(1)).sum()), move + P.bits_of(sp) + half))
+                lgl = np.where(c[1][:, None], P.liftlog(c[0], M.Du), 0); cand.append(("lift", k, abs((lgl[M.ix, M.ans] - (Pm * lgl).sum(1)).sum()), move + P.bits_of(sp) + half))
         for i, k in enumerate(st["mem"]):
             if not st["gact"][i + 1] and f"gate:{k}" not in st["rejected"]:
                 c = M.mem[i]; cand.append(("gate", i + 1, abs((W[i + 1] * (c[0][M.ix, M.ans] / Aa - (c[0] * Lx).sum(1) / Z) * M.lg(c)).sum()), move + math.log2(max(1, len(st["mem"]))) + half))
@@ -96,7 +96,7 @@ if mode == "search":
             for kd, x, g_, bb in sorted((c for c in cand if c[0] == kind and c[2] > 0), key=lambda c: -c[2])[:3]:
                 if kd == "mix": c = P.vote(CX, json.loads(x)); xv, b2 = P.golden(lambda lw: M.bits(A + (np.exp(lw) * c[1])[:, None] * c[0], logL), -12, 6)
                 elif kd == "lift":
-                    c = P.vote(CX, json.loads(x)); lgl = np.where(c[1][:, None], np.log((c[0] + M.Du) / (2 * M.Du + 1e-30)), 0); xv, b2 = P.golden(lambda be: M.bits(A, logL + be * lgl), -1, 2)
+                    c = P.vote(CX, json.loads(x)); lgl = np.where(c[1][:, None], P.liftlog(c[0], M.Du), 0); xv, b2 = P.golden(lambda be: M.bits(A, logL + be * lgl), -1, 2)
                 else: c = M.mem[x - 1]; wk = W[x]; lgc = M.lg(c); xv, b2 = P.golden(lambda ga: M.bits(A + ((wk * np.exp(ga * lgc)) - wk)[:, None] * c[0], logL), -2, 3)
                 gain = cur - b2 - bb
                 if gain > 0 and (best is None or gain > best[0]): best = (gain, kd, x, xv)

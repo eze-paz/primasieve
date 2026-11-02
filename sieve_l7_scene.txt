@@ -1,0 +1,2 @@
+L7 scene: 21,538 words; 1 queued; 0 splits kept (52 s)
+L7 scene: 8 splits kept of 17 tried; depth 5; 0 queued -- tree complete (88 s)

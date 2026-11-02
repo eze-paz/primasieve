@@ -1,0 +1,27 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+L4: 30 members, 5 lifts; fit arrays ready (37 s)
+   static mixture (no online updates), fit 7.3536 bits/word (38 s)
+   selector None, eta 0.005: fit 7.3532
+   selector None, eta 0.02: fit 7.3519
+   selector None, eta 0.05: fit 7.3509
+   selector None, eta 0.1: fit 7.3509
+   selector None, eta 0.2: fit 7.3526
+   selector None, eta 0.5: fit 7.3637
+   selector None, eta 1.0: fit 7.3861
+   selector 4, eta 0.005: fit 7.3525
+   selector 4, eta 0.02: fit 7.3504
+   selector 4, eta 0.05: fit 7.3484
+   selector 4, eta 0.1: fit 7.3473
+   selector 4, eta 0.2: fit 7.3484
+   selector 4, eta 0.5: fit 7.3579
+   selector 4, eta 1.0: fit 7.3792
+   selector 8, eta 0.005: fit 7.3528
+   selector 8, eta 0.02: fit 7.3511
+   selector 8, eta 0.05: fit 7.3490
+   selector 8, eta 0.1: fit 7.3473
+   selector 8, eta 0.2: fit 7.3468
+   selector 8, eta 0.5: fit 7.3535
+   selector 8, eta 1.0: fit 7.3724
+L4 chosen: selector 8, eta 0.2 (fit 7.3468 vs static 7.3536; grid cost 4.4 bits) (49 s)
+L4 scored on the 50,114 positions: static 7.7119 -> online 7.6727 bits/word (Stack 8.1507, LM 6.026) (60 s)

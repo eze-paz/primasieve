@@ -1,0 +1,58 @@
+cached fit9 Vote[any anchor; next 5; w=1; w1000] 2s
+cached fit9 Vote[any anchor; next 1; w=1/(1+d); book] 24s
+cached fit9 Vote[any anchor; next 1; w=1; book] 23s
+cached fit9 Vote[form(j-0) in last 1; next 1; w=1/(1+d); book] 6s
+cached fit9 Vote[form(j-0) in last 1; next 1; w=1; book] 6s
+cached fit9 Vote[id(j-0) in last 1 (count<=1000); next 1; w=1; book] 3s
+cached fit9 Vote[id(j-0) in last 1; next 1; w=1; book] 3s
+cached fit9 Vote[id(j-0) in last 1; next 1; w=1/(1+d); book] 3s
+cached fit9 Vote[mff(j-0) in last 1; next 5; w=1; w1000] 1s
+cached fit9 Vote[mff(j-0) in last 1; next 1; w=1; book] 7s
+cached fit9 Vote[id(j-1) in last 1; next 1; w=1/(1+d); book] 4s
+cached fit9 Vote[form(j-0) in last 1; next 1; w=1; static] 37s
+cached fit9 Vote[form(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static] 16s
+cached fit9 Vote[form(j-0) in last 1 & mfp(j-0) in last 1; next 1; w=1; static] 23s
+cached fit9 Vote[id(j-0) in last 1; next 1; w=1; static] 14s
+cached fit9 Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1/(1+d); book] 4s
+cached fit9 Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; book] 5s
+cached fit9 Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static] 8s
+cached fit9 Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static] 9s
+cached fit9 Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static] 8s
+cached fit9 Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static] 8s
+cached fit9 Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1/(1+d); book] 3s
+cached fit9 Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; book] 3s
+cached fit9 Vote[c50(j-0) in last 1; next 1; w=1/(1+d); book] 7s
+cached fit9 Spell[4-letter prefix shared with the last 50] 0s
+cached fit9 Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static] 6s
+cached fit9 Vote[id(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static] 6s
+all cached fit9
+cached eval Vote[any anchor; next 5; w=1; w1000] 11s
+cached eval Vote[any anchor; next 1; w=1/(1+d); book] 36s
+cached eval Vote[any anchor; next 1; w=1; book] 40s
+cached eval Vote[form(j-0) in last 1; next 1; w=1/(1+d); book] 13s
+cached eval Vote[form(j-0) in last 1; next 1; w=1; book] 13s
+cached eval Vote[id(j-0) in last 1 (count<=1000); next 1; w=1; book] 4s
+cached eval Vote[id(j-0) in last 1; next 1; w=1; book] 6s
+cached eval Vote[id(j-0) in last 1; next 1; w=1/(1+d); book] 6s
+cached eval Vote[mff(j-0) in last 1; next 5; w=1; w1000] 5s
+cached eval Vote[mff(j-0) in last 1; next 1; w=1; book] 12s
+cached eval Vote[id(j-1) in last 1; next 1; w=1/(1+d); book] 6s
+
+
+cached eval Vote[form(j-0) in last 1; next 1; w=1; static] 279s
+cached eval Vote[form(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static] 114s
+cached eval Vote[form(j-0) in last 1 & mfp(j-0) in last 1; next 1; w=1; static] 200s
+cached eval Vote[id(j-0) in last 1; next 1; w=1; static] 96s
+cached eval Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1/(1+d); book] 13s
+cached eval Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; book] 12s
+cached eval Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static] 31s
+cached eval Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static] 35s
+cached eval Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static] 27s
+cached eval Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static] 31s
+cached eval Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1/(1+d); book] 7s
+cached eval Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; book] 6s
+cached eval Vote[c50(j-0) in last 1; next 1; w=1/(1+d); book] 14s
+cached eval Spell[4-letter prefix shared with the last 50] 3s
+cached eval Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static] 16s
+cached eval Vote[id(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static] 14s
+all cached eval
