@@ -860,3 +860,7 @@ the idea on the 1,000-position subsample, gains x 9, bits as on 9,000) -- O1's s
 **SO final.** O8 scored 7.8179. All accepted pieces re-chosen greedily from the O0 base: added O3 node topic (book,
 depth 4) and O6 agreement first, then O5, O2 (both), O1 and O3 (window 1,000, depth 10): fit 7.4952 -> 7.3631;
 scored 7.7153 bits/word (O0 base 7.8446; hand-built SX10 7.7205; Stack 8.1507; LM 6.026). Overall bar (< 8.2659) PASS.
+**L4 result -- PASS.** On the SO combination (30 members, 4 lifts): fit (9,000 positions read in order) static 7.3622;
+best online = selector left node depth 8 of the previous word, eta 0.2 (grid edge), fit 7.3552. Scored (read in order):
+static 7.7142 -> online 7.6754 bits/word. (Fit positions are spread through the dev books, so online learning sees
+less there than on the consecutive scored text.)
