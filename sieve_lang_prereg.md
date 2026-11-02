@@ -634,3 +634,22 @@ gated): fit 7.3437; reweight fit 7.3204. Scored 7.7205 bits/word (without reweig
 bootstrap interval on these positions is about +-0.07, so SX8-SX10 (0, 0.0067, 0.0008) mark the end of this family of
 ideas. Loop stopped here (2026-11-02). Every idea since SP was scored on the same 50,114 positions; an untouched check
 needs fresh books.
+
+## SY -- Sieve generates its own component families (registered 2026-11-02, before running)
+**Language.** Atoms: Gather(keys, source, span) = how often the answer occurs within `span` tokens after an
+occurrence of the keys in the source, normalised over everything gathered (Q over forms the same way).
+keys = a joint context (atom sets of SR, span 1: the existing count components) or a BAG (the distinct recent tokens
+of the last B in {10, 50, 200, 1,000}, corpus count <= thr in {100, 1,000}); source in {library, training+library}
+(bags), plus the existing history / book / recency / graded / long-match atoms. Operators: Factor(A, B) (form from A,
+word within form from B) over any two pool members, including factors (nesting allowed); Gate(c) (trust exponent
+(n/(n+T))^g). Description length: atom = log2 of each field's choices; Factor = log2 3 + 2 log2 |pool|; Gate = log2 3 +
+log2 |pool|; + (1/2) log2 n per fitted number.
+**Generator.** Each step: every unused atom, every factor pair of the pool and every ungated member gets its gradient
+at zero weight; the 3 best of each kind are fitted (weights, gates jointly) and the best that pays is added; stop when
+none pays. Then the reweight stage as before. 30,000 fit positions.
+**Rediscovery test.** Start: SW2's 25 components (counts, book counts, recency, graded, long-match; no triggers, no
+factors, no gates). Bars: R1 a bag Gather with span > 1 is selected (triggers re-derived); R2 a Factor is selected;
+R3 a Gate is selected; R4 scored < 7.8984 (SW2, the same start without them). Descriptive: selected expressions the
+hand-written grammar lacked (spans 1/2/5, B = 10, library-only bags, nested factors, factor pairs outside SX4's 30), and
+the score beside the hand-built 7.7205. Book-source bags are not in the language (each costs > 4 min at 30,000
+positions; book triggers gave 7.8834 vs 7.8857).
