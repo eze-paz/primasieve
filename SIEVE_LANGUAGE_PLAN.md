@@ -124,3 +124,19 @@ per idea fell to 0.0008 -- this grammar is exhausted. Final: Sieve 7.7205 bits/w
 8.1507, LM 6.026), within-book calibration 0 refuted. Next: (1) an expression language for component families so
 Sieve generates and MDL-scores its own families (rediscovery test first: remove triggers/factor/gates and see whether
 it re-derives them); (2) score on fresh books -- the 50,114 positions have been reused for every idea.
+
+## Next: a primitive algebra (owner, 2026-11-02: "components as primitive as possible, so they combine into forms we don't expect")
+SY showed the coarse expression language only recombines hand-made mechanisms. Replace it with small primitives so
+count, recency, trigger, factor, gate and reweight are particular programs and new ones are reachable:
+- streams: token, attributes derived by counting (mff, mfp, forms), shift(k);
+- position sets: equal(stream at j, stream at t); and / or; within window; same book; source;
+- relations: j -> j + k; within span after j;
+- aggregation: weighted vote over the positions, weight from SC's generic term grammar (1, d, 1/(1+d), ...);
+- distribution algebra: normalise, mix, product, power; weights as terms over evidence (n, T) (SN1);
+- representation: per-position shortlist of candidate words with full distributions (+ rest mass), so products and
+  normalisation are exact at word level (the current P(answer) + forms-only Q is the deepest lock);
+- cost: expression-tree bits + (1/2) log2 n per fitted number; search: sampling from the length prior, subtree
+  mutation, residual-guided proposals, gradient screening; add / remove / replace moves, all MDL.
+Tests: (1) re-derive count, recency, trigger, factor, gate, reweight from primitives; (2) list programs that are none
+of them; (3) score on fresh books (about 10 library books removed from the counted history) -- the 50,114 positions
+have been reused for every idea.
