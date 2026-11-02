@@ -1,11 +1,13 @@
 """SX8 (sieve_lang_prereg.md): a second gate feature. Weight of component c at position i = w_c (n/(n+T))^g_c (1+n)^h_c,
 on SX7's program (sieve_gate7_fit30.json); h_c added component by component in gradient order, fitted jointly with
 the log-weights and g by gradient, kept while it saves more than (1/2) log2 n + log2(46) bits. Reweight stage and
-score as sieve_gate.py. Run: py -3.12 -W ignore sieve_gate8.py gate | rw | eval   (resumable)"""
+score as sieve_gate.py. Run: py -3.12 -W ignore sieve_gate8.py gate | rw | eval   (resumable). SX9: env SX9=1 -> the second
+feature is -H(Q_c), the component's own form entropy (log-weight term h_c * sum Q log2 Q)."""
 import os, sys, json, math, time
 import numpy as np
 import sieve_fs2 as F, sieve_free as SF
-T0 = time.time(); CX = "fit30"; CK = os.path.join(F.HERE, "sieve_gate8_fit30.json")
+T0 = time.time(); CX = "fit30"; V9 = os.environ.get("SX9") == "1"                                      # SX9: confidence gate instead of count gate
+CK = os.path.join(F.HERE, "sieve_gate9_fit30.json" if V9 else "sieve_gate8_fit30.json")
 if not os.path.exists(CK):
     s7 = json.load(open(os.path.join(F.HERE, "sieve_gate7_fit30.json")))
     json.dump(dict(sel=s7["sel"], th=s7["th"], ga=s7["ga"], act=s7["act"], gb=[0.0] * (len(s7["sel"]) + 1), actb=[], rejected=[]), open(CK, "w"))
@@ -14,6 +16,10 @@ def arrays(cx):
     C = [F.load(cx, n) for n in SEL]; n = len(C[0][0]); z = np.zeros(n)
     P = np.vstack([np.full(n, 1 / F.Vt)] + [c[1] for c in C]); M = np.vstack([np.ones(n, bool)] + [c[0] for c in C])
     L1 = np.vstack([z] + [np.where(c[0], np.log(np.maximum(c[2], 1) / (np.maximum(c[2], 1) + np.maximum(c[3], 1))), 0) for c in C])
+    if V9:
+        def negH(nme, ne):
+            Q = F.load(cx, nme, True)[4].astype(np.float64); return np.where(ne, (Q * np.log2(np.maximum(Q, 1e-12))).sum(1), 0)
+        L2 = np.vstack([z] + [negH(nme, c[0]) for nme, c in zip(SEL, C)]); return P, M, L1, L2
     L2 = np.vstack([z] + [np.where(c[0], np.log1p(np.maximum(c[2], 0)), 0) for c in C]); return P, M, L1, L2
 def bits(th, ga, gb, P, M, L1, L2):
     lw = th[:, None] + ga[:, None] * L1 + gb[:, None] * L2; w = np.exp(lw - lw.max(0)) * M; num = (w * P).sum(0); den = w.sum(0)
@@ -50,7 +56,7 @@ if mode == "gate":
         if not added: break
     st.update(th=th.tolist(), ga=ga.tolist(), gb=gb.tolist(), done=True, fit=cur / n); json.dump(st, open(CK, "w")); F.log(f"SX8 count gates: {len(st['actb'])}; fit {cur / n:.4f} bits/word")
 elif mode == "rw":
-    s, T, _ = F.ctx(CX); y = s[T]; n = len(T); half = 0.5 * math.log2(n); MC = os.path.join(F.CD, "gate8_fit30_model.npz")
+    s, T, _ = F.ctx(CX); y = s[T]; n = len(T); half = 0.5 * math.log2(n); MC = os.path.join(F.CD, "gate9_fit30_model.npz" if V9 else "gate8_fit30_model.npz")
     if not os.path.exists(MC): pm, Q = weights_q(CX, st); np.savez(MC, pm=pm, Q=Q.astype(np.float32)); F.log("   mixture outputs cached, rerun"); sys.exit(0)
     z = np.load(MC); pm, Q = z["pm"], z["Q"].astype(np.float64); ws, bs = st.get("ws", []), st.get("bs", []); cur = st.get("rwcur", -np.log2(pm).sum()); tried = st.get("tried", {})
     while True:
@@ -66,5 +72,5 @@ elif mode == "rw":
 else:
     pm, Q = weights_q("eval", st); y = F.ev_s[F.Te]; ix = np.arange(len(y)); fy = F.FORM[y]; b = np.ones_like(Q)
     for W, be in zip(st["ws"], st["bs"]): b = b * ((SF.win("eval", W) + 1e-4) / F.PG) ** be
-    bits_ = -np.log2(pm * b[ix, fy] / (Q * b).sum(1)); np.savez(os.path.join(F.CD, "bits_gate8_fit30.npz"), bits=bits_, y=y, Qf=(Q * b / (Q * b).sum(1, keepdims=True)).astype(np.float16))
+    bits_ = -np.log2(pm * b[ix, fy] / (Q * b).sum(1)); np.savez(os.path.join(F.CD, "bits_gate9_fit30.npz" if V9 else "bits_gate8_fit30.npz"), bits=bits_, y=y, Qf=(Q * b / (Q * b).sum(1, keepdims=True)).astype(np.float16))
     F.log(f"SX8 scored on the {len(y):,} positions: {bits_.mean():.4f} bits/word (without reweight {(-np.log2(pm)).mean():.4f}; SX7 7.7280, Stack 8.1507, LM 6.026)")

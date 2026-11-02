@@ -621,3 +621,11 @@ program; reweight refitted. Bar: scored < 7.7280.
 **SX9 confidence gate.** Second gate feature = minus the entropy (bits) of the component's own form distribution Q_c at
 the position (how sure it is of the kind of word next): weight = w_c (n/(n+T))^g_c 2^(-h_c H(Q_c)); h_c added in
 gradient order with the same rules, on SX7's program; reweight refitted. Bar: scored < 7.7280.
+**SX9 result -- PASS (narrow).** 4 confidence gates adopted (fit 7.3513 -> 7.3445); reweight 1,000 / book / 50 / 200 /
+5,000, fit 7.3213. Scored 7.7213 bits/word (without reweight 7.7619; bar 7.7280). (One reweight run shows 2,868 s of
+wall time -- the PC slept mid-run; compute per run stayed within the five-minute cap otherwise.)
+
+## SX10 -- loop iteration 12 (registered 2026-11-02, before running)
+**SX10 longer-memory triggers.** Library triggers (SX1) with the recent-word set taken from the last 200 or 1,000
+tokens instead of 50 (thr 100 / 1,000; W 10 / 50): 8 components, offered with their own gates to SX9's program
+(gradient order, log2 of the grammar + 2 x (1/2) log2 n bits each); reweight refitted. Bar: scored < 7.7213.
