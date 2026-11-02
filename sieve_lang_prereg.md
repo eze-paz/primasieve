@@ -864,3 +864,6 @@ scored 7.7153 bits/word (O0 base 7.8446; hand-built SX10 7.7205; Stack 8.1507; L
 best online = selector left node depth 8 of the previous word, eta 0.2 (grid edge), fit 7.3552. Scored (read in order):
 static 7.7142 -> online 7.6754 bits/word. (Fit positions are spread through the dev books, so online learning sees
 less there than on the consecutive scored text.)
+**L6 result -- FAIL.** Four class HMMs (16 / 32 states over left-tree nodes at depth 4 / 6; Baum-Welch 12 iterations on
+400 x 1,000 training tokens, still improving) offered on top of the SO combination: none accepted; scored unchanged
+7.7153.
