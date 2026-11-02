@@ -667,3 +667,25 @@ library | token(t-2) & mff(t-2)]; Gather(bag of last 10, count <= 1,000, library
 R1 PASS (bag Gathers with spans 5, 50 and 1 selected); R2 PASS (8 factors, one nested); R3 PASS (8 gates, one on a
 factor); R4 PASS (7.7455 < 7.8984). Hand-built program: 7.7205. Not in the hand-written grammar: bags of the last 10
 tokens, spans 1 and 5, a library-only bag, a nested factor, a gated factor, factor pairs outside SX4's 30.
+
+## SZ -- a primitive algebra (registered 2026-11-02, before running; owner: "components as primitive as possible")
+**Representation.** Per position a shortlist of candidate words (union of: the 128 most frequent followers of the
+previous token in training + library, the distinct tokens of the last 256, the 64 most frequent words; the answer is
+never added) with a full distribution over it plus a rest bucket (spread by unigram). Coverage reported.
+**Atoms (one primitive, Vote).** Vote(terms, span, weight, source): anchors j in the source whose terms hold --
+term (a, attr, B, thr): attr(token[j - a]) is among attr of the B tokens before t starting a back (attr in token,
+most-frequent follower, most-frequent predecessor, form; B in 1, 10, 50; optional corpus-count limit 100 / 1,000) --
+each anchor votes for the tokens at j+1 .. j+span (span 1, 5, 20) with weight 1 or 1/(1+d). Sources: training +
+library (static), the last 1,000 or 50,000 tokens, this book so far. Count, recency, triggers, same-book counts are
+particular Votes; nothing else is pre-built. (Compute limits, disclosed: the static source allows either joint
+single-token terms with span 1, or one rare-token bag term.)
+**Algebra.** Mixture of Votes (weights renormalised over the Votes with evidence, gate exponent on n/(n+T)), times
+lift terms ((D + u)/(2u))^beta of any Vote (factor / reweight / topic are such products), normalised over the
+shortlist + rest. Every fitted number (1/2) log2 n bits; atom = log2 of each field's choices; move type log2 4.
+**Search.** Start: unigram only -- no components at all. Per run: sample new Votes from the prior and mutate members
+(one field), evaluate them; score every add-to-mixture, add-as-lift, gate and remove move by its gradient, fit the
+best 3 of each kind, accept the best that pays; checkpointed; stop after 3 runs that accept nothing. Fit: the 9,000
+dev positions.
+**Bars.** P1 it builds a count-like Vote (static, joint token terms, span 1) and a recency-like Vote (window, weight
+1/(1+d)); P2 it builds something trigger-like (bag term with span > 1) or a lift term; P3 scored (50,114 positions)
+< 8.9368 (Counter). Descriptive: every accepted program, which ones match no hand-made family, scored beside 7.7205.
