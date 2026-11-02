@@ -835,3 +835,10 @@ L7 situation ontologies (owner: "thinking-type ontologies"): two more trees grow
    by the nodes of the words within the next 5 (clause scope); split kept if class -> following-class prediction pays.
    Used through node topic (scene tree, depths 2-10, last 200 / 1,000 / book) and class triggers / Descend (frame
    tree). Outside check: WordNet Spearman vs the neighbour tree's 0.139; shuffled text must grow no tree.
+L8 trees as search objects (owner: "let the engine develop its own trees"): a tree is a program Tree(signature) --
+   signature in the Vote language (which positions around a word: offsets / windows / same book / after a word of
+   node X; which attribute: token or a node of another tree), charged in bits; the search proposes trees; a node split
+   (2-means on the signature, proposed at the leaves whose answers carry the most model bits) is kept only if the
+   whole Sieve program, refitted with the split available to its tree-keyed pieces, saves more than the split costs.
+   Trees may use other trees' nodes. Report: which trees grow, their depth, which pieces use them, scored bits;
+   comparison with the hand-chosen L7 trees.
