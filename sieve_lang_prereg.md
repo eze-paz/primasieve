@@ -699,3 +699,15 @@ next 5; form(j) & rare id(j-2), 1/(1+d), book; id(j), 1/(1+d), last 50,000 (fit 
 alone fits 8.6944, it was never sampled); P2 PASS (static bag, span 5); P3 FAIL (9.1298 vs 8.9368). Diagnosis: the
 search, not the algebra -- about 6 Votes per five-minute run, drawn uniformly from the prior (valid static Votes are
 rare draws), no error-guided proposals; lifts and gates were never accepted at this stage.
+
+## SZ2 -- better search for the primitive algebra (registered 2026-11-02, before running)
+Same algebra and fit positions as SZ, fresh start from nothing. Proposal strategies, all generic:
+(1) prior sampling (SZ's); (2) simplest-first enumeration (every valid Vote in order of description length -- Levin
+order); (3) neighbourhood (every single-field change of each accepted Vote, queued); (4) mutation (random field of a
+member); (5) crossover (terms of one member with source / span / weight of another). A bandit splits each run's
+proposals over the strategies by their record ((accepted + 1) / (tried + 2), at least 2 each). Screening: every
+proposal is first evaluated on 1,000 of the 9,000 fit positions (every 9th) -- its best 1-D gain there, scaled to
+9,000 positions, minus its bits; only proposals with positive estimated gain are evaluated on all 9,000 and enter the
+move loop (mix / lift / gate as SZ). Stop: 6 consecutive runs that accept nothing.
+Bars: P1 a static count Vote (joint token terms, span 1) is accepted; P3 scored < 8.9368 (Counter); descriptive: wins
+per strategy, every accepted program, scored beside SZ's 9.1298 and the hand-built 7.7205.
