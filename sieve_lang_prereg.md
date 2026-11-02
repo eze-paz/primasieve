@@ -842,3 +842,10 @@ L8 trees as search objects (owner: "let the engine develop its own trees"): a tr
    whole Sieve program, refitted with the split available to its tree-keyed pieces, saves more than the split costs.
    Trees may use other trees' nodes. Report: which trees grow, their depth, which pieces use them, scored bits;
    comparison with the hand-chosen L7 trees.
+L9 deliberation layer (owner: "a separate thinking / reasoning layer"): a hypothesis is a structured interpretation
+   (active scene node, active frame node, referent of each recent pronoun from the registers, current speaker if a quote
+   is open); the lower layers propose hypotheses; each conditions the statistical model (lifts / registers) and is
+   scored by how well it would have compressed the last 1-2 sentences; the next word is predicted by the mixture over
+   surviving hypotheses weighted by that score; the layer's own description = its hypothesis types (bits); decode-time
+   search is replayable (no bits). Budget = hypotheses kept and tested per sentence (1, 4, 16, 64): report scored bits
+   per budget (overall and words 11+); bar: bits fall with budget.
