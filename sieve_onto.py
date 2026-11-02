@@ -149,6 +149,7 @@ def install():
     P.valid = valid; P3.valid = valid; P.describe = describe; P3.describe = describe
     P.bits_of = P3.bits_of = lambda sp: 6.0 if P3.kind(sp) in ("hback", "nodecache", "ctrig", "agree") else P4.bits_of(sp)
 install()
+import sieve_fast as FS; FS.install()                                                                # vectorised count / Descend Votes, indexes on disk
 def candidates(idea):
     if idea == "O1": return [dict(kind="descend", view=v, k=k, terms=tm) for v in ("l", "r") for k in (2, 4, 6, 8, 10) for tm in ([[0, "id", 1, None]], [[0, "id", 1, None], [1, "id", 1, None]], [[0, f"h{v}{k}", 1, None]])]
     if idea == "O2": return [dict(kind="hback", view="l", offs=offs, depths=[4, 8, 12, 0]) for offs in ([1], [1, 2])]
@@ -162,37 +163,36 @@ def candidates(idea):
     if idea == "O7": nm = attr_sense(); return [dict(src=src, terms=tm, span=1, w="1") for src in ("book", "w1000") for tm in ([[0, nm, 1, None]], [[0, nm, 1, None], [1, nm, 1, None]])]
     if idea == "O8": nm = attr_revised(); return [dict(kind="descend", view="l", k=13, terms=[[0, "id", 1, None]])] + [dict(src="static", terms=[[0, nm, 1, None]], span=1, w="1"), dict(src="static", terms=[[0, "id", 1, None], [1, nm, 1, None]], span=1, w="1")]
     return []
-def move_loop(st, cands, budget=230):
-    M = P3.Model(CX, st); M.gact = st["gact"]; n = M.n; half = 0.5 * math.log2(n); cur = M.bits(); acc = []; rej = set(st.get("so_rejected", []))
+def move_loop(st, cands, budget=230, cx=None, scale=1.0, n_bits=None):
+    """greedy MDL acceptance; on a subsample (screen) gains are scaled by `scale` and bits charged as on n_bits positions"""
+    cx = cx or CX; M = P3.Model(cx, st); M.gact = st["gact"]; n = M.n; half = 0.5 * math.log2(n_bits or n); cur = M.bits(); acc = []; rej = set(st.get("so_rejected", []))
     while time.time() - T0 < budget:
         A, logL, W = M.parts(); Lx = np.exp(logL - logL.max(1, keepdims=True)); Z = (A * Lx).sum(1); best = None
         for sp in cands:
             k = P.key(sp)
             if k in rej: continue
-            c = P.vote(CX, sp)
+            c = P.vote(cx, sp)
             for kd in (("mix",) if k in st["mem"] else ("mix",)) + (("lift",) if k not in st["lift"] else ()):
                 if kd == "mix" and k in st["mem"]: continue
                 if kd == "mix": xv, b2 = P.golden(lambda lw: M.bits(A + (np.exp(lw) * c[1])[:, None] * c[0], logL), -12, 6)
                 else: lgl = np.where(c[1][:, None], P.liftlog(c[0], M.Du), 0); xv, b2 = P.golden(lambda be: M.bits(A, logL + be * lgl), -1, 2)
-                gain = cur - b2 - (math.log2(5) + P.bits_of(sp) + half)
+                gain = (cur - b2) * scale - (math.log2(5) + P.bits_of(sp) + half)
                 if gain > 0 and (best is None or gain > best[0]): best = (gain, kd, k, xv)
             if time.time() - T0 > budget: break
         if best is None: break
         _, kd, k, xv = best
         if kd == "mix": st["mem"].append(k); st["th"].append(float(xv)); st["ga"].append(0.0); st["gact"].append(0)
         else: st["lift"].append(k); st["be"].append(float(xv))
-        M = P3.Model(CX, st); M.gact = st["gact"]; cur = M.refit(); st.update(th=M.th.tolist(), ga=M.ga.tolist(), be=M.be.tolist()); acc.append((kd, k)); F.log(f"   + {kd}: {P.describe(json.loads(k))}: fit {cur / n:.4f} bits/word")
+        M = P3.Model(cx, st); M.gact = st["gact"]; cur = M.refit(); st.update(th=M.th.tolist(), ga=M.ga.tolist(), be=M.be.tolist()); acc.append((kd, k)); F.log(f"   + {kd}: {P.describe(json.loads(k))}: fit {cur / n:.4f} bits/word")
         rej.add(k) if kd == "lift" else None
     st["so_rejected"] = sorted(rej); return st, acc, cur / n
-mode = argv[1] if len(argv) > 1 else "base"
+mode = (argv[1] if len(argv) > 1 else "base") if __name__ == "__main__" else None                 # importable (pool workers)
 if mode == "base":
     st = json.load(open(os.path.join(HERE, "sieve_prim4_fit9.json"))); M = P3.Model(CX, st); M.gact = st["gact"]; b0 = M.bits() / M.n; b1 = M.refit() / M.n
     st.update(th=M.th.tolist(), ga=M.ga.tolist(), be=M.be.tolist()); json.dump(st, open(BASE, "w")); F.log(f"O0 base: SH2 program under exact columns, fit {b0:.4f} (same weights) -> {b1:.4f} (refit)")
 elif mode == "offer":
     idea = argv[2]; out = os.path.join(HERE, f"sieve_onto_{idea}.json"); st = json.load(open(out if os.path.exists(out) else BASE)); cands = candidates(idea)
-    for sp in cands:
-        if time.time() - T0 > 150: break
-        if cached(CX, sp) is None: P.vote(CX, sp); F.log(f"   evaluated {P.describe(sp)}")
+    r = FS.parallel_votes(CX, cands, nproc=5, budget=170); F.log(f"   evaluated {len(r)} candidates in parallel" + (f"; errors: {[v for v in r.values() if isinstance(v, str)][:2]}" if any(isinstance(v, str) for v in r.values()) else ""))
     if any(cached(CX, sp) is None for sp in cands): json.dump(st, open(out, "w")); F.log(f"{idea}: still evaluating candidates; rerun"); sys.exit(0)
     st, acc, fit = move_loop(st, cands); st["so_done"] = True; json.dump(st, open(out, "w")); F.log(f"{idea}: {len(acc)} accepted; fit {fit:.4f} bits/word")
 def setup_attrs():
@@ -204,6 +204,11 @@ if mode == "all":                                                               
         if os.path.exists(f): s_ = json.load(open(f)); cands += [json.loads(k) for k in s_["mem"] + s_["lift"] if k not in bm and k not in bl]
     st = json.load(open(out)) if os.path.exists(out) and json.load(open(out)).get("all_v2") else json.load(open(BASE)); st["all_v2"] = True
     st, acc, fit = move_loop(st, cands); json.dump(st, open(out, "w")); F.log(f"SO all: {len(acc)} accepted this run; {len(st['mem'])} Votes, {len(st['lift'])} lifts; fit {fit:.4f} bits/word")
+elif mode == "screen":                                                                               # screen first: the idea on the 1,000-position subsample
+    idea = argv[2]; SUBX = "fit9s"; st = json.load(open(BASE)); cands = candidates(idea)
+    r = FS.parallel_votes(SUBX, [json.loads(k) for k in st["mem"] + st["lift"]] + cands, nproc=5, budget=200)
+    if any(cached(SUBX, sp) is None for sp in cands): F.log(f"{idea} screen: still evaluating; rerun"); sys.exit(0)
+    st2, acc, fit = move_loop(json.loads(json.dumps(st)), cands, cx=SUBX, scale=9.0, n_bits=9000); F.log(f"{idea} SCREEN: {len(acc)} piece(s) would be accepted (subsample fit {fit:.4f}); {'promote to the full offer' if acc else 'drop'}")
 elif mode == "eval":
     setup_attrs(); st = json.load(open(argv[2])); M = P3.Model("eval", st); M.gact = st["gact"]; F.log(f"{os.path.basename(argv[2])} scored on the {M.n:,} positions: {M.bits() / M.n:.4f} bits/word")
 elif mode == "coverage":

@@ -849,3 +849,11 @@ L9 deliberation layer (owner: "a separate thinking / reasoning layer"): a hypoth
    surviving hypotheses weighted by that score; the layer's own description = its hypothesis types (bits); decode-time
    search is replayable (no bits). Budget = hypotheses kept and tested per sentence (1, 4, 16, 64): report scored bits
    per budget (overall and words 11+); bar: bits fall with budget.
+**SO per-idea scores on the 50,114 positions (O0 base 7.8446):** O1 7.8392; O2 7.8351; O3 7.7984; O4 7.8290; O5
+7.8019; O6 7.8044; O7 7.8176 (O8 and the combination pending). O9: coverage 0.739 -> 0.746 (scored), 0.756 -> 0.764
+(fit) -- not rebuilt (O0 makes the shortlist matter less).
+**Speed-ups (sieve_fast.py; identical outputs: max |D diff| 0 for counts, 1.2e-7 for Descend).** Vectorised static
+count and Descend Votes: 0.7-1.3 s with the index on disk vs 6.5-15.2 s looped; static indexes memory-mapped on disk;
+5-process pool for candidate evaluation (lazy derived attributes); screen-first offers (sieve_onto.py screen <idea>:
+the idea on the 1,000-position subsample, gains x 9, bits as on 9,000) -- O1's screen in ~4 min recommends promotion
+(4 pieces), matching its full offer.
