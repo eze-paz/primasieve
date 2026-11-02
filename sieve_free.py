@@ -15,6 +15,8 @@ if os.path.exists(os.path.join(F.CD, f"{sys.argv[2] if len(sys.argv) > 2 and sys
     NAMES += [f"trig_{W}_{thr}" for W in (10, 50) for thr in (100, 1000)]                                # SX1: trigger components
     if os.path.exists(os.path.join(F.CD, f"{sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] in ('rw', 'eval') else (sys.argv[1] if len(sys.argv) > 1 else 'fit9')}_btrig_10_100.npz")):
         NAMES += [f"btrig_{W}_{thr}" for W in (10, 50) for thr in (100, 1000, "any")]                    # SX2: book triggers
+        if os.path.exists(os.path.join(F.CD, f"{sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] in ('rw', 'eval') else (sys.argv[1] if len(sys.argv) > 1 else 'fit9')}_fact_0_0.npz")):
+            NAMES += [f"fact_{a}_{b}" for a in range(2) for b in range(4)]                                   # SX3: factor combinator
 WS = (50, 200, 1000, 5000, "book")
 def mix_bits(th, P, M):
     """bits and gradient wrt log-weights; row 0 = uniform"""

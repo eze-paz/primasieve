@@ -571,3 +571,13 @@ A in {token(t-1) history+library count, token(t-1) & token(t-2) history+library 
 token(t-1) earlier in this book, trigger W 10 thr 100, book trigger W 10 thr 1,000}: 8 components. Offered to the
 knob-free selection on 30,000 fit positions resuming from SX2's selection; reweight refitted. Bar: scored < 7.8834;
 repeat-in-book mean reported.
+**SX3 result -- PASS.** MDL added one factor component -- forms from token(t-1) & token(t-2) history+library count x
+word within form from any-position recency: fit 7.4735 (SX2 7.5053); reweight 1,000 / 200 / 5,000, betas 0.140 /
+0.056 / 0.184, fit 7.4541. Scored 7.8490 bits/word (without reweight 7.8865; bar 7.8834). By kind (SX2 / SX3): repeat
+in book 6.564 / 6.514; function 7.509 / 7.518; content 14.416 / 14.456; unknown 6.389 / 6.357.
+
+## SX4 -- loop iteration 6 (registered 2026-11-02, before running)
+**SX4 wider factor family.** A in {token(t-1), token(t-1) & token(t-2), mff(t-1) & mff(t-2) -- history+library counts;
+longest match history; longest match library}; B in {any-position recency, token(t-1) same book, token(t-1) &
+token(t-2) same book, book trigger W 10 thr 1,000, trigger W 10 thr 100, graded identity 221}: 30 factor components
+(the 8 of SX3 included). Knob-free selection resuming from SX3; reweight refitted. Bar: scored < 7.8490.

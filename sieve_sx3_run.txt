@@ -1,0 +1,21 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+SW on fit30: 109 components, 30,000 positions; uniform 16.5281 bits/word (10 s)
+   resumed with 30 components, fit 7.5053 (10 s)
+   + factor: forms from [token(t-1) & token(t-2), in history + library count] x word within form from [any position recency]: fit 7.4735 bits/word (31 components) (16 s)
+   time budget: checkpoint (36 rejected), rerun to resume (264 s)
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+SW on fit30: 109 components, 30,000 positions; uniform 16.5281 bits/word (9 s)
+   resumed with 31 components, fit 7.4735 (9 s)
+SW selected 31 components; fit 7.4735 bits/word, description 440.3 bits (222 s)
+   mixture outputs cached, rerun (13 s)
+   + reweight by form shares of 1000: betas [0.262], fit 7.4581 bits/word (60 s)
+   + reweight by form shares of 200: betas [0.214, 0.055], fit 7.4563 bits/word (103 s)
+   + reweight by form shares of 5000: betas [0.14, 0.056, 0.184], fit 7.4541 bits/word (152 s)
+SW reweight stage: 3 windows [1000, 200, 5000], betas [0.14, 0.056, 0.184]; fit 7.4541 bits/word (164 s)
+SW scored on the 50,114 positions: 7.8490 bits/word (without reweight 7.8865; SU1 chain 7.9517, Stack 8.1507, LM 6.026) (25 s)
+   repeat in book  40,984: SX2 6.564; SX3 6.514
+   function word      447: SX2 7.509; SX3 7.518
+   content word     8,373: SX2 14.416; SX3 14.456
+   unknown            310: SX2 6.389; SX3 6.357
