@@ -757,3 +757,8 @@ side / end / country / town / war / family. Bars: tree forms (depth 13) PASS; re
 have / were / are / been; i / you / they / we / would / will / could; time / day / life / nothing / house / place /
 things / love / thing; for / at / on / by / from / about / like / upon / than; him / them / out / up / down / come / go
 / us / himself.
+**SZ3 / SH2 search defect (found 2026-11-02, fixed before continuing).** The bandit gave each strategy a fixed count
+(>= 2) of the 24 proposals, so as strategies failed a run proposed only ~6-10 and ended after ~85 of its 295 s; SZ3
+screened ~80 proposals in 12 runs and SH2 stopped by "6 idle runs" after ~35. Fix: each run keeps drawing proposals
+(strategy chosen by the bandit's record) until its 115 s screening budget is used. SH2 continues from its state with
+the idle count reset; the right-view tree (hr1-hr10) joins its language.

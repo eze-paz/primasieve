@@ -217,27 +217,30 @@ def search_main():
     install(); st = state(); st["run"] += 1; rng = np.random.default_rng(5000 + st["run"]); half = 0.5 * math.log2(9000); move = math.log2(5)
     Ms = Model(SUB, st); Ms.gact = st["gact"]; scale = 9000 / Ms.n
     F.log(f"{LABEL} run {st['run']}: {len(st['mem'])} Votes, {len(st['lift'])} lifts, {int(sum(st['gact']))} gates, {len(st['cg'])} class-weights; bandit {st['strat']}")
-    r = {s: (st["strat"][s][1] + 1) / (st["strat"][s][0] + 2) for s in STRATS}; NP = 24; alloc = {s: max(2, round(NP * r[s] / sum(r.values()))) for s in STRATS}
-    seen = set(st["screen"]) | set(st["evaluated"]); props = []
-    def add(sp, s):
-        if sp and valid(sp) and P.key(sp) not in seen: seen.add(P.key(sp)); props.append((s, sp))
-    members = [json.loads(k) for k in st["mem"] + st["lift"]]
-    for _ in range(alloc["prior"]): add(sample(rng), "prior")
-    L = levin(); c0 = len(props)
-    while len(props) - c0 < alloc["levin"] and st["levin_i"] < len(L): add(L[st["levin_i"]], "levin"); st["levin_i"] += 1
-    c0 = len(props)
-    while len(props) - c0 < alloc["neigh"] and st["neigh"]: add(st["neigh"].pop(0), "neigh")
-    if members:
-        for _ in range(alloc["mutate"]): add(mutate(members[rng.integers(len(members))], rng), "mutate")
-        vm = [m for m in members if kind(m) == "vote"]
-        for _ in range(alloc["cross"]):
-            if len(vm) < 2: break
-            a, b = (vm[i] for i in rng.choice(len(vm), 2, replace=False)); add(dict(src=a["src"], span=a["span"], w=a["w"], terms=b["terms"][:2]), "cross")
-    rng.shuffle(props)
-    for s, sp in props:
-        if time.time() - T0 > 115: break
+    r = {s: (st["strat"][s][1] + 1) / (st["strat"][s][0] + 2) for s in STRATS}; pr = np.array([r[s] for s in STRATS]); pr /= pr.sum()
+    seen = set(st["screen"]) | set(st["evaluated"]); members = [json.loads(k) for k in st["mem"] + st["lift"]]; vm = [m for m in members if kind(m) == "vote"]; L = levin(); nscr = 0
+    def gen(s):
+        """one proposal from strategy s (None if it has nothing new)"""
+        for _ in range(20):
+            if s == "prior": sp = sample(rng)
+            elif s == "levin":
+                if st["levin_i"] >= len(L): return None
+                sp = L[st["levin_i"]]; st["levin_i"] += 1
+            elif s == "neigh":
+                if not st["neigh"]: return None
+                sp = st["neigh"].pop(0)
+            elif s == "mutate": sp = mutate(members[rng.integers(len(members))], rng) if members else None
+            else:
+                if len(vm) < 2: return None
+                a, b = (vm[i] for i in rng.choice(len(vm), 2, replace=False)); sp = dict(src=a["src"], span=a["span"], w=a["w"], terms=b["terms"][:2])
+            if sp and valid(sp) and P.key(sp) not in seen: seen.add(P.key(sp)); return sp
+        return None
+    while time.time() - T0 < 115:                                                                    # keep proposing until the screening budget is used
+        s = STRATS[int(rng.choice(len(STRATS), p=pr))]; sp = gen(s)
+        if sp is None: continue
         k = P.key(sp); c = vote(SUB, sp); gm, gl = P2.gains(Ms, c); est = max(gm, gl) * scale - (move + bits_of(sp) + half)
-        st["screen"][k] = est; st["origin"][k] = s; st["strat"][s][0] += 1
+        st["screen"][k] = est; st["origin"][k] = s; st["strat"][s][0] += 1; nscr += 1
+    F.log(f"   screened {nscr} proposals")
     json.dump(st, open(CK, "w"))
     for k in sorted((k for k, v in st["screen"].items() if v > 0 and k not in st["evaluated"]), key=lambda k: -st["screen"][k]):
         if time.time() - T0 > 170: break
