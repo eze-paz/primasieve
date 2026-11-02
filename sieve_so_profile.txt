@@ -1,0 +1,27 @@
+PROFILE (O3 program) 50,114 positions: Sieve 7.7984 bits/word = 390,807 bits; LM 6.0261 = 301,992 bits
+ by word kind:
+   repeat in book                     40,984 pos (0.818) | Sieve  6.408 b/w, 0.672 of Sieve bits | LM  4.979 b/w | Sieve minus LM total    58,553 bits
+   function word                         447 pos (0.009) | Sieve  7.632 b/w, 0.009 of Sieve bits | LM  6.234 b/w | Sieve minus LM total       625 bits
+   content word                        8,373 pos (0.167) | Sieve 14.598 b/w, 0.313 of Sieve bits | LM 10.858 b/w | Sieve minus LM total    31,311 bits
+   unknown                               310 pos (0.006) | Sieve  8.178 b/w, 0.006 of Sieve bits | LM 13.580 b/w | Sieve minus LM total    -1,675 bits
+ by shortlist:
+   answer in shortlist                37,020 pos (0.739) | Sieve  5.585 b/w, 0.529 of Sieve bits | LM  4.372 b/w | Sieve minus LM total    44,919 bits
+   answer outside shortlist           13,094 pos (0.261) | Sieve 14.055 b/w, 0.471 of Sieve bits | LM 10.702 b/w | Sieve minus LM total    43,895 bits
+ by answer frequency (training+library count):
+   count 0-10                            256 pos (0.005) | Sieve 21.822 b/w, 0.014 of Sieve bits | LM 16.068 b/w | Sieve minus LM total     1,473 bits
+   count 10-100                        2,091 pos (0.042) | Sieve 15.908 b/w, 0.085 of Sieve bits | LM 11.388 b/w | Sieve minus LM total     9,452 bits
+   count 100-1000                      6,133 pos (0.122) | Sieve 13.354 b/w, 0.210 of Sieve bits | LM  9.683 b/w | Sieve minus LM total    22,516 bits
+   count 1000-10000                   10,132 pos (0.202) | Sieve  9.740 b/w, 0.253 of Sieve bits | LM  7.602 b/w | Sieve minus LM total    21,667 bits
+   count 10000-100000                 10,973 pos (0.219) | Sieve  7.376 b/w, 0.207 of Sieve bits | LM  6.103 b/w | Sieve minus LM total    13,966 bits
+   count 100000-1000000000000         20,529 pos (0.410) | Sieve  4.405 b/w, 0.231 of Sieve bits | LM  3.444 b/w | Sieve minus LM total    19,741 bits
+ by position in sentence:
+   word 1-1 of sentence                    0 pos (0.000) | Sieve    nan b/w, 0.000 of Sieve bits | LM    nan b/w | Sieve minus LM total         0 bits
+   word 2-2 of sentence                3,317 pos (0.066) | Sieve  7.152 b/w, 0.061 of Sieve bits | LM  6.886 b/w | Sieve minus LM total       882 bits
+   word 3-5 of sentence                8,324 pos (0.166) | Sieve  7.666 b/w, 0.163 of Sieve bits | LM  6.572 b/w | Sieve minus LM total     9,102 bits
+   word 6-10 of sentence              11,449 pos (0.228) | Sieve  7.896 b/w, 0.231 of Sieve bits | LM  6.163 b/w | Sieve minus LM total    19,839 bits
+   word 11-999999999 of sentence      27,024 pos (0.539) | Sieve  7.877 b/w, 0.545 of Sieve bits | LM  5.694 b/w | Sieve minus LM total    58,991 bits
+ by Sieve bits (worst positions):
+   best half                          25,057 pos (0.500) | Sieve  3.948 b/w, 0.253 of Sieve bits | LM  2.975 b/w | Sieve minus LM total    24,382 bits
+   50-90%                             20,045 pos (0.400) | Sieve  9.928 b/w, 0.509 of Sieve bits | LM  8.023 b/w | Sieve minus LM total    38,193 bits
+   worst 10%                           5,012 pos (0.100) | Sieve 18.530 b/w, 0.238 of Sieve bits | LM 13.295 b/w | Sieve minus LM total    26,240 bits
+   worst 1%                              502 pos (0.010) | Sieve 24.733 b/w, 0.032 of Sieve bits | LM 16.805 b/w | Sieve minus LM total     3,980 bits

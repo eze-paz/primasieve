@@ -806,3 +806,26 @@ of an answer outside the shortlist (re-spread by unigram) -- a representation ar
 exact probability of the answer (an extra column, linear like the others; lifts on it use the rest column's lift); the
 unigram member carries u(answer). Shortlist distributions and normalisation are unchanged. SH2's program re-evaluated
 under O0 (same weights, then refit on the fit positions) is the new base for O1-O9.
+**Profile (O3 program, 50,114 positions; sieve_so_profile.txt).** Sieve 390,807 bits (7.7984), LM 301,992 (6.0261):
+gap 88,815. Words 11+ of a sentence: 27,024 positions, Sieve 7.877 vs LM 5.694 = 58,991 of the gap; words 6-10:
+19,839; 3-5: 9,102; word 2: 882 -- Sieve is flat after word 5, the LM keeps improving. Repeats in book: 58,553 of the
+gap (6.408 vs 4.979); content words 31,311 (14.598 vs 10.858).
+
+## SL -- long-range context (registered 2026-11-02, before running). Target: the 58,991-bit gap at words 11+.
+Each idea is offered to the SO move loop on top of the best SO program; scored on the 50,114 positions with / without;
+the profile by sentence position is re-run for every accepted idea.
+L1 copy by context similarity: each earlier occurrence j of a word in this book votes for it with weight from how many
+   of the last k (3, 5, 8) tokens before j and before t agree at token / tree-node level (graded, any length).
+L2 sentence so far: the content words (count <= 1,000) of the current sentence (and of the paragraph) as a bag key ->
+   node of the next word (class trigger at sentence scope) and -> next word (Vote).
+L3 test-time tree refinement ("thinking"): every 1,000 tokens of a book, re-place words whose in-book contexts disagree
+   with their leaf and split leaves this book uses heavily; a change is kept if it compresses the book's recent text;
+   budget = candidate changes per update (0, 4, 16, 64); strictly causal; held-out bits vs budget reported.
+L4 online context mixing (PAQ-style): mixing weights learned online while reading (a gradient step after every word,
+   deterministic, from the past only), selected by a small context (node of the previous word); no extra bits for the
+   weights (the decoder replays the updates).
+L5 node registers (head words): position attributes "last word of top-level node n in this sentence" for each of the
+   tree's top-level nodes (e.g. last noun-like, last verb-like word) usable as Vote / Descend contexts.
+L6 class HMM forward state: a hidden-state model over tree nodes (depth 6) fitted on training; its forward
+   distribution over the next node, carried through the whole sentence and beyond, as a Descend-like component.
+Bar for the block: scored < the best SO program; descriptive: words-11+ bits per idea.
