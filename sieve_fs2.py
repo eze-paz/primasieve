@@ -150,19 +150,32 @@ def compute(cx, n):
     s, T, book = ctx(cx); p = n.split("_")
     if p[0] == "count": r = count_comp(s, T, SETS[int(p[1])], p[2], book)
     elif p[0] == "recency": r = recency_comp(s, T)
+    elif p[0] == "graded" and len(T) > 40000:                                                         # SW3: resumable chunks (five-minute cap)
+        parts = []; t0 = time.time()
+        for a in range(0, len(T), 15000):
+            pf_ = os.path.join(CD, f"{cx}_{n}_part{a}.npz")
+            if not os.path.exists(pf_):
+                if time.time() - t0 > 150: log(f"   {n}: chunk budget reached, rerun to resume"); sys.exit(0)
+                ne_, P_, N_, TD_, Q_ = graded_comp(s, T[a:a + 15000], p[1], p[2]); np.savez(pf_, ne=ne_, P=P_, N=N_, TD=TD_, Q=Q_)
+            parts.append(np.load(pf_))
+        r = tuple(np.concatenate([z[k] for z in parts]) for k in ("ne", "P", "N", "TD", "Q"))
     elif p[0] == "graded": r = graded_comp(s, T, p[1], p[2])
     else: r = long_comp(s, T, "library" if p[1] == "library" else "hist")
     ne, P, N, TD, Q = r[:5]; y = s[T]
     assert np.all(np.abs(Q[ne].sum(1) - 1) <= 1e-4), f"{n}: Q does not sum to 1"                         # SR2 checks (float32 storage)
     assert np.all(Q[ne, FORM[y[ne]]] >= P[ne] - 1e-4), f"{n}: Q[form of answer] < P(answer)"
-    np.savez(os.path.join(CD, f"{cx}_{n}.npz"), ne=ne, P=P, N=N, TD=TD, Q=Q.astype(np.float16))
+    if cx in NOQ and not KEEPQ: np.savez(os.path.join(CD, f"{cx}_{n}.npz"), ne=ne, P=P, N=N, TD=TD)      # SW3: Q stored only for selected components (disk)
+    else: np.savez(os.path.join(CD, f"{cx}_{n}.npz"), ne=ne, P=P, N=N, TD=TD, Q=Q.astype(np.float16))
     if len(r) > 5: np.save(os.path.join(CD, f"{cx}_{n}_fol.npy"), np.array(r[5], dtype=object), allow_pickle=True)
-MEMO = {}
+MEMO = {}; NOQ = ("fit90",); KEEPQ = False
 def load(cx, n, q=False):
+    global KEEPQ
     if (cx, n, q) in MEMO: return MEMO[(cx, n, q)]
     f = os.path.join(CD, f"{cx}_{n}.npz")
     if not os.path.exists(f): compute(cx, n)
-    z = np.load(f); MEMO[(cx, n, q)] = r = (z["ne"], z["P"], z["N"], z["TD"]) + ((z["Q"].astype(np.float32),) if q else ()); return r
+    z = np.load(f)
+    if q and "Q" not in z.files: KEEPQ = True; compute(cx, n); KEEPQ = False; z = np.load(f)
+    MEMO[(cx, n, q)] = r = (z["ne"], z["P"], z["N"], z["TD"]) + ((z["Q"].astype(np.float32),) if q else ()); return r
 def windows(cx, W):
     f = os.path.join(CD, f"{cx}_win{W}.npy")
     if not os.path.exists(f):

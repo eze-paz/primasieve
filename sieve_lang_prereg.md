@@ -536,3 +536,16 @@ selection and the reweight stage checkpoint and resume across runs (each < 5 min
 alone, then all betas refitted for the chosen window.
 **SW3 energy x3 (registered before running).** Same procedure on 90,000 fit positions spread over the 7 dev books.
 Bar: scored < 7.8984. Descriptive: the scored value against fit positions (3,000 / 9,000 / 30,000 / 90,000).
+**SW3 result -- FAIL (flat).** 90,000 fit positions: 27 components (fit 7.5366), reweight windows 1,000 / book / 200 /
+5,000, betas 0.097 / 0.110 / 0.044 / 0.108 (fit 7.5219). Scored 7.8992 bits/word (without reweight 7.9291; bar
+7.8984). Knob-free score by fit positions: 9,000 7.9240; 30,000 7.8984; 90,000 7.8992 -- energy has saturated with this
+grammar. (Execution: mixture outputs cached once; reweight betas fitted coordinate by coordinate with the other
+windows folded in -- same objective, for time.)
+
+## SX -- loop iteration 3 (registered 2026-11-02, before running)
+**SX1 trigger components (LM gap on content words: Sieve 14.6, LM 10.9).** P(y) = sum_{r in R_t} c_W(r, y) / sum_{r
+in R_t} c_W(r, .), c_W(r, y) = how often y occurs within the W tokens after an occurrence of r in training + library;
+R_t = the distinct words among the last 50 tokens whose training + library count <= thr. Variants W in {10, 50}, thr in
+{1,000, 10,000}: 4 components (with Q over forms). Offered to the knob-free selection on 30,000 fit positions,
+resuming from SW2's 25 components (same rules), then the reweight stage refitted. Bar: scored < 7.8984; content-word
+mean bits reported (SW2 vs SX1).

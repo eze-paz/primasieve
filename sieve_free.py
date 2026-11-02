@@ -27,7 +27,24 @@ def fit_w(P, M, th):
     return th, b
 def fit_beta(pm, Q, m, ws, y, cx, betas, only_last=False):
     """bits of the reweight stage with windows ws; betas fitted by coordinate golden search"""
-    fy = F.FORM[y]; ix = np.arange(len(y)); B = [((win(cx, W) + 1e-4) / F.PG) for W in ws]
+    fy = F.FORM[y]; ix = np.arange(len(y))
+    if only_last:                                                                                       # fixed windows folded once: one power per evaluation (time)
+        fix = np.ones_like(Q)
+        for W, be in zip(ws[:-1], betas[:-1]): fix *= ((win(cx, W) + 1e-4) / F.PG) ** be
+        QF = Q * fix; fy_fix = fix[ix, fy]; Bn = np.log((win(cx, ws[-1]) + 1e-4) / F.PG); By = Bn[ix, fy]
+        def b1(be): return -(np.log2(pm * fy_fix) + be * By / math.log(2) - np.log2((QF * np.exp(be * Bn)).sum(1))).sum()
+        lo, hi = -0.5, 2.0; g = (math.sqrt(5) - 1) / 2
+        for _ in range(18):
+            a, c = hi - g * (hi - lo), lo + g * (hi - lo)
+            if b1(a) < b1(c): hi = c
+            else: lo = a
+        be = (lo + hi) / 2; return list(betas[:-1]) + [be], b1(be)
+    bs, b = list(betas), None                                                                          # joint refit: coordinate descent, each coordinate folded as above
+    for _ in range(2):
+        for k in range(len(bs)):
+            o = [i for i in range(len(bs)) if i != k] + [k]; nb, b = fit_beta(pm, Q, m, [ws[i] for i in o], y, cx, [bs[i] for i in o], only_last=True); bs[k] = nb[-1]
+    return bs, b
+    B = [((win(cx, W) + 1e-4) / F.PG) for W in ws]
     def bits(bs):
         b = np.ones_like(Q)
         for Bi, be in zip(B, bs): b = b * Bi ** be
@@ -45,8 +62,10 @@ def fit_beta(pm, Q, m, ws, y, cx, betas, only_last=False):
 def model(cx, sel, th, ws, bs):
     s, T, _ = F.ctx(cx); y = s[T]; C = [F.load(cx, n, True) for n in sel]; n = len(T)
     P = np.vstack([np.full(n, 1 / F.Vt)] + [c[1] for c in C]); M = np.vstack([np.ones(n, bool)] + [c[0] for c in C])
-    Qs = np.stack([np.broadcast_to(F.U, (n, F.NF))] + [c[4] for c in C]); w = np.exp(th)[:, None] * M; den = w.sum(0)
-    pm = (w * P).sum(0) / den; Q = np.einsum("kn,knf->nf", w, Qs) / den[:, None]
+    w = np.exp(th)[:, None] * M; den = w.sum(0); pm = (w * P).sum(0) / den
+    Q = w[0][:, None] * F.U[None, :]                                                                    # accumulated one component at a time (memory)
+    for k, c in enumerate(C): Q += w[k + 1][:, None] * c[4]
+    Q /= den[:, None]
     if not ws: return -np.log2(pm), Q
     b = np.ones_like(Q)
     for W, be in zip(ws, bs): b = b * ((win(cx, W) + 1e-4) / F.PG) ** be
@@ -79,7 +98,10 @@ if __name__ == "__main__" and MODE not in ("rw", "eval"):
 elif __name__ == "__main__" and MODE == "rw":                                                       # the reweight stage, a separate run (five-minute cap)
     prog = json.load(open(os.path.join(F.HERE, f"sieve_free_{CX}.json"))); sel, th = prog["sel"], np.array(prog["th"]); s, T, _ = F.ctx(CX); y = s[T]; n = len(T); half = 0.5 * math.log2(n)
     RC = os.path.join(F.HERE, f"sieve_free_{CX}_rwckpt.json"); rc = json.load(open(RC)) if os.path.exists(RC) else dict(ws=[], bs=[], tried={})   # resumable
-    ws, bs = rc["ws"], rc["bs"]; pm_bits, Q = model(CX, sel, th, [], []); cur = pm_bits.sum() if not ws else rc["cur"]
+    MC = os.path.join(F.CD, f"free_{CX}_model.npz")                                                      # the mixture's outputs, computed once (time)
+    if not os.path.exists(MC): pm_bits, Q = model(CX, sel, th, [], []); np.savez(MC, pm_bits=pm_bits, Q=Q.astype(np.float32)); F.log("   mixture outputs cached, rerun"); sys.exit(0)
+    z = np.load(MC); pm_bits, Q = z["pm_bits"], z["Q"].astype(np.float64)
+    ws, bs = rc["ws"], rc["bs"]; cur = pm_bits.sum() if not ws else rc["cur"]
     pm = 2.0 ** -pm_bits
     while True:
         for W in WS:
