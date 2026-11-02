@@ -554,3 +554,9 @@ thr 100) and token(t-2) & mfp(t-1) count: fit 7.5071 (SW2 7.5148); reweight wind
 0.178 / 0.045, fit 7.4912. Scored: 7.8857 bits/word (without reweight 7.9171; bar 7.8984). By word kind (SW2 / SX1 /
 Stack / LM): content word (8,373) 14.481 / 14.414 / 15.220 / 10.858; repeat in book (40,984) 6.569 / 6.568 / 6.711 /
 4.979; function word (447) 7.513 / 7.506 / 7.920 / 6.234; unknown (310) 6.362 / 6.390 / 7.933 / 13.580.
+
+## SX2 -- loop iteration 4 (registered 2026-11-02, before running)
+**SX2 book triggers.** As SX1 but c_W(r, y) counted over this book's earlier text (positions before t, same book):
+R_t = distinct words among the last 50 tokens with training + library count <= thr, thr in {100, 1,000, any};
+W in {10, 50}: 6 components. Offered to the knob-free selection on 30,000 fit positions, resuming from SX1's
+selection; reweight stage refitted. Bar: scored < 7.8857; repeat-in-book and content-word means reported.
