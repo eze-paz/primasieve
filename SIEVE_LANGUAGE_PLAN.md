@@ -113,3 +113,7 @@ form-level triggers), or the LM gap on repeats (6.568 vs 4.979).
 
 ## Loop iteration 4 (2026-11-02): SX2
 Book triggers add little: 7.8834 (SX1 7.8857); repeats 6.564 (LM 4.979). Gains per idea are shrinking.
+
+## Loop iterations 5-8 (2026-11-02): SX3-SX6
+Factor combinator (form from one component, word within form from another): 7.8490 -> 7.8430 (SX4). Stage-2 factors
+from Sieve's own model: not selected. Trust-gated weights (n/(n+T))^g: 7.7451 (Stack 8.1507, LM 6.026).

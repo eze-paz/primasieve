@@ -598,3 +598,12 @@ is unchanged: scored 7.8430.
 n = the component's matched count there, T = its distinct followers (the trust term Sieve derived in SN1); g_c fitted
 by gradient with the log-weights, (1/2) log2 n bits each, added component by component in gradient order while MDL
 pays. On SX4's 35 components, 30,000 fit positions; reweight refitted. Bar: scored < 7.8430.
+**SX6 result -- PASS.** MDL gated 12 of the 35 components (exponents 0.88-0.90 at the last additions): fit 7.4673 ->
+7.3674; reweight 1,000 / book / 50 / 200 / 5,000, betas 0.124 / 0.124 / 0.016 / 0.042 / 0.126, fit 7.3467. Scored
+7.7451 bits/word (without reweight 7.7816; bar 7.8430; Stack 8.1507, LM 6.026).
+
+## SX7 -- loop iteration 9 (registered 2026-11-02, before running)
+**SX7 selection under gating.** Starting from SX6 (35 components, 12 gates), every unused component (96) is offered
+again with its own gate: candidates in gradient order, each fitted with its log-weight and gate exponent jointly with
+the rest, added if it saves more than log2(131) + 2 x (1/2) log2 n bits; then gates re-offered on all; reweight
+refitted. Bar: scored < 7.7451.
