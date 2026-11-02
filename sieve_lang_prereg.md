@@ -581,3 +581,12 @@ in book 6.564 / 6.514; function 7.509 / 7.518; content 14.416 / 14.456; unknown 
 longest match history; longest match library}; B in {any-position recency, token(t-1) same book, token(t-1) &
 token(t-2) same book, book trigger W 10 thr 1,000, trigger W 10 thr 100, graded identity 221}: 30 factor components
 (the 8 of SX3 included). Knob-free selection resuming from SX3; reweight refitted. Bar: scored < 7.8490.
+**SX4 result -- PASS (narrow).** MDL added 3 factor components (forms from longest match history x word from graded
+identity 221; forms from token(t-1) history+library x word from book trigger W 10 thr 1,000; forms from token(t-1)
+history+library x word from trigger W 10 thr 100) and 1 more: 35 components, fit 7.4673; reweight 1,000 / 5,000 / 50
+/ 200, fit 7.4472. Scored 7.8430 bits/word (without reweight 7.8826; bar 7.8490).
+
+## SX5 -- loop iteration 7 (registered 2026-11-02, before running)
+**SX5 second stage (Sieve factors with its own model).** The SX4 mixture before reweight (stage 1) becomes a
+component A = mix1 (its P and Q over forms); new factor components forms-from-mix1 x word-within-form from B, B in
+SX4's six. Offered to the knob-free selection resuming from SX4; reweight refitted. Bar: scored < 7.8430.
