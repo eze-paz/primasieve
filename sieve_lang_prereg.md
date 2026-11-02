@@ -829,3 +829,9 @@ L5 node registers (head words): position attributes "last word of top-level node
 L6 class HMM forward state: a hidden-state model over tree nodes (depth 6) fitted on training; its forward
    distribution over the next node, carried through the whole sentence and beyond, as a Descend-like component.
 Bar for the block: scored < the best SO program; descriptive: words-11+ bits per idea.
+L7 situation ontologies (owner: "thinking-type ontologies"): two more trees grown by the SH1 rule with different
+   objectives -- (a) scene tree: words described by the words of their 50-token window; a split is kept if
+   class -> classes-within-the-window prediction of the training text pays its bits; (b) frame tree: words described
+   by the nodes of the words within the next 5 (clause scope); split kept if class -> following-class prediction pays.
+   Used through node topic (scene tree, depths 2-10, last 200 / 1,000 / book) and class triggers / Descend (frame
+   tree). Outside check: WordNet Spearman vs the neighbour tree's 0.139; shuffled text must grow no tree.
