@@ -4,7 +4,7 @@ Run: SZ_EXACT=1 py -3.12 -W ignore sieve_fresh.py build | eval   (build is resum
 import os, sys, json, time
 import numpy as np
 def main(argv):
-    import sieve_sg as SG; F, P, P3, O = SG.setup()
+    import sieve_bilin as BL; F, P, P3, O = BL.setup()
     z = np.load(os.path.join(F.SC.LX, "lx_fresh.npz")); fs = np.r_[F.tr, F.mk(z["fr"], z["frs"])]; fb = np.r_[np.full(F.NT, -1), F.mkb(z["fr"], z["frs"], z["frb"] + 20_000)]
     T = np.arange(F.NT + 1, len(fs)); T = T[(fs[T] != 0) & (fs[T - 1] != 0)]; F.CTX["fresh"] = (fs, T, fb)
     stf = argv[2] if len(argv) > 2 else "sieve_l5_offer.json"; ST = json.load(open(os.path.join(F.HERE, stf))); specs = [json.loads(k) for k in ST["mem"] + ST["lift"]]

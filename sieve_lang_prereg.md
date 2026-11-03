@@ -1115,3 +1115,39 @@ Where it moved (online, per position, SG vs SK): answers inside both lists (37,0
 (5,868) 11.1793 -> 10.7789; outside both (7,226) 15.9129 -> 15.9747. Bars: static PASS; online PASS; first use FAIL.
 Reading: the list was not the bottleneck. The newly covered answers gain, but the 680 extra candidates take probability
 from the answers already covered; the model cannot rank a larger set of plausible words sharply enough.
+
+## SB block (2026-11-03): a graded, labeled ontology with multiplicative links (owner: "lets test it") -- registered before any run
+Idea: every word gets graded memberships over Sieve's own named nodes instead of one hard leaf per tree; context
+features (also named) get vectors over the same axes; score(w | t) = q(t) . m(w) + b(w), normalised over the whole
+vocabulary; all vectors fitted by gradient on the training text. A bilinear model: the smallest neural net, with named
+axes.
+Axes (A = 309): dictionary-placed left tree depth 8 (94), right tree depth 8 (97), scene depth 5 (10), frame depth 9
+(23), hybrid depth 8 (39), WordNet lexicographer file (46). Word memberships m(w): labeled variant L starts at the
+word's one-hot nodes (one per axis family) and is pulled back toward it (L2, lambda 1e-3 on the rows a step touches);
+unlabeled control U starts random (N(0, 0.3)) with no pull -- same size, same training.
+Context features (each value a learned vector over the axes, summed into q): t-1's word (5,000 most frequent) or its
+left node (rarer words); t-2's left node; scene shares of the last 200 tokens (10 weights); WordNet lexicographer file of
+the sentence's last verb and last noun (register, before t); sentence-position bucket. Bias b(w) starts at log unigram.
+Training: 6,000,000 positions sampled from the training text (seed 0); sampled softmax (4,096 negatives by unigram^0.75
++ the batch's answers, with the log-sampling-probability correction), batch 2,048, Adam / SparseAdam lr 3e-3, resumable
+runs of ~190 s of training; as many runs as reach one pass over the sample. Knobs fixed before running, none tuned.
+Description: like Sieve's count tables, the vectors are a deterministic function of the training text and the fixed
+procedure (seeded), so the piece pays its 6 bits, not its weights (stated).
+Reported: standalone held-out bits (exact softmax over the vocabulary) for L and U; L's top memberships for sample words;
+then kind "bilin" (L and U) offered through the move loop on the SG program (member and lift), scored static, online
+stack (settings re-chosen), D diagnostics, fresh books. Bars: L accepted; online < 7.5739 (SG on today's list);
+content-word bits < 10.6156; L within 0.05 bits/word of U standalone (labels cost little).
+**SB results.** One pass over the 6,000,000 sampled positions for each variant (runs of ~190 s; a stray duplicate
+training loop was stopped -- only completed chunks were saved, each variant saw each position once). Sampled training
+loss of the last chunk: L 7.4433, U 7.5351 bits. Standalone (exact softmax over the vocabulary): L fit9 9.2736, held-out
+9.7722; U fit9 9.3534, held-out 9.8359 -- labels cost nothing here (L ahead of U) PASS. L's memberships barely left their
+starting nodes: for ship / drink / sword / happy / london / said / slowly the top 5 memberships are all the word's
+original one-hot nodes (0.79-1.49) -- the pull toward the labels plus one pass kept the grading near hard placement.
+Offer on the SG program: lift Bilinear[labeled] accepted (fit 7.2717 -> 7.2672); unlabeled not accepted on top; second
+pass accepts nothing. Scored: static 7.6294 (SG 7.6331); online stack (SP1 l8+r4 eta 0.1, SP3 eta 0.1) 7.5708 (SG
+7.5739). D: function 4.7313 (SG 4.7679), content 10.6489 (SG 10.6156), words 1-10 7.4679, 11+ 7.6587, repeats 6.2158,
+first use 13.9120, D2 4.5179 / top-1 0.4268, D3 0.8283. Fresh books: static 7.6469, online 7.5935 (SG 7.6517 / 7.5968),
+content 10.6926 (SG 10.6586). Bars: L accepted PASS; online < 7.5739 PASS; content < 10.6156 FAIL.
+Reading: as built, the bilinear piece acts as a smoothed class-bigram -- it helps function words and hurts content words.
+It did not learn graded memberships (one pass, sampled softmax, strong pull to the labels, context limited to t-1 / t-2 /
+scene / registers / position). Not tested here: weaker or no pull, many passes (GPU), richer context features.

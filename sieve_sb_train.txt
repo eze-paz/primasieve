@@ -1,0 +1,10 @@
+L run 1: 
+L run 2: 
+L run 3: 
+L run 4: SB train L: 5,169,152 of 6,000,000 positions; sampled loss 7.4890 bits this run (1380 batches) (238 s)
+L run 5: SB train L: 6,000,000 of 6,000,000 positions; sampled loss 7.4433 bits this run (406 batches) (92 s)
+L run 6: SB train L: done (6,000,000 positions) (40 s)
+U run 1: SB train U: 4,644,864 of 6,000,000 positions; sampled loss 7.6270 bits this run (1466 batches) (230 s)
+U run 2: SB train U: 6,000,000 of 6,000,000 positions; sampled loss 7.5351 bits this run (662 batches) (126 s)
+U run 3: SB train U: done (6,000,000 positions) (38 s)
+DONE
