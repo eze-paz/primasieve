@@ -21,6 +21,10 @@ is the gate on the core itself. This README and the per-arc plans below are hist
 
 # Primasieve Engine
 
+> **Zero-LLM, rejection-first symbolic reasoning engine** — GENERATE → REJECT → COMPRESS → COMPOSE,
+> fails closed (COMMIT/ABSTAIN, never confabulates), ~26 KB of stdlib Python whose entire learned
+> knowledge is 137 bytes of verified relations. The opposite shape of an LLM.
+
 A rejection-first reasoning engine. Zero LLM, pure-Python stdlib, deterministic verification.
 
 **One-sentence claim:** a fixed, domain-free loop — GENERATE → REJECT → COMPRESS → COMPOSE → PROPOSE →
