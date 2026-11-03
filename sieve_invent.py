@@ -189,8 +189,9 @@ def search(tag):
             if not os.path.exists(P.cname(SUB, hashlib.md5(k.encode()).hexdigest()[:16])): continue
             c = vote(SUB, sp); gm, gl = P2.gains(Ms, c); est = max(gm, gl) * scale9 - (move + bits_of(sp) + half)
             st["screen"][k] = est; st["origin"][k] = s; st["strat"][s][0] += 1; nscr += 1
+            if est <= 0: os.remove(P.cname(SUB, hashlib.md5(k.encode()).hexdigest()[:16]))                   # disk: a rejected screen's cache is never read again
     log(f"   screened {nscr} proposals this run ({len(st['screen'])} in all)"); json.dump(st, open(ck, "w"))
-    prom = sorted((k for k, v in st["screen"].items() if v > 0 and k not in st["evaluated"]), key=lambda k: -st["screen"][k])[:8 * NPROC]
+    prom = sorted((k for k, v in st["screen"].items() if v > 0 and k not in st["evaluated"] and k not in st["rejected"]), key=lambda k: -st["screen"][k])[:8 * NPROC]
     parallel(CX, [json.loads(k) for k in prom], budget=max(30, tP - (time.time() - T0)))
     for k in prom:
         if os.path.exists(P.cname(CX, hashlib.md5(k.encode()).hexdigest()[:16])): st["evaluated"].append(k); log(f"   promoted ({st['origin'].get(k, '-')}, est {st['screen'][k]:.0f} bits): {describe(json.loads(k))}")
@@ -200,8 +201,14 @@ def search(tag):
     for kd, k in acc:
         s0 = st["origin"].get(k, "prior"); st["strat"][s0][1] += 1; st["neigh"] += [q for q in neighbours(json.loads(k)) if P.key(q) not in st["screen"] and P.key(q) not in st["evaluated"]]
         st["logi"].append(f"run {st['run']} {kd} ({s0}): {describe(json.loads(k))} -> fit {fit:.4f}")
+    live = set(st["mem"]) | set(st["lift"]); old = [k for k in st["evaluated"] if k not in live][:-150]                # disk: keep the 150 newest evaluated non-members
+    for k in old:
+        f = P.cname(CX, hashlib.md5(k.encode()).hexdigest()[:16])
+        if os.path.exists(f): os.remove(f)
+        st["rejected"].append(k)
+    st["evaluated"] = [k for k in st["evaluated"] if k not in set(old)]
     st["idle"] = 0 if acc else st["idle"] + 1; json.dump(st, open(ck, "w"))
-    log(f"INVENT[{tag}] run {st['run']}: accepted {len(acc)}; idle {st['idle']}; fit {fit:.4f} bits/word; {len(st['mem'])} Votes, {len(st['lift'])} lifts")
+    log(f"INVENT[{tag}] run {st['run']}: accepted {len(acc)}; idle {st['idle']}; fit {fit:.4f} bits/word; {len(st['mem'])} Votes, {len(st['lift'])} lifts; {len(old)} stale caches dropped")
 def evaluate(path, cx):
     O.setup_attrs(); st = json.load(open(path)); parallel(cx, [json.loads(k) for k in st["mem"] + st["lift"]]); M = P3.Model(cx, st); M.gact = st["gact"]
     A, logL, _ = M.parts(); Lx = np.exp(logL - logL.max(1, keepdims=True)); Z = (A * Lx).sum(1); p = A[M.ix, M.ans] * Lx[M.ix, M.ans] / Z; bits = -np.log2(np.maximum(p, 1e-300)) + M.rx

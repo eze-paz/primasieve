@@ -4,7 +4,7 @@ under SZ_FRESH=10, SZ_SCALE=4, 4 processes; finally score base / hand / search o
 "fresh". Everything that matters is copied to /kaggle/working (state json, logs, per-position bits)."""
 import os, sys, glob, shutil, subprocess, time, json
 T0 = time.time(); HOURS = float(os.environ.get("INVENT_HOURS", "10.5")); TAG = os.environ.get("INVENT_TAG", "a"); SEED = os.environ.get("INVENT_SEED", "0")
-W = "/kaggle/working"; ENG = os.path.join(W, "eng"); LX = os.path.join(ENG, "learned", "lx"); os.makedirs(LX, exist_ok=True)
+W = "/kaggle/working"; ENG = "/tmp/eng"; LX = os.path.join(ENG, "learned", "lx"); os.makedirs(LX, exist_ok=True)   # engine + caches outside the output folder (v1 filled the 20 GB output disk with caches)
 def find(name):
     hits = glob.glob(f"/kaggle/input/**/{name}", recursive=True); assert hits, f"missing {name}"; return hits[0]
 code = os.path.dirname(find("sieve_invent.py"))
@@ -27,7 +27,8 @@ n = 0
 while time.time() - T0 < HOURS * 3600 - 2400:
     rc, dt = run(["search", TAG], 3600); n += 1
     shutil.copy(os.path.join(ENG, f"sieve_invent_{TAG}.json"), W)
-    print(f"--- run {n} rc {rc} {dt:.0f} s; elapsed {(time.time() - T0) / 3600:.2f} h", flush=True)
+    du = shutil.disk_usage("/tmp"); print(f"--- run {n} rc {rc} {dt:.0f} s; elapsed {(time.time() - T0) / 3600:.2f} h; /tmp free {du.free / 1e9:.1f} GB", flush=True)
+    if du.free < 3e9: print("low disk: stopping the search loop", flush=True); break
     if rc != 0 and n > 3: break
 for st in ("sieve_onto_base.json", "sieve_onto_all.json", f"sieve_invent_{TAG}.json"):
     for cx in ("eval", "fresh"):
