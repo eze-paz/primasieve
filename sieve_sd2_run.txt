@@ -1,0 +1,28 @@
+   built Descend[id(t-1) -> class of next word at depth 4 of the right tree] [lw]: 3 s
+   built Descend[id(t-1) -> class of next word at depth 8 of the right tree] [lw]: 3 s
+   built Descend[id(t-1) -> class of next word at depth 13 of the right tree] [lw]: 3 s
+   built Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the right tree] [lw]: 6 s
+   built Descend[id(t-1) -> class of next word at depth 4 of the right tree] [rw]: 3 s
+   built Descend[id(t-1) -> class of next word at depth 8 of the right tree] [rw]: 3 s
+   built NodeTopic[lw-tree depth 4; last book] [lw]: 2 s
+   built NodeTopic[sw-tree depth 5; last 200] [sw]: 0 s
+   built ClassTrigger[rare(<= 1000) in last 50 -> node depth 4 within 20] [lw]: 6 s
+   built ClassTrigger[rare(<= 1000) in last 50 -> node depth 8 within 20] [lw]: 1 s
+   built Vote[hlw8(j-0) in last 1; next 1; w=1; static] []: 4 s
+   built Vote[hlw8(j-0) in last 1; next 1; w=1; book] []: 9 s
+   + lift: NodeTopic[lw-tree depth 4; last book]: fit nan bits/word (173 s)
+SD2: 1 accepted this run; fit nan bits/word (12 candidates; SD 7.3447) (183 s)
+   built Descend[id(t-1) -> class of next word at depth 4 of the right tree] [y]: 2 s
+   built Descend[id(t-1) -> class of next word at depth 8 of the right tree] [y]: 2 s
+   built NodeTopic[y-tree depth 4; last 200] [y]: 0 s
+   built NodeTopic[y-tree depth 4; last book] [y]: 1 s
+   built NodeTopic[y-tree depth 8; last 200] [y]: 0 s
+   built NodeTopic[y-tree depth 8; last book] [y]: 1 s
+   built ClassTrigger[rare(<= 1000) in last 50 -> node depth 4 within 20] [y]: 4 s
+   built Vote[id(j-0) in last 1 & hy8(j-1) in last 1; next 1; w=1; static] []: 3 s
+SD2: 0 accepted this run; fit nan bits/word (20 candidates; SD 7.3447) (69 s)
+   + lift: NodeTopic[lw-tree depth 4; last book]: fit 7.3392 bits/word (121 s)
+   + lift: Vote[hlw8(j-0) in last 1; next 1; w=1; static]: fit 7.3309 bits/word (205 s)
+   + lift: NodeTopic[y-tree depth 4; last book]: fit 7.3277 bits/word (293 s)
+SD2: 3 accepted this run; fit 7.3277 bits/word (20 candidates; SD 7.3447) (293 s)
+SD2: 0 accepted this run; fit 7.3277 bits/word (20 candidates; SD 7.3447) (45 s)

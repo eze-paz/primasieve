@@ -20,7 +20,8 @@ def exactify(D, exn, ans, K):
     D2 = np.zeros((D.shape[0], K + 2), np.float32); D2[:, :K + 1] = D; out = ans == K; e = np.minimum(np.maximum(exn, 0), D[:, K]); D2[out, K + 1] = e[out]; D2[out, K] = D[out, K] - e[out]; return D2
 def liftlog(D, Du):
     """log((D + u)/(2u)) per column; with the exact column both rest columns take the lift of the unsplit rest bucket"""
-    L = np.log((D + Du) / (2 * Du + 1e-30))
+    with np.errstate(divide="ignore"): L = np.log((D + Du) / (2 * Du + 1e-30))
+    L[(D + Du) == 0] = 0                                                                            # columns with no mass anywhere (padding, empty exact column): no lift, never -inf
     if EXACT and D.shape[1] == Du.shape[1]:
         K = D.shape[1] - 2; r = np.log((D[:, K] + D[:, K + 1] + Du[:, K] + Du[:, K + 1]) / (2 * (Du[:, K] + Du[:, K + 1]) + 1e-30)); L[:, K] = r; L[:, K + 1] = r
     return L

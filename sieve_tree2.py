@@ -10,7 +10,7 @@ import numpy as np
 import sieve_fs2 as F
 T0 = time.time(); VIEW = sys.argv[2] if len(sys.argv) > 2 else "scene"; SHUF = len(sys.argv) > 3 and sys.argv[3] == "shuffled"
 OFFS = {"scene": (-20, -10, -5, -3, 3, 5, 10, 20), "frame": (1, 2, 3, 4, 5), "scenefull": (-20, -10, -5, -3, 3, 5, 10, 20),   # L8 signatures below (SN block)
-        "near": (-3, -2, -1, 1, 2, 3), "f3": (1, 2, 3), "b3": (-3, -2, -1), "far": (-50, -25, 25, 50)}[VIEW]; TAG = VIEW + ("_shuf" if SHUF else "")
+        "near": (-3, -2, -1, 1, 2, 3), "f3": (1, 2, 3), "b3": (-3, -2, -1), "far": (-50, -25, 25, 50), "hyb": (-1, 1)}[VIEW]; TAG = VIEW + ("_shuf" if SHUF else "")
 TD = os.path.join(F.SC.LX, "sieve_tree"); CK = os.path.join(TD, f"tree_{TAG}.json"); NC = 2000; NOBJ = len(F.tr) if VIEW == "scenefull" else 3_000_000
 def stream():
     s = F.tr.copy()
@@ -22,7 +22,14 @@ def signatures(s, words):
         a = s[max(0, -o):len(s) - max(0, o)]; b = s[max(0, o):len(s) - max(0, -o)]; r = row[a]; ok = r >= 0; col = np.where(b == 0, NC + 1, np.where(b <= NC, b - 1, NC)); np.add.at(M, (r[ok], col[ok]), 1)
     cs = M.sum(0); tot = cs.sum()
     with np.errstate(all="ignore"): X = np.log(M * tot / np.maximum(M.sum(1, keepdims=True), 1) / np.maximum(cs, 1))
-    X = np.where(M > 0, np.maximum(X, 0), 0).astype(np.float32); X /= np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-9); return X
+    X = np.where(M > 0, np.maximum(X, 0), 0).astype(np.float32); X /= np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-9)
+    if VIEW == "hyb":                                                                                  # SD2: + dictionary features (lexicographer file, hypernym ancestors 2-6), equal weight
+        z = np.load(os.path.join(F.SC.LX, "sieve_dict.npz")); cols = [z["wlex"][words]] + [z[f"d{k}"][words] for k in range(2, 7)]; off = 0; parts = []
+        for c in cols: u, inv = np.unique(c, return_inverse=True); parts.append(inv + off); off += len(u)
+        Dm = np.zeros((len(words), off), np.float32)
+        for p in parts: Dm[np.arange(len(words)), p] = 1
+        none = z["wpos"][words] == 0; Dm[none] = 0; Dm /= np.maximum(np.linalg.norm(Dm, axis=1, keepdims=True), 1e-9); X = np.hstack([X, Dm]) / np.sqrt(2)
+    return X
 def plogp(c): c = c[c > 0].astype(np.float64); return (c * np.log2(c)).sum()
 def two_means(X, w):
     i0 = int(np.argmax(w)); i1 = int(np.argmin(X @ X[i0])); cen = X[[i0, i1]].copy()

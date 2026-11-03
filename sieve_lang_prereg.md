@@ -974,3 +974,24 @@ count 7.7819; static word count 7.7307; context-placed rare-word lift (hl4c, boo
 Agree[left 8 x right 4] 7.7270; book recency (any anchor, 1/(1+d)) 7.7255; Descend[left 8] 7.7251; L1 node match
 7.7145. Three lifts help fit but hurt held-out when kept: NodeTopic[left 4; book] (without: 7.6943), HBack[t-1+t-2]
 (7.7042), NodeTopic[left 10; 1,000] (7.7037). The online stack: static 7.7073 -> 7.6191.
+
+## SD2 block (2026-11-03): the dictionary feeds the self-grown ontology (owner) -- registered before any run
+Reference: SD program + online stack 7.6154 (static 7.6999).
+(a) Dictionary-placed rare words: 62,202 vocabulary words have < 20 uses and sit in the trees' shared rare class; each
+rare word in WordNet takes the node (left / right / scene tree, every depth) held by most of its dictionary relatives
+(synonyms + hypernym/hyponym lemmas, else definition words) that have >= 20 uses, weighted by their counts. New views
+lw / rw / sw; the tree-keyed kinds and count Votes on them are offered.
+(b) Hybrid tree: grown by the SH1 rule on offsets -1, +1 (the left/right objective) but each word's signature = its
+text PPMI vector and its dictionary features (lexicographer file, hypernym ancestors at depths 2-6), each part unit-
+normalised, equal weight. The dictionary only proposes splits; a split is kept only if it pays on the text. Outside
+check vs the text-only trees: WordNet Spearman is no longer independent (stated), so report splits, depth, leaves.
+Bars: a piece accepted; with the online stack < 7.6154; content-word and first-use bits fall.
+**SD2 results.** (a) 25,874 of the 62,202 rare words placed by their dictionary relatives. (b) Hybrid tree: 43 splits of
+81 tried, depth 10 (leaves less clean than the text-only trees'). First pass hit nan: a lift's log was -inf on columns
+with no mass anywhere (padding / empty exact column) and the refit drove its strength negative; fixed in
+sieve_prim.liftlog (those entries 0; they carry no probability; SD rescored unchanged 7.6999). Accepted (3 lifts):
+NodeTopic[dictionary-placed left tree depth 4; this book], count Vote keyed by the dictionary-placed left node depth 8
+of t-1, NodeTopic[hybrid tree depth 4; this book]; fit 7.3447 -> 7.3277; scored static 7.6785 (SD 7.6999); with the
+online stack (same settings chosen) 7.6078 -- best. D: function 4.7984, content 10.6533, words 1-10 7.4952, 11+ 7.7041,
+repeats 6.2572, first use 13.9287, D2 4.4966 / top-1 0.4239, D3 0.8194. Bars: accepted PASS; < 7.6154 PASS; content and
+first-use bits fall PASS (small; most of the gain is on function words).
