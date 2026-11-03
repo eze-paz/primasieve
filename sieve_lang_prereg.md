@@ -884,3 +884,63 @@ triggers): one accepted -- NodeTopic[scene depth 5; last 200] as a lift; fit 7.3
 bits/word (SO all 7.7153). Two more passes (forward and reversed candidate order) accept nothing.
 **L4 + L7.** Online mixing on the L7 program: fit static 7.3536 -> 7.3468 (selector left node depth 8, eta 0.2);
 scored static 7.7119 -> online 7.6727 bits/word -- best so far (Stack 8.1507, LM 6.026).
+
+## SN block (2026-11-03): owner "try all except more text" -- registered before any run
+Reference: L4+L7, scored 7.6727 bits/word on the 50,114 positions (fit 7.3468 online). Every piece below is offered
+through the MDL move loop (or, for decode-time learning, chosen on the 9,000 fit positions read in order with log2 of
+the grid charged) and scored once on the 50,114 positions. Block bar: the final combination scores < 7.6727.
+Compute: GitHub Actions not set up -- the primasieve repo is public, so jobs there would publish the unpushed history
+and the corpus; instead the move loop's 1-D fits were made exact-and-fast locally (sieve_fast.fast_move_loop: mixture
+fits on n-vectors, lift fits by safeguarded Newton; same choices and fit as the slow loop on the L7 offer, 67 s vs
+~12 min).
+D diagnostics (not a bar, reported for every scored result from here on): bits split by function word (the 100 most
+frequent) / content word; by sentence position 1-10 / 11+; by repeat (word already in this book) / first use.
+D2 long-context final word: scored positions that end a sentence and whose answer appeared in the previous 200
+tokens but not in the sentence so far: bits and top-1 accuracy. D3 minimal pairs: scored positions whose answer is
+is/are, was/were, has/have, he/she, his/her, him/her: share where the model gives the answer more probability than
+its pair (both must be on the shortlist). Fresh book: not possible without new text (item 1 excluded) -- stated.
+SP1 PAQ multi-selector mixing: online offsets from several selectors at once (left node of t-1 depth 8, right node of
+t-1 depth 4, sentence-position bucket, scene node depth 5 of the last 200), summed into the log-weights; one eta.
+SP2 adaptive calibration (SSE analogue): an online per-context temperature on the final distribution (context =
+sentence-position bucket x confidence bucket of the top shortlist word), one gradient step per word.
+SP3 online lifts: the lift strengths also get per-context online offsets (selector left node depth 8).
+Bar for SP: each kept only if fit falls; scored reported per stage.
+L1 soft-match copy (kind "nmatch"): for each position, the longest context (1-8 tokens) whose tree-node sequence (left
+tree, depth d in 4 / 8 / 13) occurred earlier in this book or the last 50,000 tokens; vote for the words that followed
+the most recent 20 occurrences, weighted by match length. Offered as member and lift. Bar: accepted, and repeat bits
+fall.
+L2 sentence state (kind "sstate"): static counts over training keyed by (sentence-position bucket, t-1 word) and by
+(bucket, set of right-tree depth-2 classes seen since the sentence started, t-1 node); plus the bucket as an online
+selector (SP1). Bar: accepted, and words-11+ bits fall.
+L9b richer deliberation: hypotheses = scene node x frame node pairs, and scene nodes of a finer scene tree (grown on
+all 13.8M training tokens instead of 3M); same scoring and budgets B 0 / 1 / 4 / 16 / 64. Bar: bits fall with B.
+L8 trees as search objects: the engine chooses the signature (offset set from {+1}, {-1}, {+1..+3}, {-3..+3},
+{+-5,+-10,+-20}, window 50; log2 6 bits) and grows a tree by the SH1 rule for each; all tree-keyed kinds offered
+through the move loop for every grown tree. Report which signatures grow trees, depths, what is accepted, scored.
+**SN results (in order run).**
+D baseline (L4+L7, 7.6727): function 4.8425, content 10.7405; sentence words 1-10 7.5714, 11+ 7.7592; repeats 6.3166
+(41,291 positions), first use 14.0187; D2 (1,038 positions) 4.6967 bits, top-1 0.4297; D3 (3,367 pairs) 0.8173.
+SP on L7: SP1 chosen l8+r4, eta 0.1 (fit 7.3418) -> scored 7.6640; SP2 first version leaked the answer (tempered the
+two rest columns apart, so Z depended on the answer: "6.8679" is invalid); fixed (rest tempered as one bucket, split by
+its shares): eta_tau 0.002, scored 7.6629; SP3 online lifts eta 0.1 (interior of 0.001-0.2), fit 7.3310, scored
+7.6333.
+L1: weighted all-length matches not accepted (coverage 0.93-1.0, P(answer) 0.10-0.14 -- redundant with the program);
+the longest-match variant on left nodes depth 13 accepted as a lift: fit 7.3536 -> 7.3497; static scored 7.7046.
+L2: one accepted as a lift, SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]:
+fit 7.3536 -> 7.3506.
+SN combination (38 candidates re-chosen from SO all): scene topic, L1 longest node match, L2 state; fit 7.3471;
+static scored 7.7073. With the online stack: SP1 all four selectors eta 0.05, SP2 off, SP3 eta 0.1: fit 7.3242;
+scored L4-only 7.6663, SP1 7.6500, SP3 7.6191 -- best so far. (L7+L1 without L2: SP3 7.6283.)
+L8 trees: near (+-1..3) 41 splits depth 8; forward 1..3 28 splits depth 8; backward 1..3 35 splits depth 9; far
+(+-25, 50) 1 split; scene on all 13.8M tokens 16 splits depth 6 (3M: 8 splits depth 5). Shuffled near / f3 / b3 / far:
+no split. Leaves read as classes: prepositions (with, at, on, from, into, upon), past verbs (was, had, were, came,
+went, thought), verbs after 'to' (fight, reach, examine, seize).
+L8 offer: the 27 pieces on the new trees (node topic, Descend, class triggers on near / forward / backward trees; node
+topic on the full-data scene tree) offered with everything else: none accepted (full scan, 65 candidates). L8: trees
+form for 4 of 5 signatures, but none improves prediction over the existing trees -- FAIL on prediction.
+L9b on the SN program (static base 7.7073): scene x frame-depth-3 pairs (51 hypotheses): B=1 7.7046, B=4 7.7026,
+B=16 7.7032, B=64 7.7042; full-data scene tree depth 6 (18): B=1 7.7120, B=4 7.7056, B=16 7.7049, B=64 7.7049.
+Bar (bits fall with budget) FAIL: best at B=4 then flat or worse.
+**SN final (best: SN program + online stack, 7.6191).** D: function 4.8099, content 10.6643; sentence words 1-10
+7.5100, 11+ 7.7123; repeats 6.2672, first use 13.9456; D2 4.5131 bits, top-1 0.4258; D3 0.8197. L1 bar (repeat bits
+fall: 6.3166 -> 6.2672) and L2 bar (words 11+ fall: 7.7592 -> 7.7123) met on the combination. Block bar (< 7.6727) PASS.

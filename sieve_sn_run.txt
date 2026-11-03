@@ -1,0 +1,8 @@
+   + lift: NodeTopic[s-tree depth 5; last 200]: fit 7.3536 bits/word (149 s)
+   + lift: NodeMatch[the longest matching context as left nodes depth 13; last 50,000]: fit 7.3497 bits/word (247 s)
+SN: 2 accepted this run; fit 7.3497 bits/word (38 candidates; SO all 7.3631) (259 s)
+   + lift: SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]: fit 7.3471 bits/word (153 s)
+SN: 1 accepted this run; fit 7.3471 bits/word (38 candidates; SO all 7.3631) (171 s)
+SN: 0 accepted this run; fit 7.3471 bits/word (38 candidates; SO all 7.3631) (72 s)
+SN scored on the 50,114 positions: 7.7073 bits/word static (L7 7.7119) (75 s)
+SN: 0 accepted this run; fit 7.3471 bits/word (65 candidates; SO all 7.3631) (76 s)

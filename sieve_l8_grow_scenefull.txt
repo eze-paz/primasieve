@@ -1,0 +1,20 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+L7 scenefull: 21,538 words; 1 queued; 0 splits kept (45 s)
+   split 'root' (21,538 words): saves 915,858 bits, costs 22,012
+   split '0' (12,489 words): saves 76,332 bits, costs 13,153
+   split '1' (9,049 words): saves 131,431 bits, costs 9,713
+   split '00' (1,807 words): saves 67,087 bits, costs 2,661
+   split '10' (2,229 words): saves 86,027 bits, costs 3,273
+   split '11' (6,820 words): saves 30,259 bits, costs 8,053
+   split '001' (344 words): saves 68,912 bits, costs 1,767
+   split '100' (1,613 words): saves 216,083 bits, costs 3,226
+   split '110' (1,064 words): saves 24,418 bits, costs 2,867
+   split '111' (5,756 words): saves 18,807 bits, costs 7,748
+   split '1000' (411 words): saves 4,138 bits, costs 2,593
+   split '1001' (1,202 words): saves 50,763 bits, costs 3,574
+   split '1101' (947 words): saves 4,127 bits, costs 3,509
+   split '1110' (725 words): saves 11,717 bits, costs 3,476
+   split '10011' (1,084 words): saves 4,990 bits, costs 4,025
+   split '11100' (607 words): saves 8,035 bits, costs 3,738
+L7 scenefull: 16 splits kept of 33 tried; depth 6; 0 queued -- tree complete (232 s)

@@ -1,0 +1,39 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+L7 b3: 21,538 words; 1 queued; 0 splits kept (27 s)
+   split 'root' (21,538 words): saves 246,338 bits, costs 21,699
+   split '0' (13,343 words): saves 73,676 bits, costs 13,569
+   split '1' (8,195 words): saves 57,121 bits, costs 8,421
+   split '00' (2,415 words): saves 34,814 bits, costs 2,705
+   split '10' (4,031 words): saves 87,762 bits, costs 4,386
+   split '11' (4,164 words): saves 48,062 bits, costs 4,584
+   split '000' (1,582 words): saves 26,484 bits, costs 2,066
+   split '001' (833 words): saves 53,373 bits, costs 1,382
+   split '100' (2,654 words): saves 88,977 bits, costs 3,267
+   split '101' (1,377 words): saves 38,300 bits, costs 2,055
+   split '110' (2,259 words): saves 46,438 bits, costs 3,001
+   split '111' (1,905 words): saves 7,340 bits, costs 2,712
+   split '0000' (930 words): saves 30,752 bits, costs 1,801
+   split '0001' (652 words): saves 4,113 bits, costs 1,588
+   split '0010' (398 words): saves 19,035 bits, costs 1,399
+   split '1000' (1,141 words): saves 31,464 bits, costs 2,206
+   split '1001' (1,513 words): saves 15,226 bits, costs 2,643
+   split '1010' (415 words): saves 6,227 bits, costs 1,598
+   split '1011' (962 words): saves 6,021 bits, costs 2,221
+   split '1100' (489 words): saves 2,243 bits, costs 1,812
+   split '1101' (1,770 words): saves 8,204 bits, costs 3,158
+   split '1110' (1,467 words): saves 19,074 bits, costs 2,919
+   split '00000' (289 words): saves 159,201 bits, costs 1,806
+   split '00010' (131 words): saves 1,719 bits, costs 1,691
+   split '00100' (326 words): saves 7,195 bits, costs 1,961
+   split '10000' (726 words): saves 8,746 bits, costs 2,426
+   split '10001' (415 words): saves 15,751 bits, costs 2,190
+   split '10010' (353 words): saves 2,511 bits, costs 2,193
+   split '10011' (1,160 words): saves 3,759 bits, costs 3,064
+   split '11101' (1,400 words): saves 6,853 bits, costs 3,369
+   split '000000' (270 words): saves 22,629 bits, costs 2,303
+   split '001000' (284 words): saves 6,008 bits, costs 2,371
+   split '100011' (368 words): saves 2,564 bits, costs 2,520
+   split '0000000' (253 words): saves 20,470 bits, costs 2,480
+   split '00000001' (171 words): saves 5,524 bits, costs 2,463
+L7 b3: 35 splits kept of 71 tried; depth 9; 0 queued -- tree complete (65 s)

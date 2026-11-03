@@ -186,7 +186,8 @@ def move_loop(st, cands, budget=230, cx=None, scale=1.0, n_bits=None):
         M = P3.Model(cx, st); M.gact = st["gact"]; cur = M.refit(); st.update(th=M.th.tolist(), ga=M.ga.tolist(), be=M.be.tolist()); acc.append((kd, k)); F.log(f"   + {kd}: {P.describe(json.loads(k))}: fit {cur / n:.4f} bits/word")
         rej.add(k) if kd == "lift" else None
     st["so_rejected"] = sorted(rej); return st, acc, cur / n
-mode = (argv[1] if len(argv) > 1 else "base") if __name__ == "__main__" else None                 # importable (pool workers)
+slow_move_loop = move_loop; move_loop = FS.fast_move_loop                                           # same fits on n-vectors / Newton (sieve_fast_check2.py)
+mode =(argv[1] if len(argv) > 1 else "base") if __name__ == "__main__" else None                 # importable (pool workers)
 if mode == "base":
     st = json.load(open(os.path.join(HERE, "sieve_prim4_fit9.json"))); M = P3.Model(CX, st); M.gact = st["gact"]; b0 = M.bits() / M.n; b1 = M.refit() / M.n
     st.update(th=M.th.tolist(), ga=M.ga.tolist(), be=M.be.tolist()); json.dump(st, open(BASE, "w")); F.log(f"O0 base: SH2 program under exact columns, fit {b0:.4f} (same weights) -> {b1:.4f} (refit)")

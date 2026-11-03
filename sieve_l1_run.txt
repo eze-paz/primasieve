@@ -1,0 +1,7 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+   NodeMatch[longest contexts 1-8 as tokens; last 50,000] on fit9: 1 s
+   NodeMatch[longest contexts 1-8 as left nodes depth 4; last 50,000] on fit9: 2 s
+   NodeMatch[longest contexts 1-8 as left nodes depth 8; last 50,000] on fit9: 1 s
+   NodeMatch[longest contexts 1-8 as left nodes depth 13; last 50,000] on fit9: 2 s
+L1: 0 accepted; fit 7.3536 bits/word (L7 7.3536) (80 s)

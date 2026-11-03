@@ -12,8 +12,13 @@ import sieve_fs2 as F
 import sieve_prim as P
 import sieve_onto as O
 import sieve_prim3 as P3
+import sieve_l1 as L1, sieve_l2 as L2, sieve_paq as SPQ; L1.install(); L2.install(); SPQ.load_trees()   # kinds / trees used by later programs
 O.setup_attrs(); T0 = time.time(); VIEW = argv[1] if len(argv) > 1 else "scene"; KD = int(argv[2]) if len(argv) > 2 else 5
-A_ = np.load(os.path.join(F.SC.LX, "sieve_tree", f"attrs_{VIEW}.npz"))[f"k{KD}"]; ST = json.load(open(os.path.join(F.HERE, "sieve_onto_all.json")))
+TDIR = os.path.join(F.SC.LX, "sieve_tree")
+if VIEW == "pair":                                                                                  # L9b: hypothesis = (scene node depth 5, frame node depth KD)
+    a, b = np.load(os.path.join(TDIR, "attrs_scene.npz"))["k5"], np.load(os.path.join(TDIR, "attrs_frame.npz"))[f"k{KD}"]; A_ = np.unique(a * (int(b.max()) + 1) + b, return_inverse=True)[1]
+else: A_ = np.load(os.path.join(TDIR, f"attrs_{VIEW}.npz"))[f"k{KD}"]
+ST = json.load(open(os.path.join(F.HERE, argv[3] if len(argv) > 3 else "sieve_onto_all.json")))
 def base_probs(cx):
     """the program's distribution over shortlist + rest (+ exact answer column) per position"""
     M = P3.Model(cx, ST); M.gact = ST["gact"]; A, logL, W = M.parts(); L = np.exp(logL - logL.max(1, keepdims=True)); Z = (A * L).sum(1)

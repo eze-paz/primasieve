@@ -10,8 +10,7 @@ argv = sys.argv[:]; sys.argv = [sys.argv[0], "none"]
 import sieve_fs2 as F
 import sieve_prim as P
 import sieve_onto as O
-O.setup_attrs(); T0 = time.time(); ST = json.load(open(argv[1] if len(argv) > 1 else os.path.join(F.HERE, "sieve_onto_all.json")))
-def arrays(cx):
+def arrays(cx, ST):
     """members' distributions (float16), evidence masks, gate features, lift logs and the answer columns, in reading order"""
     Du, ans, _ = P.base(cx); n = len(ans); Ds = [Du.astype(np.float16)]; NE = [np.ones(n, bool)]; LG = [np.zeros(n)]
     for k in ST["mem"]:
@@ -19,22 +18,27 @@ def arrays(cx):
     logL = np.zeros(Du.shape, np.float32)
     for k, be in zip(ST["lift"], ST["be"]):
         D, ne, _, _ = P.vote(cx, json.loads(k)); logL += be * np.where(ne[:, None], P.liftlog(D, Du), 0)
-    return np.stack(Ds), np.stack(NE), np.stack(LG), logL, ans
-def run(cx, sel, eta, data):
-    Ds, NE, LG, logL, ans = data; m, n, K2 = Ds.shape; th = np.array(ST["th"]); ga = np.array(ST["ga"]); s, T, _ = F.ctx(cx)
-    ctx = np.zeros(n, np.int64) if sel is None else F.AT[f"hl{sel}"][s[T - 1]]; nc = int(ctx.max()) + 1; delta = np.zeros((nc, m)); bits = np.zeros(n)
+    return dict(Ds=np.stack(Ds), NE=np.stack(NE), LG=np.stack(LG), logL=logL, ans=ans, th=np.array(ST["th"]), ga=np.array(ST["ga"]))
+def run(cx, sel, eta, data, keep=None):
+    """bits per position read in order; keep = positions whose full column distribution is returned too"""
+    Ds, NE, LG, logL, ans, th, ga = (data[k] for k in ("Ds", "NE", "LG", "logL", "ans", "th", "ga")); m, n, K2 = Ds.shape; s, T, _ = F.ctx(cx)
+    ctx = np.zeros(n, np.int64) if sel is None else F.AT[f"hl{sel}"][s[T - 1]]; nc = int(ctx.max()) + 1; delta = np.zeros((nc, m)); bits = np.zeros(n); kept = {}
+    keep = set() if keep is None else set(int(i) for i in keep)
     for i in range(n):
-        D = Ds[:, i, :].astype(np.float32); w = np.exp(th + ga * LG[:, i] + delta[ctx[i]] - (th + ga * LG[:, i] + delta[ctx[i]]).max()) * NE[:, i]
+        D = Ds[:, i, :].astype(np.float32); lw = th + ga * LG[:, i] + delta[ctx[i]]; w = np.exp(lw - lw.max()) * NE[:, i]
         L = np.exp(logL[i] - logL[i].max()); A = w @ D; Z = A @ L; a = ans[i]; pa = A[a] * L[a] / Z; bits[i] = -math.log2(max(pa, 1e-300))
+        if i in keep: kept[i] = A * L / Z
         if eta: g = w * (D[:, a] / max(A[a], 1e-300) - (D @ L) / Z); delta[ctx[i]] += eta * g
-    return bits
-fit = arrays("fit9"); F.log(f"L4: {len(ST['mem'])} members, {len(ST['lift'])} lifts; fit arrays ready")
-b0 = run("fit9", None, 0.0, fit).mean(); F.log(f"   static mixture (no online updates), fit {b0:.4f} bits/word"); grid = []
-for sel in (None, 4, 8):
-    for eta in (0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0):
-        b = run("fit9", sel, eta, fit).mean(); grid.append((b, sel, eta)); print(f"   selector {sel}, eta {eta}: fit {b:.4f}", flush=True)
-best = min(grid); F.log(f"L4 chosen: selector {best[1]}, eta {best[2]} (fit {best[0]:.4f} vs static {b0:.4f}; grid cost {math.log2(len(grid)):.1f} bits)")
-del fit; ev = arrays("eval"); e0 = run("eval", None, 0.0, ev); e1 = run("eval", best[1], best[2], ev)
-json.dump(dict(selector=best[1], eta=best[2], fit=best[0]), open(os.path.join(F.HERE, "sieve_online_best.json"), "w"))
-np.save(os.path.join(P.PD, "bits_online.npy"), e1)
-F.log(f"L4 scored on the {len(e1):,} positions: static {e0.mean():.4f} -> online {e1.mean():.4f} bits/word (Stack 8.1507, LM 6.026)")
+    return (bits, kept) if keep else bits
+if __name__ == "__main__":
+    O.setup_attrs(); ST = json.load(open(argv[1] if len(argv) > 1 else os.path.join(F.HERE, "sieve_onto_all.json")))
+    fit = arrays("fit9", ST); F.log(f"L4: {len(ST['mem'])} members, {len(ST['lift'])} lifts; fit arrays ready")
+    b0 = run("fit9", None, 0.0, fit).mean(); F.log(f"   static mixture (no online updates), fit {b0:.4f} bits/word"); grid = []
+    for sel in (None, 4, 8):
+        for eta in (0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0):
+            b = run("fit9", sel, eta, fit).mean(); grid.append((b, sel, eta)); print(f"   selector {sel}, eta {eta}: fit {b:.4f}", flush=True)
+    best = min(grid); F.log(f"L4 chosen: selector {best[1]}, eta {best[2]} (fit {best[0]:.4f} vs static {b0:.4f}; grid cost {math.log2(len(grid)):.1f} bits)")
+    del fit; ev = arrays("eval", ST); e0 = run("eval", None, 0.0, ev); e1 = run("eval", best[1], best[2], ev)
+    json.dump(dict(selector=best[1], eta=best[2], fit=best[0]), open(os.path.join(F.HERE, "sieve_online_best.json"), "w"))
+    np.save(os.path.join(P.PD, "bits_online.npy"), e1)
+    F.log(f"L4 scored on the {len(e1):,} positions: static {e0.mean():.4f} -> online {e1.mean():.4f} bits/word (Stack 8.1507, LM 6.026)")

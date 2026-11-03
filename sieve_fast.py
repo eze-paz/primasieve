@@ -63,7 +63,7 @@ def install():
 def _init(env):
     os.environ.update(env); sys.argv = [sys.argv[0], "none"]
     import sieve_onto                                                                             # installs every kind; derived attributes are built lazily in _work
-    for v, c in (("scene", "s"), ("frame", "f")):                                                # L7 trees, when grown
+    for v, c in (("scene", "s"), ("frame", "f"), ("near", "n"), ("f3", "g"), ("b3", "b"), ("scenefull", "u")):   # L7 / L8 trees, when grown
         f = os.path.join(F.SC.LX, "sieve_tree", f"attrs_{v}.npz")
         if os.path.exists(f):
             z = np.load(f)
@@ -102,3 +102,55 @@ if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "check":
         t = time.time(); new = (count_vote if sp.get("kind", "vote") == "vote" else descend_vote)("fit9s", sp); t2 = time.time() - t
         t = time.time(); new = (count_vote if sp.get("kind", "vote") == "vote" else descend_vote)("fit9s", sp); t3 = time.time() - t
         print(f"{P.describe(sp)}: max |D diff| {np.abs(ref[0] - new[0]).max():.2e}, ne equal {np.array_equal(ref[1], new[1])}, N diff {np.abs(ref[2] - new[2]).max():.1f}; loop {t1:.1f}s, vectorised {t2:.1f}s (first, builds index), {t3:.1f}s (index on disk)", flush=True)
+def lift_fit(A, logL, lgl, ix, ans, rx, lo=-1.0, hi=2.0):
+    """argmin over be in [lo, hi] of the bits with logL + be * lgl: convex in be, so Newton steps (safeguarded by bisection
+    on the derivative's sign) reach the same minimum the golden search approaches, in ~6 evaluations instead of 45"""
+    lgl = np.nan_to_num(lgl, neginf=-60.0, posinf=60.0); la = lgl[ix, ans]                      # -inf only where the column has no mass
+    def ev(be):
+        q = logL + be * lgl; E = A * np.exp(q - q.max(1, keepdims=True)); Zq = E.sum(1); m1 = (E * lgl).sum(1) / Zq; m2 = (E * lgl * lgl).sum(1) / Zq
+        b = -(np.log2(np.maximum(A[ix, ans] * E[ix, ans] / np.maximum(A[ix, ans], 1e-300) / Zq, 1e-300))).sum() + rx
+        return b, (m1 - la).sum() / math.log(2), (m2 - m1 * m1).sum() / math.log(2)
+    x = 0.0; a, c = lo, hi
+    for _ in range(12):
+        b, g, h = ev(x)
+        if g > 0: c = x
+        else: a = x
+        nx = x - g / h if h > 1e-12 else (a + c) / 2
+        if not (a < nx < c): nx = (a + c) / 2
+        if abs(nx - x) < 1e-5: break
+        x = nx
+    b, _, _ = ev(x); return x, b
+# ---------------- fast move loop (same decisions as sieve_onto.move_loop) ----------------
+def fast_move_loop(st, cands, budget=230, cx=None, scale=1.0, n_bits=None, save=None):
+    """greedy MDL acceptance as sieve_onto.move_loop, but a mixture candidate's 1-D fit runs on four n-vectors
+    (answer mass and normaliser, before and from the candidate) instead of the (n, K) arrays; the budget counts from
+    this call; `save(st)` is called after every acceptance so an interrupted run keeps its progress"""
+    import sieve_onto as O, sieve_prim3 as P3
+    t0 = time.time(); cx = cx or O.CX; M = P3.Model(cx, st); M.gact = st["gact"]; n = M.n; half = 0.5 * math.log2(n_bits or n); cur = M.bits(); acc = []; rej = set(st.get("so_rejected", []))
+    ix, ans, rx = M.ix, M.ans, M.rx.sum()
+    while time.time() - t0 < budget:
+        A, logL, W = M.parts(); m = logL.max(1, keepdims=True); Lx = np.exp(logL - m); AL = A * Lx; Z = AL.sum(1); a0 = AL[ix, ans]; best = None
+        for sp in cands:
+            k = P.key(sp)
+            if k in rej: continue
+            c = P.vote(cx, sp); ne = c[1].astype(float)
+            if k not in st["mem"]:
+                cL = c[0] * Lx; ca = cL[ix, ans] * ne; cz = cL.sum(1) * ne
+                xv, b2 = P.golden(lambda lw: -(np.log2(np.maximum((a0 + np.exp(lw) * ca) / (Z + np.exp(lw) * cz), 1e-300))).sum() + rx, -12, 6)
+                gain = (cur - b2) * scale - (math.log2(5) + P.bits_of(sp) + half)
+                if gain > 0 and (best is None or gain > best[0]): best = (gain, "mix", k, xv)
+            if k not in st["lift"]:
+                lgl = np.where(c[1][:, None], P.liftlog(c[0], M.Du), 0)
+                xv, b2 = lift_fit(A, logL, lgl, ix, ans, rx)
+                gain = (cur - b2) * scale - (math.log2(5) + P.bits_of(sp) + half)
+                if gain > 0 and (best is None or gain > best[0]): best = (gain, "lift", k, xv)
+            if time.time() - t0 > budget: break
+        if best is None: break
+        _, kd, k, xv = best
+        if kd == "mix": st["mem"].append(k); st["th"].append(float(xv)); st["ga"].append(0.0); st["gact"].append(0)
+        else: st["lift"].append(k); st["be"].append(float(xv))
+        M = P3.Model(cx, st); M.gact = st["gact"]; cur = M.refit(); st.update(th=M.th.tolist(), ga=M.ga.tolist(), be=M.be.tolist()); acc.append((kd, k)); F.log(f"   + {kd}: {P.describe(json.loads(k))}: fit {cur / n:.4f} bits/word")
+        if kd == "lift": rej.add(k)
+        st["so_rejected"] = sorted(rej)
+        if save: save(st)
+    st["so_rejected"] = sorted(rej); return st, acc, cur / n

@@ -22,7 +22,7 @@ def main(argv):
             if isinstance(v, str): print(f"   worker error {k}: {v}", flush=True)
         if any(O.cached("fit9", sp) is None for sp in C): F.log(f"L7: {sum(O.cached('fit9', sp) is None for sp in C)} of {len(C)} still to evaluate; rerun"); return
         st = json.load(open(out)) if os.path.exists(out) else json.load(open(os.path.join(F.HERE, "sieve_onto_all.json")))
-        t0 = time.time(); print(f"   setup done at {t0 - O.T0:.0f} s", flush=True); O.T0 = t0; st, acc, fit = O.move_loop(st, C, budget=110); print(f"   move loop {time.time() - t0:.0f} s", flush=True); json.dump(st, open(out, "w")); F.log(f"L7: {len(acc)} accepted this run; fit {fit:.4f} bits/word (SO all 7.3631)")
+        t0 = time.time(); print(f"   setup done at {t0 - O.T0:.0f} s", flush=True); st, acc, fit = O.move_loop(st, C, budget=200, save=lambda s: json.dump(s, open(out, "w"))); print(f"   move loop {time.time() - t0:.0f} s", flush=True); json.dump(st, open(out, "w")); F.log(f"L7: {len(acc)} accepted this run; fit {fit:.4f} bits/word (SO all 7.3631)")
     else:
         st = json.load(open(out)); M = P3.Model("eval", st); M.gact = st["gact"]; F.log(f"L7 scored on the {M.n:,} positions: {M.bits() / M.n:.4f} bits/word (SO all 7.7153)")
 if __name__ == "__main__": main(sys.argv[:])

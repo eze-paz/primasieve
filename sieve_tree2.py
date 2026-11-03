@@ -9,8 +9,9 @@ import os, sys, json, math, time
 import numpy as np
 import sieve_fs2 as F
 T0 = time.time(); VIEW = sys.argv[2] if len(sys.argv) > 2 else "scene"; SHUF = len(sys.argv) > 3 and sys.argv[3] == "shuffled"
-OFFS = {"scene": (-20, -10, -5, -3, 3, 5, 10, 20), "frame": (1, 2, 3, 4, 5)}[VIEW]; TAG = VIEW + ("_shuf" if SHUF else "")
-TD = os.path.join(F.SC.LX, "sieve_tree"); CK = os.path.join(TD, f"tree_{TAG}.json"); NC = 2000; NOBJ = 3_000_000
+OFFS = {"scene": (-20, -10, -5, -3, 3, 5, 10, 20), "frame": (1, 2, 3, 4, 5), "scenefull": (-20, -10, -5, -3, 3, 5, 10, 20),   # L8 signatures below (SN block)
+        "near": (-3, -2, -1, 1, 2, 3), "f3": (1, 2, 3), "b3": (-3, -2, -1), "far": (-50, -25, 25, 50)}[VIEW]; TAG = VIEW + ("_shuf" if SHUF else "")
+TD = os.path.join(F.SC.LX, "sieve_tree"); CK = os.path.join(TD, f"tree_{TAG}.json"); NC = 2000; NOBJ = len(F.tr) if VIEW == "scenefull" else 3_000_000
 def stream():
     s = F.tr.copy()
     if SHUF: s = np.random.default_rng(0).permutation(s)
