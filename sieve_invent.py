@@ -213,5 +213,5 @@ if __name__ == "__main__":
     if mode == "search": search(ARGV[2] if len(ARGV) > 2 else "a")
     elif mode == "eval": evaluate(ARGV[2], ARGV[3] if len(ARGV) > 3 else "eval")
     elif mode == "smoke":
-        sp = dict(kind="ctxsim", src="w1000", k=3, lvl="both", p=1, top=50, decay="flat"); c = vote(SUB, sp); log(f"smoke {describe(sp)}: ne {c[1].mean():.3f}, mean N {c[2].mean():.1f}, D row sums {c[0].sum(1).mean():.3f}")
+        sp = dict(kind="ctxsim", src="static", k=5, lvl="both", p=3, top=500, decay="near"); c = vote(SUB, sp); log(f"smoke {describe(sp)}: ne {c[1].mean():.3f}, mean N {c[2].mean():.1f}, D row sums {c[0].sum(1).mean():.3f}")
         Ms = P3.Model(SUB, json.load(open(os.path.join(HERE, "sieve_onto_base.json")))); Ms.gact = json.load(open(os.path.join(HERE, "sieve_onto_base.json")))["gact"]; gm, gl = P2.gains(Ms, c); log(f"smoke gains on the subsample: mix {gm:.1f} bits, lift {gl:.1f} bits (x9 for 9,000; bits of spec {bits_of(sp):.1f})")
