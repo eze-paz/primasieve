@@ -1060,3 +1060,36 @@ program carries to books no run has read; no sign of tuning to the scored text.
 F2 L3 leaf splitting -- FAIL. B=0 (the SD2 lift) 7.6783; B=4: fit 7.3312, scored 7.6846; B=16: 7.3335, 7.6832; B=64:
 7.3334, 7.6832. Like re-placement, in-book class-bigram evidence makes this piece worse.
 All registered ideas of the SL / SN / SD / SE / SF blocks are now run.
+
+## SG block (2026-11-03): content-word selection (owner: "yes" to the four hypotheses) -- registered before any run
+Reference: L5 program (sieve_l5_offer.json), fit 7.2749, scored static 7.6381, online stack 7.5767; content 10.6316,
+first use 13.8880. Each kind is offered through the move loop (member and lift, 6 bits per piece) on top of the L5
+program; accepted pieces scored static, with the online stack (settings re-chosen on fit9), D diagnostics, fresh books.
+H1 head-driven class prediction (kind "hdesc"): the head = the last verb (WordNet v) or last adjective (a) in the
+sentence up to and including t-1; key = the head's base form (wlem), alone or with t-1's left node depth 4 (the slot);
+predicts the next word's class (dictionary tree depth 4 / 6, dictionary-placed left tree depth 8, hybrid tree depth 8),
+spread to words by count within the class (as Descend). Counts from training + library.
+H3 learned triggers (kind "trig"): from training text, directional co-occurrence of content words (>= 20 uses, outside
+the 300 most frequent) within 50 tokens; PMI kept for pairs seen >= 5 times with PMI > 0, the 100 strongest partners
+per trigger (by count x PMI). At t, the distinct content words of the last 50 / 500 tokens of the book are triggers;
+s(w) = sum of their PMIs to w, capped at 6; the Vote is proportional to count(w) exp(s(w)) over the vocabulary.
+H2 slot x topic (kind "gdesc"): a Descend keyed by t-1's left node depth 8 predicting the dictionary-placed left-tree
+class (depth 8); inside the class, words weighted count(w) exp(s(w)) with s from H3 (last 50 / 500) -- syntax picks the
+slot, topic picks the filler.
+H4 morphology families (kind "fam"): a family = words sharing a WordNet base form, joined with suffix derivations
+inside the vocabulary (-s -es -ed -ing -er -est -ly -ness -ment -ion -ful -less -able -ity -ous -al -ish -y, with
+final-e and doubled-consonant variants) and the prefix un-; the families of the content words in the last 500 tokens
+vote for their members by count, either all members or only those not in the last 2,000 tokens.
+Bars: per hypothesis, accepted (fit falls); block: scored online < 7.5767 and content-word bits < 10.6316.
+**SG results.** Built: 404,693 trigger pairs over 18,611 trigger words (e.g. ship -> sea, deck, captain, anchor);
+55,538 morphology families (some false joins: kind / kindled, happy / hapless). A full 19-candidate move loop exceeds a
+5-minute run, so candidates were offered by hypothesis group (H1, then H2+H3, then H4, each repeated until it accepts
+nothing; H1 re-offered after H2's acceptance). Mean log2 P(answer) / unigram base on covered content words (fit9): H1
+-1.143 to 0.297 (Descend[t-1, t-2] -0.684), H3 -0.108 / 0.242, H2 0.266 / 0.736, H4 -12.221 / -15.436.
+H1 head-driven classes -- FAIL (0 of 13 accepted, twice). H3 triggers -- FAIL (not accepted). H4 families -- FAIL (the
+answer is almost never in a recent word's family beyond the word itself). H2 slot x topic -- PASS: lift SlotTopic[t-1
+left node 8 -> dictionary-placed left class 8; inside it triggers of the last 500] accepted, fit 7.2749 -> 7.2717.
+Scored: static 7.6331 (L5 7.6381); online stack (SP1 l8+r4 eta 0.1, SP2 off, SP3 eta 0.1) 7.5739 -- best (L5 7.5767).
+D: function 4.7679, content 10.6156 (L5 10.6316), words 1-10 7.4702, 11+ 7.6625, repeats 6.2286, first use 13.8699,
+D2 4.5116 / top-1 0.4249, D3 0.8283. Fresh books: static 7.6517, online 7.5968 (L5 7.6546 / 7.5997), content 10.6586
+(L5 10.6711), first use 12.7438. Block bars: online < 7.5767 PASS; content < 10.6316 PASS (both small).

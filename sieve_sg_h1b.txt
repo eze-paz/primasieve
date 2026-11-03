@@ -1,0 +1,1 @@
+SG h1: 0 accepted; fit 7.2717 bits/word (13 candidates; L5 7.2749) (79 s)

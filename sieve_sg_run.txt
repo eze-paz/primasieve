@@ -1,0 +1,6 @@
+h1 run 1: SG h1: 0 accepted; fit 7.2749 bits/word (13 candidates; L5 7.2749) (106 s)
+h23 run 1:    + lift: SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]: fit 7.2717 bits/word (247 s)
+SG h23: 1 accepted; fit 7.2717 bits/word (4 candidates; L5 7.2749) (250 s)
+h23 run 2: SG h23: 0 accepted; fit 7.2717 bits/word (4 candidates; L5 7.2749) (74 s)
+h4 run 1: SG h4: 0 accepted; fit 7.2717 bits/word (2 candidates; L5 7.2749) (90 s)
+DONE
