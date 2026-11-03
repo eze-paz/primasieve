@@ -1,0 +1,2 @@
+fresh: shortlist K = 320; answer inside 0.726 (59 s)
+SF1 build: 0 of 46 still to build on 22,647 fresh positions (249 s)

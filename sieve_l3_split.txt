@@ -1,0 +1,3 @@
+L3 split B=4: fit 7.3312, scored 7.6846 bits/word static (140 s) (194 s)
+L3 split B=16: fit 7.3335, scored 7.6832 bits/word static (131 s) (186 s)
+L3 split B=64: fit 7.3334, scored 7.6832 bits/word static (153 s) (209 s)

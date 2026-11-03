@@ -1037,3 +1037,26 @@ e.g. after a socialist-economics passage "in one of these gold dios which as and
 touch the sorry mr | nay but be". Local word pairs and the book's vocabulary and register (names, dialogue forms) carry
 over; no sentence is grammatical beyond 3-4 words; no thread of meaning.
 Still open (not testable here): fresh-book test (needs new text, excluded); L3 leaf splitting (not built).
+
+## SF block (2026-11-03): owner "finish the pending items now" -- registered before any run
+F1 fresh books: 31 of the 41 held-out-split books were never read by any Sieve run (training = 359 other books; scored and
+dev text come from the first 10 held-out books). The first 3 unread books (162, 1628, 1641), first ~8,000 tokens each,
+tokenised exactly as lx_docs.py (sentences of >= 2 alphabetic tokens, lower-cased, out-of-vocabulary -> the unknown id),
+become context "fresh"; scored positions as for the 50,114 (inside sentences). The L5 program, unchanged (weights and
+online settings as chosen on fit9), scored static and with the online stack; D diagnostics. No bar: a generalisation
+check -- reported next to the same program's 7.6381 / 7.5767 on the usual held-out text.
+F2 L3 leaf splitting (the unbuilt half of L3): every 1,000 tokens of a book, the B (0 / 4 / 16 / 64) dictionary-placed
+left-tree leaves (depth 8) holding the most in-book tokens so far are each split in two by 2-means of their in-book words
+over the class-bigram evidence vectors (as in L3, past only); a split is kept if the class-bigram log-likelihood of the
+book so far rises by more than log2 of the split choice. Applied to the same lift as L3 (count Vote keyed by t-1's
+node: a split-off half keeps its parent's counts but is keyed separately only where training has it -- i.e. the new
+node maps to the training key of the word's own static node unless the half's words share one other node); refitted on
+fit9, scored. Bar: bits fall with B.
+**SF results.**
+F1 fresh books (books 162, 1628, 1641; 24,229 tokens, 22,647 scored positions; unknown-word answers 0.0192; shortlist
+holds the answer at 0.726): L5 program static 7.6546, with the online stack 7.5997 (usual held-out text: 7.6381 /
+7.5767). D: function 4.5399, content 10.6711, words 1-10 7.4518, 11+ 7.7627, repeats 5.8696, first use 12.7567. The
+program carries to books no run has read; no sign of tuning to the scored text.
+F2 L3 leaf splitting -- FAIL. B=0 (the SD2 lift) 7.6783; B=4: fit 7.3312, scored 7.6846; B=16: 7.3335, 7.6832; B=64:
+7.3334, 7.6832. Like re-placement, in-book class-bigram evidence makes this piece worse.
+All registered ideas of the SL / SN / SD / SE / SF blocks are now run.
