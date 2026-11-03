@@ -25,7 +25,7 @@ def positions():
 PAIRS = [("is", "are"), ("was", "were"), ("has", "have"), ("he", "she"), ("his", "her"), ("him", "her")]
 def main():
     stf = argv[1] if len(argv) > 1 else "sieve_l7_offer.json"; sel = None if len(argv) < 3 or argv[2] in ("none", "paq") else int(argv[2]); eta = float(argv[3]) if len(argv) > 3 else 0.2
-    import sieve_l1 as L1, sieve_l2 as L2; L1.install(); L2.install(); OL.O.setup_attrs()
+    import sieve_l1 as L1, sieve_l2 as L2, sieve_dict as SDi; L1.install(); L2.install(); SDi.install(); OL.O.setup_attrs()
     for v, c in (("scene", "s"), ("frame", "f")):
         f = os.path.join(F.SC.LX, "sieve_tree", f"attrs_{v}.npz")
         if os.path.exists(f):

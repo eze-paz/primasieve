@@ -944,3 +944,33 @@ Bar (bits fall with budget) FAIL: best at B=4 then flat or worse.
 **SN final (best: SN program + online stack, 7.6191).** D: function 4.8099, content 10.6643; sentence words 1-10
 7.5100, 11+ 7.7123; repeats 6.2672, first use 13.9456; D2 4.5131 bits, top-1 0.4258; D3 0.8197. L1 bar (repeat bits
 fall: 6.3166 -> 6.2672) and L2 bar (words 11+ fall: 7.7592 -> 7.7123) met on the combination. Block bar (< 7.6727) PASS.
+
+## SD block (2026-11-03): dictionary access (owner: "do it") -- registered before any run
+Source: WordNet 3.1 database files already on disk (_nldata/dict; no download). Until now WordNet was only an outside
+check (SH1, SP7); here it becomes an input. Reference: SN program + online stack, scored 7.6191 (static 7.7073).
+The dictionary's own size is not charged (like the training text and the library); each piece pays its 6 / Vote bits.
+Word-level facts per vocabulary word (exact spelling, else morphy-style base form via the .exc lists and suffix rules):
+wpos = set of parts of speech (n / v / a / r bitmask); wlex = lexicographer file of the most frequent sense; wlem = base
+form; dictionary tree view "d": depth-k ancestor on the first sense's hypernym chain (nouns, verbs; adjectives and
+adverbs by lexicographer file; words not in WordNet one class).
+Pieces offered (23): count Votes keyed by wlem / wlex / wpos of recent words (static, book, last 1,000); dictionary-tree
+node topic (depth 2 / 4 / 6; last 200 / book), Descend (depth 4 / 8) and class trigger; and kind "gloss": the rare
+(<= 1,000 uses) words in the last B (20 / 100) tokens vote for their related words -- synonyms, definition words,
+hypernym + hyponym lemmas, or all (first 2 senses, vocabulary only).
+Bars: a piece accepted (fit falls); with the online stack scored < 7.6191; diagnostic: content-word bits fall
+(10.6643).
+**Correction (L1 note above).** "P(answer) 0.10-0.14" read the whole rest bucket as the answer for out-of-shortlist
+answers; with the exact answer column: all-length NodeMatch 0.0216-0.0668, longest-match 0.0230-0.0887 (tokens
+highest), coverage unchanged.
+**SD results.** Dictionary: 54,461 of 94,501 vocabulary words in WordNet (0.699 of training tokens); related lists
+without the 300 most frequent words. Of 23 pieces one accepted: NodeTopic[dictionary tree depth 6; this book] as a
+member, fit 7.3471 -> 7.3447; a second pass accepts nothing. Gloss Votes: coverage 0.82-1.0 but P(answer) 0.0001-0.0002
+(related words almost never are the next word) -- not accepted.
+SD scored: static 7.6999 (SN 7.7073); with the online stack (all four selectors eta 0.05, SP3 eta 0.1) 7.6154 -- best
+(SN 7.6191). D: content 10.6549 (SN 10.6643), function 4.8114, words 11+ 7.7087, repeats 6.2651, first use 13.9345, D2
+4.5155 / top-1 0.4268, D3 0.8200. Bars: accepted PASS; < 7.6191 PASS; content bits fall PASS (small).
+**Ablation of the SN program (static 7.7073; each piece removed, no refit, scored):** largest losses -- static bigram
+count 7.7819; static word count 7.7307; context-placed rare-word lift (hl4c, book) 7.7281; book bigram count 7.7283;
+Agree[left 8 x right 4] 7.7270; book recency (any anchor, 1/(1+d)) 7.7255; Descend[left 8] 7.7251; L1 node match
+7.7145. Three lifts help fit but hurt held-out when kept: NodeTopic[left 4; book] (without: 7.6943), HBack[t-1+t-2]
+(7.7042), NodeTopic[left 10; 1,000] (7.7037). The online stack: static 7.7073 -> 7.6191.

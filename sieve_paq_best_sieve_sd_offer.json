@@ -1,0 +1,17 @@
+{
+ "state": "sieve_sd_offer.json",
+ "sels": [
+  "l8",
+  "r4",
+  "pos",
+  "scene"
+ ],
+ "eta": 0.05,
+ "eta_tau": 0.0,
+ "eta_lift": 0.1,
+ "fit": 7.321470415721278,
+ "scored_L4": 7.6618744596822,
+ "scored_SP1": 7.6467495404568195,
+ "scored_SP2": 7.6467495404568195,
+ "scored_SP3": 7.615370535122098
+}

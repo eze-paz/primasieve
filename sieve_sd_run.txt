@@ -1,0 +1,26 @@
+   built Vote[wlem(j-0) in last 1; next 1; w=1; static]: 3 s
+   built Vote[wlex(j-0) in last 1; next 1; w=1; static]: 2 s
+   built Vote[id(j-0) in last 1 & wlem(j-1) in last 1; next 1; w=1; static]: 4 s
+   built Vote[wpos(j-0) in last 1 & wpos(j-1) in last 1; next 1; w=1; static]: 3 s
+   built Vote[wlem(j-0) in last 1; next 1; w=1; book]: 2 s
+   built Vote[wlex(j-0) in last 1; next 1; w=1; w1000]: 1 s
+   built NodeTopic[d-tree depth 2; last 200]: 0 s
+   built NodeTopic[d-tree depth 2; last book]: 1 s
+   built NodeTopic[d-tree depth 4; last 200]: 0 s
+   built NodeTopic[d-tree depth 4; last book]: 1 s
+   built NodeTopic[d-tree depth 6; last 200]: 0 s
+   built NodeTopic[d-tree depth 6; last book]: 1 s
+   built Descend[id(t-1) -> class of next word at depth 4 of the right tree]: 2 s
+   built Descend[id(t-1) -> class of next word at depth 8 of the right tree]: 2 s
+   built ClassTrigger[rare(<= 1000) in last 50 -> node depth 4 within 20]: 5 s
+   built Gloss[rare words in the last 20 -> their dictionary syn words]: 0 s
+   built Gloss[rare words in the last 100 -> their dictionary syn words]: 0 s
+   built Gloss[rare words in the last 20 -> their dictionary gloss words]: 0 s
+   built Gloss[rare words in the last 100 -> their dictionary gloss words]: 0 s
+   built Gloss[rare words in the last 20 -> their dictionary hyper words]: 0 s
+   built Gloss[rare words in the last 100 -> their dictionary hyper words]: 0 s
+   built Gloss[rare words in the last 20 -> their dictionary all words]: 0 s
+   built Gloss[rare words in the last 100 -> their dictionary all words]: 1 s
+   + mix: NodeTopic[d-tree depth 6; last book]: fit 7.3447 bits/word (130 s)
+SD: 1 accepted this run; fit 7.3447 bits/word (SN 7.3471) (145 s)
+SD: 0 accepted this run; fit 7.3447 bits/word (SN 7.3471) (62 s)
