@@ -1093,3 +1093,25 @@ Scored: static 7.6331 (L5 7.6381); online stack (SP1 l8+r4 eta 0.1, SP2 off, SP3
 D: function 4.7679, content 10.6156 (L5 10.6316), words 1-10 7.4702, 11+ 7.6625, repeats 6.2286, first use 13.8699,
 D2 4.5116 / top-1 0.4249, D3 0.8283. Fresh books: static 7.6517, online 7.5968 (L5 7.6546 / 7.5997), content 10.6586
 (L5 10.6711), first use 12.7438. Block bars: online < 7.5767 PASS; content < 10.6316 PASS (both small).
+
+## SK block (2026-11-03): a larger candidate list (owner: "do it, except adding more text") -- registered before the rebuild
+Measured first (sieve_cover.py, 5,000 scored positions): today's shortlist holds the answer at 0.7400; the answer is
+outside at 0.2613 of all positions, costing 13.7916 bits each (180,587 of 379,559 bits; inside 5.3747). Union of
+today's list with a causal proxy's best words (0.4 bigram after t-1 + 0.2 book so far + 0.3 class route t-1 node 8 ->
+dictionary-placed class 8 + 0.1 unigram; weights fixed, not fitted, not charged): K=640 0.8228, K=1000 0.8556, K=2000
+0.8996, K=5000 0.9434; proxy rank of the answer: median 33, 0.9 quantile 2349.
+Rebuild: candidate list = today's shortlist united with the proxy's best words up to K = 1000 (past only; the answer is
+not used). The SG program's pieces unchanged; all Votes rebuilt on the new lists; weights and lift strengths refitted on
+fit9 (no new pieces). Held-out scored in 5 chunks of ~10,000 positions (memory); the online stack (settings as chosen
+for SG on fit9) restarts at each chunk start (a small handicap, stated). Fresh books likewise (3 chunks).
+Bars: static < 7.6331; online < 7.5739; first-use bits < 13.8699.
+**SK results.** Answer inside the K = 1000 lists: fit9 0.8794 (today's 0.7562); held-out chunks 0.8370 / 0.8540 / 0.8249 /
+0.8724 / (chunk 4 not logged); fresh 0.8396 (chunk 2; today's 0.7091). One refit step on fit9 takes ~65 s, so the refit ran
+in resumable runs of 3 steps (24 steps): fit9 with SG's weights 7.2416, refitted 7.2392 (SG on today's list 7.2717).
+Held-out: static 7.6177 (SG 7.6331); online stack restarting per chunk 7.5621 -- best (SG 7.5739). D: function 4.7846,
+content 10.5730, words 1-10 7.4647, 11+ 7.6454, repeats 6.2135, first use 13.8734 (SG 13.8699). Fresh books: static
+7.6370, online 7.5848 (SG 7.6517 / 7.5968), content 10.6188, first use 12.7568.
+Where it moved (online, per position, SG vs SK): answers inside both lists (37,020) 5.3747 -> 5.4107; newly inside
+(5,868) 11.1793 -> 10.7789; outside both (7,226) 15.9129 -> 15.9747. Bars: static PASS; online PASS; first use FAIL.
+Reading: the list was not the bottleneck. The newly covered answers gain, but the 680 extra candidates take probability
+from the answers already covered; the model cannot rank a larger set of plausible words sharply enough.
