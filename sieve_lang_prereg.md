@@ -1151,3 +1151,50 @@ content 10.6926 (SG 10.6586). Bars: L accepted PASS; online < 7.5739 PASS; conte
 Reading: as built, the bilinear piece acts as a smoothed class-bigram -- it helps function words and hurts content words.
 It did not learn graded memberships (one pass, sampled softmax, strong pull to the labels, context limited to t-1 / t-2 /
 scene / registers / position). Not tested here: weaker or no pull, many passes (GPU), richer context features.
+
+## SB2 block (2026-11-03): toward a meaning model (owner: "ok do it") -- registered before any run
+Same model as SB's labeled variant, three changes (variant "L2"): (1) context adds the mean vector of the content words
+(>= 20 uses, outside the 300 most frequent) in the last 50 and in the last 500 tokens, each through a learned 309 x 309
+map; (2) those context vectors ARE the word vectors m(w) (tied: one vector per word, as context and as target);
+(3) the pull toward the labels drops to lambda 1e-5 and training runs 4 passes over the same 6,000,000 positions.
+Everything else as SB (axes, other features, sampled softmax, lr, batch, seeds); runs of ~190 s of training.
+Bars (meaning): (a) for the sample words, at least one of each word's top 5 memberships is not one of its starting nodes;
+(b) mean cosine of WordNet-synonym pairs (both >= 20 uses) above that of random pairs by a margin larger than L's
+(both reported); (c) content-word bits < 10.6156 and online < 7.5708 once offered on the SG program.
+SB2 amendment (before any SB2 result): the first chunk ran at ~1.6 s per batch (4 passes ~5 h on this CPU); each bag is
+capped at its 64 most recent content words, and the chunk is discarded (training restarts from the start).
+SB2 amendment 2 (before any SB2 result): with the cap, ~0.78 s per batch -- 4 passes ~2.5 h; cut to 2 passes
+(12,000,000 positions, ~75 min of resumable runs). The partial chunk above is kept (same procedure).
+
+## SA block (2026-11-03): ontological attention (owner: "apply it to sieve") -- registered before any run
+A head (kind "shead") = query, keys, values, all named and counted:
+query = the slot, t-1's left-tree node (depth 4, 14 slots; variant: depth 8, 94 slots);
+keys = for each class c of a family X (left tree depth 4 / dictionary-placed left depth 8 / WordNet lexicographer file),
+the most recent earlier word of class c within the last W tokens (50 / 500), same text, past only;
+value = what the head reads from that word: "self" (the word itself: a repeat) or "next" (the word that followed it: an
+induction read; the word right before t is excluded for "next", its follower is the answer);
+attention weight of class c in slot s = R[s, c] = hits / (occurrences + 1), counted on 2,000,000 training positions
+(seed 0): how often the read word was the answer when slot s saw a class-c word within W.
+Vote: each candidate word gets the summed weight of the classes pointing at it, normalised; N = summed weight x 100.
+Candidates (14): X in {hl4, hlw8, wlex} x read in {self, next} x W in {50, 500} with slot depth 4, plus slot depth 8 for
+(wlex, self, 50) and (hl4, next, 50). Offered through the move loop on the SB program (sieve_sb_offer.json; fit 7.2672,
+static 7.6294, online 7.5708), 6 bits per head. Reported: the attention map (top slot -> class weights with >= 1,000
+occurrences, named by example words); heads accepted; static, online, D, fresh books.
+Bars: a head accepted; online < 7.5708; content-word bits < 10.6489 (SB's).
+**SB2 results.** 2 passes (12,000,000 positions; ~24 runs). Sampled training loss of the last chunk 6.8116 bits (SB's L
+7.4433). Standalone (exact softmax): fit9 9.2790, held-out 9.7247 (L 9.2736 / 9.7722). Meaning checks: synonym pairs
+(39,604) cosine 0.1519 vs random pairs 0.0478 (L: 0.2649 vs 0.1356) -- bar (b) FAIL as registered (L's vectors are
+near the one-hot start, where synonyms already share nodes); top-5 memberships of the sample words: only drink gained a
+non-starting axis (right node 30) -- bar (a) FAIL for 6 of 7 words. Offered on the SA program (below): not accepted.
+Reading: the low training loss did not carry over to held-out; with the labels as a strong starting point the
+memberships soften but keep their order -- the graded-meaning step did not happen in 2 passes on this CPU.
+**SA results.** Tables from 2,000,000 training positions; attention map in sieve_sa_map.txt, e.g. after a title (mrs /
+captain) attend to the last title and read the word after it, weight 0.111 (1,436 cases); after a number attend to the
+last unit word (years / days / feet), 0.063 (4,163); after a pronoun attend to the last was / had / is, 0.049 (145,086).
+Offers in two groups of 7 (a full scan overran 5-minute runs while SB2 trained; offers were re-run after SB2 finished):
+accepted (lift) SlotHead[slot t-1 left node 4 -> last left-node-4 class within 50 -> read next], fit 7.2672 -> 7.2645;
+nothing else in either group. Scored: static 7.6306 (SB 7.6294); online 7.5711 (SB 7.5708). D: function 4.7352,
+content 10.6452 (SB 10.6489), words 11+ 7.6586, repeats 6.2148, first use 13.9185, D2 4.5279 / top-1 0.4345, D3 0.8254.
+Fresh books: static 7.6439, online 7.5940 (SB 7.6469 / 7.5935). Bars: accepted PASS; online < 7.5708 FAIL; content <
+10.6489 PASS (by 0.0037). The heads are readable and real, but what they capture (repeats, induction) the program
+already had through its copy and match pieces.

@@ -1,0 +1,6 @@
+a run 1:    + lift: SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]: fit 7.2645 bits/word (193 s)
+SA a: 1 accepted; fit 7.2645 bits/word (7 heads; SB 7.2672) (193 s)
+a run 2: SA a: 0 accepted; fit 7.2645 bits/word (7 heads; SB 7.2672) (44 s)
+b run 1: SA b: 0 accepted; fit 7.2645 bits/word (7 heads; SB 7.2672) (55 s)
+a run 1: SA a: 0 accepted; fit 7.2645 bits/word (7 heads; SB 7.2672) (52 s)
+DONE
