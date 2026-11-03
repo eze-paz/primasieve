@@ -1,0 +1,110 @@
+50,114 positions; Sieve 7.6727 (384,507 bits), net 7.4423 (372,963 bits)
+   k=1: context seen before at 50,113 positions (4 s)
+   k=2: context seen before at 43,358 positions (9 s)
+   k=3: context seen before at 24,703 positions (20 s)
+   k=4: context seen before at 8,617 positions (37 s)
+   k=5: context seen before at 2,382 positions (57 s)
+   k=6: context seen before at 713 positions (79 s)
+   k=7: context seen before at 308 positions (99 s)
+   k=8: context seen before at 216 positions (125 s)
+
+word kind  (ranked by Sieve total minus net total)
+   content word                         8,279 pos | Sieve  14.383 b/w   119,077 bits | net  12.841 b/w   106,314 bits
+   unknown                                310 pos | Sieve   8.172 b/w     2,533 bits | net   6.653 b/w     2,062 bits
+   function word                          425 pos | Sieve   7.685 b/w     3,266 bits | net   6.754 b/w     2,870 bits
+   repeat in book                      41,100 pos | Sieve   6.317 b/w   259,630 bits | net   6.368 b/w   261,716 bits
+
+distance since the answer last occurred in this book  (ranked by Sieve total minus net total)
+   never in book                        8,706 pos | Sieve  14.055 b/w   122,365 bits | net  12.543 b/w   109,198 bits
+   last 1001-10000                      6,827 pos | Sieve   9.850 b/w    67,249 bits | net   9.432 b/w    64,395 bits
+   last > 10000                           868 pos | Sieve  12.368 b/w    10,735 bits | net  11.361 b/w     9,862 bits
+   last 101-1000                       11,744 pos | Sieve   7.106 b/w    83,457 bits | net   7.137 b/w    83,818 bits
+   last <= 10                           6,195 pos | Sieve   4.024 b/w    24,927 bits | net   4.126 b/w    25,562 bits
+   last 11-100                         15,774 pos | Sieve   4.804 b/w    75,774 bits | net   5.080 b/w    80,129 bits
+
+longest earlier-seen context suffix  (ranked by Sieve total minus net total)
+   match 2                             18,655 pos | Sieve   7.759 b/w   144,742 bits | net   7.483 b/w   139,590 bits
+   match 3-4                           22,321 pos | Sieve   7.669 b/w   171,180 bits | net   7.498 b/w   167,373 bits
+   match 1                              6,755 pos | Sieve   7.660 b/w    51,746 bits | net   7.118 b/w    48,083 bits
+   match 0                                  1 pos | Sieve   9.272 b/w         9 bits | net  10.789 b/w        11 bits
+   match 5-7                            2,166 pos | Sieve   7.367 b/w    15,957 bits | net   7.499 b/w    16,243 bits
+   match 8+                               216 pos | Sieve   4.041 b/w       873 bits | net   7.700 b/w     1,663 bits
+
+2-word context in training  (ranked by Sieve total minus net total)
+   ctx2 seen, answer never followed    19,525 pos | Sieve  10.305 b/w   201,214 bits | net  10.081 b/w   196,832 bits
+   ctx2 unseen                          7,535 pos | Sieve   7.665 b/w    57,754 bits | net   7.184 b/w    54,128 bits
+   ctx2 seen, answer followed          23,054 pos | Sieve   5.445 b/w   125,539 bits | net   5.292 b/w   122,003 bits
+
+answer count in training  (ranked by Sieve total minus net total)
+   count 10k-100k                      13,663 pos | Sieve   6.244 b/w    85,308 bits | net   5.742 b/w    78,459 bits
+   count 100-1k                         8,153 pos | Sieve  11.560 b/w    94,252 bits | net  10.959 b/w    89,349 bits
+   count > 100k                        14,419 pos | Sieve   3.871 b/w    55,810 bits | net   3.600 b/w    51,913 bits
+   unknown                                310 pos | Sieve   8.172 b/w     2,533 bits | net   6.653 b/w     2,062 bits
+   count 1k-10k                         9,046 pos | Sieve   8.778 b/w    79,404 bits | net   8.814 b/w    79,733 bits
+   count 10-100                         3,672 pos | Sieve  14.206 b/w    52,164 bits | net  14.597 b/w    53,600 bits
+   count 0-10                             851 pos | Sieve  17.667 b/w    15,035 bits | net  20.970 b/w    17,846 bits
+
+position in sentence  (ranked by Sieve total minus net total)
+   words 11-20                         14,741 pos | Sieve   7.752 b/w   114,272 bits | net   7.422 b/w   109,401 bits
+   words 6-10                          11,454 pos | Sieve   7.783 b/w    89,152 bits | net   7.465 b/w    85,502 bits
+   words 21+                           12,273 pos | Sieve   7.766 b/w    95,316 bits | net   7.474 b/w    91,729 bits
+   words 3-5                            8,328 pos | Sieve   7.546 b/w    62,839 bits | net   7.348 b/w    61,192 bits
+   word 2                               3,318 pos | Sieve   6.910 b/w    22,928 bits | net   7.577 b/w    25,140 bits
+
+kind x longest match  (ranked by Sieve total minus net total)
+   content word | match 3-4             3,754 pos | Sieve  13.999 b/w    52,554 bits | net  12.581 b/w    47,228 bits
+   content word | match 2               3,240 pos | Sieve  14.595 b/w    47,287 bits | net  12.956 b/w    41,977 bits
+   repeat in book | match 1             5,685 pos | Sieve   6.343 b/w    36,060 bits | net   6.030 b/w    34,279 bits
+   content word | match 1                 964 pos | Sieve  15.347 b/w    14,794 bits | net  13.546 b/w    13,058 bits
+   content word | match 5-7               314 pos | Sieve  13.899 b/w     4,364 bits | net  12.675 b/w     3,980 bits
+   unknown | match 3-4                    128 pos | Sieve   8.181 b/w     1,047 bits | net   6.580 b/w       842 bits
+   unknown | match 2                      126 pos | Sieve   7.803 b/w       983 bits | net   6.247 b/w       787 bits
+   function word | match 2                173 pos | Sieve   7.714 b/w     1,335 bits | net   6.586 b/w     1,139 bits
+   function word | match 3-4              176 pos | Sieve   7.464 b/w     1,314 bits | net   6.874 b/w     1,210 bits
+   function word | match 1                 58 pos | Sieve   8.144 b/w       472 bits | net   6.608 b/w       383 bits
+   unknown | match 1                       48 pos | Sieve   8.747 b/w       420 bits | net   7.548 b/w       362 bits
+   unknown | match 5-7                      8 pos | Sieve  10.407 b/w        83 bits | net   8.846 b/w        71 bits
+   function word | match 5-7               17 pos | Sieve   8.019 b/w       136 bits | net   7.483 b/w       127 bits
+   content word | match 8+                  7 pos | Sieve  11.182 b/w        78 bits | net  10.026 b/w        70 bits
+   function word | match 0                  1 pos | Sieve   9.272 b/w         9 bits | net  10.789 b/w        11 bits
+   repeat in book | match 2            15,116 pos | Sieve   6.294 b/w    95,137 bits | net   6.330 b/w    95,686 bits
+   repeat in book | match 5-7           1,827 pos | Sieve   6.225 b/w    11,373 bits | net   6.604 b/w    12,065 bits
+   repeat in book | match 8+              209 pos | Sieve   3.802 b/w       795 bits | net   7.623 b/w     1,593 bits
+   repeat in book | match 3-4          18,263 pos | Sieve   6.366 b/w   116,265 bits | net   6.466 b/w   118,093 bits
+
+kind x last distance  (ranked by Sieve total minus net total)
+   content word | never in book         8,279 pos | Sieve  14.383 b/w   119,077 bits | net  12.841 b/w   106,314 bits
+   repeat in book | last 1001-10000     6,823 pos | Sieve   9.850 b/w    67,207 bits | net   9.432 b/w    64,352 bits
+   repeat in book | last > 10000          868 pos | Sieve  12.368 b/w    10,735 bits | net  11.361 b/w     9,862 bits
+   function word | never in book          425 pos | Sieve   7.685 b/w     3,266 bits | net   6.754 b/w     2,870 bits
+   unknown | last 11-100                  151 pos | Sieve   7.611 b/w     1,149 bits | net   5.547 b/w       838 bits
+   unknown | last <= 10                    38 pos | Sieve   7.148 b/w       272 bits | net   4.822 b/w       183 bits
+   unknown | last 101-1000                115 pos | Sieve   9.131 b/w     1,050 bits | net   8.566 b/w       985 bits
+   unknown | never in book                  2 pos | Sieve  10.686 b/w        21 bits | net   6.916 b/w        14 bits
+   unknown | last 1001-10000                4 pos | Sieve  10.276 b/w        41 bits | net  10.684 b/w        43 bits
+   repeat in book | last 101-1000      11,629 pos | Sieve   7.086 b/w    82,407 bits | net   7.123 b/w    82,832 bits
+   repeat in book | last <= 10          6,157 pos | Sieve   4.005 b/w    24,656 bits | net   4.122 b/w    25,379 bits
+   repeat in book | last 11-100        15,623 pos | Sieve   4.777 b/w    74,625 bits | net   5.075 b/w    79,291 bits
+
+content word x count x match  (ranked by Sieve total minus net total)
+   count 100-1k | match 3-4             1,688 pos | Sieve  13.308 b/w    22,464 bits | net  11.690 b/w    19,733 bits
+   count 100-1k | match 2               1,415 pos | Sieve  13.595 b/w    19,236 bits | net  11.777 b/w    16,664 bits
+   count 10-100 | match 2                 897 pos | Sieve  17.335 b/w    15,549 bits | net  14.990 b/w    13,446 bits
+   count 10-100 | match 3-4               925 pos | Sieve  16.904 b/w    15,636 bits | net  14.989 b/w    13,865 bits
+   count 100-1k | match 1                 434 pos | Sieve  14.187 b/w     6,157 bits | net  12.177 b/w     5,285 bits
+   count 1k-10k | match 3-4               912 pos | Sieve  10.369 b/w     9,456 bits | net   9.611 b/w     8,765 bits
+   count 10-100 | match 1                 282 pos | Sieve  17.686 b/w     4,987 bits | net  15.343 b/w     4,327 bits
+   count 1k-10k | match 2                 684 pos | Sieve  10.598 b/w     7,249 bits | net   9.845 b/w     6,734 bits
+   count 100-1k | match 5-7               144 pos | Sieve  13.359 b/w     1,924 bits | net  11.842 b/w     1,705 bits
+   count 1k-10k | match 1                 176 pos | Sieve  11.611 b/w     2,044 bits | net  10.543 b/w     1,856 bits
+   count 0-10 | match 3-4                 229 pos | Sieve  21.824 b/w     4,998 bits | net  21.243 b/w     4,865 bits
+   count 0-10 | match 2                   244 pos | Sieve  21.525 b/w     5,252 bits | net  21.038 b/w     5,133 bits
+   count 10-100 | match 5-7                77 pos | Sieve  16.921 b/w     1,303 bits | net  15.438 b/w     1,189 bits
+   count 1k-10k | match 5-7                75 pos | Sieve  10.254 b/w       769 bits | net   9.571 b/w       718 bits
+   count 0-10 | match 1                    72 pos | Sieve  22.305 b/w     1,606 bits | net  22.100 b/w     1,591 bits
+   count 100-1k | match 8+                  5 pos | Sieve  12.423 b/w        62 bits | net   9.992 b/w        50 bits
+   count 0-10 | match 5-7                  18 pos | Sieve  20.487 b/w       369 bits | net  20.461 b/w       368 bits
+   count 1k-10k | match 8+                  2 pos | Sieve   8.081 b/w        16 bits | net  10.113 b/w        20 bits
+   other                               41,835 pos | Sieve   6.345 b/w   265,430 bits | net   6.374 b/w   266,649 bits
+
+saved kaggle_fair_control/sieve_residual_attrs.npz (149 s)
