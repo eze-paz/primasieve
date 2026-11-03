@@ -1,0 +1,18 @@
+   AssocHead[slot t-1 left node 4 attends to hlw8 classes in the last 50 -> their associations]:
+      after [england/heaven/london] attend to [graham/richmond/euphemia]: weight 0.0227 (1,092 cases)
+      after [one/two/three] attend to [one/two/three]: weight 0.0201 (4,457 cases)
+      after [england/heaven/london] attend to [ours/grettir/buck]: weight 0.0166 (2,050 cases)
+      after [england/heaven/london] attend to [washington/ireland/gawain]: weight 0.0161 (3,544 cases)
+      after [de/th/la] attend to [en/cleves/mon]: weight 0.0149 (1,620 cases)
+      after [first/own/last] attend to [same/latter/bottom]: weight 0.0120 (4,883 cases)
+      after [de/th/la] attend to [th/s/p]: weight 0.0116 (4,587 cases)
+      after [one/two/three] attend to [years/days/feet]: weight 0.0113 (2,265 cases)
+   AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations]:
+      after [one/two/three] attend to [a/in/one]: weight 0.0159 (7,151 cases)
+      after [de/th/la] attend to [the/and/of]: weight 0.0116 (11,771 cases)
+      after [first/own/last] attend to [literary/scientific/economic]: weight 0.0107 (1,700 cases)
+      after [england/heaven/london] attend to [the/and/of]: weight 0.0094 (11,581 cases)
+      after [de/th/la] attend to [i/he/as]: weight 0.0072 (3,226 cases)
+      after [one/two/three] attend to [had/own/got]: weight 0.0062 (1,308 cases)
+      after [mrs/captain/m] attend to [the/and/of]: weight 0.0061 (3,367 cases)
+      after [other/great/good] attend to [literary/scientific/economic]: weight 0.0061 (1,273 cases)

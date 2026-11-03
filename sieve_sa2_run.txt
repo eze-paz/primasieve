@@ -1,0 +1,3 @@
+a run 1: SA2 a: 0 accepted; fit 7.2645 bits/word (5 candidates; SA 7.2645) (58 s)
+b run 1: SA2 b: 0 accepted; fit 7.2645 bits/word (5 candidates; SA 7.2645) (70 s)
+a run 1: SA2 a: 0 accepted; fit 7.2645 bits/word (5 candidates; SA 7.2645) (54 s)

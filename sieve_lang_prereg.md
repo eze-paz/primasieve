@@ -1198,3 +1198,26 @@ content 10.6452 (SB 10.6489), words 11+ 7.6586, repeats 6.2148, first use 13.918
 Fresh books: static 7.6439, online 7.5940 (SB 7.6469 / 7.5935). Bars: accepted PASS; online < 7.5708 FAIL; content <
 10.6489 PASS (by 0.0037). The heads are readable and real, but what they capture (repeats, induction) the program
 already had through its copy and match pieces.
+
+## SA2 block (2026-11-03): attention that reads meaning, not words (owner: "do it") -- registered before any run
+Diagnosis of SA: its values were the attended word or its follower -- copy only, so it could not raise words new to the
+book, where the whole neural-control margin is (content new to the book: net 12.841 vs Sieve 14.383).
+Head (kind "ahead"): query = the slot (t-1's left node, depth 4 or 8); keys = every earlier content word j (>= 20 uses,
+outside the 300 most frequent) among the 64 most recent within W (50 / 500) tokens, keyed by its class (dictionary-
+placed left node depth 8, or WordNet lexicographer file); value = j's association distribution over the vocabulary,
+v_j(w) ~ count(w) (exp(PMI(j, w)) - 1) over j's 100 trigger partners (SG's 50-token training PMI table);
+attention weight R[slot, class] = mean of v_j(answer) over training cases (1,000,000 training positions, seed 0) --
+how much class-c words' associations predict the next word in that slot; Vote = sum_j R v_j / sum_j R.
+Candidates (8): slot depth {4, 8} x class {lw8, lexfile} x W {50, 500}; controls (2): the same Vote with uniform
+weights (no attention), W 50 / 500. Offered on the SA program (fit 7.2645, static 7.6306, online 7.5711) in groups of
+5; each candidate's mean log2 P(answer)/unigram on content words (fit9) reported. Bars: an attention head accepted;
+online < 7.5711; content-word bits < 10.6452; attention heads beat their uniform controls on the content-word measure.
+**SA2 results.** Tables from 1,000,000 training positions (map in sieve_sa2_map.txt; weights small, 0.0061-0.0227, e.g.
+after a place name attend to earlier person / place names, 0.0227; after a number attend to earlier numbers, 0.0201).
+Content-word measure (fit9; dominated by answers outside every partner list, floored): attention heads -13.0190 to
+-13.0077 (W 50) and -10.4115 to -10.3941 (W 500); uniform controls -13.0135 (W 50), -10.3860 (W 500) -- attention no
+better than none. Move loop (groups a, b, a): 0 accepted of 10 (fit stays 7.2645). Bars: accepted FAIL; online / content
+not reached; attention beats uniform FAIL.
+Reading: with values that carry meaning, choosing which earlier words to read adds nothing over reading all of them --
+and the SG slot x topic lift already reads the same association table. In this count-based system the limit is the
+associations themselves (100 PMI partners per word from 13.8M tokens), not the selection of which words to attend to.
