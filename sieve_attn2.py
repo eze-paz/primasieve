@@ -6,35 +6,35 @@ Run: SZ_EXACT=1 py -3.12 -W ignore sieve_attn2.py tables | map | offer <group a|
 import os, sys, json, time
 import numpy as np
 NTR, CAP = 1_000_000, 64; G = {}
-def values(F, P):
+def values(F, P, tab=None):
     """sorted pair codes j * Vt + w and their value v_j(w); per-row partner lists"""
-    if "val" not in G:
-        import sieve_sg as SG; ptr, tgt, pmi = SG.trig_rows(F, P); C = P.ccount().astype(float); a = np.repeat(np.arange(F.Vt), np.diff(ptr))
+    if "val" + (tab or "") not in G:
+        import sieve_sg as SG; ptr, tgt, pmi = SG.trig_rows(F, P, tab); C = P.ccount().astype(float); a = np.repeat(np.arange(F.Vt), np.diff(ptr))
         e = C[tgt] * np.expm1(pmi.astype(float)); Z = np.bincount(a, weights=e, minlength=F.Vt); v = e / np.maximum(Z[a], 1e-12)
-        code = a * np.int64(F.Vt) + tgt; o = np.argsort(code); G["val"] = (code[o], v[o], ptr, tgt, v, np.diff(ptr) > 0)
-    return G["val"]
-def window(seq, T, W, F, P):
+        code = a * np.int64(F.Vt) + tgt; o = np.argsort(code); G["val" + (tab or "")] = (code[o], v[o], ptr, tgt, v, np.diff(ptr) > 0)
+    return G["val" + (tab or "")]
+def window(seq, T, W, F, P, tab=None):
     """(n, W) earlier tokens and the mask of attendable ones (content, has partners, 64 most recent)"""
-    import sieve_sg as SG; cm = SG.content_mask(F, P); has = values(F, P)[5]
+    import sieve_sg as SG; cm = SG.amask(F, P, tab); has = values(F, P, tab)[5]
     ix = T[:, None] - np.arange(1, W + 1)[None, :]; tk = seq[np.maximum(ix, 0)]; ok = (ix >= 0) & cm[tk] & has[tk]; ok &= np.cumsum(ok, 1) <= CAP; return tk, ok
 def slot(seq, T, F, sp): return F.AT[f"hl{sp['sd']}"][seq[T - 1]].astype(np.int64)
-def tname(sp): return f"ahead_s{sp['sd']}_{sp['X']}_{sp['W']}"
+def tname(sp): return f"ahead_s{sp['sd']}_{sp['X']}_{sp['W']}" + (f"_{sp['tab']}" if sp.get("tab") else "")
 def table(F, P, sp):
     import sieve_fast as FS
     f = os.path.join(FS.IDX, tname(sp) + ".npz")
     if not os.path.exists(f):
-        code, val = values(F, P)[:2]; tr = F.tr; T = np.arange(2, len(tr)); T = T[(tr[T] != 0) & (tr[T - 1] != 0)]; T = np.sort(np.random.default_rng(0).choice(T, NTR, replace=False))
+        code, val = values(F, P, sp.get("tab"))[:2]; tr = F.tr; T = np.arange(2, len(tr)); T = T[(tr[T] != 0) & (tr[T - 1] != 0)]; T = np.sort(np.random.default_rng(0).choice(T, NTR, replace=False))
         ns = int(F.AT[f"hl{sp['sd']}"].max()) + 1; nc = int(F.AT[sp["X"]].max()) + 1; sm = np.zeros(ns * nc); cn = np.zeros(ns * nc); X = F.AT[sp["X"]]
         for a0 in range(0, NTR, 50_000):
-            t_ = T[a0:a0 + 50_000]; tk, ok = window(tr, t_, sp["W"], F, P); S = slot(tr, t_, F, sp); y = tr[t_]
+            t_ = T[a0:a0 + 50_000]; tk, ok = window(tr, t_, sp["W"], F, P, sp.get("tab")); S = slot(tr, t_, F, sp); y = tr[t_]
             q = tk * np.int64(F.Vt) + y[:, None]; i = np.minimum(np.searchsorted(code, q), len(code) - 1); v = np.where(code[i] == q, val[i], 0.0)
             cell = (S[:, None] * nc + X[tk])[ok]; np.add.at(sm, cell, v[ok]); np.add.at(cn, cell, 1)
         np.savez(f, R=(sm / np.maximum(cn, 1)).reshape(ns, nc), cnt=cn.reshape(ns, nc))
     if f not in G: G[f] = dict(np.load(f))
     return G[f]
 def vote(cx, sp, F, P):
-    s, T, _ = F.ctx(cx); SL, ans = P.shortlist(cx); n, K = SL.shape; y = s[T]; code, val, ptr, tgt, vrow, _ = values(F, P)
-    tk, ok = window(s, T, sp["W"], F, P)
+    s, T, _ = F.ctx(cx); SL, ans = P.shortlist(cx); n, K = SL.shape; y = s[T]; code, val, ptr, tgt, vrow, _ = values(F, P, sp.get("tab"))
+    tk, ok = window(s, T, sp["W"], F, P, sp.get("tab"))
     if sp.get("uni"): A = ok.astype(float)
     else: R = table(F, P, sp)["R"]; A = np.where(ok, R[slot(s, T, F, sp)[:, None], F.AT[sp["X"]][tk]], 0.0)
     D = np.zeros((n, K + 1), np.float32); EX = np.zeros(n); tot = A.sum(1); N = np.zeros(n); TD = np.zeros(n)
@@ -56,8 +56,9 @@ def install():
         return O.save(cx, sp, *vote(cx, sp, F, P))
     P.vote = P3.vote = v_
     def nm(sp):
-        if sp.get("uni"): return f"AssocHead[no attention: every content word of the last {sp['W']} -> its associations]"
-        return f"AssocHead[slot t-1 left node {sp['sd']} attends to {sp['X']} classes in the last {sp['W']} -> their associations]"
+        tb = f"; table {sp['tab']}" if sp.get("tab") else ""
+        if sp.get("uni"): return f"AssocHead[no attention: every content word of the last {sp['W']} -> its associations{tb}]"
+        return f"AssocHead[slot t-1 left node {sp['sd']} attends to {sp['X']} classes in the last {sp['W']} -> their associations{tb}]"
     _d = P.describe; P.describe = P3.describe = lambda sp: nm(sp) if sp.get("kind") == "ahead" else _d(sp)
     _b = P.bits_of; P.bits_of = P3.bits_of = lambda sp: 6.0 if sp.get("kind") == "ahead" else _b(sp)
     _v = P.valid; P.valid = P3.valid = lambda sp: True if sp.get("kind") == "ahead" else _v(sp)

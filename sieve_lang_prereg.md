@@ -1221,3 +1221,39 @@ not reached; attention beats uniform FAIL.
 Reading: with values that carry meaning, choosing which earlier words to read adds nothing over reading all of them --
 and the SG slot x topic lift already reads the same association table. In this count-based system the limit is the
 associations themselves (100 PMI partners per word from 13.8M tokens), not the selection of which words to attend to.
+
+## SR2 block (2026-11-03): better word representations until attention is useful (owner: "try all of them") -- registered before any run
+Goal stated by the owner: improve what each word "is" in Sieve until attention (SA2's AssocHead) starts paying.
+Text: training + library (32,446,004 tokens; the library's 400 books were counted before but never used for word
+profiles) -- the "more text" lever without a download. Rows: the 32,299 words with >= 20 uses.
+R1 factorised profiles: topic matrix = co-occurrence within +-20 tokens with the 10,000 content contexts (frequency
+ranks 100-10,099); syntax matrix = co-occurrence at offsets -2, -1, +1, +2 with the 2,500 most frequent words (10,000
+columns). PPMI (context distribution smoothed ^0.75); truncated SVD, 150 dimensions each (torch randomised SVD, seed 0);
+NMF of the topic PPMI, 100 parts (multiplicative updates, 60 iterations, seed 0), parts named by their top words.
+R2 second-order associations: association(j, w) = (u_j sqrt(s)) . (u_w sqrt(s)) from the topic SVD (the low-rank
+smoothed PPMI, defined for every word with a vector); each word's 100 strongest partners (by count x association,
+association > 0) replace SG's raw PMI table. Re-offered with the new table: SG's Triggers and SlotTopic, SA2's 8
+attention heads and their 2 uniform controls (heads' weights recounted).
+R3 rare words: the 62,202 words with < 20 uses get a topic vector = mean of the vectors of their dictionary relatives
+(synonyms + hypernym/hyponym lemmas) with vectors, else of words sharing their last 4 letters (>= 3 such words); they
+join the association table as triggers and partners. Re-offer as R2.
+R4 senses: each of the 1,000 most frequent content words is split into 2 senses by 2-means of its occurrences' context
+vectors (mean topic vector of the +-20 window), kept if the two halves' context centroids have cosine < 0.5; a trigger
+occurrence reads the partner list of the sense nearest its own window. Re-offer as R2.
+R5 long learned vectors: the SB2 model for 20 passes on a Kaggle GPU (private kernel and dataset), offered as SB2.
+Bars per step: attention useful = an AssocHead accepted AND its content-word measure better than its uniform control;
+stop when met. Throughout: online score and content-word bits reported (SA reference 7.5711 / 10.6452).
+**SR2 results (R1-R2; stop condition met at R2).** R1: co-occurrence over training + library (topic 40 lag steps,
+syntax 4 offsets); topic PPMI nonzero 0.1098, syntax 0.0240; SVD 150 dimensions each; NMF 100 parts, relative error
+0.8211, parts nameable (e.g. horse / rode / mounted / riding / saddle; painting / pictures / painter / artist / painted;
+tone / expression / attitude / miss / conversation). R2: second-order table 3,229,900 pairs over 32,299 words.
+Diagnostic on fit9 content words (attention heads vs uniform control): W 500 heads -8.5875 to -8.5818 vs uniform
+-8.6248; W 50 heads -10.1238 to -10.1215 vs uniform -10.1572; answer among the values 0.4023 (W 500) / 0.3062 (W 50)
+(the SA2 heads on the raw PMI table: -10.4115 to -10.3941 vs uniform -10.3860). Offers (heads first, groups b, c, a, b,
+c): accepted (lift) AssocHead[slot t-1 left node 4 attends to lexicographer-file classes in the last 50 -> their
+associations; table svd], fit 7.2645 -> 7.2610; nothing else, uniform controls included (offered after the head).
+Scored: static 7.6272 (SA 7.6306); online 7.5678 -- best on today's list (SB 7.5708). D: function 4.7112, content
+10.6643 (SA 10.6452), words 1-10 7.4642, 11+ 7.6562, repeats 6.2061, first use 13.9406, D2 4.4991 / top-1 0.4326, D3
+0.8283. Fresh books: static 7.6418, online 7.5890 (SA 7.6439 / 7.5940). Bar "attention useful" (head accepted and
+better than its uniform control) PASS -> R3, R4, R5 not run (stop condition). Caveat: heads were offered before the
+uniform controls; the gain lands on function words, content-word bits rose.

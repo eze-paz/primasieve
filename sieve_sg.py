@@ -31,11 +31,11 @@ def class_index(name, kc, y, nc):
         brk = np.r_[True, comb[1:] != comb[:-1]]; pairs = comb[brk]; cnt = np.diff(np.r_[np.nonzero(brk)[0], len(comb)]); nT = np.bincount(np.searchsorted(uk, pairs // nc), minlength=len(uk))
         for nm, x in zip(names, (uk, nN, nT, pairs, cnt)): np.save(os.path.join(d, f"{nm}.npy"), x)
     return tuple(np.load(os.path.join(d, f"{nm}.npy"), mmap_mode="r") for nm in names)
-def trig_rows(F, P):
+def trig_rows(F, P, tab=None):
     """CSR over the vocabulary: the 100 strongest PMI partners of each content word (training, 50 tokens ahead)"""
     import sieve_fast as FS
     f = os.path.join(FS.IDX, "sg_trig.npz")
-    if not os.path.exists(f):
+    if not os.path.exists(f) and not tab:
         t0 = time.time(); cm = content_mask(F, P); tr = F.tr; cid = np.where(cm[tr], tr, -1); keys = []
         for lag in range(1, 51):
             a, b = cid[:-lag], cid[lag:]; ok = (a >= 0) & (b >= 0) & (a != b); keys.append(a[ok] * np.int64(F.Vt) + b[ok])
@@ -45,8 +45,10 @@ def trig_rows(F, P):
         o = np.lexsort((-(n * pmi), a)); a, b, pmi = a[o], b[o], pmi[o]; first = np.r_[True, a[1:] != a[:-1]]; grp = np.cumsum(first) - 1; rank = np.arange(len(a)) - np.nonzero(first)[0][grp]
         keep = rank < 100; a, b, pmi = a[keep], b[keep], pmi[keep]; ptr = np.r_[0, np.cumsum(np.bincount(a, minlength=F.Vt))]
         np.savez(f, ptr=ptr, tgt=b, pmi=pmi.astype(np.float32)); F.log(f"SG trig: {len(a):,} trigger pairs over {int((np.diff(ptr) > 0).sum()):,} triggers ({time.time() - t0:.0f} s)")
-    if "trig" not in G: z = np.load(f); G["trig"] = (z["ptr"], z["tgt"], z["pmi"])
-    return G["trig"]
+    if tab: f = os.path.join(FS.IDX, f"sg_trig_{tab}.npz")                                       # SR2: tables built by sieve_vec.py
+    k = "trig" + (tab or "")
+    if k not in G: z = np.load(f); G[k] = (z["ptr"], z["tgt"], z["pmi"])
+    return G[k]
 def families(F, P):
     import sieve_fast as FS
     f = os.path.join(FS.IDX, "sg_fam.npy")
@@ -70,10 +72,18 @@ def families(F, P):
     if "fam" not in G:
         fam = np.load(f); o = np.argsort(fam, kind="stable"); fs = fam[o]; st = np.searchsorted(fs, np.arange(F.Vt)); en = np.searchsorted(fs, np.arange(F.Vt), "right"); G["fam"] = (fam, o, st, en)
     return G["fam"]
-def recent(s, b, t, W, F, P):
-    lo = max(0, t - W); w = s[lo:t][b[lo:t] == b[t]]; w = np.unique(w); return w[content_mask(F, P)[w]]
-def trig_scores(ws, F, P):
-    ptr, tgt, pmi = trig_rows(F, P)
+def amask(F, P, tab=None):
+    """words a window may read: content words; with an SR2 table also every other word that has partners there"""
+    k = "am" + (tab or "")
+    if k not in G:
+        m = content_mask(F, P).copy()
+        if tab: C = P.ccount(); top = np.zeros(F.Vt, bool); top[np.argsort(-C)[:300]] = True; m |= (np.diff(trig_rows(F, P, tab)[0]) > 0) & ~top
+        G[k] = m
+    return G[k]
+def recent(s, b, t, W, F, P, tab=None):
+    lo = max(0, t - W); w = s[lo:t][b[lo:t] == b[t]]; w = np.unique(w); return w[amask(F, P, tab)[w]]
+def trig_scores(ws, F, P, tab=None):
+    ptr, tgt, pmi = trig_rows(F, P, tab)
     if not len(ws): return np.zeros(0, np.int64), np.zeros(0)
     tk = np.concatenate([tgt[ptr[w]:ptr[w + 1]] for w in ws]); pv = np.concatenate([pmi[ptr[w]:ptr[w + 1]] for w in ws])
     if not len(tk): return np.zeros(0, np.int64), np.zeros(0)
@@ -99,14 +109,14 @@ def vote_of(cx, sp, F, P):
         else:
             for i, t in enumerate(T):
                 if not hit[i]: continue
-                u, sc = trig_scores(recent(s, b, t, sp["W"], F, P), F, P); Zc = cc + np.bincount(Hk[u], weights=C[u] * np.expm1(sc), minlength=nc) if len(u) else cc
+                u, sc = trig_scores(recent(s, b, t, sp["W"], F, P, sp.get("tab")), F, P, sp.get("tab")); Zc = cc + np.bincount(Hk[u], weights=C[u] * np.expm1(sc), minlength=nc) if len(u) else cc
                 D[i, :K] = np.where(inSL[i], pcS[i] * C[SLc[i]] * np.exp(sval(u, sc, SLc[i])) / np.maximum(Zc[slc[i]], 1e-9), 0)
                 EX[i] = pcY[i] * C[y[i]] * np.exp(float(sval(u, sc, np.array([y[i]]))[0])) / max(Zc[Hk[y[i]]], 1e-9)
         D[:, K] = np.maximum(0.0, 1 - D[:, :K].sum(1)); D[~hit] = 0; EX = EX * hit; ne = hit
     elif kd == "trig":
         Ct = C.sum()
         for i, t in enumerate(T):
-            ws = recent(s, b, t, sp["W"], F, P); u, sc = trig_scores(ws, F, P)
+            ws = recent(s, b, t, sp["W"], F, P, sp.get("tab")); u, sc = trig_scores(ws, F, P, sp.get("tab"))
             if not len(u): continue
             Z = Ct + (C[u] * np.expm1(sc)).sum(); D[i, :K] = np.where(inSL[i], C[SLc[i]] * np.exp(sval(u, sc, SLc[i])) / Z, 0); EX[i] = C[y[i]] * np.exp(float(sval(u, sc, np.array([y[i]]))[0])) / Z
             N[i] = len(ws); TD[i] = len(u)
@@ -139,8 +149,9 @@ def install():
     def name(sp):
         k = sp["kind"]
         if k == "hdesc": return f"HeadDescend[base form of the last {dict(v='verb', a='adjective')[sp['head']]}{' & t-1 left node 4' if sp.get('slot') else ''} -> {sp['cls']} class]"
-        if k == "trig": return f"Triggers[content words of the last {sp['W']} tokens -> PMI partners]"
-        if k == "gdesc": return f"SlotTopic[t-1 left node 8 -> {sp['cls']} class; inside it triggers of the last {sp['W']}]"
+        tb = f"; table {sp['tab']}" if sp.get("tab") else ""
+        if k == "trig": return f"Triggers[content words of the last {sp['W']} tokens -> PMI partners{tb}]"
+        if k == "gdesc": return f"SlotTopic[t-1 left node 8 -> {sp['cls']} class; inside it triggers of the last {sp['W']}{tb}]"
         return f"Family[morphology families of the last 500 tokens{'; members not in the last 2,000' if sp.get('new') else ''}]"
     _d = P.describe; P.describe = P3.describe = lambda sp: name(sp) if sp.get("kind") in KINDS else _d(sp)
     _b = P.bits_of; P.bits_of = P3.bits_of = lambda sp: 6.0 if sp.get("kind") in KINDS else _b(sp)
