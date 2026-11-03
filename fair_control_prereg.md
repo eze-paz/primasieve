@@ -48,3 +48,21 @@ Stack 8.1507, Counter 8.9368, LM 6.026. Paragraph-bootstrap half-width about 0.0
   epoch (does more passes help); S's bits on content words (Sieve 14.598, LM 10.858).
 - **Confounds named:** context 512 vs Sieve's 50k memory (favours Sieve on repeats); the network trains on the library
   as text while Sieve only counts it (favours the net on content words); no hyper-parameter search on either side.
+
+## Result (2026-11-03; Kaggle T4, kernel fair-control-s v3; logs kaggle_fair_control/fair_control_S_run.txt, sieve_vs_control_S.txt)
+First attempt (v2) ran 8.5 h on CPU because the account had no GPU access yet (enable_gpu is silently ignored); killed
+at the cap, nothing saved. v3 on the T4: 29,062,912 parameters, 6 epochs in 7,658 s (about 21 min per epoch), dev
+bits/word per epoch 7.5607, 7.2303, 7.0617, 6.9648, 6.9104, 6.8956 (still falling at the last epoch; best = epoch 5).
+**Scored on the 50,114 positions: control 7.4423 bits/word (372,963 bits), 95% interval 7.3853-7.4981. Sieve (L4+L7)
+7.6727 (384,507 bits), interval 7.6038-7.7399. Stack 8.1507. LM 6.0261.**
+**Verdict: KILL.** The control's mean lies outside Sieve's interval and below it. A from-scratch 29M-parameter network
+on exactly Sieve's 32M tokens, with 512 words of context, no library counting, no recency memory and no search, scores
+below Sieve after 2 h of T4 time; its dev curve had not flattened, so more epochs would widen the margin.
+Per word kind (Sieve / control): repeat in book 6.303 / 6.353; function word 7.661 / 6.770; content word 14.360 /
+12.838; unknown 8.172 / 6.653. Per sentence position: word 2 6.910 / 7.577; words 3-5 7.545 / 7.347; words 6-10
+7.783 / 7.465; words 11+ 7.759 / 7.445.
+Where Sieve still holds: repeats in book (its 50k memory) and the second word of a sentence. Everything else, above all
+content words and long sentences, the network does better from the same data. The 0.4B LM remains far ahead of both.
+Consequence written in the prereg's own terms: counting + search is not the right substrate for raw-text bits/word
+even at matched data; the remaining language use for Sieve is the hybrid (Sieve-derived features into a net), or a
+different claim than bits/word. The XS size point is not needed for the verdict and was not run.

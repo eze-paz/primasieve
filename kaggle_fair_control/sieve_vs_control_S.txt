@@ -1,0 +1,14 @@
+aligned: 50,114 positions, answers equal
+   Stack: mean 8.1507 bits/word [408,463 bits], 95% interval 8.0842 - 8.2178
+   LM (RWKV-7 0.4B, 3T tokens): mean 6.0261 bits/word [301,992 bits], 95% interval 5.9471 - 6.1100
+   Sieve (L4 + L7): mean 7.6727 bits/word [384,507 bits], 95% interval 7.6038 - 7.7399
+   control fair_control_bits_S.npz (29,062,912 params, epoch 5, dev 6.8956): mean 7.4423 bits/word [372,963 bits], 95% interval 7.3853 - 7.4981
+   verdict vs control fair_control_bits_S.npz: KILL (control ahead; its mean outside Sieve's interval)
+   repeat in book  40,984 positions: Stack 6.711; LM 4.979; Sieve 6.303; control fair_control_bits_S.npz 6.353
+   function word      447 positions: Stack 7.920; LM 6.234; Sieve 7.661; control fair_control_bits_S.npz 6.770
+   content word     8,373 positions: Stack 15.220; LM 10.858; Sieve 14.360; control fair_control_bits_S.npz 12.838
+   unknown            310 positions: Stack 7.933; LM 13.580; Sieve 8.172; control fair_control_bits_S.npz 6.653
+   words 2-2 of sentence  3,318 positions: Stack 7.494; LM 6.886; Sieve 6.910; control fair_control_bits_S.npz 7.577
+   words 3-5 of sentence  8,327 positions: Stack 8.001; LM 6.574; Sieve 7.545; control fair_control_bits_S.npz 7.347
+   words 6-10 of sentence 11,454 positions: Stack 8.233; LM 6.163; Sieve 7.783; control fair_control_bits_S.npz 7.465
+   words 11-999 of sentence 27,014 positions: Stack 8.242; LM 5.693; Sieve 7.759; control fair_control_bits_S.npz 7.445
