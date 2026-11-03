@@ -1257,3 +1257,40 @@ Scored: static 7.6272 (SA 7.6306); online 7.5678 -- best on today's list (SB 7.5
 0.8283. Fresh books: static 7.6418, online 7.5890 (SA 7.6439 / 7.5940). Bar "attention useful" (head accepted and
 better than its uniform control) PASS -> R3, R4, R5 not run (stop condition). Caveat: heads were offered before the
 uniform controls; the gain lands on function words, content-word bits rose.
+
+## SC block (2026-11-03): content words, Sieve alone (owner: "massively ... improvement in content") -- measured, then registered
+Measured first (sieve_cdec.py, static SR2 program, 24,097 content-word answers of the 50,114; 10.7810 bits on them):
+class + word-inside-class = 5.0814 + 5.6997 (dictionary-placed left class 8, 94 classes; uniform 6.5546), 4.6028 +
+6.1782 (WordNet lexicographer file, 46), 5.8849 + 4.8961 (topic NMF part, 101). Headroom check (sieve_chead.py): the
+passage's NMF loadings name the part at 6.0270 bits, a (t-2, t-1) class trigram names the syntax class at 6.2906 --
+both worse than the program: no easy class signal is left.
+Registered (before any run) -- SC1 retrieval by meaning (kind "knn"): each position's context vector = [syntax profile of
+t-1 (syntax SVD, first 48 dimensions, unit), 0.5 x syntax profile of t-2, topic profile of the passage (mean topic SVD
+vector, first 48 dimensions, of the content words in the last 50 tokens of the book, unit)], unit overall; the index =
+5,000,000 positions sampled from training + library (seed 0); for each scored position the 64 nearest index positions
+(cosine, exact search) vote for the word that followed them, weight exp((cos - best) / 0.05). Control: syntax only (no
+topic part). Offered (member and lift) on the SR2 program; bars: accepted; content-word bits < 10.6643 (SR2's online
+D) with the online stack; the full vector beats the syntax-only control on content words. Fresh books reported.
+SC1 amendment (before any held-out score): the syntax-only control is compared on fit9 only (its held-out / fresh
+searches dropped to save ~40 min of CPU); held-out and fresh books are searched for the full variant.
+**SC1 results.** fit9 gains before refit: full (syntax + passage topic) 70.7 bits as member, 50.9 as lift; syntax-only
+control 2.6 / 7.9 -- the passage meaning is what retrieves. Accepted as a member (fit 7.2610 -> 7.2511). Held-out:
+static 7.6212 (SR2 7.6272); online 7.5624 -- best on today's list (SR2 7.5678). D: function 4.7062, content 10.6585
+(SR2 10.6643), words 1-10 7.4605, 11+ 7.6495, repeats 6.1994, first use 13.9411, D2 4.5191 / top-1 0.4383, D3 0.8286.
+Fresh books: static 7.6329, online 7.5839, content 10.7017. Bars: accepted PASS; content < 10.6643 PASS (by 0.0058);
+full beats syntax-only PASS (fit9). Not the large content-word gain sought.
+**Trace (owner: trace one example; sieve_trace.py, SR2 program, held-out answers ship, sea x5, sword x2; output in
+sieve_trace_run.txt).** Findings:
+(1) The mixture is owned by surface count Votes with large weights (static word trigram w 591, bigram w 84, Agree 37,
+HBack 37); meaning pieces enter as lifts with small strengths (0.08-0.40) -- when they favour the answer far more than
+the final distribution does (sword: SlotTopic P 0.00472 vs final 0.000211; ship: AssocHead P 0.00268 vs final
+0.000264), their log factor on the answer is +0.036 / -0.012. No per-context trust: a global strength cannot say "here
+the topic is reliable".
+(2) Shortlist: ship and sword (both content words new to the passage) were outside it; their probability came only
+through the rest bucket / exact column.
+(3) Classes are syntactic and coarse: ship's class = house, world, room, door, country, land, war, city (share of ship
+inside it 0.0043); sword's = eyes, hand, face, head, hands, white, black, fire (0.0283 / 0.0033).
+(4) Associations are noisy: recent words listing ship in the second-order table: seamen, coast, haul, san, francisco,
+gas, maximum, boiler, forthwith, owners; raw PMI: 4 of 153 recent words list it at all.
+(5) Collinear pieces fight: lifts with negative strengths (count Vote on dictionary-placed left node -0.432, NodeTopic on
+the dictionary-placed left tree -1.026) cancel others.

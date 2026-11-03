@@ -1,0 +1,38 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+SP on sieve_sc_offer.json: fit static 7.2511; L4 alone 7.2463 (46 s)
+   SP1 l8 eta 0.05: fit 7.2480
+   SP1 l8 eta 0.1: fit 7.2466
+   SP1 l8 eta 0.2: fit 7.2463
+   SP1 l8 eta 0.4: fit 7.2497
+   SP1 l8+r4 eta 0.05: fit 7.2449
+   SP1 l8+r4 eta 0.1: fit 7.2438
+   SP1 l8+r4 eta 0.2: fit 7.2466
+   SP1 l8+r4 eta 0.4: fit 7.2583
+   SP1 l8+pos eta 0.05: fit 7.2476
+   SP1 l8+pos eta 0.1: fit 7.2471
+   SP1 l8+pos eta 0.2: fit 7.2499
+   SP1 l8+pos eta 0.4: fit 7.2611
+   SP1 l8+scene eta 0.05: fit 7.2478
+   SP1 l8+scene eta 0.1: fit 7.2473
+   SP1 l8+scene eta 0.2: fit 7.2498
+   SP1 l8+scene eta 0.4: fit 7.2602
+   SP1 l8+r4+pos+scene eta 0.05: fit 7.2445
+   SP1 l8+r4+pos+scene eta 0.1: fit 7.2462
+   SP1 l8+r4+pos+scene eta 0.2: fit 7.2563
+   SP1 l8+r4+pos+scene eta 0.4: fit 7.2860
+SP1 chosen l8+r4 eta 0.1: fit 7.2438 (grid 4.3 bits) (62 s)
+   SP2 eta_tau 0.0: fit 7.2438
+   SP2 eta_tau 0.002: fit 7.2457
+   SP2 eta_tau 0.01: fit 7.2579
+   SP2 eta_tau 0.05: fit 7.3252
+SP2 chosen eta_tau 0.0: fit 7.2438 (66 s)
+   SP3 eta_lift 0.0: fit 7.2438
+   SP3 eta_lift 0.001: fit 7.2435
+   SP3 eta_lift 0.005: fit 7.2424
+   SP3 eta_lift 0.02: fit 7.2401
+   SP3 eta_lift 0.05: fit 7.2386
+   SP3 eta_lift 0.1: fit 7.2386
+   SP3 eta_lift 0.2: fit 7.2416
+SP3 chosen eta_lift 0.05: fit 7.2386 (71 s)
+SP scored: scored_L4 7.5872; scored_SP1 7.5792; scored_SP2 7.5792; scored_SP3 7.5624 (112 s)

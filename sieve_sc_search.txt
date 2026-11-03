@@ -1,0 +1,12 @@
+eval full run 1: SC1 search eval full: 31 of 98 query chunks left (185 s) (233 s)
+eval full run 2: SC1 search eval full: 18 of 98 query chunks left (173 s) (227 s)
+eval full run 3: SC1 search eval full: 5 of 98 query chunks left (172 s) (221 s)
+eval full run 4: SC1 search eval full: 0 of 98 query chunks left (65 s) (114 s)
+fresh full run 1: SC1 search fresh full: 32 of 45 query chunks left (173 s) (226 s)
+fresh full run 2: SC1 search fresh full: 20 of 45 query chunks left (183 s) (232 s)
+fresh full run 3: SC1 search fresh full: 7 of 45 query chunks left (179 s) (228 s)
+fresh full run 4: SC1 search fresh full: 0 of 45 query chunks left (89 s) (129 s)
+DONE
+   + mix: Retrieve[64 nearest training contexts by syntax + passage topic profiles -> their next words]: fit 7.2511 bits/word (194 s)
+SC1: 1 accepted; fit 7.2511 bits/word (SR2 7.2610) (194 s)
+OFFERED

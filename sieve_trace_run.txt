@@ -1,0 +1,253 @@
+
+=== position 29327: ...the helpers the stablemen the machinists the brewers the coast seamen the varnishers and ? the confectioners the upholsterers the paper hangers and fresco painters the drug clerks the fitters and helpers the metal workers the boiler makers and iron [[ship]]
+final P(ship) = 0.000264 (11.89 bits); on the shortlist: False; rank None; unigram share 0.000120
+top words: and 0.196, ore 0.039, of 0.034, in 0.027, the 0.027, oxide 0.020, bar 0.018, was 0.016, iron 0.012, which 0.011, work 0.009, were 0.008
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.380  P=0.00139  w=36.705  Agree[left depth 8 x right depth 4]
+   0.333  P=0.00075  w=59.394  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.167  P=0.00060  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+   0.093  P=0.00032  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+   0.010  P=0.00009  w=14.669  NodeTopic[d-tree depth 6; last book]
+   0.003  P=0.00023  w=1.600  Vote[form(j-0) in last 1 & mfp(j-0) in last 1; next 1; w=1; static]
+   0.001  P=0.00014  w=0.893  Vote[form(j-0) in last 1; next 1; w=1; static]
+   0.000  P=0.00000  w=7.338  Vote[any anchor; next 5; w=1; w1000]
+lifts (log factor on the answer, strength x log(piece / base)):
+   +0.100  P=0.00013  be=1.570  NodeTopic[l-tree depth 4; last book]
+   +0.074  P=0.00013  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   -0.066  P=0.00013  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   -0.038  P=0.00003  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   -0.030  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   +0.030  P=0.00029  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+   -0.023  P=0.00012  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   -0.015  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.014  P=0.00020  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+   -0.012  P=0.00268  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   -0.011  P=0.00005  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   -0.011  P=0.00001  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   +0.011  P=0.00009  be=0.510  NodeTopic[y-tree depth 4; last book]
+   -0.010  P=0.00000  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   +0.008  P=0.00000  be=0.340  Register[last verb word in the sentence]
+   +0.007  P=0.00017  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+   -0.002  P=0.00005  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+class (dictionary-placed left node 8 = 22: house, world, room, door, country, land, war, city): shortlist mass on the class 0.0617; answer's share inside it 0.0043
+other classes of ship: scene node 5, hybrid node 14, WordNet file 6, uses 3,905
+recent words (last 500) listing ship as a partner, table raw PMI: 4 of 153: seamen 1.16, coast 0.50, owners 0.45, deemed 0.44
+recent words (last 500) listing ship as a partner, table svd: 11 of 153: seamen 1.15, coast 1.10, haul 0.85, san 0.69, francisco 0.68, gas 0.63, maximum 0.51, boiler 0.43, forthwith 0.41, owners 0.39
+
+=== position 108: ...escapes from accidents which threatened his mixed with mercy he terms them which made him feel that he was not utterly forsaken of god | twice he narrowly escaped drowning once in bedford ouse once in a creek of the [[sea]]
+final P(sea) = 0.006025 (7.37 bits); on the shortlist: True; rank 13; unigram share 0.000231
+top words: village 0.113, fields 0.069, cottage 0.065, creek 0.045, two 0.026, site 0.010, house 0.009, knowledge 0.009, white 0.007, river 0.007, first 0.006, most 0.006
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.652  P=0.00355  w=591.372  Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.133  P=0.01053  w=40.594  Vote[id(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static]
+   0.052  P=0.00201  w=83.768  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.043  P=0.00224  w=62.157  Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static]
+   0.027  P=0.00667  w=12.801  Vote[form(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static]
+   0.023  P=0.00204  w=36.705  Agree[left depth 8 x right depth 4]
+   0.023  P=0.00198  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+   0.016  P=0.00137  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+lifts (log factor on the answer, strength x log(piece / base)):
+   +0.794  P=0.00455  be=0.340  Register[last verb word in the sentence]
+   -0.322  P=0.00074  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   -0.278  P=0.00000  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+   +0.264  P=0.00152  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   +0.233  P=0.00334  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   +0.181  P=0.00126  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   -0.137  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   +0.137  P=0.00250  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   +0.088  P=0.00094  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   +0.068  P=0.00025  be=1.570  NodeTopic[l-tree depth 4; last book]
+   -0.056  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   +0.047  P=0.00031  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+   +0.040  P=0.00029  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+   -0.039  P=0.00025  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   +0.015  P=0.00028  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+   +0.015  P=0.00025  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   -0.004  P=0.00023  be=0.510  NodeTopic[y-tree depth 4; last book]
+class (dictionary-placed left node 8 = 33: light, air, water, sea, earth, ground, sun, wind): shortlist mass on the class 0.0950; answer's share inside it 0.0634
+other classes of sea: scene node 1, hybrid node 18, WordNet file 17, uses 7,511
+recent words (last 500) listing sea as a partner, table raw PMI: 0 of 39: 
+recent words (last 500) listing sea as a partner, table svd: 6 of 39: drowning 0.44, creek 0.41, brooks 0.37, fields 0.35, escapes 0.22, site 0.22
+
+=== position 10085: ...reviews high in quality dignity and restraint they possess countless daily and weekly papers which circulate throughout the land and single papers which have subscribers by the hundreds of thousands and they literally swamp the working classes in a vast [[sea]]
+final P(sea) = 0.001285 (9.60 bits); on the shortlist: True; rank 81; unigram share 0.000231
+top words: number 0.101, and 0.049, class 0.044, amount 0.029, deal 0.026, of 0.016, army 0.015, quantity 0.014, population 0.011, expanse 0.010, country 0.009, states 0.008
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.257  P=0.00315  w=52.628  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.187  P=0.00159  w=76.170  Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.156  P=0.00275  w=36.705  Agree[left depth 8 x right depth 4]
+   0.132  P=0.00228  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+   0.100  P=0.00411  w=15.634  Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static]
+   0.097  P=0.00162  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+   0.029  P=0.00159  w=11.601  Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static]
+   0.017  P=0.00049  w=23.194  Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+lifts (log factor on the answer, strength x log(piece / base)):
+   -0.236  P=0.00000  be=0.340  Register[last verb word in the sentence]
+   +0.210  P=0.00158  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   +0.152  P=0.00044  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+   +0.149  P=0.00297  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   -0.137  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   +0.136  P=0.00129  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   -0.127  P=0.00039  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   +0.110  P=0.00037  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   -0.109  P=0.00020  be=1.570  NodeTopic[l-tree depth 4; last book]
+   -0.098  P=0.00011  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+   +0.097  P=0.00060  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+   +0.080  P=0.00085  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   -0.072  P=0.00017  be=0.510  NodeTopic[y-tree depth 4; last book]
+   +0.069  P=0.00020  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   +0.066  P=0.00041  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   -0.056  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   +0.047  P=0.00031  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+class (dictionary-placed left node 8 = 33: light, air, water, sea, earth, ground, sun, wind): shortlist mass on the class 0.0276; answer's share inside it 0.0465
+other classes of sea: scene node 1, hybrid node 18, WordNet file 17, uses 7,511
+recent words (last 500) listing sea as a partner, table raw PMI: 3 of 150: land 0.96, vast 0.20, crush 0.11
+recent words (last 500) listing sea as a partner, table svd: 10 of 150: land 0.75, vast 0.64, countless 0.59, above 0.44, cast 0.32, grows 0.30, marseilles 0.29, fold 0.29, hundreds 0.27, swamp 0.24
+
+=== position 10849: ...formed international unions the socialists a international organization and on all sides space and race are bridged in the effort to achieve solidarity | resolutions of sympathy and fully as important donations of money pass back and forth across the [[sea]]
+final P(sea) = 0.023354 (5.42 bits); on the shortlist: True; rank 4; unigram share 0.000231
+top words: street 0.029, room 0.026, river 0.025, sea 0.023, road 0.022, table 0.020, class 0.018, hall 0.014, common 0.012, country 0.012, world 0.009, effort 0.009
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.755  P=0.01828  w=274.687  Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.052  P=0.01485  w=23.194  Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.051  P=0.00830  w=40.594  Vote[id(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static]
+   0.043  P=0.00581  w=49.312  Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static]
+   0.028  P=0.00482  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+   0.025  P=0.00201  w=83.768  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.011  P=0.00204  w=36.705  Agree[left depth 8 x right depth 4]
+   0.011  P=0.00198  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+lifts (log factor on the answer, strength x log(piece / base)):
+   +0.634  P=0.01111  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   +0.421  P=0.00155  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+   +0.400  P=0.01515  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   -0.322  P=0.00074  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   +0.217  P=0.00753  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   +0.150  P=0.00049  be=0.340  Register[last verb word in the sentence]
+   -0.137  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   -0.127  P=0.00009  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+   -0.088  P=0.00021  be=1.570  NodeTopic[l-tree depth 4; last book]
+   +0.088  P=0.00094  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   +0.086  P=0.00058  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   -0.078  P=0.00017  be=0.510  NodeTopic[y-tree depth 4; last book]
+   +0.057  P=0.00021  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   -0.056  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.051  P=0.00040  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   +0.049  P=0.00029  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   +0.000  P=0.00000  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+class (dictionary-placed left node 8 = 33: light, air, water, sea, earth, ground, sun, wind): shortlist mass on the class 0.0683; answer's share inside it 0.3420
+other classes of sea: scene node 1, hybrid node 18, WordNet file 17, uses 7,511
+recent words (last 500) listing sea as a partner, table raw PMI: 2 of 153: international 0.40, sheer 0.11
+recent words (last 500) listing sea as a partner, table svd: 13 of 153: beneath 0.45, across 0.45, glimmering 0.45, sides 0.41, tireless 0.40, sheer 0.38, forth 0.33, midst 0.27, idly 0.24, fray 0.24
+
+=== position 21840: ...labor trouble but the masters and men are alike suffering from sheer lack of employment | markets which were once theirs are now american | it would seem that the unfortunate british laborer is twixt the devil and the deep [[sea]]
+final P(sea) = 0.016252 (5.94 bits); on the shortlist: True; rank 5; unigram share 0.000231
+top words: and 0.100, in 0.051, of 0.026, blue 0.019, sea 0.016, the 0.015, into 0.010, is 0.010, it 0.009, to 0.007, that 0.007, time 0.007
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.533  P=0.03027  w=105.238  Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.163  P=0.02400  w=40.594  Vote[id(j-0) in last 1 & id(j-2) in last 1; next 1; w=1; static]
+   0.060  P=0.00548  w=65.888  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.059  P=0.03027  w=11.601  Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static]
+   0.050  P=0.01337  w=22.366  Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static]
+   0.037  P=0.00571  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+   0.029  P=0.00469  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+   0.023  P=0.00379  w=36.705  Agree[left depth 8 x right depth 4]
+lifts (log factor on the answer, strength x log(piece / base)):
+   -0.499  P=0.00124  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   +0.441  P=0.00146  be=0.340  Register[last verb word in the sentence]
+   +0.438  P=0.02130  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   -0.234  P=0.00000  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+   +0.210  P=0.00157  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   -0.137  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   +0.101  P=0.00041  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+   +0.097  P=0.00060  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+   -0.077  P=0.00017  be=0.510  NodeTopic[y-tree depth 4; last book]
+   -0.056  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   +0.033  P=0.00032  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   +0.029  P=0.00040  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   +0.020  P=0.00025  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   +0.010  P=0.00023  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   -0.009  P=0.00018  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   -0.008  P=0.00023  be=1.570  NodeTopic[l-tree depth 4; last book]
+   +0.000  P=0.00000  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+class (dictionary-placed left node 8 = 33: light, air, water, sea, earth, ground, sun, wind): shortlist mass on the class 0.0510; answer's share inside it 0.3188
+other classes of sea: scene node 1, hybrid node 18, WordNet file 17, uses 7,511
+recent words (last 500) listing sea as a partner, table raw PMI: 1 of 135: sheer 0.11
+recent words (last 500) listing sea as a partner, table svd: 13 of 135: swiftly 0.49, deep 0.48, twixt 0.46, sheer 0.38, rise 0.37, british 0.32, steadily 0.30, towns 0.29, passage 0.28, flies 0.28
+
+=== position 31139: ...that spells right | every society has been ruled by classes and the classes have ruled by sheer strength and have been overthrown by sheer strength | the bourgeoisie because it was the stronger dragged down the nobility of the [[sword]]
+final P(sword) = 0.000211 (12.21 bits); on the shortlist: False; rank None; unigram share 0.000083
+top words: world 0.030, united 0.025, bourgeoisie 0.017, law 0.012, great 0.012, department 0.012, nobility 0.011, eighteenth 0.010, same 0.008, country 0.008, state 0.008, people 0.007
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.655  P=0.00033  w=591.372  Vote[id(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.100  P=0.00036  w=83.768  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.071  P=0.00035  w=62.157  Vote[id(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static]
+   0.045  P=0.00036  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+   0.040  P=0.00033  w=36.705  Agree[left depth 8 x right depth 4]
+   0.031  P=0.00041  w=23.194  Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.025  P=0.00020  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+   0.013  P=0.00033  w=11.601  Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static]
+lifts (log factor on the answer, strength x log(piece / base)):
+   +0.092  P=0.00009  be=1.570  NodeTopic[l-tree depth 4; last book]
+   -0.081  P=0.00029  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   -0.060  P=0.00009  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   -0.056  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.052  P=0.00031  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   -0.048  P=0.00029  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   +0.041  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   +0.036  P=0.00472  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+   +0.034  P=0.00034  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   -0.026  P=0.00007  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   +0.017  P=0.00008  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+   +0.014  P=0.00014  be=0.340  Register[last verb word in the sentence]
+   +0.013  P=0.00031  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   +0.007  P=0.00023  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   +0.007  P=0.00009  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+   +0.007  P=0.00006  be=0.510  NodeTopic[y-tree depth 4; last book]
+   +0.000  P=0.00000  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+class (dictionary-placed left node 8 = 21: eyes, hand, face, head, hands, white, black, fire): shortlist mass on the class 0.0075; answer's share inside it 0.0283
+other classes of sword: scene node 5, hybrid node 14, WordNet file 6, uses 2,710
+recent words (last 500) listing sword as a partner, table raw PMI: 5 of 137: steel 1.49, fought 1.04, draw 0.92, cut 0.80, ay 0.45
+recent words (last 500) listing sword as a partner, table svd: 4 of 137: steel 0.98, overthrown 0.67, shorn 0.54, draws 0.40
+
+=== position 35249: ...words express which when she saw had no effect but still i pleaded honour and nearness of blood to my uncle then came the storm i feared at first for starting from my like a fury she flew to my [[sword]]
+final P(sword) = 0.000168 (12.54 bits); on the shortlist: False; rank None; unigram share 0.000083
+top words: uncle 0.107, dear 0.072, like 0.043, fury 0.036, father 0.031, own 0.027, mind 0.018, husband 0.018, heart 0.018, side 0.012, friend 0.011, mother 0.011
+members (share of the mixture's mass on the answer, P(answer) the piece states, weight):
+   0.386  P=0.00089  w=78.768  Vote[id(j-0) in last 1; next 1; w=1; static]
+   0.215  P=0.00106  w=36.705  Agree[left depth 8 x right depth 4]
+   0.176  P=0.00085  w=37.470  HBack[t-1; depths [4, 8, 12, 0]]
+   0.100  P=0.00047  w=38.726  Descend[id(t-1) & id(t-2) -> class of next word at depth 8 of the left tree]
+   0.047  P=0.00073  w=11.601  Vote[id(j-0) in last 1 & mff(j-1) in last 1; next 1; w=1; static]
+   0.030  P=0.00024  w=23.194  Vote[form(j-0) in last 1 & id(j-1) in last 1; next 1; w=1; static]
+   0.022  P=0.00049  w=8.412  Register[last noun word in the sentence]
+   0.007  P=0.00024  w=5.726  Vote[form(j-0) in last 1 & form(j-1) in last 1; next 1; w=1; static]
+lifts (log factor on the answer, strength x log(piece / base)):
+   -0.092  P=0.00029  be=-0.432  Vote[hlw8(j-0) in last 1; next 1; w=1; static]
+   -0.055  P=0.00038  be=0.154  AssocHead[slot t-1 left node 4 attends to wlex classes in the last 50 -> their associations; table svd]
+   +0.050  P=0.00000  be=-0.072  SlotHead[slot t-1 left node 4 -> last hl4 class within 50 -> read next]
+   +0.047  P=0.00013  be=0.164  SlotTopic[t-1 left node 8 -> hlw8 class; inside it triggers of the last 500]
+   +0.045  P=0.00004  be=1.570  NodeTopic[l-tree depth 4; last book]
+   -0.031  P=0.00004  be=-1.026  NodeTopic[lw-tree depth 4; last book]
+   +0.024  P=0.00010  be=0.431  NodeTopic[s-tree depth 5; last 200]
+   +0.022  P=0.00000  be=0.081  NodeMatch[the longest matching context as left nodes depth 13; last 50,000]
+   +0.019  P=0.00021  be=0.095  SentenceState[position bucket & right classes seen (depth 3) & t-1 left node 4]
+   +0.017  P=0.00005  be=0.510  NodeTopic[y-tree depth 4; last book]
+   +0.015  P=0.00007  be=0.114  HBack[t-1+t-2; depths [4, 8, 12, 0]]
+   -0.014  P=0.00077  be=0.077  Bilinear[labeled graded ontology, 309 axes]
+   +0.007  P=0.00050  be=0.340  Register[last verb word in the sentence]
+   +0.007  P=0.00010  be=0.313  Register[last left node 1 (depth 2) word in the sentence]
+   +0.006  P=0.00000  be=0.198  Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]
+   +0.006  P=0.00000  be=0.197  Vote[hl4c(j-0) in last 1; next 1; w=1; book]
+   +0.004  P=0.00005  be=0.402  Register[last left node 3 (depth 2) word in the sentence]
+   +0.000  P=0.00005  be=0.338  NodeTopic[l-tree depth 10; last 1000]
+class (dictionary-placed left node 8 = 21: eyes, hand, face, head, hands, white, black, fire): shortlist mass on the class 0.0516; answer's share inside it 0.0033
+other classes of sword: scene node 5, hybrid node 14, WordNet file 6, uses 2,710
+recent words (last 500) listing sword as a partner, table raw PMI: 1 of 139: flew 0.41
+recent words (last 500) listing sword as a partner, table svd: 2 of 139: fury 0.78, lightning 0.58
+TRACED
