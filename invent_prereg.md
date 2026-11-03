@@ -85,7 +85,10 @@ base 7.8486 [7.7811-7.9161], fresh 7.8679; hand (SO offers) 7.7191 [7.6517-7.786
   simplest-first order found nearly everything; random proposals and mutations found nothing in 3 runs.
 - Fresh books agree with the 50,114 positions in order and roughly in size (base 7.8679, hand 7.7408, search 7.6796):
   no sign that the reused scoring set flatters the hand-built program.
-Kernel a (seed 0): pending (scoring run).
+**Kernel a (seed 0), same scoring:** search a 7.6689 [7.5992-7.7377], fresh 7.6931 (base and hand as above). Below
+the hand program on both scorings (PASS A), inside the hand program's interval. By word kind (hand / search a): content
+words 14.440 / 14.533, repeats 6.362 / 6.281, function words 7.724 / 7.735. Same picture as b: the gain is on repeats,
+the content-word bucket does not move. Two seeds, both below the hand-built program after 3 runs each.
 
 Caveats named: the 1,000-position screen rejects diffuse pieces (SH2's tree Votes were rejected on 9,000); ctxsim's
 static anchor cap (20,000) truncates frequent previous words; the net is not re-scored on fresh books (it trained on
