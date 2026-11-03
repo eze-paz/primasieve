@@ -1,0 +1,15 @@
+   built Register[last left node 0 (depth 2) word in the sentence]: 7 s
+   built Register[last left node 0 (depth 2) word in the sentence & t-1 left node 4]: 11 s
+   built Register[last left node 1 (depth 2) word in the sentence]: 8 s
+   built Register[last left node 1 (depth 2) word in the sentence & t-1 left node 4]: 12 s
+   built Register[last left node 2 (depth 2) word in the sentence]: 9 s
+   built Register[last left node 2 (depth 2) word in the sentence & t-1 left node 4]: 8 s
+   built Register[last left node 3 (depth 2) word in the sentence]: 6 s
+   built Register[last left node 3 (depth 2) word in the sentence & t-1 left node 4]: 6 s
+   built Register[last noun word in the sentence]: 7 s
+   built Register[last noun word in the sentence & t-1 left node 4]: 9 s
+   built Register[last verb word in the sentence]: 7 s
+   built Register[last verb word in the sentence & t-1 left node 4]: 8 s
+   + lift: Register[last verb word in the sentence]: fit 7.3007 bits/word (230 s)
+   + lift: Register[last left node 3 (depth 2) word in the sentence]: fit 7.2928 bits/word (283 s)
+L5: 1 accepted; fit 7.2928 bits/word (12 candidates; SD2 7.3277) (283 s)

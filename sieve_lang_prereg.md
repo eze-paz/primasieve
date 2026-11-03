@@ -995,3 +995,45 @@ of t-1, NodeTopic[hybrid tree depth 4; this book]; fit 7.3447 -> 7.3277; scored 
 online stack (same settings chosen) 7.6078 -- best. D: function 4.7984, content 10.6533, words 1-10 7.4952, 11+ 7.7041,
 repeats 6.2572, first use 13.9287, D2 4.4966 / top-1 0.4239, D3 0.8194. Bars: accepted PASS; < 7.6154 PASS; content and
 first-use bits fall PASS (small; most of the gain is on function words).
+
+## SE block (2026-11-03): owner "close all pending ideas now. test all"
+L3 / L5 / L9 as registered in the SL block; written here before their scores were read (L5's offer had started).
+Reference: SD2 program, static 7.6785, with the online stack 7.6078.
+SE1 fit30 re-check: the SD2 program's 41 pieces built on the 30,000 fit positions; backward elimination (each round:
+the 6 removals cheapest without refit are refitted; the one saving the most bits -- description bits minus fit-bit
+loss -- is made; until none pays); scored. Bar: scored < 7.6785 (the 3 lifts that hurt held-out get removed).
+L5 node registers (kind "reg"): the last word of class c in the sentence before t-1, c = each left-tree node at depth 2
+(4) and the dictionary's noun / verb sets; alone or with t-1's left node depth 4 (12 pieces). Bar: accepted, scored <
+7.6785, words-11+ bits fall (7.7041).
+L3 test-time re-placement (kind "l3"): every 1,000 tokens of a book, words used >= 3 times so far move to the
+dictionary-placed left-tree node (depth 8) their in-book neighbours favour (training class-bigram log-likelihood,
+past only); B = 0 / 4 / 16 / 64 moves per update; applied to the SD2 lift keyed by that node of t-1 (B=0 = that lift);
+refitted on fit9, scored. Leaf splitting not built. Bar: bits fall with B.
+L9c referent hypotheses: "the entity in focus is e" for each entity (word outside WordNet and the 300 most frequent) in
+the last 200 tokens; same scoring / mixture as L9; alpha x R grid on fit9 at B=4; B 0 / 1 / 4 / 16 / 64 scored. Speaker
+hypotheses: not testable (the corpus has no quote marks or capitals) -- stated. Bar: bits fall with B.
+SE5 generated text: the SD2 program continues held-out passages by sampling (no bar; samples recorded verbatim in
+sieve_gen_samples.json).
+**SE results.**
+SE1 fit30 re-check -- FAIL. A refit on 30,000 positions exceeds the 5-minute cap, so removals were scored without refit
+(a lower bound on each saving); a first run removed the wrong weights (th / ga / gact carry the base at index 0) and was
+discarded. Fixed run: SD2 on fit30 7.3042; 11 members removed (book / static form and mff Votes), no lift; refitted on
+fit9 7.3356; scored 7.6865 (SD2 7.6785). The three lifts that hurt held-out in the ablation are not removed by fit30
+MDL. SD2 kept.
+L5 node registers -- PASS. Four passes; accepted (in order): lift Register[last verb], lift Register[last left node 3],
+lift Register[last left node 2 & t-1 left node 4], lift Register[last left node 1], member Register[last noun]; a fifth
+pass accepts nothing. Fit 7.3277 -> 7.2749; scored static 7.6381 (SD2 7.6785); with the online stack (SP1 l8+r4 eta
+0.1, SP2 off, SP3 eta 0.1) 7.5767 -- best. D: function 4.7586, content 10.6316, words 1-10 7.4728, 11+ 7.6655 (SD2
+7.7041), repeats 6.2281, first use 13.8880, D2 4.5106 / top-1 0.4268, D3 0.8289. Bars: accepted PASS; < 7.6785 PASS;
+words 11+ fall PASS.
+L3 test-time re-placement -- FAIL. B=0 reproduces the SD2 lift (max |D diff| 2.4e-4; scored 7.6783, fit 7.3268);
+B=4: fit 7.3321, scored 7.6821; B=16: 7.3334, 7.6826; B=64: 7.3339, 7.6830. Bits rise with budget: in-book class-bigram
+evidence moves words to worse nodes for this piece.
+L9c referent hypotheses -- FAIL. 2.5 entities tracked per position; the answer is a tracked entity at 0.0060 of fit
+positions. Chosen alpha 2, R 20 (fit 7.3277 -> 7.3265 at B=4). Scored: B=0 7.6785; B=1 7.6792; B=4 7.6786; B=16
+7.6785; B=64 7.6785. Speaker hypotheses not testable (no quote marks in the corpus).
+SE5 generated text (L5 program, static, 9 words x 6 held-out passages, seed 0), verbatim in sieve_gen_samples.json:
+e.g. after a socialist-economics passage "in one of these gold dios which as andrew"; after a play's dialogue "lord
+touch the sorry mr | nay but be". Local word pairs and the book's vocabulary and register (names, dialogue forms) carry
+over; no sentence is grammatical beyond 3-4 words; no thread of meaning.
+Still open (not testable here): fresh-book test (needs new text, excluded); L3 leaf splitting (not built).

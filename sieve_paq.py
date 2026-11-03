@@ -51,7 +51,7 @@ def run(data, SEL, pb, sels, eta, eta_t=0.0, eta_b=0.0, keep=None):
         if eta_b: bo[cb] -= eta_b * (-lgl[:, a] + lgl @ p0)
     return (bits, kept) if keep is not None else bits
 def main():
-    stf = argv[1] if len(argv) > 1 else "sieve_l7_offer.json"; import sieve_l1 as L1, sieve_l2 as L2, sieve_dict as SDi; L1.install(); L2.install(); SDi.install(); OL.O.setup_attrs(); load_trees(); import sieve_dict2 as SD2; SD2.load(F); ST = json.load(open(os.path.join(F.HERE, stf))); out = {}
+    stf = argv[1] if len(argv) > 1 else "sieve_l7_offer.json"; import sieve_l1 as L1, sieve_l2 as L2, sieve_dict as SDi; L1.install(); L2.install(); SDi.install(); OL.O.setup_attrs(); load_trees(); import sieve_dict2 as SD2; SD2.load(F); import sieve_l5 as L5; L5.install(); ST = json.load(open(os.path.join(F.HERE, stf))); out = {}
     def prep(cx):
         d = OL.arrays(cx, ST); Du, _, _ = P.base(cx); d["LL"] = finite(lifts(cx, ST, Du)); SEL, pb = selectors(cx); return d, SEL, pb
     fd, fs, fp = prep("fit9"); b0 = run(fd, fs, fp, [], 0.0).mean(); F.log(f"SP on {stf}: fit static {b0:.4f}; L4 alone {run(fd, fs, fp, ['l8'], 0.2).mean():.4f}")

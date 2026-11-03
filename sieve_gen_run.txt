@@ -1,0 +1,17 @@
+weight terms (distinct behaviours, size <= 5): 15: ['1', 'd', '(1+d)', '(1/d)', '(d*d)', '(1+(1+d))', '(1/(1+d))', '(1+(1/d))', '(1+(d*d))', '(1/(d*d))', '(d+(1+d))', '(d*(1+d))', '(d/(1+d))', '(d+(1/d))', '(d*(d*d))'] (0 s)
+trust terms valid in [0,1]: 20: ['1', '(1/n)', '(1/T)', '(T/n)', '(1/(1+1))', '(1/(1+n))', '(1/(1+T))', '(1/(n+n))', '(1/(n*n))', '(1/(n+T))', '(1/(n*T))', '(1/(T+T))', '(1/(T*T))', '(n/(1+n))', '(n/(n+T))', '(T/(1+n))', '(T/(1+T))', '(T/(n+n))', '(T/(n*n))', '(T/(n+T))'] (0 s)
+   step 1: 28 s
+   step 2: 51 s
+   step 3: 69 s
+   step 4: 88 s
+   step 5: 106 s
+   step 6: 124 s
+   step 7: 142 s
+   step 8: 163 s
+   step 9: 181 s
+SE5 sample 1: ...but ambiguous there is still time in the united states to head off the socialistic programme which unrestrained is sure to wreck our country | >> two leagues away and deceived by a investigation had (252 s)
+SE5 sample 2: ...flanked by the great american scab has nothing left but to join with the scab and play the historic labor role of armed pinkerton | >> in one of these gold dios which as andrew (252 s)
+SE5 sample 3: ...| and so through the economic process the socialist preaches the ripening of the capitalistic society and the coming of the new cooperative society | >> the diet tenet as a diet tenet whereas the (252 s)
+SE5 sample 4: ...yielding minute and was blest | how i have loved you since words have not shown then how should words express | lady touch | >> the the soul which once more i had to (252 s)
+SE5 sample 5: ...touch | sorry for what | death you rack me with delay | lady touch | nay no great matter i have your promise | >> lord touch the sorry mr | nay but be (252 s)
+SE5 sample 6: ...my honour | whither is it going | i protest you have given me the palpitation of the heart | can you be so | >> ends the i chatterer you any my time to (252 s)

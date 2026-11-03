@@ -1,0 +1,2 @@
+L3 check: B=0 equals the SD2 piece: max |D diff| 2.44e-04 (37 s)
+L3 B=4: fit 7.3321, scored 7.6821 bits/word static (94 s) (131 s)
