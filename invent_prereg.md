@@ -66,6 +66,27 @@ Scored on the 50,114 positions (and fresh), all under SZ_FRESH=10 so that every 
   bits on the lever-1 bucket "content word never in book" before / after (the number ctxsim exists to move).
 - Descriptive, no bar: the fresh scoring of base / hand / search beside the 50,114 scoring (does the 50,114 set, reused
   for every idea since SP, flatter the hand-built program?).
+## Results (2026-11-03; kaggle_invent/results_<tag>/, sieve_invent_report.py)
+Budget actually used: the owner stopped the long run; each kernel did 3 search runs (about 280 proposals screened per
+run, 1,800 in all per kernel; v1 died of a full output disk after run 3-4, v2 resumed from the saved state, v3 = scoring
+only). So this is 3 x 4 = about 12 laptop-runs of budget per kernel, not the 20x pre-registered; the bars are judged on
+what was found anyway.
+**Kernel b (seed 1), scored under SZ_FRESH=10, bits/word, paragraph-bootstrap 95% intervals on the 50,114 positions:**
+base 7.8486 [7.7811-7.9161], fresh 7.8679; hand (SO offers) 7.7191 [7.6517-7.7868], fresh 7.7408; search b 7.6450
+[7.5776-7.7123], fresh 7.6796. Beside: previous Sieve best L4+L7 7.6727 (full library), net 7.4423, Stack 8.1507.
+- **PASS A:** the search alone is below the hand-offered program on both scorings, and below the hand program's
+  interval. The program: 32 Votes, 7 lifts; kinds vote 31, ctxsim 3, nodecache 2, descend 1, agree 1, spell 1.
+- **PASS B (with a caveat):** three CtxSim pieces accepted (8-word tok static as lift, run 1 levin; 8-word book, run 2;
+  5-word both static as mix, run 3). Caveat, the descriptive number the prereg asked for: the lever-1 bucket "content
+  word never in book" did NOT move -- base 14.619, hand 14.440, search 14.442 (net 12.841). The search's gain over the
+  hand program is on repeats in book (6.362 -> 6.278) and function words (7.724 -> 7.514). So CtxSim as accepted is
+  not yet doing what it was built for; its drop-one ablation is still owed, and the net's content-word margin stands.
+- Strategies: levin 9 accepted of 113, neigh 2 of 52, cross 1 of 1, prior 0 of 407, mutate 0 of 417. The enumerated
+  simplest-first order found nearly everything; random proposals and mutations found nothing in 3 runs.
+- Fresh books agree with the 50,114 positions in order and roughly in size (base 7.8679, hand 7.7408, search 7.6796):
+  no sign that the reused scoring set flatters the hand-built program.
+Kernel a (seed 0): pending (scoring run).
+
 Caveats named: the 1,000-position screen rejects diffuse pieces (SH2's tree Votes were rejected on 9,000); ctxsim's
 static anchor cap (20,000) truncates frequent previous words; the net is not re-scored on fresh books (it trained on
 the full library, including those 10).
