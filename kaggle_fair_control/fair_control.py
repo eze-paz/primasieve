@@ -9,7 +9,8 @@ for i, a in enumerate(_av):
     if a.startswith("--"): A[a.split("=")[0]] = a.split("=", 1)[1] if "=" in a else (_av[i + 1] if i + 1 < len(_av) and not _av[i + 1].startswith("--") else True)
 def arg(k, d): return A.get("--" + k, d)
 SIZE = arg("size", "S"); TINY = "--tiny" in A
-DATA = arg("data", next((p for p in glob.glob("/kaggle/input/*") if os.path.exists(os.path.join(p, "lx_tokens.npz"))), "."))
+DATA = arg("data", next((os.path.dirname(p) for p in glob.glob("/kaggle/input/**/lx_tokens.npz", recursive=True)), "."))   # Kaggle mounts under /kaggle/input/datasets/<owner>/<slug>/
+if not os.path.exists(os.path.join(DATA, "lx_tokens.npz")): print("input tree:", glob.glob("/kaggle/input/**", recursive=True)[:50]); sys.exit(3)
 OUT = arg("out", "/kaggle/working" if os.path.isdir("/kaggle/working") else ".")
 CFG = {"S": dict(d=256, L=6, H=4, ff=1024), "XS": dict(d=128, L=4, H=4, ff=512)}[SIZE]
 CTX, STRIDE, BATCH, MICRO, EPOCHS, LR, WARM, DROP, WD = 512, 256, 32, 4, 6, 6e-4, 300, 0.1, 0.1

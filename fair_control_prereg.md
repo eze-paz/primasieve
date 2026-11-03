@@ -36,9 +36,9 @@ bootstrap (2,000 resamples, seed 0, the ST1 recipe) and the profile by word kind
 against Sieve's L4 bits.
 
 ## Bars, written before running
-Scoreboard today on the 50,114 positions: Sieve 7.6768 (L4 online), hand-built 7.7205, Stack 8.1507, Counter 8.9368,
-LM 6.026. Paragraph-bootstrap half-width about 0.07.
-- **PASS (potential shown):** S scores above Sieve 7.6768 and Sieve's mean lies outside S's 95% interval. Claim: a
+Scoreboard today on the 50,114 positions: Sieve 7.6727 (L4 + L7, commit 3e813422; L4 alone 7.6768), hand-built 7.7205,
+Stack 8.1507, Counter 8.9368, LM 6.026. Paragraph-bootstrap half-width about 0.07. "Sieve" below = 7.6727.
+- **PASS (potential shown):** S scores above Sieve 7.6727 and Sieve's mean lies outside S's 95% interval. Claim: a
   derived program out-compresses a trained network at equal data and far less compute.
 - **KILL:** S scores below Sieve and S's mean lies outside Sieve's interval. Then counting + search is the wrong
   substrate for raw text; the remaining Sieve use on language is the hybrid (Sieve-derived features into a net).
