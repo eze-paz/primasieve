@@ -1,0 +1,41 @@
+     0: right, better, true, full, dead, hard, close, clear
+     4: help, call, turn, show, hold, play, bear, watch
+     8: father, mother, friend, wife, son, brother, daughter, master
+    12: death, silence, beauty, tears, joy, pain, surprise, grace
+    16: it, suddhoo, flopit, descartes, modestine, otkell, paracelsus, tolstoi
+    20: gold, paper, wine, smoke, fish, bread, tea, steel
+    24: more, very, most, rather, less, pretty, somewhat, perfectly
+    28: being, having, half, becoming, newly, partially, freshly, gorgeously
+    32: than, exaggerates, deciphered, sizzling, betoken, edified, denounces, bemoaned
+    36: not, infallibly, conceivably, lacquered, tabulated, carolling, extirpated, fringing
+    40: been, become, lain, apportioned, priced, wields, taxing, supplementing
+    44: the, messire, yon, ze, woodbine, polk, yuba, covent
+    48: looking, coming, standing, waiting, sitting, talking, turning, speaking
+    52: did, does, nil, heeds, recked, sayeth, seeketh
+    56: who, bryond
+    60: were, are, re, aint, wor
+    64: nothing, something, anything, everything, none, anybody, somebody, anyone
+    68: blood, trees, horses, steps, flowers, houses, heads, faces
+    72: which, whom, osgood, whomsoever, whilk, hereinafter, mongrober, pistole
+    77: room, door, ground, table, road, window, river, wall
+    81: so, too, immensely, physically, morally, outwardly, sith, unnecessarily
+    85: love, hope, use, care, fear, answer, doubt, need
+    89: life, mind, heart, name, soul, age, position, youth
+    93: for, after, without, excepting, involving, viz, gainst, barring
+    97: little, great, small, certain, large, big, fine, sudden
+   103: on, from, into, upon, through, against, between, among
+   107: is, becomes, requires, proves, implies, mattered, constitutes, involves
+   111: they, we
+   115: good, strong, strange, beautiful, happy, fair, bad, sweet
+   119: that, whatever, whatsoever, whichever, thet
+   123: case, state, letter, point, manner, question, story, book
+   127: out, instead, ahead, rid, consisted, upwards, alongside, consisting
+   131: enough, sure, ready, possible, glad, afraid, necessary, easy
+   135: tom, nobody, everybody, dick, paul, billy, jane, harry
+   139: you, ye, yuh, yeh, septimus, ee, polyeucte, lenin
+   143: got, put, set, brought, held, read, carried, laid
+   147: know, think, want, believe, mean, wish, suppose, guess
+   151: friends, thoughts, clothes, ideas, affairs, feelings, hearts, sons
+   155: her, thine, yer
+   159: work, bed, form, change, cause, sleep, force, fight
+   ship level 1: house, country, land, city, town, family, street, church, company, court

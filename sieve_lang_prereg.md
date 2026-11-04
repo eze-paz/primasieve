@@ -1436,3 +1436,45 @@ Held-out content answers (24,097): taxonomy level 1 (102 incl. boundary / unknow
 top-1 at 0.1161, in its top 5 at 0.2935; bits: category 6.0463 + word inside 4.6909. Level 2 (2,219): top-1 0.0882, top 5
 0.1917; category 8.7256 + word 2.0117. Level 3 leaves (3,959): top-1 0.0871, top 5 0.1887; category 9.2014 + word 1.5358
 (total 10.7372 at every level). The cost is in choosing the category, not the word inside it.
+
+## TC block (2026-11-04): training the category system (owner: "focus on training the category system") -- registered before any run
+Measured motive: on held-out content words the right top-level category is Sieve's first pick at 0.1161 and naming it
+costs 6.0463 bits (TX program); the word inside a leaf costs 1.5358.
+TC1 / TC2 exchange training: categories re-assigned to maximise the class-bigram likelihood of training + library text
+(32,446,004 tokens) -- sum over category pairs of N(c1, c2) log N(c1, c2) minus 2 sum over categories N(c) log N(c) (Brown /
+exchange objective: how well a word's category predicts the next word's category). Start: the taxonomy (TC1: level 1,
+100 categories + boundary / unknown fixed; TC2: level 2, 2,219 groups). Each pass visits the words with >= 20 uses in
+order of frequency and moves each to the category with the largest exact gain (TC1: all categories; TC2: the 200
+categories its neighbours fall in most); words with < 20 uses stay where the taxonomy put them. Passes until < 1% of the
+words move or 6 passes; deterministic; resumable. Reported: objective per pass, words moved, names (3 most frequent
+words), ship / boat / sea / sword placements, and sieve_tdec.py's top-1 / bits measure on the trained levels.
+Offered on the TX program: Descend (t-1 word -> next word's trained category), category n-gram Descend (t-1 and t-2
+trained categories -> next category), NodeTopic on the trained levels (last 200 / book). Bars: category top-1 rises above
+0.1161 (level 1); a piece accepted; content-word bits < 10.6323; online < 7.5502.
+TC amendment (owner, after TC1 pass 1, before any later step): "the optimization objective is the categories" -- it is
+(the exchange objective is next-category predictability); and "the system determines when new categories should be
+added": TC1s -- after the TC1 passes settle, each category with >= 2 movable words is tried as a split: its words are
+divided by 2-means on their (left, right) neighbour-category profiles and re-exchanged between the two halves (3 rounds);
+the split is kept if the objective gain in bits exceeds (2K + 1) x 0.5 x log2(32,446,004) bits (one new row and column of
+category transitions; K = current number of categories); categories tried in order of token mass, re-scanning until no
+split pays or 60 runs; then exchange passes again until < 1% move. Merges: the reverse test on the 20 smallest
+categories (merge into the category giving the largest gain) kept if the saved description exceeds the objective loss.
+Reported: number of categories over the run, accepted splits / merges, final names.
+**TC results -- PASS.** TC1: 6 exchange passes from the taxonomy's level 1 (102 incl. boundary / unknown): objective
+-5.558195e8 -> -5.354272e8; words moved per pass 25,479 / 7,310 / 4,306 / 3,125 / 2,367 / 2,067 (cap of 6 reached).
+TC1s: all 60 split tries paid their MDL cost (the 60-try cap, not the data, stopped growth), 20 small categories merged,
+6 more passes (1,072 moved in the last); 162 category ids (159 in use); objective -5.328468e8. The trained categories read
+as classic Brown classes (prepositions on / from / into / upon; know / think / want / believe; good / strong / strange /
+beautiful; ship with house / country / land / city / town) -- grouped by behaviour, less by topic (sieve_tc1_show.txt).
+TC2: 6 passes from the 2,219 groups: -5.471122e8 -> -5.235111e8 (1,487 moved in the last).
+Category measure (sieve_tdec.py, held-out content words, TX program): taxonomy level 1 top-1 0.1161 / top-5 0.2935,
+6.0463 bits (uniform 6.67); trained level 1 top-1 0.1269 / top-5 0.3091, 6.1192 bits (uniform 7.34) -- 1.22 bits better
+than uniform vs 0.62. Offered on the TX program (8 pieces; 4 runs + a final run accepting nothing): member Descend[t-1,
+t-2 trained level-1 categories -> next category], member Descend[t-1, t-2 trained level-2 categories -> next], lift
+NodeTopic[trained level 1; last 200], lift NodeTopic[trained level 2; this book]; fit 7.2374 -> 7.1903.
+Held-out: static 7.5523 (TX 7.6067); online 7.4911 -- best (TX 7.5502; neural control 7.4423). D: function 4.6668,
+content 10.5527 (TX 10.6323), words 1-10 7.3822, 11+ 7.5841, repeats 6.1567, first use 13.7362, D2 4.2812 / top-1
+0.4489, D3 0.8462. Fresh books: static 7.5461, online 7.4959, content 10.5563, first use 12.6491. Category measure under
+the TC program: trained level 1 top-1 0.1262 / top-5 0.3119; static content 10.6528 (TX 10.7372). Bars: top-1 > 0.1161
+PASS; accepted PASS; content < 10.6323 PASS; online < 7.5502 PASS. The gain comes mostly from category n-grams: the
+trained categories of the last two words predicting the next category.

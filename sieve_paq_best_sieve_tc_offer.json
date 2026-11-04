@@ -1,0 +1,17 @@
+{
+ "state": "sieve_tc_offer.json",
+ "sels": [
+  "l8",
+  "r4",
+  "pos",
+  "scene"
+ ],
+ "eta": 0.05,
+ "eta_tau": 0.0,
+ "eta_lift": 0.1,
+ "fit": 7.178785765660333,
+ "scored_L4": 7.524873728962409,
+ "scored_SP1": 7.512520780447105,
+ "scored_SP2": 7.512520780447105,
+ "scored_SP3": 7.491107063146098
+}

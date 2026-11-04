@@ -1,0 +1,17 @@
+   built Descend[id(t-1) -> class of next word at depth 1 of the right tree]: 3 s
+   built Descend[id(t-1) -> class of next word at depth 2 of the right tree]: 4 s
+   built Descend[hc1(t-1) & hc1(t-2) -> class of next word at depth 1 of the right tree]: 4 s
+   built Descend[hc2(t-1) & hc2(t-2) -> class of next word at depth 2 of the right tree]: 5 s
+   built NodeTopic[c-tree depth 1; last 200]: 0 s
+   built NodeTopic[c-tree depth 1; last book]: 2 s
+   built NodeTopic[c-tree depth 2; last 200]: 0 s
+   built NodeTopic[c-tree depth 2; last book]: 2 s
+   + mix: Descend[hc1(t-1) & hc1(t-2) -> class of next word at depth 1 of the right tree]: fit 7.2120 bits/word (246 s)
+TC: 1 accepted; fit 7.2120 bits/word (TX 7.2374) (246 s)
+   + mix: Descend[hc2(t-1) & hc2(t-2) -> class of next word at depth 2 of the right tree]: fit 7.2009 bits/word (232 s)
+TC: 1 accepted; fit 7.2009 bits/word (TX 7.2374) (232 s)
+   + lift: NodeTopic[c-tree depth 1; last 200]: fit 7.1947 bits/word (271 s)
+TC: 1 accepted; fit 7.1947 bits/word (TX 7.2374) (271 s)
+   + lift: NodeTopic[c-tree depth 2; last book]: fit 7.1903 bits/word (263 s)
+TC: 1 accepted; fit 7.1903 bits/word (TX 7.2374) (263 s)
+TC: 0 accepted; fit 7.1903 bits/word (TX 7.2374) (67 s)
