@@ -51,12 +51,15 @@ def search(F, P, cx, var, budget=170):
 def vote(cx, sp, F, P):
     d = idir(F); s, T, _ = F.ctx(cx); SL, ans = P.shortlist(cx); n, K = SL.shape; y = s[T]; pos = np.load(os.path.join(d, "index_pos.npy")); S = P.corpus(); rd = os.path.join(d, f"{cx}_{sp['var']}")
     I = np.zeros((n, KNN), np.int64); V = np.zeros((n, KNN), np.float32)
+    have = np.zeros(n, bool)
     for q0 in range(0, n, 512):
-        z = np.load(os.path.join(rd, f"{q0}.npz")); I[q0:q0 + 512] = z["idx"]; V[q0:q0 + 512] = z["sim"]
+        f = os.path.join(rd, f"{q0}.npz")
+        if not os.path.exists(f): continue                                                             # unsearched chunk: the piece is silent there
+        z = np.load(f); I[q0:q0 + 512] = z["idx"]; V[q0:q0 + 512] = z["sim"]; have[q0:q0 + 512] = True
     nxt = S[pos[I]]; w = np.exp((V - V[:, :1]) / TAU); w /= w.sum(1, keepdims=True); D = np.zeros((n, K + 1), np.float32); EX = (w * (nxt == y[:, None])).sum(1)
     for i in range(n):
         c = np.searchsorted(SL[i], nxt[i]); cc = np.minimum(c, K - 1); h = SL[i][cc] == nxt[i]; D[i, :K] = np.bincount(c[h], weights=w[i][h], minlength=K)[:K]; D[i, K] = w[i][~h].sum()
-    ne = np.ones(n, bool)
+    ne = have; D[~have] = 0; EX[~have] = 0
     if P.EXACT: D = P.exactify(D, EX, ans, K)
     return D, ne, np.full(n, KNN * 10.0), np.array([len(np.unique(x)) for x in nxt], float)
 def install():

@@ -1,0 +1,14 @@
+eval run 1: SC1 search eval comp: 94 of 98 query chunks left (189 s) (282 s)
+eval run 2: SC1 search eval comp: 87 of 98 query chunks left (182 s) (246 s)
+eval run 3: SC1 search eval comp: 81 of 98 query chunks left (177 s) (252 s)
+eval run 4: SC1 search eval comp: 75 of 98 query chunks left (194 s) (261 s)
+eval run 5: SC1 search eval comp: 69 of 98 query chunks left (188 s) (267 s)
+eval run 6: SC1 search eval comp: 63 of 98 query chunks left (185 s) (266 s)
+eval run 7: SC1 search eval comp: 57 of 98 query chunks left (204 s) (283 s)
+eval run 8: SC1 search eval comp: 51 of 98 query chunks left (193 s) (270 s)
+eval run 9: SC1 search eval comp: 45 of 98 query chunks left (192 s) (266 s)
+eval run 10: SC1 search eval comp: 40 of 98 query chunks left (179 s) (255 s)
+eval run 11: SC1 search eval comp: 36 of 98 query chunks left (220 s) (291 s)
+eval run 12: SC1 search eval comp: 34 of 98 query chunks left (182 s) (277 s)
+eval run 13: 
+eval run 14: 

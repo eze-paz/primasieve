@@ -1423,3 +1423,10 @@ per position 0.935915 -> 0.935822 over 4 rounds (converged at round 1); tau stan
 (chosen), 100 20.0748, 300 31.5453 bits/word. Offered on the TX program: not accepted. A linear least-squares model over
 2,000 words from these context vectors is too weak to add to the program. (A first fit had a normalisation bug -- n was
 the sum of the features, giving negative squared errors; fixed before any offer.)
+**TX3 held-out (owner: "I'd rather get results now") -- stopped early.** The held-out search was stopped after 66 of 98
+chunks (33,792 of 50,114 positions); the fresh-book search was not run. The move loop overran the 5-minute cap (setup +
+refit), so the piece was accepted as a lift with its own fitted strength (0.078) and no joint refit: fit 7.2374 ->
+7.2287, gain 63.2 bits after its charge. Static on the 33,792 searched positions: TX 7.6864 -> TX3 7.6831 bits/word;
+content words 10.9388 -> 10.9616 (worse). All 50,114 positions (the piece silent where unsearched): 7.6067 -> 7.6045.
+Online stack not run. Reading: composed retrieval helps on function words and hurts content words -- the opposite of
+the aim.
