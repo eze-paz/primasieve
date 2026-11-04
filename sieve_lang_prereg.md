@@ -1406,3 +1406,20 @@ next word's level-2 group]; fit 7.2511 -> 7.2374. Held-out: static 7.6067 (SC1 7
 7.5624). D: function 4.7070, content 10.6323 (SC1 10.6585), words 1-10 7.4466, 11+ 7.6388, repeats 6.1929, first use
 13.9024, D2 4.3634 / top-1 0.4364, D3 0.8372. Fresh books: static 7.6149, online 7.5631 (SC1 7.6329 / 7.5839), content
 10.6571 (SC1 10.7017). Bars: accepted PASS; content < 10.6585 PASS.
+**TX2 result.** Predictive profiles (word x next taxonomy leaf within +1..+3, training + library): PPMI nonzero 0.0316,
+SVD 150. Retrieval with them in place of the syntax profiles, on the TX program (fit 7.2374), gain before refit: member
+-8.4 bits, lift +12.2 bits (the SC1 retrieval is already in the program).
+TX3 amendment (before any TX3 run): an index of all 32.4M positions would be ~12 GB of context vectors and ~1 h per fit9
+search (~5 h held-out) on this PC; TX3 runs on the same 5,000,000-position index, composed context = predictive profiles
+of t-1, t-2, t-3 at weights 1 / 0.7 / 0.5 + passage topic.
+**TX3 result.** Composed retrieval (predictive t-1, t-2, t-3 + passage topic, 5M index): on the TX program, gain before
+refit member +47.5, lift +63.2 bits (on top of SC1's retrieval, which the program already holds).
+TX4 amendment (before any offer): the first fit used ridge lambda = 1e-2 x positions, far above the features' scale
+(unit vectors over 192 dimensions): squared error per position 0.9446 (predict-nothing 1.0) and tau at the grid edge
+(standalone fit9: 1 13.2827, 3 13.1529, 10 12.7011, 30 11.7226). Refit with lambda = 1e-5 x positions; tau grid
+{10, 30, 100, 300}.
+**TX4 result -- FAIL.** Statistics over 28,971,346 training + library positions; refit (lambda 1e-5): squared error
+per position 0.935915 -> 0.935822 over 4 rounds (converged at round 1); tau standalone on fit9: 10 12.4985, 30 11.5805
+(chosen), 100 20.0748, 300 31.5453 bits/word. Offered on the TX program: not accepted. A linear least-squares model over
+2,000 words from these context vectors is too weak to add to the program. (A first fit had a normalisation bug -- n was
+the sum of the features, giving negative squared errors; fixed before any offer.)

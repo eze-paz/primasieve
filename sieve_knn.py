@@ -10,17 +10,18 @@ def vecs(F, P):
     if "v" not in G:
         import sieve_fast as FS, sieve_vec as SV, sieve_sg as SG
         d, C, rid, rows, *_ = SV.base(F, P); out = []
-        for nm in ("syntax", "topic"):
+        for nm in ("syntax", "topic", "pred"):
             z = np.load(os.path.join(d, f"{nm}_svd.npz")); X = np.zeros((F.Vt, KD), np.float32); X[rows] = (z["U"] * np.sqrt(z["S"])[None, :])[:, :KD]
             X /= np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-9); out.append(X)
-        G["v"] = (out[0], out[1], SG.content_mask(F, P))
+        G["v"] = (out[0], out[1], SG.content_mask(F, P)); G["pred"] = out[2]
     return G["v"]
 def ctxvec(seq, T, F, P, var):
     """(n, 2 or 3 x KD) unit context vectors, past only"""
-    syn, top, cm = vecs(F, P); o = np.argsort(T); Ts = T[o]; Z = np.zeros((len(T), KD * (3 if var == "full" else 2)), np.float32)
+    syn, top, cm = vecs(F, P); syn = G["pred"] if var in ("pred", "comp") else syn; o = np.argsort(T); Ts = T[o]
+    Z = np.zeros((len(T), KD * {"full": 3, "syn": 2, "pred": 3, "comp": 4}[var]), np.float32)
     for a in range(0, len(Ts), 200_000):
-        t_ = Ts[a:a + 200_000]; parts = [syn[seq[t_ - 1]], 0.5 * syn[seq[np.maximum(t_ - 2, 0)]]]
-        if var == "full":
+        t_ = Ts[a:a + 200_000]; parts = [syn[seq[t_ - 1]], (0.7 if var == "comp" else 0.5) * syn[seq[np.maximum(t_ - 2, 0)]]] + ([0.5 * syn[seq[np.maximum(t_ - 3, 0)]]] if var == "comp" else [])   # TX2 pred / TX3 comp
+        if var != "syn":
             lo, hi = max(int(t_.min()) - 50, 0), int(t_.max()); w = seq[lo:hi]; m = cm[w]; cs = np.zeros((hi - lo + 1, KD), np.float32); cs[1:] = np.cumsum(top[w] * m[:, None], 0); cn = np.r_[0, np.cumsum(m)]
             i1 = t_ - lo; i0 = np.maximum(i1 - 50, 0); tv = (cs[i1] - cs[i0]) / np.maximum(cn[i1] - cn[i0], 1)[:, None]; tv /= np.maximum(np.linalg.norm(tv, axis=1, keepdims=True), 1e-9); parts.append(tv)
         z = np.concatenate(parts, 1); Z[o[a:a + 200_000]] = z / np.maximum(np.linalg.norm(z, axis=1, keepdims=True), 1e-9)
@@ -67,7 +68,7 @@ def install():
         if r is not None: return r
         return O.save(cx, sp, *vote(cx, sp, F, P))
     P.vote = P3.vote = v_
-    _d = P.describe; P.describe = P3.describe = lambda sp: f"Retrieve[{KNN} nearest training contexts by {'syntax + passage topic' if sp['var'] == 'full' else 'syntax only'} profiles -> their next words]" if sp.get("kind") == "knn" else _d(sp)
+    _d = P.describe; P.describe = P3.describe = lambda sp: f"Retrieve[{KNN} nearest training contexts by {dict(full='syntax + passage topic', syn='syntax only', pred='predictive t-1, t-2 + passage topic', comp='predictive t-1, t-2, t-3 + passage topic, all positions')[sp['var']]} profiles -> their next words]" if sp.get("kind") == "knn" else _d(sp)
     _b = P.bits_of; P.bits_of = P3.bits_of = lambda sp: 6.0 if sp.get("kind") == "knn" else _b(sp)
     _v = P.valid; P.valid = P3.valid = lambda sp: True if sp.get("kind") == "knn" else _v(sp)
 CANDS = [dict(kind="knn", var="full"), dict(kind="knn", var="syn")]

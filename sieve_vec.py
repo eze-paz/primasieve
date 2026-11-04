@@ -15,21 +15,28 @@ def base(F, P):
     tid = np.full(F.Vt, -1, np.int64); top = [w for w in o if w != 0 and w < F.Vt - 1]; tid[np.array(top[100:100 + NC])] = np.arange(NC)
     sid = np.full(F.Vt, -1, np.int64); sid[np.array(top[:2500])] = np.arange(2500)
     return d, C, rid, rows, tid, sid, np.array(top)
-def jobs(name): return [("f", d) for d in range(1, 21)] + [("b", d) for d in range(1, 21)] if name == "topic" else [("o", o) for o in (-2, -1, 1, 2)]
+def ncols(F, name):
+    if name == "pred": import sieve_tax as TX; TX.load(F); return int(F.AT["ht3"].max()) + 1
+    return NC
+def jobs(name):
+    if name == "pred": return [("p", o) for o in (1, 2, 3)]                                        # TX2: what follows within +1..+3, as taxonomy leaves
+    return [("f", d) for d in range(1, 21)] + [("b", d) for d in range(1, 21)] if name == "topic" else [("o", o) for o in (-2, -1, 1, 2)]
 def cooc(F, P, name):
     d, C, rid, rows, tid, sid, _ = base(F, P); S = P.corpus(); f = os.path.join(d, f"{name}_cnt.npy"); fj = os.path.join(d, f"{name}_done.json")
-    M = np.lib.format.open_memmap(f, mode="r+" if os.path.exists(f) else "w+", dtype=np.uint32, shape=(len(rows), NC)); done = json.load(open(fj)) if os.path.exists(fj) else []; t0 = time.time()
+    nc_ = ncols(F, name); M = np.lib.format.open_memmap(f, mode="r+" if os.path.exists(f) else "w+", dtype=np.uint32, shape=(len(rows), nc_)); done = json.load(open(fj)) if os.path.exists(fj) else []; t0 = time.time()
     for kd, lag in jobs(name):
         if [kd, lag] in done: continue
         if time.time() - t0 > 200: break
         if kd == "f": r, c = rid[S[:-lag]], tid[S[lag:]]
         elif kd == "b": r, c = rid[S[lag:]], tid[S[:-lag]]
+        elif kd == "p": r, c = rid[S[:-lag]], np.where(S[lag:] != 0, F.AT["ht3"][S[lag:]], -1)
         else: a, b = (S[:len(S) - lag], S[lag:]) if lag > 0 else (S[-lag:], S[:len(S) + lag]); r, c = rid[a], sid[b]; c = np.where(c >= 0, c + 2500 * (0, 1, None, 2, 3)[lag + 2], -1)
-        ok = (r >= 0) & (c >= 0); uk, n = np.unique(r[ok] * NC + c[ok], return_counts=True); M.reshape(-1)[uk] += n.astype(np.uint32); M.flush(); done.append([kd, lag]); json.dump(done, open(fj, "w"))
+        ok = (r >= 0) & (c >= 0); uk, n = np.unique(r[ok] * nc_ + c[ok], return_counts=True); M.reshape(-1)[uk] += n.astype(np.uint32); M.flush(); done.append([kd, lag]); json.dump(done, open(fj, "w"))
         print(f"   {name} {kd}{lag}: {len(uk):,} cells ({time.time() - t0:.0f} s)", flush=True)
     F.log(f"SR2 cooc {name}: {len(done)} of {len(jobs(name))} steps done")
 def ppmi(M):
     M = M.astype(np.float64); N = M.sum(); r = M.sum(1, keepdims=True); c = M.sum(0) ** 0.75; pc = c / c.sum(); X = np.zeros(M.shape, np.float32)
+    pc = np.maximum(pc, 1e-30)                                                                         # empty columns: their cells are 0 anyway
     for a in range(0, M.shape[0], 4000): B = M[a:a + 4000]; X[a:a + 4000] = np.maximum(0, np.log(np.maximum(B, 1e-30) / (np.maximum(r[a:a + 4000], 1) * pc[None, :]))) * (B > 0)
     return X
 def svd(F, P, name):
