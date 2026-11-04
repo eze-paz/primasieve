@@ -95,19 +95,82 @@ def splitmerge(F, P):
         if mv < 0.01 * len(movable) or st["passes"] >= 6: st["phase"] = "done"
         save()
     u = np.unique(E.cls[1:F.Vt - 1]); F.log(f"TC1s: phase {st['phase']}; {st['splits']} splits, {st['merges']} merges, {st['tried']} split tries; categories in use {len(u)}; objective {E.obj():.6e}")
+def merge_gain(E, c, fixed):
+    """exact objective change (nats) of merging category c into each other category d (vector over d; -inf where invalid)"""
+    N, Nc, K = E.N, E.Nc, E.K; out = np.full(K, -np.inf); ok = np.array([d != c and d not in fixed and Nc[d] > 0 for d in range(K)])
+    for d in np.nonzero(ok)[0]:
+        m = np.ones(K, bool); m[[c, d]] = False
+        g = (fx(N[d, m] + N[c, m]) - fx(N[d, m]) - fx(N[c, m])).sum() + (fx(N[m, d] + N[m, c]) - fx(N[m, d]) - fx(N[m, c])).sum()
+        g += fx(N[d, d] + N[d, c] + N[c, d] + N[c, c]) - fx(N[d, d]) - fx(N[d, c]) - fx(N[c, d]) - fx(N[c, c]) - 2 * (fx(Nc[d] + Nc[c]) - fx(Nc[d]) - fx(Nc[c])); out[d] = g
+    return out
+def do_merge(E, c, d):
+    E.cls[E.cls == c] = d; E.N[d] += E.N[c]; E.N[:, d] += E.N[:, c]; E.N[c] = 0; E.N[:, c] = 0; E.Nc[d] += E.Nc[c]; E.Nc[c] = 0
+def try_split(E, c, movable, TX, Ntok):
+    m = movable[E.cls[movable] == c]
+    if len(m) < 2: return False, 0.0
+    prof = np.array([np.r_[x[1], x[2]] / max(x[1].sum() + x[2].sum(), 1) for x in (E.nb(w) for w in m)]); lab = TX.kmeans(prof, 2)
+    bak = (E.cls.copy(), E.N.copy(), E.Nc.copy(), E.K); o0 = E.obj(); new = E.grow()
+    for w in m[lab == 1]: E.move(w, [new])
+    for _ in range(3):
+        for w in m: E.move(w, [c, new])
+    live = int((E.Nc > 0).sum()); gain = (E.obj() - o0) / math.log(2); cost = (2 * live - 1) * 0.5 * math.log2(Ntok)
+    if gain > cost: return True, gain - cost
+    E.cls, E.N, E.Nc, E.K = bak; return False, gain - cost
+def ra(F, P):
+    """R-a: uncapped MDL split / merge rounds on the trained top level, then exchange passes to convergence (d)"""
+    import sieve_tax as TX
+    f = os.path.join(d_(F), "train1a.npz"); fj = f.replace(".npz", ".json"); s = np.load(f if os.path.exists(f) else os.path.join(d_(F), "train1s.npz")); E = Ex(F, P, s["cls"]); C = E.C; Ntok = float(C.sum()); t0 = time.time()
+    st = json.load(open(fj)) if os.path.exists(fj) else dict(round=1, pos=0, acc_round=0, splits=0, merges=0, passes=0, phase="rounds", log=[])
+    fixed = {int(E.cls[0]), int(E.cls[F.Vt - 1])}; movable = np.array([w for w in np.argsort(-C) if C[w] >= 20 and w != 0 and w < F.Vt - 1])
+    save = lambda: (np.savez(f, cls=E.cls), json.dump(st, open(fj, "w")))
+    while st["phase"] == "rounds" and time.time() - t0 < 200:
+        live = [c for c in np.argsort(-E.Nc) if c not in fixed and E.Nc[c] > 0]
+        if st["pos"] >= len(live):
+            st["log"].append([st["round"], st["acc_round"], len(live)]); print(f"   round {st['round']}: {st['acc_round']} changes; {len(live)} categories", flush=True)
+            if st["acc_round"] == 0 or len(live) >= 400: st["phase"] = "passes"
+            st["round"] += 1; st["pos"] = 0; st["acc_round"] = 0; save(); continue
+        c = int(live[st["pos"]]); st["pos"] += 1
+        ok, net = try_split(E, c, movable, TX, Ntok)
+        if ok: st["splits"] += 1; st["acc_round"] += 1
+        g = merge_gain(E, c, fixed); d = int(np.argmax(g)); nlive = int((E.Nc > 0).sum()); saved = (2 * nlive - 1) * 0.5 * math.log2(Ntok)
+        if np.isfinite(g[d]) and -g[d] / math.log(2) < saved: do_merge(E, c, d); st["merges"] += 1; st["acc_round"] += 1
+        save()
+    while st["phase"] == "passes" and time.time() - t0 < 230:
+        o0 = E.obj(); B = [x for x in range(E.K) if x not in fixed and E.Nc[x] > 0]; mv = sum(E.move(w, B) for w in movable); st["passes"] += 1
+        print(f"   pass {st['passes']}: objective {o0:.6e} -> {E.obj():.6e}; {mv:,} moved", flush=True)
+        if mv < 0.01 * len(movable) or st["passes"] >= 30: st["phase"] = "done"
+        save()
+    F.log(f"TC2 R-a: phase {st['phase']}, round {st['round']}; {st['splits']} splits, {st['merges']} merges; categories in use {int((E.Nc > 0).sum()) - 2}; passes {st['passes']}; objective {E.obj():.6e}")
+VIEWS = dict(a="train1a")                                                                                # TC2 trained levels, each its own view (cached Votes stay valid)
+def load2(F):
+    for v, nm in VIEWS.items():
+        f = os.path.join(d_(F), f"{nm}.npz")
+        if os.path.exists(f): F.AT[f"h{v}1"] = np.load(f)["cls"]
+def cands2(v): return [dict(kind="descend", view=v, k=1, terms=[[0, "id", 1, None]]), dict(kind="descend", view=v, k=1, terms=[[0, f"h{v}1", 1, None], [1, f"h{v}1", 1, None]])] + [dict(kind="nodecache", view=v, k=1, W=W) for W in (200, "book")]
 def load(F):
-    for lev, nm in ((1, "train1s"), (1, "train1"), (2, "train2")):
+    load2(F)
+    for lev, nm in ((1, os.environ.get("SZ_TC1", "train1s")), (1, "train1"), (2, os.environ.get("SZ_TC2", "train2"))):
         f = os.path.join(d_(F), f"{nm}.npz")
         if os.path.exists(f) and f"hc{lev}" not in F.AT: F.AT[f"hc{lev}"] = np.load(f)["cls"]
 CANDS = [dict(kind="descend", view="c", k=k, terms=[[0, "id", 1, None]]) for k in (1, 2)] + [dict(kind="descend", view="c", k=k, terms=[[0, f"hc{k}", 1, None], [1, f"hc{k}", 1, None]]) for k in (1, 2)] + \
         [dict(kind="nodecache", view="c", k=k, W=W) for k in (1, 2) for W in (200, "book")]
 def setup():
-    import sieve_tax as TX; F, P, P3, O = TX.setup(); load(F); P3.TOKATTR = tuple(dict.fromkeys(P3.TOKATTR + ("hc1", "hc2"))); return F, P, P3, O
+    import sieve_tax as TX; F, P, P3, O = TX.setup(); load(F); P3.TOKATTR = tuple(dict.fromkeys(P3.TOKATTR + ("hc1", "hc2") + tuple(f"h{v}1" for v in VIEWS))); return F, P, P3, O
 def main(argv):
     F, P, P3, O = setup(); out = os.path.join(F.HERE, "sieve_tc_offer.json")
     if argv[1] == "bigrams": bigrams(F, P); return
     if argv[1] == "train": train(F, P, int(argv[2])); return
     if argv[1] == "split": splitmerge(F, P); return
+    if argv[1] == "ra": ra(F, P); return
+    if argv[1] == "offer2":                                                                            # TC2: the new view's pieces on the chained TC2 program
+        v = argv[2]; C2 = cands2(v); o2 = os.path.join(F.HERE, "sieve_tc2_offer.json"); t0 = time.time()
+        for sp in C2:
+            if O.cached("fit9", sp) is None and time.time() - t0 < 150: P.vote("fit9", sp)
+        if any(O.cached("fit9", sp) is None for sp in C2): F.log("TC2: still building; rerun"); return
+        st = json.load(open(o2)) if os.path.exists(o2) else json.load(open(out))
+        st, acc, fit = O.move_loop(st, C2, budget=100, save=lambda s_: json.dump(s_, open(o2, "w"))); json.dump(st, open(o2, "w")); F.log(f"TC2 {v}: {len(acc)} accepted; fit {fit:.4f} bits/word (TC 7.1903)"); return
+    if argv[1] == "eval2":
+        st = json.load(open(os.path.join(F.HERE, "sieve_tc2_offer.json"))); M = P3.Model("eval", st); M.gact = st["gact"]; F.log(f"TC2 program scored on the {M.n:,} positions: {M.bits() / M.n:.4f} bits/word static (TC 7.5523)"); return
     if argv[1] == "show":
         words = json.load(open(os.path.join(F.SC.LX, "lx_vocab.json"), encoding="utf-8"))["words"]; wid = {w: i + 1 for i, w in enumerate(words)}; C = P.ccount(); H = F.AT["hc1"]
         for c in np.unique(H[1:F.Vt - 1])[::4]: m = np.nonzero(H == c)[0]; print(f"   {c:3d}: " + ", ".join(words[w - 1] for w in m[np.argsort(-C[m])][:8] if 0 < w <= len(words)), flush=True)

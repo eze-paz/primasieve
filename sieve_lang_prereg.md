@@ -1504,3 +1504,17 @@ words) whose category in the FIXED taxonomy level 1 (sieve_tax.py's 102 categori
 most probable category (static distribution; rest mass split by unigram) -- sieve_tdec.py ht1. The fixed yardstick keeps
 it comparable when the trained categories change in number. Every prereg result reports bits/word (online) and CatAcc.
 Values so far: TX program 0.1161, TC program 0.1171.
+TC2 additions (owner: "yes add those 2", before any TC2 run): (d) exchange passes run to convergence -- < 1% of the
+movable words move -- with a safety stop at 30 passes (reported if reached), replacing the 6-pass cap everywhere in TC2;
+(e) group- and leaf-level exchange consider 1,000 candidate categories per word (those its neighbours fall in most, plus
+its own), not 200. Implementation of R-a's "every category re-tried after each change": rounds -- each round tries a
+split of every category (mass order) and the best merge of every category (exact closed-form gain over all partners);
+rounds repeat until one accepts nothing; then passes to convergence. Results also report CatAcc.
+**R-a result.** Uncapped split / merge rounds from TC1s (159 categories): round 1 171 changes -> 304 categories, round 2
+141 -> 369, round 3 -> 408 (safety stop at 400 reached at the end of round 3; every round kept accepting splits -- the data
+would support more); 329 splits, 80 merges; then 11 exchange passes to convergence (288 words moved in the last, < 1%);
+objective -5.290248e8 (TC1s -5.328468e8). Offered as view "a" on the TC program: member Descend[t-1, t-2 R-a categories ->
+next category] accepted, fit 7.1903 -> 7.1766; a second run accepts nothing. Held-out: static 7.5425 (TC 7.5523); online
+7.4822 -- best (TC 7.4911); CatAcc 0.1169 (TC 0.1171). D: function 4.6589, content 10.5427 (TC 10.5527), first use
+13.7117. Fresh books: static 7.5288, online 7.4836, content 10.5425. Bars: accepted PASS; online < 7.4911 PASS; content <
+10.5527 PASS; category quality at level 1 (CatAcc) did not rise.
