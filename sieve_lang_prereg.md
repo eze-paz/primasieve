@@ -1602,3 +1602,10 @@ Encouraging semantic form in training (when the adjusted layer beats the natural
 J = J_predict + lambda x J_meaning, J_meaning = the MA objective (class-pair likelihood of content words within 50
 tokens), scaled so that both terms are per-token; lambda in {0.1, 0.3, 1}; each run reported with the watch measures,
 fit gain of its pieces, online bits/word and CatAcc; lambda chosen by fit on fit9 (log2 3 bits charged).
+SA3 amendment (after the reference measurements, before any layer is judged): references -- taxonomy level 1 purity
+0.6376, cohesion 0.7133 vs random 0.6224; taxonomy level 2 purity 0.7531, cohesion 0.8334 vs 0.7859, parent-child 0.9776;
+R-a purity 0.7144, cohesion 0.8222 vs 0.6740. "Cohesion >= 2 x random" cannot be met even by the taxonomy (random cosines
+are already 0.62-0.79); the criterion becomes excess cohesion (cohesion - random) >= the taxonomy's excess at the nearer
+level (level 1 0.0909, level 2 0.0475), with purity >= that level's purity. A/B (owner): every formed layer is offered both
+as it arranged itself (A) and semantically re-arranged (B, the manual adjustment), same pieces, same program; bits/word
+and CatAcc compared.
