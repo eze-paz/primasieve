@@ -1543,3 +1543,43 @@ node reached 100 children, so no FULL node and no layer 3; 1 sibling-exchange pa
 4 pieces) on the TC2 program: nothing accepted; online 7.4822, CatAcc 0.1169 unchanged. Reading: with children predicted
 from / predicting only the layer above, a child costs one row and one column over 408 categories (~10,200 bits) while its
 gain is small (the context side stays coarse) -- under this cost model the data pays for very little extra depth.
+
+## TH2 block (2026-11-05): three ways to make the layered hierarchy pay (owner: "ok try them all") -- registered before any run
+V3 cap at the top: the 408 R-a categories merged greedily (each step the pair with the smallest exact objective loss)
+into 100 parents; hierarchy = 100 parents over the 408. Offered: category n-gram, Descend and NodeTopic on the parents.
+V1 children pay only for deviations: as TH, but a split of child c into (c1, c2) is charged per transition cell: for each
+layer-L category q (both sides), the gain of keeping c1's and c2's counts separate over pooling them at the halves' sizes,
+g_q = f(a_q) + f(b_q) - f(a_q + b_q) - a_q ln(A / (A + B)) - b_q ln(B / (A + B)); the split keeps the m cells with the
+largest g_q (m chosen to maximise sum g_q / ln 2 - m (0.5 log2 N + log2 2K_L)), plus 0.5 log2 N + log2 2K_L for the new
+child; kept if that net is > 0. Otherwise as TH (cap 100 children, FULL nodes grow the next layer, sibling exchange).
+V2 children see children: as V1, but the transition counts are child x child (both sides at the finer layer), each word
+moving only among its siblings; deviations charged against the pooled halves as in V1.
+Each grown layer offered on the TC2 program as in TH (fit 7.1766, online 7.4822, CatAcc 0.1169). Bars: a piece accepted;
+online < 7.4822; tracked: online bits/word and CatAcc.
+
+## CS / TP / MA blocks (2026-11-05, owner: "yes please prereg these ideas ... try different topologies") -- registered before any run
+Reference for all three: the best program when each starts (now TC2: online 7.4822, CatAcc 0.1169); tracked numbers
+online bits/word and CatAcc; also D content / first use and fresh books for anything accepted.
+CS content stream (owner's idea: "predict the next content word ... keeps predicting ship until the next content word
+appears"). Content words = outside the 300 most frequent words. Kind "cstream": P(w | t) = P(content slot | t-1's left
+node 8) x P_cs(w | content history) for content words w (function words get 0 here; the program's other pieces cover
+them); P_cs from training + library counts over the content-only sequence (books kept apart); the prediction is the same
+at every position until the next content word arrives. Four variants: (1) last content word; (2) last two content words,
+backed off to (1) by count ratio N / (N + 5); (3) last two content words' trained categories (R-a) -> next content word's
+category, then the word by count inside it; (4) last content word x number of function words since (1, 2, 3+). Offered
+through the move loop (member and lift). Bars: accepted; online below the reference.
+TP topologies (owner: "maybe a very tall hierarchy is better ... 6 then 6 ... or 6, 12, 24, 48"). Each topology is built
+top-down over the words with >= 20 uses, all others following their dictionary / suffix placement: every node is split
+into its children by 2-means on the words' neighbour profiles, then sibling exchange on the layer's class-bigram
+objective (flat, at that layer's granularity; words move only among siblings, passes to < 1% moved, cap 30); a child
+split is kept only if it pays by the V1 per-cell MDL cost; growth stops where no node can split. Topologies: T6 (<= 6
+children per node, as many layers as pay); T6x2 (layer L nodes have <= 6 x 2^(L-1) children: 6, 12, 24, 48, ...);
+T100 (<= 100, for comparison with TH / TH2). Reported per topology: layers, categories per layer, objective per layer.
+Offered: for every layer, the category n-gram Descend (t-1, t-2 layer categories -> next) and NodeTopic (last 200), one
+move loop per topology on the reference program; compared by accepted pieces, fit gain, held-out online and CatAcc.
+MA meaning axis: categories that capture meaning, not grammar: exchange on content words only, objective = the summed
+class-pair likelihood of content words within 50 tokens (function words skipped), each word moving only among categories
+of its own WordNet part of speech (noun / verb / adjective / adverb / none), started from the taxonomy's level-1 meaning
+categories, K = the taxonomy's 100; passes to < 1% moved. Reported: purity against WordNet lexicographer files (share of
+a category's tokens in its most common file) vs R-a's categories; offered as NodeTopic, category n-gram over content
+words, and a two-axis Cell (R-a slot category x MA meaning category -> word) on the reference program.
