@@ -1522,3 +1522,24 @@ next category] accepted, fit 7.1903 -> 7.1766; a second run accepts nothing. Hel
 convergence (8,011 moved in pass 1, 133 in pass 9); merges tested on the 200 smallest categories (3 x description saving):
 none accepted; objective -1.637660e9 -> -1.637171e9. Offered as view "b" on the TC2 program: nothing accepted (fit stays
 7.1766); online 7.4822 and CatAcc 0.1169 unchanged.
+
+## TH block (2026-11-05): a hierarchy that grows a layer when a node fills (owner: "reaching the cap should trigger the addition of a new layer") -- registered before any run
+Layer 1 = the 408 R-a categories (fixed here). Every node may have at most 100 children. Layer L+1 grows inside each
+layer-L node: its children start as the node itself; each round tries to split every child (2-means on its words'
+left / right neighbour profiles over layer-L categories, then 3 rounds of sibling exchange); a split is kept if the gain in
+J = sum f(Min[q, ch]) + sum f(Mout[ch, q]) - 2 sum f(N_ch) (f(x) = x ln x; Min / Mout = counts of layer-L category q
+before / after a word of child ch; children predicted from and predicting the layer above, so a child costs one row and
+one column over the K_L layer-L categories) exceeds (2 K_L + 1) x 0.5 log2(32,446,004) bits. A node that has 100 children
+while a split of one of them still pays is FULL; layer L+2 is then grown (the same way) under the layer-L+1 children of the
+full nodes only. Rounds repeat until none accepts; then sibling exchange passes (each word moves only among its siblings)
+to < 1% moved (safety 30). Safety stops: depth 4, 50,000 categories in a layer. Words with < 20 uses stay in their
+parent's first child.
+Offered on the TC2 program (fit 7.1766, online 7.4822, CatAcc 0.1169) for each grown layer: category n-gram Descend
+(t-1, t-2 layer categories -> next layer category), Descend (t-1 word -> next layer category), NodeTopic (last 200 /
+book). Reported: per layer the number of categories, full nodes, accepted splits; tracked numbers online bits/word and
+CatAcc; D content / first use; fresh books. Bars: a piece accepted; online < 7.4822.
+**TH result -- FAIL.** Layer 2 under the 408 categories: round 1 accepted 12 splits (422 categories), round 2 none; no
+node reached 100 children, so no FULL node and no layer 3; 1 sibling-exchange pass (31 words moved). Offered (view "g",
+4 pieces) on the TC2 program: nothing accepted; online 7.4822, CatAcc 0.1169 unchanged. Reading: with children predicted
+from / predicting only the layer above, a child costs one row and one column over 408 categories (~10,200 bits) while its
+gain is small (the context side stays coarse) -- under this cost model the data pays for very little extra depth.
