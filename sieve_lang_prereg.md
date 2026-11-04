@@ -1497,3 +1497,10 @@ R-c group and leaf levels: the level-2 categories get the same split / merge loo
 level-3 leaf level is trained the same way from the taxonomy's 3,957 leaves (safety stop 10,000); offered as Descend /
 category n-gram / NodeTopic at each level.
 Bars per step: category quality rises at the step's level; a piece accepted; online < 7.4911; content < 10.5527.
+
+## Tracked metric from here on (owner: "condense this metric to a single value ... track it along the overall bit rate")
+CatAcc = on the 50,114 held-out positions, the share of content-word answers (outside the 100 most frequent training
+words) whose category in the FIXED taxonomy level 1 (sieve_tax.py's 102 categories, never retrained) is the program's
+most probable category (static distribution; rest mass split by unigram) -- sieve_tdec.py ht1. The fixed yardstick keeps
+it comparable when the trained categories change in number. Every prereg result reports bits/word (online) and CatAcc.
+Values so far: TX program 0.1161, TC program 0.1171.
