@@ -1372,3 +1372,37 @@ the vocabulary): exact 10.7777 bits, answer-or-synonym 9.9337 bits; all words ex
 words: exact 0.0780, within the synonym set 0.0794 -- Sieve's first choice is almost never a synonym of the answer; the
 set credit comes from WordNet's broad synonym lists (all senses), not from near-miss choices. (Not computable for the
 neural control: only its per-position bits were kept.)
+
+## TX block (2026-11-04): an explicit word taxonomy + three representation steps (owner) -- registered before any run
+TX1 taxonomy (owner's idea: ~100 broad categories, ~100 inside each, ... until every word is mapped; structure revised
+as proposed to the owner): level 1 = WordNet's lexicographer files (45 semantic files of the most frequent sense) plus a
+grammar branch (the 300 most frequent words) and a names / not-in-WordNet branch; the files with the most training tokens
+are split by k-means on the words' topic profiles (SR2 SVD) until there are 100 level-1 categories (split by token mass:
+always the category with the most tokens). Level 2: each category split by k-means into round(sqrt(words)) groups, at most
+100; level 3: groups of > 30 words split again into groups of <= 30. Words without a profile (< 20 uses) take the profile
+of their dictionary relatives, else of 4-letter suffix mates, else go to their category's unprofiled leaf. Every
+vocabulary word is in exactly one leaf; categories named by their 3 most frequent words. Views t1 / t2 / t3 offered
+through the move loop on the SC1 program: Descend (t-1 word -> next word's category, each level), NodeTopic (this book /
+last 200, each level), Cell with the taxonomy (level-1 category from the slot x level-3 leaf from the passage).
+Bars: a piece accepted; content-word bits < 10.6585.
+TX2 predictive profiles: word x next-word-class matrix (what follows each word within +1..+3, in the 1,000 classes of the
+taxonomy's level 3 or dictionary-placed left tree depth 8 -- whichever has more leaves; counts over training + library),
+PPMI, SVD 150; used as the syntax part of SC1's retrieval (re-indexed) and offered.
+TX3 composed retrieval: context vector = the predictive profiles of t-1, t-2, t-3 at their positions (weights 1, 0.7,
+0.5) + passage topic; index = every training + library position (32.4M; searched in resumable chunks); 64 neighbours as
+SC1. Offered; bar: beats SC1's retrieval on fit9 gain.
+TX4 prediction-fitted vectors (alternating least squares): next-word scores q(t) . v(w), q(t) = sum of the context's word
+vectors at positions -1..-3 (separate maps) + passage; alternate exact ridge solves for the word vectors and the maps on
+squared error to the one-hot next word over the 2,000 most frequent next words (+ an 'other' column), 4 rounds,
+deterministic, starting from TX2's profiles; offered as a Vote over the shortlist (softmax of the scores, temperature
+fitted on fit9). Bars per step: accepted; content-word bits fall.
+**TX1 results -- PASS.** Taxonomy: 100 level-1 categories, 2,217 level-2 groups, 3,957 leaves; every vocabulary word
+mapped (sieve_tx_show.txt). Leaves read as meaning sets (sword: shield, spear, spears, swords, axe, lance, helm;
+sea: shore, bay, ocean, beach, seas, gulf; boat: deck, rail, anchor, schooner, oars, brig; drink: draught, refreshment,
+cocktail, vintage, liquors; london: scotland, kent, oxford, edinburgh); level 1 is noisier (most-frequent-sense filing:
+"thus / fell / paper" under noun.substance; ship and boat in different level-1 categories). Accepted (3 passes, a 4th
+accepts nothing): lift NodeTopic[t level 2; last 200], lift NodeTopic[t level 1; this book], member Descend[t-1 word ->
+next word's level-2 group]; fit 7.2511 -> 7.2374. Held-out: static 7.6067 (SC1 7.6212); online 7.5502 -- best (SC1
+7.5624). D: function 4.7070, content 10.6323 (SC1 10.6585), words 1-10 7.4466, 11+ 7.6388, repeats 6.1929, first use
+13.9024, D2 4.3634 / top-1 0.4364, D3 0.8372. Fresh books: static 7.6149, online 7.5631 (SC1 7.6329 / 7.5839), content
+10.6571 (SC1 10.7017). Bars: accepted PASS; content < 10.6585 PASS.

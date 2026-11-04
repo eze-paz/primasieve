@@ -1,0 +1,108 @@
+     0 adj.all: later / able / happy
+     1 adj.pert: literary / scientific / economic
+     2 adv.all: within / already / suddenly
+     3 noun.Tops: person / feeling / knowledge
+     4 noun.act: help / coming / care
+     5 noun.animal: human / tom / horse
+     6 noun.artifact: arms / road / boat
+     7 noun.attribute: black / large / manner
+     8 noun.body: body / hair / eye
+     9 noun.cognition: given / fact / least
+    10 noun.communication: read / letter / story
+    11 noun.event: fire / meet / change
+    12 noun.feeling: hope / wish / fear
+    13 noun.food: dinner / drink / wine
+    14 noun.group: law / public / church
+    15 noun.location: open / state / city
+    16 noun.motive: reason / reasons / conscience
+    17 noun.object: sea / earth / ground
+    18 noun.person: women / friends / longer
+    19 noun.phenomenon: wind / effect / fortune
+    20 noun.plant: rose / glad / trees
+    21 noun.possession: land / fine / gold
+    22 noun.process: growing / flame / wearing
+    23 noun.quantity: hundred / four / sent
+    24 noun.relation: rest / latter / perfect
+    25 noun.shape: turn / bound / square
+    26 noun.state: says / dark / need
+    27 noun.substance: thus / fell / paper
+    28 noun.time: sat / leave / present
+    29 verb.body: laughed / smiled / tired
+    30 verb.change: became / become / added
+    31 verb.cognition: believe / known / understand
+    32 verb.communication: except / talked / supposed
+    33 verb.competition: played / fought / armed
+    34 verb.consumption: used / eat / employed
+    35 verb.contact: carried / opened / laid
+    36 verb.creation: written / write / wrote
+    37 verb.emotion: wanted / loved / please
+    38 verb.motion: near / returned / followed
+    39 verb.perception: seems / appeared / seem
+    40 verb.possession: received / paid / offered
+    41 verb.social: tried / doing / further
+    42 verb.stative: held / live / kept
+    43 verb.weather: shone / kindled / blazed
+    44 adj.ppl: helder / unfilled / uncontested
+    45 not in WordNet: cannot / themselves / whether
+    46 grammar: she / said / mr
+    47 grammar': their / these / men
+    48 grammar'': her / down / back
+    49 grammar'': who / life / years
+    50 grammar'': out / up / before
+    51 grammar''': its / through / feet
+    52 grammar''': the / and / a
+    53 grammar'''': there / like / little
+    54 grammar': i / you / me
+    55 grammar'': money
+    56 grammar'': de / king / year
+    57 grammar''': to / not / have
+    58 grammar'''': is / be / we
+    59 grammar''': words
+    60 grammar'''': also / called
+    61 grammar''''': were / two / three
+    62 grammar'''''': they / or / them
+    63 grammar''''''': of / in / for
+    64 grammar'''': that / it / but
+    65 noun.person': general / socrates / character
+    66 noun.person': son / lord / soul
+    67 adj.all': hard / big / strong
+    68 noun.artifact': ship / machine / car
+    69 noun.act': use / war / means
+    70 noun.communication': lay / above / call
+    71 noun.artifact': hat / dress / clothes
+    72 not in WordNet': ye / jim / yer
+    73 not in WordNet': ah / st / etc
+    74 noun.person': mourners / mourner
+    75 noun.person': inventor / passengers / pilot
+    76 noun.person': captain / forward / drew
+    77 noun.artifact': bed / street / window
+    78 not in WordNet': friedrich / william / von
+    79 not in WordNet': toward / everything / ought
+    80 noun.act': tears / walk / sitting
+    81 adv.all': therefore / beyond / nearly
+    82 adj.all': certain / several / different
+    83 noun.cognition': opinion / regard / ideas
+    84 noun.communication'': film / badge / badges
+    85 noun.communication'': order / answer / question
+    86 noun.person': monsieur / judge / private
+    87 noun.attribute': power / nature / force
+    88 noun.cognition': faith / superstition / justification
+    89 noun.cognition': sense / thoughts / experience
+    90 noun.state': pain / condition / health
+    91 noun.group': dead / lost / business
+    92 noun.act': run / fight / shot
+    93 noun.artifact': short / spoke / john
+    94 verb.communication': answered / speak / ask
+    95 noun.state': marriage / circumstances / situation
+    96 adj.all': pretty / pleasant / serious
+    97 adj.all'': strange / silent / sudden
+    98 noun.person': boy / child / children
+    99 not in WordNet': hath / saith / unto
+   ship: level 1 = noun.artifact': ship / machine / car; leaf = ship, masts, merrimac, censers, crucibles, censer, lightship, cupel, troopships, cupels
+   boat: level 1 = noun.artifact: arms / road / boat; leaf = boat, deck, rail, anchor, schooner, oars, brig, oar, gunwale, mainsail
+   sea: level 1 = noun.object: sea / earth / ground; leaf = sea, shore, bay, ocean, beach, seas, gulf, shores, lagoon, strait
+   sword: level 1 = noun.artifact: arms / road / boat; leaf = sword, shield, spear, spears, swords, axe, lance, helm, dart, shields
+   horse: level 1 = noun.animal: human / tom / horse; leaf = horse, horses, mare, hoofs, pony, horseback, hind, ponies, mane, buckskin
+   drink: level 1 = noun.food: dinner / drink / wine; leaf = drink, draught, refreshment, cocktail, vintage, liquors, vodka, cocktails, potion, brew
+   london: level 1 = noun.location: open / state / city; leaf = london, scotland, kent, oxford, edinburgh, rochester, westminster, wales, dublin, salisbury
+   happy: level 1 = adj.all: later / able / happy; leaf = happy, alive, weak, unendurable, friendless, homesick, heartfelt, motherless, steadier, inconsolable
