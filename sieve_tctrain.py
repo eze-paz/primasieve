@@ -141,7 +141,60 @@ def ra(F, P):
         if mv < 0.01 * len(movable) or st["passes"] >= 30: st["phase"] = "done"
         save()
     F.log(f"TC2 R-a: phase {st['phase']}, round {st['round']}; {st['splits']} splits, {st['merges']} merges; categories in use {int((E.Nc > 0).sum()) - 2}; passes {st['passes']}; objective {E.obj():.6e}")
-VIEWS = dict(a="train1a")                                                                                # TC2 trained levels, each its own view (cached Votes stay valid)
+def pairs(F, P, dist):
+    """word-pair tables at distance dist (as bigrams)"""
+    f = os.path.join(d_(F), f"pairs{dist}.npz")
+    if not os.path.exists(f):
+        S = P.corpus(); k, n = np.unique(S[:-dist].astype(np.int64) * F.Vt + S[dist:], return_counts=True); a, b = k // F.Vt, k % F.Vt; o = np.argsort(b, kind="stable")
+        np.savez(f, a=a.astype(np.int32), b=b.astype(np.int32), n=n.astype(np.int64), ra=np.r_[0, np.cumsum(np.bincount(a, minlength=F.Vt))], lb=b[o].astype(np.int32), la=a[o].astype(np.int32), ln=n[o], rb=np.r_[0, np.cumsum(np.bincount(b, minlength=F.Vt))])
+    return f
+class ExM:
+    """R-b: exchange over category pairs at distances 1, 2, 3 (summed objectives)"""
+    def __init__(s_, F, P, cls, dists=(1, 2, 3)):
+        s_.E = []
+        for d in dists:
+            e = Ex.__new__(Ex); z = np.load(os.path.join(d_(F), "bigrams.npz") if d == 1 else pairs(F, P, d)); e.C = P.ccount().astype(np.float64); e.a, e.b, e.n, e.ra = z["a"], z["b"], z["n"].astype(np.float64), z["ra"]
+            e.la, e.ln, e.rb = z["la"], z["ln"].astype(np.float64), z["rb"]; e.cls = cls; e.K = int(cls.max()) + 1; e.N = np.zeros((e.K, e.K)); np.add.at(e.N, (cls[e.a], cls[e.b]), e.n); e.Nc = np.bincount(cls, weights=e.C, minlength=e.K); e.Vt = F.Vt; s_.E.append(e)
+        s_.cls = cls; s_.C = s_.E[0].C
+    def obj(s_): return sum(e.obj() for e in s_.E)
+    def move(s_, w, B):
+        a = int(s_.cls[w]); nw = s_.C[w]; B = np.asarray(B); G = np.zeros(len(B)); st = []
+        for e in s_.E:
+            sw, R, L = e.nb(w); N, Nc = e.N, e.Nc; N[a] -= R; N[:, a] -= L; N[a, a] -= sw; Nc[a] -= nw; rs = np.nonzero(R)[0]; ls = np.nonzero(L)[0]; nbb = N[B, B]
+            G += (fx(N[np.ix_(B, rs)] + R[rs][None, :]) - fx(N[np.ix_(B, rs)])).sum(1) + (fx(N[np.ix_(ls, B)] + L[ls][:, None]) - fx(N[np.ix_(ls, B)])).sum(0) + fx(nbb + R[B] + L[B] + sw) - fx(nbb) - (fx(nbb + R[B]) - fx(nbb)) - (fx(nbb + L[B]) - fx(nbb)) - 2 * (fx(Nc[B] + nw) - fx(Nc[B])); st.append((sw, R, L))
+        ga = G[B == a][0] if (B == a).any() else -np.inf; b = int(B[np.argmax(G)]) if G.max() > ga + 1e-9 else a
+        for e, (sw, R, L) in zip(s_.E, st): e.N[b] += R; e.N[:, b] += L; e.N[b, b] += sw; e.Nc[b] += nw
+        s_.cls[w] = b; return b != a
+def rb_(F, P):
+    """R-b: from the R-a categories, exchange passes to convergence on the distance 1-3 objective; then merges (the
+    400-category safety stop of R-a is already exceeded, so no splits); passes again"""
+    f = os.path.join(d_(F), "train1b.npz"); fj = f.replace(".npz", ".json"); cls = np.load(f if os.path.exists(f) else os.path.join(d_(F), "train1a.npz"))["cls"].copy(); E = ExM(F, P, cls); C = E.C; Ntok = float(C.sum()); t0 = time.time()
+    st = json.load(open(fj)) if os.path.exists(fj) else dict(passes=0, phase="passes", merges=0, merged=False)
+    fixed = {int(cls[0]), int(cls[F.Vt - 1])}; movable = np.array([w for w in np.argsort(-C) if C[w] >= 20 and w != 0 and w < F.Vt - 1]); save = lambda: (np.savez(f, cls=E.cls), json.dump(st, open(fj, "w")))
+    live = lambda: [x for x in range(E.E[0].K) if x not in fixed and E.E[0].Nc[x] > 0]
+    while st["phase"] == "passes" and time.time() - t0 < 200:
+        B = live(); w0 = st.get("wpos", 0); mv = st.get("mv", 0)                                       # mid-pass checkpoints (a pass is ~200 s)
+        if w0 == 0: st["o0"] = E.obj()
+        for i in range(w0, len(movable)):
+            mv += E.move(movable[i], B)
+            if time.time() - t0 > 240: st["wpos"], st["mv"] = i + 1, mv; save(); break
+        else:
+            st["wpos"], st["mv"] = 0, 0; st["passes"] += 1; print(f"   pass {st['passes']}: objective {st['o0']:.6e} -> {E.obj():.6e}; {mv:,} moved", flush=True)
+            if mv < 0.01 * len(movable) or st["passes"] >= 30: st["phase"] = "merge" if not st["merged"] else "done"
+            save(); continue
+        break
+    if st["phase"] == "merge":
+        for c in sorted(live(), key=lambda x: E.E[0].Nc[x])[:200]:
+            if time.time() - t0 > 230: break
+            g = sum(merge_gain(e, c, fixed) for e in E.E); d = int(np.argmax(g)); n_ = len(live()); saved = 3 * (2 * n_ - 1) * 0.5 * math.log2(Ntok)
+            if np.isfinite(g[d]) and -g[d] / math.log(2) < saved:
+                for e in E.E: e.cls = E.cls
+                for e in E.E:
+                    e.N[d] += e.N[c]; e.N[:, d] += e.N[:, c]; e.N[c] = 0; e.N[:, c] = 0; e.Nc[d] += e.Nc[c]; e.Nc[c] = 0
+                E.cls[E.cls == c] = d; st["merges"] += 1
+        st["merged"] = True; st["phase"] = "passes"; save()
+    F.log(f"TC2 R-b: phase {st['phase']}; passes {st['passes']}, merges {st['merges']}; categories in use {len(live())}; objective {E.obj():.6e}")
+VIEWS = dict(a="train1a", b="train1b")                                                                                # TC2 trained levels, each its own view (cached Votes stay valid)
 def load2(F):
     for v, nm in VIEWS.items():
         f = os.path.join(d_(F), f"{nm}.npz")
@@ -162,6 +215,7 @@ def main(argv):
     if argv[1] == "train": train(F, P, int(argv[2])); return
     if argv[1] == "split": splitmerge(F, P); return
     if argv[1] == "ra": ra(F, P); return
+    if argv[1] == "rb": rb_(F, P); return
     if argv[1] == "offer2":                                                                            # TC2: the new view's pieces on the chained TC2 program
         v = argv[2]; C2 = cands2(v); o2 = os.path.join(F.HERE, "sieve_tc2_offer.json"); t0 = time.time()
         for sp in C2:

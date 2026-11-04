@@ -1518,3 +1518,7 @@ next category] accepted, fit 7.1903 -> 7.1766; a second run accepts nothing. Hel
 7.4822 -- best (TC 7.4911); CatAcc 0.1169 (TC 0.1171). D: function 4.6589, content 10.5427 (TC 10.5527), first use
 13.7117. Fresh books: static 7.5288, online 7.4836, content 10.5425. Bars: accepted PASS; online < 7.4911 PASS; content <
 10.5527 PASS; category quality at level 1 (CatAcc) did not rise.
+**R-b result -- FAIL.** From the R-a categories (408), exchange on the summed distance-1/2/3 objective: 9 passes to
+convergence (8,011 moved in pass 1, 133 in pass 9); merges tested on the 200 smallest categories (3 x description saving):
+none accepted; objective -1.637660e9 -> -1.637171e9. Offered as view "b" on the TC2 program: nothing accepted (fit stays
+7.1766); online 7.4822 and CatAcc 0.1169 unchanged.

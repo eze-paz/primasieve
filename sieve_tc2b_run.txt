@@ -1,0 +1,17 @@
+TC2 R-b: phase passes; passes 1, merges 0; categories in use 408; objective -1.637228e+09 (288 s)
+   pass 2: objective -1.637288e+09 -> -1.637228e+09; 2,396 moved
+   pass 3: objective -1.637228e+09 -> -1.637202e+09; 1,363 moved
+TC2 R-b: phase passes; passes 3, merges 0; categories in use 408; objective -1.637202e+09 (287 s)
+TC2 R-b: phase passes; passes 3, merges 0; categories in use 408; objective -1.637186e+09 (292 s)
+   pass 4: objective -1.637202e+09 -> -1.637186e+09; 911 moved
+TC2 R-b: phase passes; passes 4, merges 0; categories in use 408; objective -1.637180e+09 (288 s)
+   pass 5: objective -1.637186e+09 -> -1.637180e+09; 581 moved
+TC2 R-b: phase passes; passes 5, merges 0; categories in use 408; objective -1.637174e+09 (288 s)
+   pass 6: objective -1.637180e+09 -> -1.637174e+09; 687 moved
+TC2 R-b: phase passes; passes 6, merges 0; categories in use 408; objective -1.637172e+09 (290 s)
+   pass 7: objective -1.637174e+09 -> -1.637172e+09; 405 moved
+   pass 8: objective -1.637172e+09 -> -1.637171e+09; 198 moved
+TC2 R-b: phase passes; passes 8, merges 0; categories in use 408; objective -1.637171e+09 (288 s)
+TC2 R-b: phase passes; passes 8, merges 0; categories in use 408; objective -1.637171e+09 (287 s)
+   pass 9: objective -1.637171e+09 -> -1.637171e+09; 133 moved
+TC2 R-b: phase done; passes 9, merges 0; categories in use 408; objective -1.637171e+09 (51 s)
