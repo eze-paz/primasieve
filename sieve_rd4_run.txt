@@ -1,0 +1,3 @@
+SR2 svdf a: 0 accepted; fit 7.2511 bits/word (6 candidates; SA 7.2645) (45 s)
+SR2 svdf b: 0 accepted; fit 7.2511 bits/word (4 candidates; SA 7.2645) (44 s)
+SR2 svdf c: 0 accepted; fit 7.2511 bits/word (4 candidates; SA 7.2645) (45 s)

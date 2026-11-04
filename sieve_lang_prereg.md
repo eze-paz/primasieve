@@ -1294,3 +1294,52 @@ inside it 0.0043); sword's = eyes, hand, face, head, hands, white, black, fire (
 gas, maximum, boiler, forthwith, owners; raw PMI: 4 of 153 recent words list it at all.
 (5) Collinear pieces fight: lifts with negative strengths (count Vote on dictionary-placed left node -0.432, NodeTopic on
 the dictionary-placed left tree -1.026) cancel others.
+
+## RD block (2026-11-04): redesign against the five trace failures (owner: "start") -- registered before any run
+Base: SC1 program (sieve_sc_offer.json): fit 7.2511, static 7.6212, online 7.5624, content 10.6585. Each step is scored
+on held-out (static; online where the online stack applies), D diagnostics, fresh books, and the same trace re-run on the
+held-out answers ship / sea / sword.
+RD4 association filters (trace finding 4): from SR2's second-order table keep a pair (j, w) only if j and w co-occur
+(w within 50 tokens after j) in >= 3 different books of training + library (dispersion), and rank kept partners by a
+lower confidence bound on their direct PMI, ln((n - 1.96 sqrt n) N / (n_j n_w 50)), falling back to the second-order
+association when the pair is backed instead by a WordNet relation (synonym / hypernym / hyponym lemma) (agreement); top
+100 per word. Table "svdf"; SG Triggers / SlotTopic and SA2 heads re-offered on it (as SR2).
+RD3 two-axis classes (finding 3): kind "cell": P(w) = P(syntax class c | t-1's left node 8) x P(meaning part m | c,
+passage) x count(w) / count(c, m), syntax class = dictionary-placed left node 8, meaning part = topic NMF part (101);
+P(m | c, passage) ~ P(m | c) x (q(m) / share(m)) with q the passage's NMF loadings (last 200 tokens, mixed 0.9 / 0.1 with
+the shares); exactly normalised over the vocabulary. Offered (member and lift).
+RD5+1 experts and router (findings 5 and 1): the program's pieces grouped into three experts -- counts (static Votes,
+Agree, HBack, Descend, sentence state, registers), memory (book / window Votes, node match, slot heads), meaning
+(topic, associations, retrieval, bilinear, cell) -- each member group's mixture weight and each lift group's strengths
+scaled per router cell; router cell = (training support of the t-1, t-2 word context: < 10 / 10-1,000 / > 1,000
+occurrences) x (retrieval's best cosine, tertiles on fit9): 9 cells x 6 scales, fitted on fit9 (gradient, from 1), each
+scale charged 0.5 log2 n bits. Bar: the router's fit gain exceeds its charge; static scored < 7.6212.
+RD2 evidence shortlist (finding 2): candidates = bigram successors (top 128) + last 256 tokens + the top 40 words of
+retrieval, of the SR2 attention head and of SlotTopic, replacing the 64 most frequent words; all pieces rebuilt on it.
+Bars for the block: content-word bits < 10.6585 and online (or static where the online stack does not apply) better than
+SC1; trace: the meaning experts' share of the answer's probability rises on the traced examples.
+RD router v2 (registered after v1's fit result, before v2 runs): v1 gained 85.3 bits on fit9 against a 354.7-bit charge
+-- its per-cell scales moved all three experts together against the unigram base (redundant) and retrieval's cosine
+did not separate where meaning is reliable. v2: each expert is its own normalised distribution E_g ~ (its members'
+mixture, or the base if it has none) x exp(its lifts, with one global multiplier per expert); P = sum_g pi_g(cell) E_g
+over base, counts, memory, meaning (softmax, 3 free weights per cell); cell = context support (3 bins as v1) x the
+meaning expert's own peak probability on the shortlist (tertiles on fit9); 9 x 3 + 3 = 30 parameters, charged 0.5 log2 n
+each (197 bits). Bars as v1.
+**RD results.**
+RD4 filters -- FAIL. 3,229,900 second-order pairs; kept by >= 3 books 473,575, by WordNet only 2,021; table svdf 475,596
+pairs over 30,432 words (ship: vessel, sail, deck, ships, sea, board, shore, boat, captain ...; sword still with saith /
+thou / hath). Recall fell: answer among the head values 0.3584 (svd 0.4023), content measure -9.4374 to -9.4403 (svd
+-8.5818 to -8.5875; uniform -9.4801). 0 of 14 accepted on the SC1 program. (Two runs hit memory limits while another
+job ran; resumed from saved state, no effect on the result.)
+RD3 two-axis cells -- FAIL. Content-word measure on fit9 -0.2343 (Descend -0.684 on the same measure); not accepted.
+RD5+1 router -- FAIL. v1: +85.3 bits on fit9 vs a 354.7-bit charge (scales moved all experts together). v2 (normalised
+experts, softmax mix per cell): 7.3117 on fit9 vs the program's 7.2511 -- mixing whole experts loses to the joint
+combination; and the router gives the meaning expert LESS weight where it is most confident (0.03-0.13 in the 'sure'
+cells vs 0.13-0.22 'unsure'): its confidence runs opposite to its reliability.
+RD2 evidence shortlist -- measured, not built: content answers outside today's shortlist 0.5336 of content positions;
+of those, retrieval's top 40 holds 0.0421; dropping the 64-word filler would lose 0.0129 -- a rebuild (~1 h) cannot pay.
+Block bars FAIL; program unchanged (SC1), so the trace was not re-run.
+Reading: the trace's examples showed meaning pieces sometimes far ahead of the final probability, but over all
+positions the meaning signals neither contain most content answers (0.5336 lie outside the ~320 candidates and are not
+in the meaning experts' top 40 either) nor know when they are right. The binding limit is candidate generation and
+ranking in the long tail of content words, not how existing evidence is combined.

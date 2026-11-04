@@ -74,10 +74,40 @@ def trig(F, P, tab):
     a_, b_, p_ = np.concatenate(A), np.concatenate(B), np.concatenate(Pm); o = np.lexsort((-p_, a_)); a_, b_, p_ = a_[o], b_[o], p_[o]
     ptr = np.r_[0, np.cumsum(np.bincount(a_, minlength=F.Vt))]; np.savez(os.path.join(FS.IDX, f"sg_trig_{tab}.npz"), ptr=ptr, tgt=b_, pmi=p_.astype(np.float32))
     F.log(f"SR2 trig {tab}: {len(a_):,} pairs over {int((np.diff(ptr) > 0).sum()):,} words ({time.time() - t0:.0f} s)")
+def books(F):
+    """book id of every corpus position (training books 0..358, library books 1000+), boundaries included"""
+    z = np.load(os.path.join(F.SC.LX, "lx_tokens.npz")); dd = np.load(os.path.join(F.SC.LX, "lx_docs.npz")); L = np.load(os.path.join(F.SC.LX, "lx_library.npz")); lb = np.load(os.path.join(F.SC.LX, "lx_library_books.npz"))
+    return np.r_[F.mkb(z["tr"], z["trs"], dd["trb"]), F.mkb(L["lib"], L["libs"], lb["book"] + 1000)]
+def filt(F, P):
+    """RD4: the second-order table filtered by book dispersion (>= 3 books with a direct co-occurrence within 50 tokens),
+    ranked by a lower confidence bound on direct PMI; pairs without that support kept only if WordNet relates them"""
+    import sieve_fast as FS, sieve_sg as SG, sieve_dict as SD
+    t0 = time.time(); S = P.corpus(); B = books(F); assert len(B) == len(S), (len(B), len(S)); ptr, tgt, pmi = SG.trig_rows(F, P, "svd"); a = np.repeat(np.arange(F.Vt), np.diff(ptr))
+    key = a * np.int64(F.Vt) + tgt; o = np.argsort(key); ks = key[o]; fs = os.path.join(FS.IDX, "vec", "rd4_state.npz")
+    if os.path.exists(fs): z = np.load(fs); ndir, ub, lag0 = z["ndir"], [z["ub"]], int(z["lag"])
+    else: ndir, ub, lag0 = np.zeros(len(ks)), [np.zeros(0, np.int64)], 0
+    for lag in range(lag0 + 1, 51):                                                                    # resumable: state saved every 5 lags
+        q = S[:-lag] * np.int64(F.Vt) + S[lag:]; i = np.minimum(np.searchsorted(ks, q), len(ks) - 1); h = (ks[i] == q) & (B[:-lag] == B[lag:]); ih = i[h]
+        ndir += np.bincount(ih, minlength=len(ks)); ub.append(np.unique(ih.astype(np.int64) * 2000 + (B[:-lag][h] % 2000)))
+        if lag % 5 == 0 or lag == 50:
+            ub = [np.unique(np.concatenate(ub))]; np.savez(fs, ndir=ndir, ub=ub[0], lag=lag); print(f"   lag {lag} ({time.time() - t0:.0f} s)", flush=True)
+            if time.time() - t0 > 200 and lag < 50: F.log(f"RD4 filter: {lag} of 50 lags; rerun"); return
+    N = float(len(S)); del S, B; u = np.concatenate(ub); del ub; nb = np.bincount(u // 2000, minlength=len(ks)); del u; C = P.ccount().astype(float)   # ub is already unique; free memory first
+    A_, W_ = ks // F.Vt, ks % F.Vt; lb = np.log(np.maximum(ndir - 1.96 * np.sqrt(ndir), 0.5) * N / (C[A_] * C[W_] * 50.0)); disp = (nb >= 3) & (lb > 0)
+    DZ = SD.load(F); rk = []
+    for r in ("syn", "hyper"):
+        pr, ids = DZ[f"{r}_ptr"], DZ[f"{r}_ids"]; rk.append(np.repeat(np.arange(len(pr) - 1), np.diff(pr)).astype(np.int64) * F.Vt + ids)
+    rk = np.unique(np.concatenate(rk)); i = np.minimum(np.searchsorted(rk, ks), len(rk) - 1); wn = rk[i] == ks                          # WordNet relation, vectorised
+    val = np.where(disp, lb, pmi[o]); keep = disp | wn; A_, W_, val = A_[keep], W_[keep], val[keep]
+    oo = np.lexsort((-val, A_)); A_, W_, val = A_[oo], W_[oo], val[oo]; first = np.r_[True, A_[1:] != A_[:-1]]; g = np.cumsum(first) - 1; rank = np.arange(len(A_)) - np.nonzero(first)[0][g]; k2 = rank < 100
+    A_, W_, val = A_[k2], W_[k2], val[k2]; ptr2 = np.r_[0, np.cumsum(np.bincount(A_, minlength=F.Vt))]
+    np.savez(os.path.join(FS.IDX, "sg_trig_svdf.npz"), ptr=ptr2, tgt=W_, pmi=val.astype(np.float32))
+    F.log(f"RD4 filter: {len(ks):,} second-order pairs; kept by >= 3 books {int(disp.sum()):,}, by WordNet only {int((wn & ~disp).sum()):,}; table svdf {len(A_):,} pairs over {int((np.diff(ptr2) > 0).sum()):,} words ({time.time() - t0:.0f} s)")
 def main(argv):
     import sieve_attn2 as SA2; F, P, P3, O = SA2.setup(); m = argv[1]
     if m == "cooc": cooc(F, P, argv[2])
     elif m == "svd": svd(F, P, argv[2])
     elif m == "nmf": nmf(F, P)
     elif m == "trig": trig(F, P, argv[2])
+    elif m == "filter": filt(F, P)
 if __name__ == "__main__": main(sys.argv[:])

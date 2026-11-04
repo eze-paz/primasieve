@@ -10,7 +10,7 @@ def cands(tab):
     heads = [dict(h, tab=tab) for h in SA2.HEADS]; uni = [dict(kind="ahead", uni=1, sd=4, X="hlw8", W=W, tab=tab) for W in (50, 500)]
     return sg, heads, uni
 def main(argv):
-    import sieve_attn2 as SA2; F, P, P3, O = SA2.setup(); tab = argv[2] if len(argv) > 2 else None; out = os.path.join(F.HERE, "sieve_sr_offer.json")
+    import sieve_knn as KN, sieve_attn2 as SA2; F, P, P3, O = KN.setup(); tab = argv[2] if len(argv) > 2 else None; out = os.path.join(F.HERE, "sieve_rd_offer.json" if tab == "svdf" else "sieve_sr_offer.json")
     if argv[1] in ("build", "diag", "offer"): sg, heads, uni = cands(tab); C = sg + heads + uni
     if argv[1] == "build":
         t0 = time.time()
@@ -29,7 +29,7 @@ def main(argv):
             F.log(f"SR2 diag {P.describe(sp)}: content words {np.mean(np.log2(np.maximum(pa, 1e-9) / Du[np.arange(n), a2])[m]):.4f}; answer among the values at {hit.mean():.4f}")
         return
     if argv[1] == "offer":
-        g = argv[3]; Cg = dict(a=sg + uni, b=heads[:4], c=heads[4:])[g]; st = json.load(open(out)) if os.path.exists(out) else json.load(open(os.path.join(F.HERE, "sieve_sa_offer.json")))
+        g = argv[3]; Cg = dict(a=sg + uni, b=heads[:4], c=heads[4:])[g]; st = json.load(open(out)) if os.path.exists(out) else json.load(open(os.path.join(F.HERE, "sieve_sc_offer.json" if tab == "svdf" else "sieve_sa_offer.json")))
         st, acc, fit = O.move_loop(st, Cg, budget=120, save=lambda s_: json.dump(s_, open(out, "w"))); json.dump(st, open(out, "w"))
         F.log(f"SR2 {tab} {g}: {len(acc)} accepted; fit {fit:.4f} bits/word ({len(Cg)} candidates; SA 7.2645)"); return
     st = json.load(open(out)); M = P3.Model("eval", st); M.gact = st["gact"]; F.log(f"SR2 program scored on the {M.n:,} positions: {M.bits() / M.n:.4f} bits/word static (SA 7.6306)")
