@@ -1343,3 +1343,25 @@ Reading: the trace's examples showed meaning pieces sometimes far ahead of the f
 positions the meaning signals neither contain most content answers (0.5336 lie outside the ~320 candidates and are not
 in the meaning experts' top 40 either) nor know when they are right. The binding limit is candidate generation and
 ranking in the long tail of content words, not how existing evidence is combined.
+
+## TS block (2026-11-04): two-stage content prediction (owner: "do it") -- registered before any run
+Stage 1 (measured first): a meaning region = the K words (>= 20 uses) ranked by the passage's profile -- passage vector
+= mean topic-SVD vector (150 dimensions) of the content words in the last 200 tokens of the book; score(w) =
+cos(passage, v_w), and variant score(w) = cos + 0.1 ln count(w); K = 500 / 1,000 / 2,000 / 5,000. Reported on held-out
+content answers: coverage of those outside today's shortlist, and of all content answers; also the region restricted to
+words whose dictionary-placed left class 8 has P(class | t-1's node 8) >= 0.01 (syntax filter).
+Go / no-go for stage 2: build only if the region (K <= 2,000, with the syntax filter) holds >= 0.30 of the content answers
+outside today's shortlist. Stage 2 (if go): kind "region": P(w) = P(class | slot) x within the region a softmax of
+beta x cos(passage, v_w) + ln count(w) (beta fitted on fit9, charged), exactly normalised over the vocabulary; offered as
+member and lift on the SC1 program; bars: accepted, content-word bits < 10.6585, online < 7.5624.
+**TS stage 1 result -- GO.** 6,025 held-out content answers (every 4th), 3,165 outside today's shortlist. Region holds of
+the missed answers / of all content answers: cos K=2,000 0.3870 / 0.4335; cos + syntax filter K=2,000 0.3801 / 0.4398;
+cos + 0.1 ln count K=1,000 0.3384 / 0.5132, K=2,000 0.5002 / 0.6561, K=5,000 0.7311 / 0.8201; cos + count + syntax filter
+K=2,000 0.4556 / 0.5788 (>= 0.30: go). Stage 2 uses the registered region (cos + 0.1 ln count, syntax filter, K = 2,000);
+within a class c: e(w) = count(w) exp(beta cos(passage, w)) for region words, count(w) otherwise, P(w) = P(c | t-1's node
+8) e(w) / sum over c; beta from {2, 4, 8, 16, 32} by the piece's own fit9 likelihood (log2 5 bits charged).
+**TS stage 2 result -- FAIL.** beta by the piece's own fit9 likelihood: 2 9.6732, 4 9.6588 (chosen), 8 9.7613, 16
+10.3824, 32 12.8819 bits/word (content 13.5585 / 13.5326 / 13.6498 / 14.3615 / 16.9352). Region[beta 4] offered on SC1
+(member and lift): not accepted (fit stays 7.2511). Reading: the passage does locate the missing words (a 2,000-word
+region holds 0.4556-0.5002 of them), but inside that region the passage's similarity ranks them too flatly to pay --
+ranking within the plausible set, not finding it, is what Sieve's counted profiles cannot do sharply.
