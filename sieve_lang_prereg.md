@@ -1609,3 +1609,9 @@ are already 0.62-0.79); the criterion becomes excess cohesion (cohesion - random
 level (level 1 0.0909, level 2 0.0475), with purity >= that level's purity. A/B (owner): every formed layer is offered both
 as it arranged itself (A) and semantically re-arranged (B, the manual adjustment), same pieces, same program; bits/word
 and CatAcc compared.
+**V3 + A/B result.** 408 -> 100 parents by exact greedy merging (objective -5.290248e8 -> -5.350773e8). Watch: A
+(natural) purity 0.5395, cohesion 0.7241 vs random 0.6009 (excess 0.1232), parent-child consistency 0.4727; B (manual:
+k-means of the 408 categories' topic centroids into 100) purity 0.4195, cohesion 0.7485 vs 0.6076 (excess 0.1409),
+consistency 0.3896 -- neither "semantic" by the amended criterion (purity below the taxonomy's 0.6376; excess cohesion
+above its 0.0909). Offered from the same base (TC2): A nothing accepted, B nothing accepted; online 7.4822 and CatAcc 0.1169
+unchanged for both. A coarser layer over the 408 adds nothing either way.
