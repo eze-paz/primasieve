@@ -1365,3 +1365,10 @@ within a class c: e(w) = count(w) exp(beta cos(passage, w)) for region words, co
 (member and lift): not accepted (fit stays 7.2511). Reading: the passage does locate the missing words (a 2,000-word
 region holds 0.4556-0.5002 of them), but inside that region the passage's similarity ranks them too flatly to pay --
 ranking within the plausible set, not finding it, is what Sieve's counted profiles cannot do sharply.
+
+## Synonym-tolerant check (2026-11-04, owner: "if the word it chooses is a synonym, it's not exactly wrong")
+SC1 program, static, 50,114 held-out positions (sieve_synscore.py): content words 24,097 (0.7639 have WordNet synonyms in
+the vocabulary): exact 10.7777 bits, answer-or-synonym 9.9337 bits; all words exact 7.6212, set 7.2104. Top-1 on content
+words: exact 0.0780, within the synonym set 0.0794 -- Sieve's first choice is almost never a synonym of the answer; the
+set credit comes from WordNet's broad synonym lists (all senses), not from near-miss choices. (Not computable for the
+neural control: only its per-position bits were kept.)
