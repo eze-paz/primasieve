@@ -1583,3 +1583,22 @@ of its own WordNet part of speech (noun / verb / adjective / adverb / none), sta
 categories, K = the taxonomy's 100; passes to < 1% moved. Reported: purity against WordNet lexicographer files (share of
 a category's tokens in its most common file) vs R-a's categories; offered as NodeTopic, category n-gram over content
 words, and a two-axis Cell (R-a slot category x MA meaning category -> word) on the reference program.
+
+## SA3 protocol (2026-11-05, owner: "watch what happens when a layer forms ... do the parents and childs arrange semantically? if
+not, try manually adjusting ... think how during training we can encourage semantic format") -- registered before any run
+Applies to every layer formed in TH2 (V1, V2, V3), TP (T6, T6x2, T100) and MA.
+Watch (per layer, reported as it forms): (a) purity -- token-weighted share of a category's words in its most common
+WordNet lexicographer file (words not in WordNet excluded); (b) topic cohesion -- mean cosine of the members' topic
+profiles (SR2 SVD) to their category centroid, vs the same for random categories of equal sizes; (c) parent-child
+consistency -- share of children whose dominant lexicographer file equals their parent's; (d) a readable sample: 10
+parents (fixed seed) with each child's 5 most frequent words. References computed the same way: the taxonomy's levels and
+the R-a categories.
+Semantic if purity >= the taxonomy level-1 value at the same layer size class AND cohesion >= 2 x random; otherwise
+"not semantic".
+Manual adjustment (when not semantic): inside each parent, re-arrange its words into the same number of children by
+k-means on topic profiles (meaning), keeping the parent layer as it is; offer the adjusted layer exactly as the original
+(same pieces, same program) and compare online bits/word and CatAcc.
+Encouraging semantic form in training (when the adjusted layer beats the natural one, or when neither is semantic):
+J = J_predict + lambda x J_meaning, J_meaning = the MA objective (class-pair likelihood of content words within 50
+tokens), scaled so that both terms are per-token; lambda in {0.1, 0.3, 1}; each run reported with the watch measures,
+fit gain of its pieces, online bits/word and CatAcc; lambda chosen by fit on fit9 (log2 3 bits charged).
