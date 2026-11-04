@@ -1478,3 +1478,22 @@ content 10.5527 (TX 10.6323), words 1-10 7.3822, 11+ 7.5841, repeats 6.1567, fir
 the TC program: trained level 1 top-1 0.1262 / top-5 0.3119; static content 10.6528 (TX 10.7372). Bars: top-1 > 0.1161
 PASS; accepted PASS; content < 10.6323 PASS; online < 7.5502 PASS. The gain comes mostly from category n-grams: the
 trained categories of the last two words predicting the next category.
+
+## Category quality (2026-11-04, owner: "how often are they right in detecting the next word's category?") -- TC program, static
+sieve_tdec.py on the 50,114 held-out positions: trained level 1 (162): the answer's category is the top-1 at 0.2192, in
+the top 5 at 0.4655; bits category 5.2054 + word inside 2.3471. Trained level 2 (2,219): top-1 0.1971, top-5 0.3826; bits
+7.1070 + 0.4455. Content words only (24,097): level 1 top-1 0.1262 / top-5 0.3119; level 2 top-1 0.0831 / top-5 0.1614,
+bits 9.7383 + 0.9145.
+
+## TC2 block (2026-11-04): three refinements of the category training (owner: "agree prereg these") -- registered before any run
+Reference: TC program (sieve_tc_offer.json): fit 7.1903, static 7.5523, online 7.4911, content 10.5527; category quality as
+above. Measured after each step: the category quality numbers above (all words and content words, both levels), then the
+pieces re-offered on the TC program (the same 8 kinds on the new categories), static / online / D / fresh books.
+R-a no split cap: TC1s's split / merge loop runs until no split and no merge pays (every category re-tried after each
+change), then exchange passes until < 1% move; resumable; a safety stop at 400 categories (reported if reached).
+R-b further ahead: the exchange objective sums the class-pair likelihoods at distances 1, 2 and 3 (pairs (c_t, c_t+d),
+equal weight), from the R-a categories; split / merge costs count 3 rows and columns per category.
+R-c group and leaf levels: the level-2 categories get the same split / merge loop (no cap; safety stop 6,000), and a
+level-3 leaf level is trained the same way from the taxonomy's 3,957 leaves (safety stop 10,000); offered as Descend /
+category n-gram / NodeTopic at each level.
+Bars per step: category quality rises at the step's level; a piece accepted; online < 7.4911; content < 10.5527.

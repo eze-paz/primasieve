@@ -8,7 +8,7 @@ def main(argv):
     attrs = argv[1:] or ["ht1", "ht2", "ht3"]; import sieve_tctrain as TC; F, P, P3, O = TC.setup(); st = json.load(open(os.path.join(F.HERE, os.environ.get("SZ_STATE", "sieve_tx_offer.json"))))
     s, T, _ = F.ctx("eval"); SL, ans = P.shortlist("eval"); n, K = SL.shape; y = s[T]; u = P.uni()
     M = P3.Model("eval", st); M.gact = st["gact"]; A, logL, W = M.parts(); L = np.exp(logL - logL.max(1, keepdims=True)); Pd = A * L; Pd /= Pd.sum(1, keepdims=True); pa = Pd[np.arange(n), M.ans]
-    cnt = np.bincount(F.tr, minlength=F.Vt); fn = np.zeros(F.Vt, bool); fn[np.argsort(-cnt)[:100]] = True; con = np.nonzero(~fn[y])[0]
+    cnt = np.bincount(F.tr, minlength=F.Vt); fn = np.zeros(F.Vt, bool); fn[np.argsort(-cnt)[:100]] = True; con = np.nonzero(~fn[y])[0] if os.environ.get("SZ_ALL") != "1" else np.arange(n)          # SZ_ALL=1: every word, not only content words
     for lev in attrs:
         H = F.AT[lev]; nc = int(H.max()) + 1; un = np.bincount(H[:F.Vt], weights=u[:F.Vt], minlength=nc); t1 = t5 = 0; bc = []; bw = []
         for i in con:
