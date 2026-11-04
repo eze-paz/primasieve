@@ -1430,3 +1430,9 @@ refit), so the piece was accepted as a lift with its own fitted strength (0.078)
 content words 10.9388 -> 10.9616 (worse). All 50,114 positions (the piece silent where unsearched): 7.6067 -> 7.6045.
 Online stack not run. Reading: composed retrieval helps on function words and hurts content words -- the opposite of
 the aim.
+
+## Category vs word (2026-11-04, owner: "are we always picking the right category?") -- sieve_tdec.py, TX program static
+Held-out content answers (24,097): taxonomy level 1 (102 incl. boundary / unknown): the answer's category is the program's
+top-1 at 0.1161, in its top 5 at 0.2935; bits: category 6.0463 + word inside 4.6909. Level 2 (2,219): top-1 0.0882, top 5
+0.1917; category 8.7256 + word 2.0117. Level 3 leaves (3,959): top-1 0.0871, top 5 0.1887; category 9.2014 + word 1.5358
+(total 10.7372 at every level). The cost is in choosing the category, not the word inside it.
