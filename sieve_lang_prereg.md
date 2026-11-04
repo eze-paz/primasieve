@@ -1615,3 +1615,11 @@ k-means of the 408 categories' topic centroids into 100) purity 0.4195, cohesion
 consistency 0.3896 -- neither "semantic" by the amended criterion (purity below the taxonomy's 0.6376; excess cohesion
 above its 0.0909). Offered from the same base (TC2): A nothing accepted, B nothing accepted; online 7.4822 and CatAcc 0.1169
 unchanged for both. A coarser layer over the 408 adds nothing either way.
+**CS first result and amendment.** As registered (no back-off to frequency), the four pieces give many content answers
+zero: alone 28.0057 / 28.0852 / 21.6596 / 30.6836 bits on covered fit9 content words (program 11.49), though each beats the
+whole program at 0.138 / 0.129 / 0.175 / 0.133 of content positions; none accepted. Amendment (before the re-offer): every
+variant interpolates with the content-word unigram, lambda = N / (N + 5) (N = the history's count), as v2 already did with
+v1 inside; spec version 2.
+**CS result -- FAIL.** With the back-off (version 2), offered on TC2: nothing accepted (fit stays 7.1766); online 7.4822 and
+CatAcc 0.1169 unchanged. The pending content prediction overlaps what the program already reads (registers, triggers,
+topic, retrieval).
