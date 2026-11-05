@@ -1650,3 +1650,7 @@ again (sieve_watch_v2.txt).
 **V2 A/B result -- FAIL.** Offered from the same base (TC2): A nothing accepted, B nothing accepted; fit 7.1766, online
 7.4822, CatAcc 0.1169 unchanged. Same as V1: the natural layer is the more semantic one, and neither adds bits over the
 408 categories.
+TP amendments (before any TP result): built by sieve_tp.py. Words under 20 uses take their best sibling once at the end of
+each layer (one exchange move), not a dictionary / suffix placement. Inside a node the largest untried child is split
+next; both halves of a paying split stay eligible. The watch (SA3) runs on every layer; the manual adjustment (B) runs only
+on layers that fail the semantic criterion, as SA3 says ("if not, try manually adjusting").
