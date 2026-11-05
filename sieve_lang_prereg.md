@@ -1746,3 +1746,19 @@ Predictions: every piece below its base on both corpora; all-word gains in hundr
 - Best mixes: all words books L+T+C+K+G+R+P 7.7276 (L 8.0759); wiki L8+T+C+K+G+R+P 7.3874 (L 8.2558). Content books L8+T+C+D+N 10.7819; wiki L8+T+C+D+N 9.6083.
 - Defect: the ceiling O is NaN on all-word targets (function-word targets give a negative leave-one-out count); content-word O values are unaffected.
 - Not run: re-scoring the TC2 program on 55 books; offering K to TC2 under MDL.
+
+## XC — Sieve TC2 vs the fair neural control, per token (exploratory, computed 2026-11-06 before any prereg; existing files only)
+Same 50,114 eval positions: bits_paq_sieve_tc2_offer.npy (Sieve TC2) and kaggle_fair_control/fair_control_bits_S.npz (29.06M-param control, same corpus).
+Means: Sieve 7.4822, control 7.4423. Function words (top 100, share 0.52): Sieve 4.6589, control 4.4455. Content words: Sieve 10.5948, control 10.7435.
+Control ahead by more than 1 bit on 0.328 of tokens; Sieve ahead by more than 1 bit on 0.226. Control's largest net wins: is, the, he, are, it, a, they; Sieve's: froth, scab, touch, paul, class (book-specific words).
+One global mixing weight (lambda for Sieve 0.38, picked on odd positions): even positions Sieve 7.4776, control 7.4325, mix 7.0333. Per-token oracle minimum 6.5559 (a ceiling, not a model).
+Not yet known: how much of the mix gain any two different models would give (no second control seed to compare).
+
+## PY — Pythia states as count contexts, preregistered 2026-11-06 before any run
+Owner: "pythia test might be worthwhile". EleutherAI pythia-70m-deduped runs on a Kaggle T4 over each MT corpus (words joined by spaces, sentence boundary = "."; windows of 1,024 BPE tokens, stride 512, so every state has >= 512 tokens of context except at the start). The state for target t = final-layer hidden state at the last BPE piece of word t-1. K-means (K = 1,000 and K = 4,096) fitted on 300,000 states sampled from every 64th training window; every corpus position gets a state; P_Y(y | state) counted over all 27M training positions, additive prior 10 toward the unigram.
+- **PY1.** Y1000 / Y4096 as components in MT. Prediction: L+Y below L by more than 0.2 bits on all words; L+T+C+Y below L+T+C by more than 0.1 bits on all words. PASS = L+T+C+Y4096 below L+T+C (all words) on both corpora.
+- **PY2 (reference, no gate).** Pythia's own word bits (sum of its BPE piece bits, open vocabulary) at the same eval positions, alone and mixed with the best MT mix.
+- Caveat registered in advance: Pythia was trained on the Pile, which includes Project Gutenberg and English Wikipedia, so both eval sets may be contaminated (seen in its training). PY numbers are not a clean generalization test.
+**PY results (2026-11-06; pyR1.txt; Kaggle T4 422 s / 452 s).** Contamination caveat as registered.
+- **PY1 — PASS.** All words L -> L+Y4: books 8.0759 -> 7.6882; wiki 8.2558 -> 7.6802. L+T+C -> L+T+C+Y4: books 7.7617 -> 7.4554; wiki 7.6017 -> 7.2747. Best counting-only with Pythia states (L8+T+C+K+Y4): books 7.3905, wiki 7.0461. Content L+T+C+Y4: books 10.5161, wiki 9.5947.
+- **PY2 (reference).** Pythia-70m's own bits (all words): books 7.0885, wiki 7.4320; content books 10.1879, wiki 10.1510. Pythia mixed with the counting pieces (L8+T+C+K+Y4+PY), all words: books 6.7849, wiki 6.4665; content books 9.6091, wiki 8.5799. Counting on 27M tokens still adds on top of a model pretrained on the Pile.

@@ -103,6 +103,9 @@ def evaluate(c):
     if os.path.exists(pf) and not SUF:                                                                    # PH1-PH5
         zp = np.load(pf); assert np.array_equal(zp["T"], T); comps.update({k_: zp[k_] for k_ in ("K", "G", "R", "P", "P0")}); bases.append(("B8", zp["X"], "L8"))
         combos += ([("P",), ("P0",), ("T", "C", "P"), ("T", "C", "P0")] if MODE == "content" else []) + [("K",), ("G",), ("R",), ("T", "C", "K"), ("T", "C", "K", "G", "R", "P")]
+    if os.path.exists(fp(c, "py_" + MODE)) and not SUF:                                                  # PY: Pythia states and Pythia's own bits
+        zy = np.load(fp(c, "py_" + MODE)); assert np.array_equal(zy["T"], T); comps.update({k_: zy[k_] for k_ in ("Y1", "Y4", "PY")})
+        combos += [("Y1",), ("Y4",), ("T", "C", "Y4"), ("T", "C", "K", "Y4"), ("PY",), ("T", "C", "K", "PY"), ("T", "C", "K", "Y4", "PY")]
     if os.path.exists(fp(c, "nn")) and not SUF and MODE == "content":                                                          # MT3/MT4: MiniLM neighbours (soft) and states (hard)
         zn = np.load(fp(c, "nn")); assert np.array_equal(zn["T"], T); comps["N"] = zn["pN"]; comps["H"] = zn["pH"]; combos += [("N",), ("H",), ("T", "C", "N")]
     if os.path.exists(fp(c, "defvec")) and not SUF and MODE == "content":                                                                  # MT2: definition vectors
