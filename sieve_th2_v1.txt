@@ -1,0 +1,29 @@
+   round 1: 1195 splits; 1,605 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 1414 splits; 1,824 categories; 0 full layer-1 nodes; passes 0 (258 s)
+TH layer 2: phase rounds; 2857 splits; 3,267 categories; 0 full layer-1 nodes; passes 0 (282 s)
+   round 2: 1747 splits; 3,352 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 3822 splits; 4,232 categories; 0 full layer-1 nodes; passes 0 (262 s)
+   round 3: 1476 splits; 4,828 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 4480 splits; 4,890 categories; 0 full layer-1 nodes; passes 0 (274 s)
+TH layer 2: phase rounds; 4874 splits; 5,284 categories; 0 full layer-1 nodes; passes 0 (251 s)
+   round 4: 769 splits; 5,597 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 5203 splits; 5,613 categories; 0 full layer-1 nodes; passes 0 (261 s)
+TH layer 2: phase rounds; 5326 splits; 5,736 categories; 0 full layer-1 nodes; passes 0 (264 s)
+   round 5: 230 splits; 5,827 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 5417 splits; 5,827 categories; 0 full layer-1 nodes; passes 0 (255 s)
+TH layer 2: phase rounds; 5436 splits; 5,846 categories; 0 full layer-1 nodes; passes 0 (259 s)
+   round 6: 25 splits; 5,852 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 5445 splits; 5,855 categories; 0 full layer-1 nodes; passes 0 (250 s)
+TH layer 2: phase rounds; 5446 splits; 5,856 categories; 0 full layer-1 nodes; passes 0 (269 s)
+   round 7: 4 splits; 5,856 layer-2 categories; 0 full nodes
+TH layer 2: phase rounds; 5446 splits; 5,856 categories; 0 full layer-1 nodes; passes 0 (264 s)
+TH layer 2: phase rounds; 5446 splits; 5,856 categories; 0 full layer-1 nodes; passes 0 (254 s)
+   round 8: 0 splits; 5,856 layer-2 categories; 0 full nodes
+   pass 1: 13,592 of 32,299 moved
+   pass 2: 3,719 of 32,299 moved
+   pass 3: 1,763 of 32,299 moved
+   pass 4: 918 of 32,299 moved
+   pass 5: 548 of 32,299 moved
+   pass 6: 326 of 32,299 moved
+   pass 7: 183 of 32,299 moved
+TH layer 2: phase done; 5446 splits; 5,856 categories; 0 full layer-1 nodes; passes 7 (198 s)

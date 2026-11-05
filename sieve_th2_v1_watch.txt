@@ -1,0 +1,22 @@
+SA3 watch hv11 under ha1: categories 5854; purity 0.9361; cohesion 0.9533; random_cohesion 0.8791; parent_child_consistency 0.4351 (50 s)
+   parent 418: answer | return | desire | visit | reply | attempt
+   parent 410: young | poor, faerie | unconditional, touchy, unpeopled, moribund, bristly | gallant, valiant, trusty, worshipful, dissolute | drunken, bearded, stalwart, burly, portly | stout, dapper, strapping, superannuated
+   parent 320: under | within | during, anent | beyond | amid, amidst | throughout
+   parent 255: became | become, emit | grew | grow | becomes | grows, waxed
+   parent 137: money, grit, spunk, copra, guts | business | trouble | food, nourishment, victuals, refreshments, victual | faith, affiance | news
+   parent 22: but, whereat, howbeit, nathless, leastways | mellowing, looping, metamorphoses, oscillation, mechanisms
+   parent 8: father | mother | husband, trousseau | majesty, ladyship | grandmother, stepmother, confessor, godmother, godfather | palates, pectoral, pigtails, tonsure, plica
+   parent 158: has | hath | hez
+   parent 92: up | off, asunder | forth | aside | thwack, tailings, ambushes, rugby, contretemps
+   parent 41: began | ought | wanted | tried | immured, deflect, tabooed, fend, supervised | meant
+SA3 watch hv1b1 under ha1: categories 5854; purity 0.8559; cohesion 0.9310; random_cohesion 0.8815; parent_child_consistency 0.4117 (49 s)
+   parent 418: answer, reply | return, consent | desire | regard, objection, endeavour, incline | claim, appeal, resolve | visit
+   parent 410: young, youngish, quondam, moribund, unconditional | poor, dissolute, bereaved, benighted, motherless | stout, gallant, drunken, bearded, stalwart | valiant, wily, hapless, godlike, luckless | colored, faerie, ickle | fella, oskaloosa, yuba
+   parent 320: under | within, beyond, skirting | during, throughout, despite, notwithstanding | amid, amidst | mid, neath, dims | disregarding, pending
+   parent 255: become, becomes | became | grew | grow, grows | waxed | emit
+   parent 137: money, wages, cash, compensation, reckoning | business | trouble, housekeeping, chores, spunk, housework | mercy, vengeance, sport, revenge, mischief | taste, stuff, humor, liquor | food, clothing, nourishment, victuals, refreshments
+   parent 22: but, leastways, howsomever, mellowing, looping | whereat, howbeit, nathless
+   parent 8: father, mother, husband, stepmother, godfather | majesty, excellency, lordship, dragoman | grandfather, grandmother, ladyship | sire, confessor | highness, beck | godmother, persecutor
+   parent 158: has | hath | hez
+   parent 92: up, thwack, tailings, ambushes, rugby | off | forth | aside | asunder
+   parent 41: wanted, tried, meant, fend, deflect | began | wished, promised, refused, hoped, consented | ought | dared, ventured, pretended, yielded, longed | proceeded, managed, attempted, contrived

@@ -1623,3 +1623,13 @@ v1 inside; spec version 2.
 **CS result -- FAIL.** With the back-off (version 2), offered on TC2: nothing accepted (fit stays 7.1766); online 7.4822 and
 CatAcc 0.1169 unchanged. The pending content prediction overlaps what the program already reads (registers, triggers,
 topic, retrieval).
+**V1 + A/B result.** V1 (per-cell deviation cost): layer 2 grew to 5,856 categories under the 408 (5,446 splits over 5
+rounds: 1,195 / 1,747 / ... / 230), no node reached 100 children (no FULL node, no layer 3), 7 sibling passes (183 moved in
+the last). Watch: A (natural) purity 0.9361, cohesion 0.9533 vs random 0.8791 (excess 0.0742), parent-child consistency
+0.4351 -- semantic by the amended criterion (taxonomy level 2: 0.7531 / 0.0475); readable families (gallant / valiant /
+trusty / worshipful; drunken / bearded / stalwart / burly / portly; food / nourishment / victuals / refreshments;
+grandmother / stepmother / godmother / godfather; became / become, grew / grow, waxed) (sieve_th2_v1_watch.txt). B (manual:
+topic k-means inside each parent, same child counts) purity 0.8559, excess 0.0495 -- less semantic than A. Offered from the
+same base: A nothing accepted, B nothing accepted; online 7.4822, CatAcc 0.1169 unchanged. Finding: at fine granularity
+the prediction objective arranges words semantically by itself (better than the manual semantic re-arrangement), but the
+finer layer adds nothing to the program over the 408 categories' n-gram.
