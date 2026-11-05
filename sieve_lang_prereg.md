@@ -1679,3 +1679,13 @@ sentence: 0.0720 / 5.8558; sentence + 4 before: 0.0795 / 5.7831; book: 0.0763 / 
 words (5.7743 bits) and about five sentences (CatAcc 0.0795); the sentence so far, short spans and the whole book add
 nothing over the last two tokens. As a bag of R-a categories, longer context carries little about the next meaning
 category; the last two tokens carry most of what this probe finds.
+
+**CW v4: word identities vs their categories (2026-11-05; owner: "Do step 1").** Same targets, n-gram features, L2
+1e-3 and fit as v3; the window is the last 32 content words before t-2. Feature: for each unit in the window,
+log P(next category | unit) - log P(next category), counted on 1,000,000 corpus content positions disjoint from the
+probe's training positions (add-0.5), averaged over the window, plus log size. Units: the word itself (w32) or its R-a
+category (c32), so both share one estimator. Inputs cached to ctxw_base.npz (the full setup chain overran 5 minutes);
+features and fit run as separate chunks. Result (CatAcc / category bits): c32 0.0808 / 5.7200; w32 0.0848 / 5.6866;
+v3 bag of categories at 32 (earlier run) 0.0781 / 5.7743; last two tokens 0.0713 / 5.8281. The rerun of v3 at 32 on
+the cached inputs did not finish in its chunk. Word identities carry more than their categories (5.6866 vs 5.7200), and
+the categories carry more under this estimator than as a logistic bag (5.7200 vs 5.7743).

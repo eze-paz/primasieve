@@ -1,0 +1,7 @@
+   counts c32: 0 s
+   features 40 s (cached; rerun to fit)
+   counts w32: 26 s
+   features 72 s (cached; rerun to fit)
+   features 52 s (cached; rerun to fit)
+CW v4 content span c32: CatAcc 0.0808; category bits 5.7200 (train 5.4430; 23,787 held-out, 217,532 train; 196 s)
+CW v4 content span w32: CatAcc 0.0848; category bits 5.6866 (train 5.3838; 23,787 held-out, 217,532 train; 216 s)
