@@ -1707,3 +1707,9 @@ sieve_mstate.py; logs msR1-msR5.txt; results sieve_mstate.json. Content = outsid
 - Whole-corpus counts (32.4M): W32 K1000 10.5724 (even 10.5837; all 7.4799); refined 10.5718 (even 10.5811; all 7.4795, even 7.4738); refined state x prev word 10.5788; K4000 10.5752 (even 10.5895); W8 10.5745 (even 10.5861). W128 whole-corpus not run (sample showed nothing).
 - Step 5 (MDL offer to Sieve): not run; the state is not a P.vote kind.
 - Reading: a real but tiny signal (lam 0.05-0.06, state alone 14.2-15.7 bits). Refinement, larger K and larger W do not help. Theme headroom is small here: CE leave-one-out oracle 10.5040, cheat 10.1343. Next discriminating test: soft state (mixture over nearest states, no CCA compression).
+
+## MT — meaning test, books vs Wikipedia at matched size (sieve_mtest.py, mtR1.txt, sieve_mtest.json), 2026-11-05
+Standalone of TC2. Same tokenizer, 27M training tokens each, own top-60k vocab, 120k content-word eval positions on held-out docs (books: 55 books; wiki: WikiText-103 raw train shard, 895 articles). Bits on even positions, EM weights on odd.
+- Test A (last 2 words hidden) books: U 13.8271, U+T 12.5141, U+C 12.3711, U+T+C 11.9321, ceiling U+O 12.0260. wiki: 14.1059, 12.2035, 12.1444, 11.3960, 11.5474.
+- Test B (full) books: trigram L 12.0547, L+T 11.3036, L+C 11.0075, L+T+C 10.8531, ceiling L+O 10.8332. wiki: 11.5511, 10.5584, 10.1928, 9.9138, 9.8789.
+- Reading: counted meaning (trigger + document cache) is large against a trigram and reaches the document-frequency ceiling on both corpora; the trigger adds on top of the cache. Wikipedia shows more of it. The small MS gain on TC2 is consistent with TC2 already holding book caches/trigger tables. TC2 itself still scored on 3 eval books (not re-run on the 55).
