@@ -1,0 +1,44 @@
+MS assignall W 32 K 1000: 16,000,000 of 32,446,002 positions (277 s)
+MS assignall W 32 K 1000: 30,000,000 of 32,446,002 positions (241 s)
+MS assignall W 32 K 1000: 32,446,002 of 32,446,002 positions (31 s)
+MS mix W 32 K 1000_all all: program 7.4822; state alone 9.8875; mixed 7.4799 (lam 0.02, picked on odd positions; even positions: program 7.4776, mixed 7.4750) (6 s)
+MS mix W 32 K 1000_all content: program 10.5865; state alone 14.4040; mixed 10.5724 (lam 0.06, picked on odd positions; even positions: program 10.5994, mixed 10.5837) (6 s)
+MS assignall W 32 K 4000: 6,000,000 of 32,446,002 positions (270 s)
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 146, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 110, in mix
+AssertionError
+MS assignall W 8 K 1000: 22,000,000 of 32,446,002 positions (269 s)
+MS assignall W 8 K 1000: 32,446,002 of 32,446,002 positions (113 s)
+MS assignall W 8 K 1000: 32,446,002 of 32,446,002 positions (1 s)
+MS mix W 8 K 1000_all all: program 7.4822; state alone 9.7649; mixed 7.4805 (lam 0.02, picked on odd positions; even positions: program 7.4776, mixed 7.4756) (19 s)
+MS mix W 8 K 1000_all content: program 10.5865; state alone 14.2289; mixed 10.5745 (lam 0.06, picked on odd positions; even positions: program 10.5994, mixed 10.5861) (19 s)
+MS: state pool partial; rerun (231 s)
+MS: state pool partial; rerun (250 s)
+MS: state pool partial; rerun (267 s)
+MS: state pool partial; rerun (261 s)
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 148, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 100, in assignall
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mstate_K128_1000.npz'
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 148, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 100, in assignall
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mstate_K128_1000.npz'
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 148, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 100, in assignall
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mstate_K128_1000.npz'
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 148, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 100, in assignall
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mstate_K128_1000.npz'
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 146, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 108, in mix
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mstate_K128_1000.npz'

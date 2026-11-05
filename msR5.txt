@@ -1,0 +1,19 @@
+MS assignall W 32 K 4000: 20,000,000 of 32,446,002 positions (208 s)
+MS assignall W 32 K 4000: 26,000,000 of 32,446,002 positions (5702 s)
+MS assignall W 32 K 4000: 32,446,002 of 32,446,002 positions (135 s)
+MS assignall W 32 K 4000: 32,446,002 of 32,446,002 positions (1 s)
+MS assignall W 32 K 4000: 32,446,002 of 32,446,002 positions (1 s)
+MS assignall W 32 K 4000: 32,446,002 of 32,446,002 positions (1 s)
+MS assignall W 32 K 4000: 32,446,002 of 32,446,002 positions (1 s)
+MS mix W 32 K 4000_all all: program 7.4822; state alone 10.0828; mixed 7.4800 (lam 0.02, picked on odd positions; even positions: program 7.4776, mixed 7.4757) (7 s)
+MS mix W 32 K 4000_all content: program 10.5865; state alone 14.9470; mixed 10.5752 (lam 0.05, picked on odd positions; even positions: program 10.5994, mixed 10.5895) (7 s)
+MS states W 128: 2,973,576 counting positions' states (3 s)
+MS states W 128 K 1000: 999 states in use; largest 9,632 positions (22 s)
+MS mix W 128 K 1000 all: program 7.4822; state alone 10.7068; mixed 7.4822 (lam 0.00, picked on odd positions; even positions: program 7.4776, mixed 7.4776) (5 s)
+MS mix W 128 K 1000 content: program 10.5865; state alone 15.7481; mixed 10.5843 (lam 0.01, picked on odd positions; even positions: program 10.5994, mixed 10.5970) (5 s)
+MS assignall W 128 K 1000: 4,000,000 of 32,446,002 positions (256 s)
+MS assignall W 128 K 1000: 9,000,000 of 32,446,002 positions (281 s)
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 146, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mstate.py", line 110, in mix
+AssertionError

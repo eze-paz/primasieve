@@ -1699,3 +1699,11 @@ included; leave-one-out = the rest of the book, past and future. Script sieve_ce
 positions: program 10.5865; cheat 10.1343 (lam 0.31); leave-one-out 10.5040 (lam 0.10). The program already holds
 book-scope caches (nodecache W=book on views d, l, lw, y, t), so the book-so-far theme is mostly taken; perfect
 knowledge of the rest of the book's word frequencies leaves 10.5040 on content words.
+
+## MS — meaning state (CCA past/future state, K-means, counted next-word table mixed into TC2), 2026-11-05
+sieve_mstate.py; logs msR1-msR5.txt; results sieve_mstate.json. Content = outside the top 100 words. Program TC2 content 10.5865 (even 10.5994), all 7.4822 (even 7.4776). lam picked on odd positions.
+- Gate 2 (CCA state, probe): CatAcc 0.0854, category bits 5.7457 — FAIL vs w32 association 5.6866.
+- Gate 3, 3M-position counts: W32 K1000 v2 10.5837; refined 10.5833; prev-word control 10.5859; state x prev word 10.5848; K4000 10.5842; W8 10.5840; W128 10.5843 (lam 0.01).
+- Whole-corpus counts (32.4M): W32 K1000 10.5724 (even 10.5837; all 7.4799); refined 10.5718 (even 10.5811; all 7.4795, even 7.4738); refined state x prev word 10.5788; K4000 10.5752 (even 10.5895); W8 10.5745 (even 10.5861). W128 whole-corpus not run (sample showed nothing).
+- Step 5 (MDL offer to Sieve): not run; the state is not a P.vote kind.
+- Reading: a real but tiny signal (lam 0.05-0.06, state alone 14.2-15.7 bits). Refinement, larger K and larger W do not help. Theme headroom is small here: CE leave-one-out oracle 10.5040, cheat 10.1343. Next discriminating test: soft state (mixture over nearest states, no CCA compression).
