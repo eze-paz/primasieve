@@ -1689,3 +1689,13 @@ features and fit run as separate chunks. Result (CatAcc / category bits): c32 0.
 v3 bag of categories at 32 (earlier run) 0.0781 / 5.7743; last two tokens 0.0713 / 5.8281. The rerun of v3 at 32 on
 the cached inputs did not finish in its chunk. Word identities carry more than their categories (5.6866 vs 5.7200), and
 the categories carry more under this estimator than as a logistic bag (5.7200 vs 5.7743).
+
+## CE: the theme ceiling (2026-11-05; owner: "do the cheat")
+The TC2 program's per-position bits on the 50,114 eval positions (bits_paq_sieve_tc2_offer.npy, mean 7.4822 = TC2
+online) mixed with an oracle: the word frequencies of the target's own book (3 books on these positions),
+P = (1-lam) P_prog + lam P_book, lam picked on the same positions (oracle). Cheat = the whole book, the target
+included; leave-one-out = the rest of the book, past and future. Script sieve_ceil.py, results sieve_ceil.json.
+**Result.** All positions: program 7.4822; cheat 7.3280 (lam 0.16); leave-one-out 7.4564 (lam 0.05). Content
+positions: program 10.5865; cheat 10.1343 (lam 0.31); leave-one-out 10.5040 (lam 0.10). The program already holds
+book-scope caches (nodecache W=book on views d, l, lw, y, t), so the book-so-far theme is mostly taken; perfect
+knowledge of the rest of the book's word frequencies leaves 10.5040 on content words.
