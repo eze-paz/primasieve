@@ -1641,3 +1641,12 @@ content contexts, training + library) instead of a new +-50 count (~260M pairs);
 refit overran 5-minute runs while V2 trained, so acceptance ran without the joint refit (sieve_kaccept.py: each piece's own
 fitted weight): lift NodeTopic[meaning axis; last 200] +3.5 bits after its charge (about 0.0004 bits/word on fit9); nothing
 else. Held-out not re-scored (the change is below the reporting precision). The two-axis Cell (R-a x MA) is not built.
+**V2 + watch.** V2 (child x child transitions, per-cell cost): layer 2 grew to 5,959 categories under the 408 (5,551 splits
+over 8 rounds; the last 0), no FULL node (no layer 3), 8 sibling passes (211 moved in the last). Watch: A (natural) purity
+0.9354, cohesion 0.9539 vs random 0.8785 (excess 0.0754), parent-child consistency 0.4448 -- semantic (readable: food /
+nourishment; grandmother / stepmother / godmother / godfather; grew / grows / waxed; amid / amidst). B (manual: topic
+k-means inside each parent, same child counts) purity 0.8556, excess 0.0490, consistency 0.4141 -- less semantic than A
+again (sieve_watch_v2.txt).
+**V2 A/B result -- FAIL.** Offered from the same base (TC2): A nothing accepted, B nothing accepted; fit 7.1766, online
+7.4822, CatAcc 0.1169 unchanged. Same as V1: the natural layer is the more semantic one, and neither adds bits over the
+408 categories.

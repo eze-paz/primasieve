@@ -1,0 +1,2 @@
+TH2 v2: 0 accepted; fit 7.1766 bits/word (TC2 7.1766) (71 s)
+TH2 v2b: 0 accepted; fit 7.1766 bits/word (TC2 7.1766) (69 s)

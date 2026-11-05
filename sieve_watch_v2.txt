@@ -1,0 +1,22 @@
+SA3 watch hv21 under ha1: categories 5959; purity 0.9354; cohesion 0.9539; random_cohesion 0.8785; parent_child_consistency 0.4448 (49 s)
+   parent 418: answer | return | desire | visit | reply | attempt
+   parent 410: young | poor | unconditional, touchy, unpeopled, moribund, bristly | stout, dapper | gallant, wily, trusty | colored
+   parent 320: under | within | during | beyond | amid, amidst | throughout
+   parent 255: became | become | grew, grows, waxed | grow, emit | becomes
+   parent 137: money, siller | business | trouble | faith, affiance | news | food, nourishment, ventilation, pasturage, kith
+   parent 22: but, whereat, howbeit, nathless, leastways | mellowing, looping, metamorphoses, oscillation, mechanisms
+   parent 8: father | mother | husband, trousseau | majesty, ladyship | grandmother, stepmother, confessor, godmother, godfather | palates, pectoral, pigtails, tonsure, plica
+   parent 158: has | hath | hez
+   parent 92: up | off | forth | aside | asunder, thwack, tailings, ambushes, rugby
+   parent 41: began | ought | wanted | tried | immured, deflect, tabooed, fend, supervised | meant
+SA3 watch hv2b1 under ha1: categories 5959; purity 0.8556; cohesion 0.9308; random_cohesion 0.8818; parent_child_consistency 0.4141 (49 s)
+   parent 418: answer, reply | return, consent | desire | regard, objection, endeavour, incline | claim, appeal, resolve | visit
+   parent 410: young, colored, dissolute, talented, seafaring | poor, bereaved, benighted, motherless, demented | stout, gallant, drunken, bearded, trusty | valiant, stalwart, hapless, godlike | fella, oskaloosa, yuba | wily, luckless, intrepid, doughty, unwary
+   parent 320: under | within, beyond, skirting | during, throughout, despite, notwithstanding | amid, amidst | mid, neath, dims | disregarding, pending
+   parent 255: become, becomes | became | grew, grow, grows | waxed | emit
+   parent 137: money, wages, cash, compensation, reckoning | business | mercy, counsel, vengeance, sport, revenge | trouble, housekeeping, chores, spunk, housework | taste, stuff, humor, liquor | food, clothing, nourishment, victuals, refreshments
+   parent 22: but, leastways, howsomever, mellowing, looping | whereat, howbeit, nathless
+   parent 8: father, mother, husband, stepmother, godfather | majesty, highness, excellency, beck, dragoman | grandfather, grandmother, lordship, ladyship | sire, confessor | godmother, persecutor | nieces, trousseau
+   parent 158: has | hath | hez
+   parent 92: up, thwack, tailings, ambushes, rugby | off | forth | aside | asunder
+   parent 41: wanted, tried, meant, fend, deflect | began | wished, promised, refused, hoped, consented | ought | dared, ventured, pretended, yielded, longed | proceeded, managed, attempted, contrived

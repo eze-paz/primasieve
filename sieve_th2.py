@@ -106,10 +106,10 @@ def v3b(F, P):
     cent /= np.maximum(np.linalg.norm(cent, axis=1, keepdims=True), 1e-9); live = [c for c in range(K) if c not in fixed and np.abs(cent[c]).sum() > 0]; lab = TX.kmeans(cent[live], 100)
     pmap = np.arange(K); pmap[live] = np.array(live)[[np.nonzero(lab == l)[0][0] for l in lab]]                                     # parent id = first member category of the cluster
     np.savez(os.path.join(d_(F), "th2_v3b.npz"), cls=pmap[cls]); F.log(f"TH2 v3b: {len(np.unique(lab))} semantic parents over {len(live)} categories")
-def v1b(F, P):
-    """SA3 manual adjustment (B) of V1: inside each parent, the same number of children re-formed by k-means on topic profiles"""
+def v1b(F, P, src="th2v1_1.npz", dst="th2_v1b.npz", nm="v1b"):
+    """SA3 manual adjustment (B) of V1 (or V2): inside each parent, the same number of children re-formed by k-means on topic profiles"""
     import sieve_vec as SV, sieve_tax as TX
-    par = np.load(os.path.join(d_(F), "train1a.npz"))["cls"]; ch = np.load(os.path.join(d_(F), "th2v1_1.npz"))["ch"]; C = P.ccount().astype(float); d, Cc, rid, rows, *_ = SV.base(F, P)
+    par = np.load(os.path.join(d_(F), "train1a.npz"))["cls"]; ch = np.load(os.path.join(d_(F), src))["ch"]; C = P.ccount().astype(float); d, Cc, rid, rows, *_ = SV.base(F, P)
     z = np.load(os.path.join(d, "topic_svd.npz")); X = np.zeros((F.Vt, 150), np.float32); X[rows] = z["U"] * np.sqrt(z["S"])[None, :]; X /= np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-9)
     has = np.zeros(F.Vt, bool); has[rows] = True; out = ch.copy(); nxt = int(ch.max()) + 1; t0 = time.time()
     for p in np.unique(par[1:F.Vt - 1]):
@@ -118,8 +118,9 @@ def v1b(F, P):
         mp = m[has[m]]
         if len(mp) < k: continue
         lab = TX.kmeans(X[mp], k); ids = np.arange(nxt, nxt + k); nxt += k; out[mp] = ids[lab]; first = ids[np.bincount(lab, weights=C[mp], minlength=k).argmax()]; out[m[~has[m]]] = first
-    np.savez(os.path.join(d_(F), "th2_v1b.npz"), ch=out); F.log(f"TH2 v1b: {len(np.unique(out[1:F.Vt - 1])):,} semantic children ({time.time() - t0:.0f} s)")
-SRC = dict(v3=("th2_v3.npz", "cls"), v1=("th2v1_1.npz", "ch"), v2=("th2_v2.npz", "ch"), v3b=("th2_v3b.npz", "cls"), v1b=("th2_v1b.npz", "ch"))
+    np.savez(os.path.join(d_(F), dst), ch=out); F.log(f"TH2 {nm}: {len(np.unique(out[1:F.Vt - 1])):,} semantic children ({time.time() - t0:.0f} s)")
+def v2b(F, P): v1b(F, P, "th2_v2.npz", "th2_v2b.npz", "v2b")
+SRC = dict(v3=("th2_v3.npz", "cls"), v1=("th2v1_1.npz", "ch"), v2=("th2_v2.npz", "ch"), v3b=("th2_v3b.npz", "cls"), v1b=("th2_v1b.npz", "ch"), v2b=("th2_v2b.npz", "ch"))
 def load(F):
     for v, (fn, key) in SRC.items():
         f = os.path.join(d_(F), fn)
@@ -129,7 +130,7 @@ def setup():
     import sieve_tchier as TH; F, P, P3, O = TH.setup(); load(F); P3.TOKATTR = tuple(dict.fromkeys(P3.TOKATTR + tuple(f"h{v}1" for v in SRC))); return F, P, P3, O
 def main(argv):
     F, P, P3, O = setup(); out = os.path.join(F.HERE, "sieve_th2_offer.json")
-    if argv[1] in ("v3", "v1", "v2", "v3b", "v1b"): globals()[argv[1]](F, P); return
+    if argv[1] in ("v3", "v1", "v2", "v3b", "v1b", "v2b"): globals()[argv[1]](F, P); return
     if argv[1] == "offer":
         v = argv[2]; C = cands(v); t0 = time.time()
         for sp in C:
