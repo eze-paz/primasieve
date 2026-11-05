@@ -1654,3 +1654,7 @@ TP amendments (before any TP result): built by sieve_tp.py. Words under 20 uses 
 each layer (one exchange move), not a dictionary / suffix placement. Inside a node the largest untried child is split
 next; both halves of a paying split stay eligible. The watch (SA3) runs on every layer; the manual adjustment (B) runs only
 on layers that fail the semantic criterion, as SA3 says ("if not, try manually adjusting").
+**TP partial (T6 grown; T6x2 at layer 4; T100 paused).** T6 grew 8 layers by itself: 8 / 38 / 212 / 932 / 2,993 / 5,754 /
+6,247 / 6,283 categories (objective -5.509e8 -> -5.176e8; layer 9 no paying split). Watch: L4 purity 0.7479, excess
+cohesion 0.1298; L6 0.9218 / 0.0767 (consistency 0.7053); L8 0.9274 / 0.0725 -- all semantic, so no manual B. Offered on
+TC2: L4 nothing accepted, L8 nothing accepted; fit 7.1766, online 7.4822, CatAcc 0.1169 unchanged. Other layers pending.

@@ -27,7 +27,7 @@ def sample(F, P, cat, par, seed=0):
         lines.append(f"   parent {p}: " + " | ".join(", ".join(words[x - 1] for x in np.nonzero(cat == c)[0][np.argsort(-C[cat == c])][:5] if 0 < x <= len(words)) for c in kids))
     return lines
 def main(argv):
-    import sieve_ma as MA; F, P, P3, O = MA.setup(); a = argv[1]; pa = argv[2] if len(argv) > 2 else None
+    import sieve_ma as MA, sieve_tp as TP; F, P, P3, O = MA.setup(); TP.load(F); a = argv[1]; pa = argv[2] if len(argv) > 2 else None
     r, _ = measures(F, P, F.AT[a], F.AT[pa] if pa else None); F.log(f"SA3 watch {a}" + (f" under {pa}" if pa else "") + ": " + "; ".join(f"{k} {v:.4f}" if isinstance(v, float) else f"{k} {v}" for k, v in r.items()))
     if pa:
         for l in sample(F, P, F.AT[a], F.AT[pa]): print(l, flush=True)
