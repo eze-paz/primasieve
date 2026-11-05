@@ -1,0 +1,32 @@
+   pass 3: objective -9.245720e+09 -> -9.245423e+09; 4,062 of 32,299 moved
+MA: phase passes, passes 3 (132 s)
+   pass 4: objective -9.245423e+09 -> -9.245289e+09; 2,623 of 32,299 moved
+MA: phase passes, passes 4 (142 s)
+   pass 5: objective -9.245289e+09 -> -9.245184e+09; 2,491 of 32,299 moved
+MA: phase passes, passes 5 (122 s)
+   pass 6: objective -9.245184e+09 -> -9.245143e+09; 1,649 of 32,299 moved
+MA: phase passes, passes 6 (138 s)
+   pass 7: objective -9.245143e+09 -> -9.245116e+09; 1,297 of 32,299 moved
+MA: phase passes, passes 7 (123 s)
+   pass 8: objective -9.245116e+09 -> -9.245090e+09; 1,186 of 32,299 moved
+MA: phase passes, passes 8 (154 s)
+   pass 9: objective -9.245090e+09 -> -9.245075e+09; 970 of 32,299 moved
+MA: phase passes, passes 9 (136 s)
+   pass 10: objective -9.245075e+09 -> -9.245048e+09; 1,215 of 32,299 moved
+MA: phase passes, passes 10 (137 s)
+   pass 11: objective -9.245048e+09 -> -9.245029e+09; 962 of 32,299 moved
+MA: phase passes, passes 11 (117 s)
+   pass 12: objective -9.245029e+09 -> -9.245018e+09; 759 of 32,299 moved
+MA: phase passes, passes 12 (135 s)
+   pass 13: objective -9.245018e+09 -> -9.245012e+09; 665 of 32,299 moved
+MA: phase passes, passes 13 (113 s)
+   pass 14: objective -9.245012e+09 -> -9.245007e+09; 540 of 32,299 moved
+MA: phase passes, passes 14 (135 s)
+   pass 15: objective -9.245007e+09 -> -9.245002e+09; 436 of 32,299 moved
+MA: phase passes, passes 15 (115 s)
+   pass 16: objective -9.245002e+09 -> -9.245000e+09; 389 of 32,299 moved
+MA: phase passes, passes 16 (131 s)
+   pass 17: objective -9.245000e+09 -> -9.244990e+09; 526 of 32,299 moved
+MA: phase passes, passes 17 (117 s)
+   pass 18: objective -9.244990e+09 -> -9.244989e+09; 282 of 32,299 moved
+MA: phase done, passes 18 (128 s)

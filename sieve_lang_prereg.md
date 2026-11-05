@@ -1633,3 +1633,11 @@ topic k-means inside each parent, same child counts) purity 0.8559, excess 0.049
 same base: A nothing accepted, B nothing accepted; online 7.4822, CatAcc 0.1169 unchanged. Finding: at fine granularity
 the prediction objective arranges words semantically by itself (better than the manual semantic re-arrangement), but the
 finer layer adds nothing to the program over the 408 categories' n-gram.
+MA amendment (before any MA run): the meaning objective uses the existing topic co-occurrence matrix (+-20 tokens, 10,000
+content contexts, training + library) instead of a new +-50 count (~260M pairs); everything else as registered.
+**MA result -- negligible.** 18 passes to convergence (23,653 / 8,200 / ... / 282 moved); objective -9.258472e9 ->
+-9.244989e9. Watch: purity 0.5001, cohesion 0.7659 vs random 0.6387 (excess 0.1272) -- more topical than the taxonomy
+(excess 0.0909), less WordNet-pure (taxonomy 0.6376): meaning-by-subject crosses WordNet's files. The move loop's joint
+refit overran 5-minute runs while V2 trained, so acceptance ran without the joint refit (sieve_kaccept.py: each piece's own
+fitted weight): lift NodeTopic[meaning axis; last 200] +3.5 bits after its charge (about 0.0004 bits/word on fit9); nothing
+else. Held-out not re-scored (the change is below the reporting precision). The two-axis Cell (R-a x MA) is not built.
