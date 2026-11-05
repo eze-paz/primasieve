@@ -65,11 +65,24 @@ def grow(F, P, T):
             pof = list(range(E.K))                                                                        # each layer-L category is a node of layer L+1; its id is its first child
         save()
     F.log(f"TP {T}: layer {st['L']} phase {st['phase']}; {st['splits']} splits; {int((E.Nc > 0).sum()):,} categories; passes {st['passes']}")
+def tune(F, P, T, L):
+    """SA3 manual adjustment (B) of layer L: inside each layer-(L-1) node, the same number of children re-formed by k-means
+    on topic profiles; words without a profile join the heaviest new child"""
+    import sieve_vec as SV, sieve_tax as TX
+    ch = np.load(layerfile(F, T, L))["cls"]; par = np.load(layerfile(F, T, L - 1))["cls"] if L > 1 else np.where((np.arange(F.Vt) == 0) | (np.arange(F.Vt) == F.Vt - 1), ch, 0)
+    C = P.ccount().astype(float); d, Cc, rid, rows, *_ = SV.base(F, P); z = np.load(os.path.join(d, "topic_svd.npz")); X = np.zeros((F.Vt, 150), np.float32); X[rows] = z["U"] * np.sqrt(z["S"])[None, :]
+    X /= np.maximum(np.linalg.norm(X, axis=1, keepdims=True), 1e-9); has = np.zeros(F.Vt, bool); has[rows] = True; out = ch.copy(); nxt = int(ch.max()) + 1; t0 = time.time()
+    for p in np.unique(par[1:F.Vt - 1]):
+        m = np.nonzero(par == p)[0]; m = m[(m > 0) & (m < F.Vt - 1)]; k = len(np.unique(ch[m])); mp = m[has[m]]
+        if k < 2 or len(mp) < k: continue
+        lab = TX.kmeans(X[mp], k); ids = np.arange(nxt, nxt + k); nxt += k; out[mp] = ids[lab]; out[m[~has[m]]] = ids[np.bincount(lab, weights=C[mp], minlength=k).argmax()]
+    np.savez(layerfile(F, T, L).replace(".npz", "b.npz"), cls=out); F.log(f"TP {T} layer {L} B: {len(np.unique(out[1:F.Vt - 1])):,} semantic children ({time.time() - t0:.0f} s)")
 def load(F):
     for T in CAP:
         for L in range(1, 30):
-            f = layerfile(F, T, L)
-            if os.path.exists(f): F.AT[f"ht{T}l{L}1"] = np.load(f)["cls"]
+            for x in ("", "b"):
+                f = layerfile(F, T, L).replace(".npz", x + ".npz")
+                if os.path.exists(f): F.AT[f"ht{T}l{L}{x}1"] = np.load(f)["cls"]
 def attrs(F): return [k for k in F.AT if k.startswith("ht") and "l" in k[3:] and k[2:].split("l")[0] in CAP]
 def setup():
     import sieve_th2 as T2; F, P, P3, O = T2.setup(); load(F); P3.TOKATTR = tuple(dict.fromkeys(P3.TOKATTR + tuple(attrs(F)))); return F, P, P3, O
@@ -77,7 +90,8 @@ def cands(v): return [dict(kind="descend", view=v, k=1, terms=[[0, f"h{v}1", 1, 
 def main(argv):
     a = argv[:]; F, P, P3, O = setup()
     if a[1] == "grow": grow(F, P, a[2]); return
-    T, L = a[2], int(a[3]); v = f"t{T}l{L}"; o_ = os.path.join(F.HERE, f"sieve_tp_{T}_L{L}_offer.json")
+    if a[1] == "tune": tune(F, P, a[2], int(a[3])); return
+    T, L = a[2], a[3]; v = f"t{T}l{L}"; o_ = os.path.join(F.HERE, f"sieve_tp_{T}_L{L}_offer.json")
     if a[1] == "offer":
         Cs = cands(v); t0 = time.time()
         for sp in Cs:

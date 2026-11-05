@@ -1658,3 +1658,24 @@ on layers that fail the semantic criterion, as SA3 says ("if not, try manually a
 6,247 / 6,283 categories (objective -5.509e8 -> -5.176e8; layer 9 no paying split). Watch: L4 purity 0.7479, excess
 cohesion 0.1298; L6 0.9218 / 0.0767 (consistency 0.7053); L8 0.9274 / 0.0725 -- all semantic, so no manual B. Offered on
 TC2: L4 nothing accepted, L8 nothing accepted; fit 7.1766, online 7.4822, CatAcc 0.1169 unchanged. Other layers pending.
+
+## CW: which context span predicts the next content word's meaning category (2026-11-05; owner: "try different levels of
+input word counts ... prior 2, 4, 8, sentence, paragraph ... only count prior content words") -- a probe, not a program piece
+sieve_ctxw.py. Target: the taxonomy level-1 category (ht1, 102) of the next word at content positions (outside the 100 most
+frequent words, as CatAcc); scored on the 23,787 held-out eval content positions as CatAcc (top-1) and category bits.
+Probe (v3): multinomial logistic regression (L-BFGS, 100 iterations, standardised columns) on 217,532 positions of
+training + library; features = log P(category | R-a category of t-1) and | t-2 (counts over the corpus) + a frequency bag of
+the R-a categories (408) of the span before t-2 + log span size. Modes: all tokens / content tokens only. Spans never cross
+a book; "sent" = sentence so far; "sent+4" = and the 4 sentences before (paragraph stand-in: the corpus marks sentences,
+not paragraphs). Amendments made while building: v1 (dev-only training, 91,670 positions) and v2 (bag without the n-gram)
+were too weak (wider spans scored worse, train too); unstandardised v3 ignored the bag; L2 1e-6 overfit, so 1e-3 (chosen
+between those two on the held-out positions -- a mild selection). all:sent+1, content:sent+1 and all:sent+4 overran 5
+minutes (not re-run).
+**CW result.** Prior only: CatAcc 0.0371, 6.3615 bits. Last two tokens: 0.0713, 5.8281. Plus the span before them
+(CatAcc / bits): all tokens 4: 0.0739 / 5.8548; 8: 0.0738 / 5.8296; 16: 0.0743 / 5.8052; 32: 0.0784 / 5.7875; 128:
+0.0784 / 5.7822; 512: 0.0753 / 5.8061; sentence: 0.0739 / 5.8381; book: 0.0756 / 5.8340. Content tokens only 4: 0.0715 /
+5.8392; 8: 0.0762 / 5.8043; 16: 0.0777 / 5.7879; 32: 0.0781 / 5.7743; 128: 0.0764 / 5.7838; 512: 0.0774 / 5.7895;
+sentence: 0.0720 / 5.8558; sentence + 4 before: 0.0795 / 5.7831; book: 0.0763 / 5.8243. Best: the last 32 content
+words (5.7743 bits) and about five sentences (CatAcc 0.0795); the sentence so far, short spans and the whole book add
+nothing over the last two tokens. As a bag of R-a categories, longer context carries little about the next meaning
+category; the last two tokens carry most of what this probe finds.
