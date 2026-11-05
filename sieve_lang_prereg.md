@@ -1713,3 +1713,36 @@ Standalone of TC2. Same tokenizer, 27M training tokens each, own top-60k vocab, 
 - Test A (last 2 words hidden) books: U 13.8271, U+T 12.5141, U+C 12.3711, U+T+C 11.9321, ceiling U+O 12.0260. wiki: 14.1059, 12.2035, 12.1444, 11.3960, 11.5474.
 - Test B (full) books: trigram L 12.0547, L+T 11.3036, L+C 11.0075, L+T+C 10.8531, ceiling L+O 10.8332. wiki: 11.5511, 10.5584, 10.1928, 9.9138, 9.8789.
 - Reading: counted meaning (trigger + document cache) is large against a trigram and reaches the document-frequency ceiling on both corpora; the trigger adds on top of the cache. Wikipedia shows more of it. The small MS gain on TC2 is consistent with TC2 already holding book caches/trigger tables. TC2 itself still scored on 3 eval books (not re-run on the 55).
+
+## MT2-MT5 — preregistered 2026-11-05, before any of these runs (same MT setup: 27M training tokens per corpus, 120k content positions, EM weights on odd, bits on even)
+Questions from the discussion: can meaning come from something other than co-occurrence counts and the last two words?
+- **MT2 definition vectors (D).** Each word's vector from its WordNet definitions only (gloss + synonym content words, sense weight 1/(r+1), TF-IDF, SVD 256); context = mean vector of the last 50 content words before t-2; P_D(y) proportional to unigram(y) * exp(beta * cos), beta picked on odd. Prediction: A U+D between U and U+T on both corpora; L+T+C+D lower than L+T+C by less than 0.05 bits. PASS = L+T+C+D below L+T+C on both corpora.
+- **MT3 sentence neighbours (N, MiniLM).** all-MiniLM-L6-v2 embeds the two complete sentences before the target's sentence; the k=50 nearest training contexts (cosine, over 300,000 sampled training contexts; embedded on a Kaggle T4 because the CPU measured ~26 contexts/s) vote with the content words of the sentence that followed them, weighted by similarity. Counting over neural meaning, not pure counting. Prediction: A U+N below U, above U+T+C; L+T+C+N below L+T+C by less than 0.1 bits. PASS = L+T+C+N below L+T+C on both corpora.
+- **MT4 hard vs soft states.** Same MiniLM contexts: hard = k-means K=1000 on training contexts, the next-sentence content counts of the nearest centroid; soft = N. Tests the MS reading that one-hard-cluster states are crude. Prediction: soft beats hard in test A on both corpora. PASS = A U+N below A U+H on both.
+- **MT5 corpus size.** T and L counted on the first 3M, 9M and 27M training tokens. Tests "more text sharpens counted meaning". Prediction: B L+T+C decreases with size on both corpora. PASS = monotone on both.
+- Not run here: re-scoring the TC2 program on 55 eval books (needs the full program build on new positions; cost not yet measured).
+
+## PH1-PH5 — phrasing and long-range links, preregistered 2026-11-05 before any run (sieve_mtph.py; MT data, splits and EM as MT)
+Owner: "how can we implement phrasing and long range linking cleverly" + "a pending word system ... carry it like a remainder until it's chosen".
+Two target sets: content words (the MT 120k) and all words (120k positions over every non-boundary, non-UNK eval token). Bits on even positions.
+- **PH1 skip n-gram (K).** P(y | c1, w[t-1]) with c1 = the last content word before t-1 (same document), absolute discount 0.75, backing off to P(y | c1), then unigram. PASS = L+K below L, all words, both corpora.
+- **PH2 long match (L8).** The trigram L extended by interpolated absolute-discount orders 4..8 (64-bit hashed contexts) — a stand-in for the longest earlier exact match. PASS = L8 below L, all words, both. Prediction: the largest of the five.
+- **PH3 distance pairs (G).** For d = 3..12: P_d(y | w[t-d]) counted on 3M training targets, add-1 smoothing toward unigram; G = mean over the defined d. PASS = L+G below L, all words, both.
+- **PH4 agreement memory (R).** P(y | last pronoun among he/she/it/they/i/you/we/his/her/him/them/its/their at distance >= 3 within 50 tokens, number of the last WordNet noun at distance >= 3 within 30 tokens: singular/plural/none), counted on all training targets. PASS = L+R below L, all words, both.
+- **PH5 pending words (P).** Each of the last 50 content words c before t-2 adds its 20 highest-lift partners (lift = P(y|c)/P(y), N(c,y) >= 5, from the MT trigger counts) to a pending set, weight log lift; a partner leaves the set once it has appeared after c (it was "chosen"). P_P(y) = pending weight of y / total. Control P0 = same with no removal. Note: CS (TC2) found a pending content prediction gave nothing on top of TC2; this version differs by removal-on-use. PASS = U+P below U+P0 (test A, content) AND L+T+C+P below L+T+C (content), both corpora.
+- Combined: L8+T+C+K+G+R+P on both target sets.
+Predictions: every piece below its base on both corpora; all-word gains in hundredths of a bit except PH2 (tenths); PH5 above P0 (removal helps) but under 0.02 bits on top of L+T+C.
+
+## MT2-MT5 + PH1-PH5 results (2026-11-05; logs mtR2.txt, mtR4.txt, mtR5.txt; sieve_mtest.json). Bits on even positions.
+- **MT2 definitions — PASS.** content L+T+C -> +D: books 10.8531 -> 10.8382; wiki 9.9138 -> 9.9110. A: U+D books 12.5933 (U+T 12.5141), wiki 12.9070 (U+T 12.2035). Coverage of targets 0.9648 / 0.9370.
+- **MT3 MiniLM neighbours — PASS (small).** Index 300k contexts, embedded on a Kaggle T4 (96 s / 119 s). content L+T+C -> +N: books 10.8531 -> 10.8517; wiki 9.9138 -> 9.8841. A: U+N books 13.7003, wiki 13.2052 (between U and U+T+C as predicted).
+- **MT4 hard vs soft — FAIL (reverse).** A: hard U+H books 13.5183, wiki 13.0407; soft U+N 13.7003 / 13.2052. Pooled hard states beat 50 weighted neighbours; the MS reading "hard states are crude" is not supported here — pooling more evidence per estimate matters more.
+- **MT5 size — PASS.** content L+T+C at 3M / 9M / 27M: books 11.4435 / 11.1346 / 10.8531; wiki 10.8568 / 10.3652 / 9.9138.
+- **PH1 skip n-gram — PASS.** all words L -> L+K: books 8.0759 -> 7.9814; wiki 8.2558 -> 8.0846. On top of L+T+C: books 7.7617 -> 7.7282; wiki 7.6017 -> 7.5358.
+- **PH2 8-gram — FAIL on books.** all words L8 vs L: books 8.2339 vs 8.0759; wiki 8.2190 vs 8.2558. With T+C: books 7.8114 vs 7.7617; wiki 7.4333 vs 7.6017. Prediction "tenths of a bit" failed. Note: fixed discount 0.75 at every order (as registered); not tuned.
+- **PH3 distance pairs — PASS alone, nothing in combination.** all words L+G books 8.0214, wiki 8.1771; weight 0.001 or less inside the full mix.
+- **PH4 agreement memory — PASS alone, nothing in combination.** all words L+R books 7.9848, wiki 8.1542; weight 0.004 or less inside the full mix (L base).
+- **PH5 pending words — FAIL.** Removal-on-use hurts: A U+P vs U+P0 books 13.6960 vs 13.6669, wiki 13.6857 vs 13.5875; on top of L+T+C: books 10.8526, wiki 9.9137 (L+T+C 10.8531 / 9.9138).
+- Best mixes: all words books L+T+C+K+G+R+P 7.7276 (L 8.0759); wiki L8+T+C+K+G+R+P 7.3874 (L 8.2558). Content books L8+T+C+D+N 10.7819; wiki L8+T+C+D+N 9.6083.
+- Defect: the ceiling O is NaN on all-word targets (function-word targets give a negative leave-one-out count); content-word O values are unaffected.
+- Not run: re-scoring the TC2 program on 55 books; offering K to TC2 under MDL.

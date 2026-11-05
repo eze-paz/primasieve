@@ -1,0 +1,49 @@
+PH count books: skip n-grams (20 s)
+PH count books: orders 4-8 (231 s)
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 90, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 52, in comp
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 471, in load
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 197, in __init__
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 112, in zipfile_factory
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\zipfile\__init__.py", line 1354, in __init__
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\zipfile\__init__.py", line 1421, in _RealGetContents
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 90, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 52, in comp
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 471, in load
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 197, in __init__
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 112, in zipfile_factory
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\zipfile\__init__.py", line 1354, in __init__
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\zipfile\__init__.py", line 1421, in _RealGetContents
+MT books_all A U: 9.9479 bits (weights [1.0]) (17 s)
+MT books_all A U+T: 9.8991 bits (weights [0.856, 0.144]) (17 s)
+MT books_all A U+C: 9.6607 bits (weights [0.801, 0.199]) (18 s)
+MT books_all A U+T+C: 9.6607 bits (weights [0.801, 0.0, 0.199]) (18 s)
+MT books_all A U+O: 9.6258 bits (weights [0.766, 0.234]) (19 s)
+MT books_all B L: 8.0759 bits (weights [1.0]) (19 s)
+MT books_all B L+T: 7.9256 bits (weights [0.889, 0.111]) (19 s)
+MT books_all B L+C: 7.7806 bits (weights [0.883, 0.117]) (20 s)
+MT books_all B L+T+C: 7.7617 bits (weights [0.863, 0.03, 0.107]) (22 s)
+MT books_all B L+O: nan bits (weights [0.866, 0.134]) (22 s)
+PH count wiki: skip n-grams (20 s)
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 90, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 52, in comp
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mtest\\wiki_phcount.npz'
+Traceback (most recent call last):
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 90, in <module>
+  File "C:\Users\aezequiel\Desktop\AI_Projects\primasieve\sieve_mtph.py", line 52, in comp
+  File "C:\Users\aezequiel\AppData\Local\Programs\Python\Python312\Lib\site-packages\numpy\lib\_npyio_impl.py", line 454, in load
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\aezequiel\\Desktop\\AI_Projects\\primasieve\\mtest\\wiki_phcount.npz'
+MT wiki_all A U: 10.6823 bits (weights [1.0]) (10 s)
+MT wiki_all A U+T: 10.3068 bits (weights [0.662, 0.338]) (10 s)
+MT wiki_all A U+C: 9.8594 bits (weights [0.759, 0.241]) (11 s)
+MT wiki_all A U+T+C: 9.8215 bits (weights [0.677, 0.096, 0.227]) (11 s)
+MT wiki_all A U+O: nan bits (weights [0.733, 0.267]) (12 s)
+MT wiki_all B L: 8.2558 bits (weights [1.0]) (12 s)
+MT wiki_all B L+T: 7.9263 bits (weights [0.828, 0.172]) (12 s)
+MT wiki_all B L+C: 7.6624 bits (weights [0.856, 0.144]) (13 s)
+MT wiki_all B L+T+C: 7.6017 bits (weights [0.802, 0.061, 0.137]) (13 s)
+MT wiki_all B L+O: nan bits (weights [0.801, 0.199]) (13 s)
