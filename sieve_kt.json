@@ -1,0 +1,44 @@
+{
+ "control": {
+  "even": 7.432458790702752,
+  "weights": [
+   1.0
+  ]
+ },
+ "sieve": {
+  "even": 7.47758769484051,
+  "weights": [
+   1.0
+  ]
+ },
+ "a control+cache": {
+  "even": 7.354011463781674,
+  "weights": [
+   0.921,
+   0.079
+  ]
+ },
+ "b control+cache+sieve": {
+  "even": 7.032233420648992,
+  "weights": [
+   0.615,
+   0.008,
+   0.378
+  ]
+ },
+ "c sieve+control": {
+  "even": 7.033203655347886,
+  "weights": [
+   0.385,
+   0.615
+  ]
+ },
+ "b control+cache+sieve minus a control+cache 95% CI": [
+  -0.3588544591085788,
+  -0.28366613146624714
+ ],
+ "c sieve+control minus a control+cache 95% CI": [
+  -0.3619096444778033,
+  -0.2842429384848132
+ ]
+}
