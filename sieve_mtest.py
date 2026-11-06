@@ -99,6 +99,8 @@ def evaluate(c):
     ds = np.searchsorted(Dc, Dc[T]); de = np.searchsorted(Dc, Dc[T], side="right"); kb = np.searchsorted(kp, ds); nh = np.searchsorted(kp, T - 2) - kb; nd = np.searchsorted(kp, de) - kb
     pC = hist / np.maximum(nh, 1); pO = (tot - 1) / np.maximum(nd - 1, 1)
     comps = dict(T=pT, C=pC, O=pO); combos = [(), ("T",), ("C",), ("T", "C"), ("O",)]; xtra = {}
+    if not SUF: np.savez(fp(c, "base_" + MODE), T=T, U=pU, L=pL, Tg=pT, C=pC)                              # RZ: per-position components
+    if os.environ.get("MT_BASEONLY"): log(f"MT {c}: base components saved"); return
     bases = [("A", pU, "U"), ("B", pL, "L")]; pf = fp(c, "ph_" + MODE)
     if os.path.exists(pf) and not SUF:                                                                    # PH1-PH5
         zp = np.load(pf); assert np.array_equal(zp["T"], T); comps.update({k_: zp[k_] for k_ in ("K", "G", "R", "P", "P0")}); bases.append(("B8", zp["X"], "L8"))
