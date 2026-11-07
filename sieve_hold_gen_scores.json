@@ -1,0 +1,44 @@
+{
+ "coherence": {
+  "BASE": 1.1,
+  "ALWAYS": 1.175,
+  "GATED": 1.05,
+  "truth": 4.875,
+  "GATED minus BASE": [
+   -0.15,
+   0.05
+  ],
+  "ALWAYS minus BASE": [
+   -0.075,
+   0.2256
+  ]
+ },
+ "fluency": {
+  "BASE": 1.925,
+  "ALWAYS": 1.925,
+  "GATED": 1.9,
+  "truth": 4.75,
+  "GATED minus BASE": [
+   -0.15,
+   0.1
+  ],
+  "ALWAYS minus BASE": [
+   -0.125,
+   0.125
+  ]
+ },
+ "pythia": {
+  "BASE": 7.648019337654114,
+  "ALWAYS": 7.736876571178437,
+  "GATED": 7.765335106849671,
+  "truth": 5.722517251968384,
+  "GATED minus BASE": [
+   -0.1354,
+   0.3792
+  ],
+  "ALWAYS minus BASE": [
+   -0.1566,
+   0.3415
+  ]
+ }
+}

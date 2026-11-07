@@ -1,0 +1,642 @@
+{
+ "U000": {
+  "coherence": 3,
+  "fluency": 3
+ },
+ "U001": {
+  "coherence": 5,
+  "fluency": 4
+ },
+ "U002": {
+  "coherence": 4,
+  "fluency": 4
+ },
+ "U003": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U004": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U005": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U006": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U007": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U008": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U009": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U010": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U011": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U012": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U013": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U014": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U015": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U016": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U017": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U018": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U019": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U020": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U021": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U022": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U023": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U024": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U025": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U026": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U027": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U028": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U029": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U030": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U031": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U032": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U033": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U034": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U035": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U036": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U037": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U038": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U039": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U040": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U041": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U042": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U043": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U044": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U045": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U046": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U047": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U048": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U049": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U050": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U051": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U052": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U053": {
+  "coherence": 4,
+  "fluency": 4
+ },
+ "U054": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U055": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U056": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U057": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U058": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U059": {
+  "coherence": 2,
+  "fluency": 3
+ },
+ "U060": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U061": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U062": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U063": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U064": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U065": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U066": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U067": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U068": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U069": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U070": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U071": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U072": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U073": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U074": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U075": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U076": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U077": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U078": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U079": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U080": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U081": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U082": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U083": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U084": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U085": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U086": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U087": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U088": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U089": {
+  "coherence": 5,
+  "fluency": 4
+ },
+ "U090": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U091": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U092": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U093": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U094": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U095": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U096": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U097": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U098": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U099": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U100": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U101": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U102": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U103": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U104": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U105": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U106": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U107": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U108": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U109": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U110": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U111": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U112": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U113": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U114": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U115": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U116": {
+  "coherence": 5,
+  "fluency": 4
+ },
+ "U117": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U118": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U119": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U120": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U121": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U122": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U123": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U124": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U125": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U126": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U127": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U128": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U129": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U130": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U131": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U132": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U133": {
+  "coherence": 2,
+  "fluency": 2
+ },
+ "U134": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U135": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U136": {
+  "coherence": 2,
+  "fluency": 3
+ },
+ "U137": {
+  "coherence": 5,
+  "fluency": 4
+ },
+ "U138": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U139": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U140": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U141": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U142": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U143": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U144": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U145": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U146": {
+  "coherence": 4,
+  "fluency": 4
+ },
+ "U147": {
+  "coherence": 5,
+  "fluency": 4
+ },
+ "U148": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U149": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U150": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U151": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U152": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U153": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U154": {
+  "coherence": 1,
+  "fluency": 1
+ },
+ "U155": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U156": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U157": {
+  "coherence": 1,
+  "fluency": 2
+ },
+ "U158": {
+  "coherence": 5,
+  "fluency": 5
+ },
+ "U159": {
+  "coherence": 1,
+  "fluency": 2
+ }
+}

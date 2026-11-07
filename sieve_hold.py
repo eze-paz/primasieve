@@ -55,4 +55,5 @@ def run(c):
         log(f"GATE {c} {nm}: even gain always {r['always']:+.4f}, gate A {r['gateA']:+.4f} (coverage {r['gateA_coverage']:.3f}, {r['gateA_states']} states), gate B {r['gateB']:+.4f} (coverage {r['gateB_coverage']:.3f}); "
             f"top states covering {r['top10']['coverage']:.3f}: {r['top10']['gain_inside']:+.4f} inside; syntax positions ({R['syntax_positions_even']}) always {r['syntax']['always']:+.4f}, A {r['syntax']['gateA']:+.4f}, B {r['syntax']['gateB']:+.4f}")
     A = json.load(open(os.path.join(HERE, "sieve_hold.json"))) if os.path.exists(os.path.join(HERE, "sieve_hold.json")) else {}; A[c] = R; json.dump(A, open(os.path.join(HERE, "sieve_hold.json"), "w"), indent=1)
-for c in sys.argv[1:]: run(c)
+if __name__ == "__main__":
+    for c in sys.argv[1:]: run(c)
