@@ -93,3 +93,8 @@ gives books +0.1072 / wiki +0.1674 bits, and a gate chosen on one half of the te
 average into books +0.0400 / wiki +0.0496 (cell gate). So the "opportune moment" exists and can be found from counts.
 Open: a fair syntax-position test (positions chosen by history, not by the arriving word), the sharpness and
 uncertainty signals of the gate, and whether the gated model changes generated text.
+
+## Follow-ups (MI2, 2026-11-07)
+- **Distributed state, no training** (random projections into leaky integrators at tau 1..128, nearest-neighbour readout): beats the discrete local state on the next class (books 5.6977 -> 5.5069 bits) — but the near blocks alone do the same (5.5014). The long blocks carry a little on their own (R_128 5.6858 vs shuffled 5.7138) and nothing once the near past is known. Still no synergy.
+- **Targets decided by long syntax:** far information is real there. Agreement on top of the exact last two words: books 0.4586 -> 0.4479 bits with the 8-word merged state of words 3-10; wiki 0.4953 -> 0.4787. Clause end: sentence position helps on wiki (0.2094 -> 0.1919). Small, but present, and concentrated where grammar predicts it should be.
+- **What it means for fluency:** the large lever in every test is the *near* context represented by similarity (distributed near state 5.5014 vs merged near state 5.6977), not long memory. Sieve's generation breaks where the exact near context is unseen and it backs off; a model that generalises across similar near contexts is the first fix. Long state is a second-order correction that matters at specific words (agreement, clause ends).
