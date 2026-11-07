@@ -1,0 +1,8 @@
+BIG books 27M (27,000,000 words): L 12.0547; L+T+C 10.8531; REDUCED-BEST 10.7470 (weights [0.339, 0.128, 0.299, 0.07, 0.014, 0.056, 0.094])
+BIG books 100M (100,000,000 words): L 11.7077; L+T+C 10.6243; REDUCED-BEST 10.4728 (weights [0.335, 0.109, 0.272, 0.047, 0.023, 0.083, 0.131])
+BIG books 200M (191,064,163 words): L 11.5456; L+T+C 10.5155; REDUCED-BEST 10.3355 (weights [0.339, 0.104, 0.257, 0.029, 0.027, 0.09, 0.153])
+BIG books: Pythia-70m on the same even content targets 10.1828; intervals 200M minus 27M: L+T+C [-0.357, -0.3187], REDUCED [-0.4316, -0.3915]
+BIG wiki 27M (27,000,000 words): L 11.5511; L+T+C 9.9138; REDUCED-BEST 9.6964 (weights [0.298, 0.177, 0.28, 0.026, 0.002, 0.03, 0.187])
+BIG wiki 100M (100,000,000 words): L 11.2743; L+T+C 9.7626; REDUCED-BEST 9.4829 (weights [0.288, 0.162, 0.269, 0.011, 0.003, 0.039, 0.227])
+BIG wiki 200M (200,000,000 words): L 11.1820; L+T+C 9.7061; REDUCED-BEST 9.3874 (weights [0.287, 0.153, 0.264, 0.001, 0.005, 0.042, 0.248])
+BIG wiki: Pythia-70m on the same even content targets 10.1570; intervals 200M minus 27M: L+T+C [-0.2303, -0.1847], REDUCED [-0.3296, -0.2881]
