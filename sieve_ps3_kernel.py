@@ -39,6 +39,8 @@ class Corpus:
         pU = (n1[s.y] + 0.5) / (n1.sum() + 0.5 * VV); b = S[s.T - 1]; c2 = look(u2, n2, b * VV + s.y)
         s.p2 = np.where(cb[b] > 0, np.maximum(c2 - D, 0) / np.maximum(cb[b], 1) + D * db[b] / np.maximum(cb[b], 1) * pU, pU)
         p = np.arange(s.N); s.ctx2 = np.where(p >= 2, S[np.maximum(p - 2, 0)] * VV + S[np.maximum(p - 1, 0)], -1)
+        cf = [f for f in glob.glob("/kaggle/input/**/*_cat.npz", recursive=True) + glob.glob(os.path.join(os.environ.get("PS3_CAT", "."), "*_cat.npz")) if os.path.basename(f).startswith(c)]
+        if cf: zc = np.load(cf[0]); s.cat = {1: zc["t1"], 2: zc["t2"]}                                       # PC: taxonomy category of every MT word id
         log(f"{c}: {s.N:,} tokens, {len(s.tr):,} training positions, {NEV:,} targets")
     def f_next(s, inv): return inv, colmap(s.ytr), FD
     def f_bag(s, inv, base):
@@ -119,8 +121,21 @@ def g3(cp, out):
         prev = fill(prev)                                                                                   # V5b: s_t = f(s_t-1, w_t-1)
         p = np.arange(cp.N); ctx = np.where(p >= 2, (sh(prev, 1) + 1) * VV + cp.S[np.maximum(p - 1, 0)], -1)
         prev = cp.states(ctx, cp.f_next, 256, f"V5b round {r}"); out[f"V5b_r{r}"] = cp.pred(prev)
+def catctx(cp, lev, k, skip=0):
+    """key of the categories of words t-1-skip .. t-k-skip (hashed for long windows); -1 where t < k + skip + 1"""
+    t = cp.cat[lev]; B = np.uint64(int(t.max()) + 2); p = np.arange(cp.N); h = np.zeros(cp.N, np.uint64)
+    with np.errstate(over="ignore"):
+        for j in range(1 + skip, k + 1 + skip): h = h * B + t[cp.S[np.maximum(p - j, 0)]].astype(np.uint64)
+    return np.where(p >= k + skip + 1, (h % np.uint64(2 ** 61 - 1)).astype(np.int64), -1)
+def g4(cp, out):
+    for k in (2, 3, 4, 6): out[f"PC1_{k}"] = cp.pred(cp.states(catctx(cp, 1, k), cp.f_next, 256, f"PC1 k{k}"))
+    cw = catctx(cp, 2, 4, skip=1); p = np.arange(cp.N)
+    with np.errstate(over="ignore"): key = ((cw.astype(np.uint64) * np.uint64(1000003) + cp.S[np.maximum(p - 1, 0)].astype(np.uint64)) % np.uint64(2 ** 61 - 1)).astype(np.int64)
+    out["PCW"] = cp.pred(cp.states(np.where(cw >= 0, key, -1), cp.f_next, 256, "PCW"))
+def g5(cp, out):
+    for k in (2, 3, 4, 6): out[f"PC2_{k}"] = cp.pred(cp.states(catctx(cp, 2, k), cp.f_next, 256, f"PC2 k{k}"))
 for c in ("books", "wiki"):
-    cp = Corpus(c); out = dict(T=cp.T, p2=cp.p2); dict(zip((1, 2, 3), (g1, g2, g3)))[GROUP](cp, out)
+    cp = Corpus(c); out = dict(T=cp.T, p2=cp.p2); dict(zip((1, 2, 3, 4, 5), (g1, g2, g3, g4, g5)))[GROUP](cp, out)
     for k, v in out.items():
         if k not in ("T",): assert np.all(np.isfinite(v)) and np.all(v > 0), k
     np.savez(os.path.join(OUTD, f"{c}_g{GROUP}.npz"), **out); log(f"{c} group {GROUP} saved: {sorted(out)}")
