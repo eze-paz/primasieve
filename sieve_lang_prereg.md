@@ -1942,3 +1942,18 @@ Owner: "try search while writing now". Under log-loss, extra search with the sam
 - Pythia-410m bits per token of the continuation: 7.8206 / 7.2077 / 6.6814 / 5.7225; B64 minus B1 [-1.4211, -0.8518], B64 minus B8 [-0.8259, -0.1804].
 - Copied 8-word windows: 0.004 / 0.028 / 0.105 / 0.000; repeated trigrams 0.000 / 0.000 / 0.001 / 0.004.
 - Predictions: Pythia bits improve (70%) held; coherence improves (55%) held; PASS (45%) held. Caveats: coherence moves from 1.000 to 1.175 on a 1-5 scale — still word salad by the rater's own anchors; part of the Pythia gain may come from more verbatim corpus copying at B 64 (0.105 of 8-word windows). More search reliably makes the text more fluent; it does not yet make it coherent.
+
+## SW2 — search while writing with a verifier that holds the thread, preregistered 2026-11-07 before any run
+Owner: "do it" (after SW: more search -> more fluent, still word salad). Same generator, prompts and judges as SW; changes:
+- **Lookahead h = 20 words; commit the first 5 words of the best rollout** (clause-level steps; 10 steps per 50-word continuation).
+- **Verifier v2 (sees the whole passage):** per word log(0.7 x P_trigram + 0.3 x P_cache) + 1.0 x [content] x log((P_trigger + 1e-6) / (P_unigram + 1e-6)), where P_cache = the word's share among the content words of prompt + text so far (0 for function words) and P_trigger uses the last 50 content words; minus 3 per repeated trigram.
+- **Copy cap:** a rollout containing any 8-word window that occurs verbatim in the training text (checked against the committed tail + rollout) is excluded unless every rollout has one (then the fewest wins).
+- **Budgets B in {1, 64, 256, 1,024}** (B = 1: plain sampling, no search, as SW).
+- **Judges:** a fresh blind Claude rater on the 200 shuffled items (40 prompts x 4 budgets + true continuation), coherence and fluency 1-5 with the same instructions as SW; Pythia-410m bits per token; copy and repetition rates.
+- **PASS** = mean coherence rises at every budget step AND B1,024 above B1 (paired bootstrap 95% interval excluding zero) AND B1,024 mean coherence >= 2.0 (out of the "word salad" anchor) AND copied 8-word windows at B1,024 <= 0.02. Predictions: rise with interval 55%; coherence >= 2.0 at 1,024: 25%; PASS 20%.
+**SW2 results (2026-11-07; sieve_sw.py with SW_V=2; sieve_sw2_gen.json, sieve_sw2_blind_ratings.json + key, sieve_sw2_pythia.json, sieve_sw2_stats.json, sw2R1.txt) — FAIL (coherence bar not reached).** Budgets 1 / 64 / 256 / 1,024 / true continuation:
+- Blind coherence (fresh rater, 200 shuffled items): 1.000 / 1.125 / 1.150 / 1.325 / 4.875 — rises at every step; B1,024 minus B1 [0.175, 0.475] (256 minus 64 [-0.100, 0.150], 1,024 minus 256 [0.000, 0.350]). Fluency 1.450 / 2.000 / 1.925 / 1.900 / 4.650.
+- Pythia-410m bits per token: 7.8206 / 7.2131 / 6.9730 / 6.8208 / 5.7225; B1,024 minus B1 [-1.2666, -0.7330].
+- Copied 8-word windows: 0.004 / 0.000 / 0.000 / 0.000 / 0.000 (copy cap held); repeated trigrams 0.000 / 0.002 / 0.000 / 0.001 / 0.004.
+- PASS conditions: rise at every step — held; interval — held; coherence >= 2.0 at 1,024 — failed (1.325); copy <= 0.02 — held. Predictions: rise 55% (held); >= 2.0 at 25% (failed); PASS 20% (failed).
+- Reading: with copying ruled out, search over a corpus-only generator steadily buys coherence and fluency, but slowly (a 1,024x budget moves coherence 1.000 -> 1.325 on 1-5) and fluency saturates by 64. The generator's 4-word horizon and a bag-of-words verifier cannot hold a thread; the search finds better-formed splices, not meaning.

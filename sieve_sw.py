@@ -4,8 +4,9 @@ relevance - repetition), commit the first word of the best rollout. Run: py -3.1
 import os, sys, json, time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); import sieve_mtest as MT
-V, VV, D = MT.V, MT.VV, MT.D; C = "books"; NP, LP, LG, H = 40, 30, 50, 10; BUD = (1, 8, 64); T0 = time.time()
-GEN = os.path.join(MT.OUT, "sw_gen.json"); IDX = MT.fp(C, "sw_index")
+V, VV, D = MT.V, MT.VV, MT.D; C = "books"; NP, LP, LG = 40, 30, 50; T0 = time.time(); V2 = os.environ.get("SW_V") == "2"
+H, COMMIT, BUD = (20, 5, (1, 64, 256, 1024)) if V2 else (10, 1, (1, 8, 64))                               # SW2: clause steps, bigger budgets
+GEN = os.path.join(MT.OUT, "sw2_gen.json" if V2 else "sw_gen.json"); IDX = MT.fp(C, "sw_index")
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
 def k4(S, p):
     k = np.zeros(len(p), np.uint64)
@@ -42,27 +43,38 @@ class Model:
     def score(s, text, paths):
         """verifier: per word log P_L + 0.5 x content x log(P_T / P_U), minus 3 per repeated trigram"""
         R, h = paths.shape; full = np.concatenate([np.repeat(np.array(text)[None, -2:], R, 0), paths], 1); y = paths.ravel(); a = full[:, :-2].ravel(); b = full[:, 1:-1].ravel()
-        sc = np.log(s.pL(a, b, y)); con = (y > 100) & (y <= V); W = [w for w in text if 100 < w <= V][-50:]; W = [w for w in W if s.rc[w] > 0]
+        con = (y > 100) & (y <= V); W = [w for w in text if 100 < w <= V][-50:]; pl = s.pL(a, b, y)
+        if V2:                                                                                                # SW2: cache over the passage's content words
+            hist = np.array([w for w in text if 100 < w <= V]); u_, n_ = np.unique(hist, return_counts=True) if len(hist) else (np.zeros(0, np.int64), np.zeros(0, np.int64))
+            pc = np.where(con, (MT.look(u_, n_, y) if len(u_) else 0) / max(len(hist), 1), 0.0); sc = np.log(0.7 * pl + 0.3 * pc)
+        else: sc = np.log(pl)
+        W = [w for w in W if s.rc[w] > 0]; TW = 1.0 if V2 else 0.5
         if W and con.any():
             pT = np.zeros(con.sum())
             for w in W: pT += MT.look(s.tu, s.tn, w * VV + y[con]) / s.rc[w]
-            pT /= len(W); sc[con] += 0.5 * np.log((pT + 1e-6) / (s.pUall[y[con]] + 1e-6))
+            pT /= len(W); sc[con] += TW * np.log((pT + 1e-6) / (s.pUall[y[con]] + 1e-6))
         sc = sc.reshape(R, h).sum(1); seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}
         for r in range(R):
             tt = seen.copy(); ext = list(text[-2:]) + list(paths[r]); rep = 0
             for i in range(len(ext) - 2):
                 g = tuple(ext[i:i + 3]); rep += g in tt; tt.add(g)
             sc[r] -= 3 * rep
+        if V2:                                                                                                # copy cap: 8-word windows found verbatim in the training text
+            ext = np.concatenate([np.repeat(np.array(text)[None, -7:], R, 0), paths], 1); nw = ext.shape[1] - 7
+            a8 = np.zeros((R, nw), np.uint64); b8 = np.zeros((R, nw), np.uint64)
+            for i in range(4): a8 = (a8 << np.uint64(16)) | ext[:, i:i + nw].astype(np.uint64); b8 = (b8 << np.uint64(16)) | ext[:, 4 + i:4 + i + nw].astype(np.uint64)
+            with np.errstate(over="ignore"): h8 = (a8 * np.uint64(0x9E3779B97F4A7C15)) ^ b8
+            j = np.minimum(np.searchsorted(s.H8, h8), len(s.H8) - 1); ncp = (s.H8[j] == h8).sum(1); sc = sc - 1e6 * ncp
         return sc
     def generate(s, prompt, B, seed):
         rng = np.random.default_rng(seed); text = list(prompt)
-        for _ in range(LG):
+        while len(text) - len(prompt) < LG:
             ctx = np.array(text[-4:])[None]
             if B == 1: text.append(int(s.nxt(ctx, rng)[0])); continue
             paths = np.zeros((B, H), np.int64); cur = np.repeat(ctx, B, 0)
             for j in range(H): paths[:, j] = s.nxt(cur, rng); cur = np.concatenate([cur[:, 1:], paths[:, j:j + 1]], 1)
-            text.append(int(paths[np.argmax(s.score(text, paths)), 0]))
-        return text[len(prompt):]
+            text.extend(int(w) for w in paths[np.argmax(s.score(text, paths)), :COMMIT])
+        return text[len(prompt):len(prompt) + LG]
     def words(s, ids): return " ".join("." if i == 0 else "<unk>" if i > V else str(s.vw[i]) for i in ids).replace(" .", ".")
 def prompts(m):
     st = np.nonzero((m.S[m.ntr + 1:-100] != 0) & (m.S[m.ntr:-101] == 0))[0] + m.ntr + 1; st = st[np.linspace(0, len(st) - 1, NP).astype(int)]
@@ -87,5 +99,5 @@ def stats():
             i = np.minimum(np.searchsorted(m.H8, h), len(m.H8) - 1); cp.append(float((m.H8[i] == h).mean()))
             tg = [tuple(ids[j:j + 3]) for j in range(len(ids) - 2)]; rp.append(1 - len(set(tg)) / len(tg))
         R[str(B)] = dict(copy8=float(np.mean(cp)), repeat3=float(np.mean(rp))); log(f"SW stats B={B}: copied 8-word windows {np.mean(cp):.3f}, repeated trigrams {np.mean(rp):.3f}")
-    json.dump(R, open(os.path.join(HERE, "sieve_sw_stats.json"), "w"), indent=1)
+    json.dump(R, open(os.path.join(HERE, "sieve_sw2_stats.json" if V2 else "sieve_sw_stats.json"), "w"), indent=1)
 if __name__ == "__main__": dict(index=index, gen=gen, stats=stats)[sys.argv[1]]()

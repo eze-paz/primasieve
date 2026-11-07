@@ -1,0 +1,7 @@
+SW gen: saved at prompt 33; rerun (233 s)
+SW gen: done, 200 items (76 s)
+SW stats B=1: copied 8-word windows 0.004, repeated trigrams 0.000 (12 s)
+SW stats B=64: copied 8-word windows 0.000, repeated trigrams 0.002 (12 s)
+SW stats B=256: copied 8-word windows 0.000, repeated trigrams 0.000 (12 s)
+SW stats B=1024: copied 8-word windows 0.000, repeated trigrams 0.001 (12 s)
+SW stats B=truth: copied 8-word windows 0.000, repeated trigrams 0.004 (12 s)
