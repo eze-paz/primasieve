@@ -54,3 +54,42 @@ one joint key; total key about 25 bits split by measured information.
 - **Recursive discrete merging forgets:** a 64-state recursive merge loses information as it reaches further back (books h2 1.2553 -> h128 1.1714). A fixed small discrete state must spend its few bits (6) on the near past, which is worth far more per bit; merging by the next 4 classes made it worse, not better.
 - **No synergy:** every candidate (far recursive state, held clause stack, sentence position, topic bag) is redundant with the last two words' state; the held stack adds books -0.0018 / wiki 0.0203 bits given the local state.
 - **What this implies:** with discrete count states the capacity is the bottleneck — log2(states) bits per step. Holding many weak far signals at once needs a distributed state (many dimensions in superposition), which is what neural recurrent states and transformers have and counting tables do not. The candidates that remain: (a) a distributed state computed without training (e.g. random-feature / reservoir recurrence over word vectors, read out by counts or nearest neighbours); (b) measuring on targets where long syntax decides the word (agreement, clause closure) instead of the average word, where these signals are diluted.
+
+## 6. Carrying weak signals and choosing the moment they take over (2026-11-07)
+The MI results say a fixed small state cannot hold far signals; averaged over all words they are worth little. The
+design splits the problem into **carry**, **arbitrate**, **release**.
+
+**Carry: an item buffer, not a compressed state.** Keep discrete held items (open-clause markers, recent nouns, open
+quotes/brackets) next to the local state, each with an activation that decays as a power law of its age:
+A = log sum_j age_j^(-d). Theory: ACT-R base-level activation (Anderson & Schooler 1991, "Reflections of the
+environment in memory") uses d about 0.5 because the recurrence of things in the environment follows a power law; our
+corpus gives d = 0.46 (books) / 0.34 (wiki) from E1. Separate storage means far items never compete with the near
+past for the same few bits (the failure of the recursive merge).
+
+**Arbitrate: precision-weighted, situation-specific gating.** Optimal cue combination weights each source by its
+reliability (precision) *in the current situation* (Ernst & Banks 2002; predictive coding's precision weighting;
+Yu & Dayan 2005: "unexpected uncertainty" releases stored context). The next-word model is a gated product of experts:
+log P(y) = log P_local(y) + g * log P_item(y) - log Z, with the gate g driven by three counted signals:
+1. **applicability** — the pointwise conditional information I(Y; item | L = l) for this local state l, a table
+   counted from the corpus (the opportune moment is a property of the local situation, not of the item alone);
+2. **sharpness / disagreement** — how confident the item's prediction is and how far it is from the local one (KL);
+3. **local uncertainty** — the entropy of P_local; a confident local state should not be overridden.
+Gate = threshold on these (ACT-R retrieval threshold). All counted, no gradient training.
+
+**Why the averaged synergy test can miss it.** Averaged I(Y; H | L) was about 0 (books -0.0018, wiki 0.0203), but an
+average over all local states can hide a few states where the held item decides the word (e.g. where a verb is due
+inside an open clause). Gating puts all the weight there and none elsewhere, so the gated gain can exceed the average.
+
+**Release.** When the expected element arrives (the verb that closes the clause, the closing quote) the item is
+popped (bounded pushdown); a used item is refractory for a while so it cannot enforce itself repeatedly (repetition).
+
+**Tests.** (1) Concentration: is the held item's benefit concentrated in a few local states, selected on one half of
+the held-out text and measured on the other? If not, the idea fails cheaply. (2) Gated vs always-on vs local-only,
+all words and syntax-decided positions. (3) Generation with the gate, blind-rated.
+
+**Concentration check result (HOLD, 2026-11-07).** The held clause stack is worth almost nothing on average (books
+-0.0021 bits, wiki +0.0207) but its benefit is concentrated: inside the local states covering about 10% of positions it
+gives books +0.1072 / wiki +0.1674 bits, and a gate chosen on one half of the text and measured on the other turns the
+average into books +0.0400 / wiki +0.0496 (cell gate). So the "opportune moment" exists and can be found from counts.
+Open: a fair syntax-position test (positions chosen by history, not by the arriving word), the sharpness and
+uncertainty signals of the gate, and whether the gated model changes generated text.
