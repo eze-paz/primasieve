@@ -41,13 +41,18 @@ def fit(c, K):
         t1 = time.time(); new, ll = assign(X, phis(X, zz, K)); last = time.time() - t1; ch = int((new != zz).sum()); zz = new
         log(f"PS fit {c} K{K}: iteration {it + 1}, moved {ch:,}, states in use {len(np.unique(zz)):,}, bits/feature-count {-ll / X.sum() / np.log(2):.4f}")
     np.savez(sf, z=zz, it=IT); log(f"PS fit {c} K{K}: done")
-def score(c, K):
-    q = np.load(MT.fp(c, "ps_prep")); X = q["X"]; mi = q["mi"]; T = q["T"]; eidx = q["eidx"]
-    with np.load(MT.fp(c, f"ps_fit{K}")) as s: zz = s["z"].copy(); assert int(s["it"]) == IT
+def score(c, K, tag=None):
+    q = np.load(MT.fp(c, "ps_prep")); T = q["T"]; eidx = q["eidx"]
+    if tag is None:
+        X = q["X"]; mi = q["mi"]
+        with np.load(MT.fp(c, f"ps_fit{K}")) as s: zz = s["z"].copy(); assert int(s["it"]) == IT
+    else:                                                                                                  # PS2: states fitted on Kaggle
+        with np.load(os.path.join(MT.OUT, "kaggle_ps2", "out", f"{c}_{tag}.npz")) as s: mi, zz, lph_ext = s["mi"].astype(np.int64), s["z"].astype(np.int64), torch.tensor(s["lph"])
+        if tag in ("A1", "B50000"): assert np.array_equal(mi, q["mi"]), "member set differs from the local PS prep"
     g, uc, ci, y3, n3, cols = ctxs(c); n1, u2, n2 = g["n1"], g["u2"], g["n2"]
     stt = np.full(len(uc), -1, np.int64); stt[mi] = zz                                                    # member contexts keep their state
     ue = np.unique(eidx[(eidx >= 0)]); ue = ue[stt[ue] < 0]                                               # seen non-member eval contexts: one E-step
-    erow = np.full(len(uc), -1, np.int64); erow[ue] = np.arange(len(ue)); tr = feats(erow, ci, cols, n3, len(ue)); lph = phis(X, zz, K)
+    erow = np.full(len(uc), -1, np.int64); erow[ue] = np.arange(len(ue)); tr = feats(erow, ci, cols, n3, len(ue)); lph = phis(X, zz, K) if tag is None else lph_ext
     for a in range(0, len(ue), 20000): stt[ue[a:a + 20000]] = assign(dense(tr, a, min(a + 20000, len(ue))), lph)[0]
     z = np.load(MT.fp(c, "data")); S = z["S"].astype(np.int64); y = S[T]; b = S[T - 1]
     pU = (n1[y] + 0.5) / (n1.sum() + 0.5 * VV); b2 = u2 // VV; cb = np.bincount(b2, weights=n2, minlength=VV); db = np.bincount(b2, minlength=VV)
@@ -58,8 +63,9 @@ def score(c, K):
     es = np.where(eidx >= 0, stt[np.maximum(eidx, 0)], -1); cs = np.where(es >= 0, MT.look(ks, ns, np.maximum(es, 0) * VV + y), 0)
     ok = (es >= 0) & (tot[np.maximum(es, 0)] > 0); te = tot[np.maximum(es, 0)]; de = dis[np.maximum(es, 0)]
     pS = np.where(ok, np.maximum(cs - D, 0) / np.maximum(te, 1) + D * de / np.maximum(te, 1) * p2, p2)
-    np.savez(MT.fp(c, f"ps_S{K}"), T=T, S=pS, has_state=ok); log(f"PS score {c} K{K}: eval targets with a state {ok.mean():.3f}")
-def curve(c):
+    np.savez(MT.fp(c, f"ps_S{K}" if tag is None else f"ps2_S{tag}"), T=T, S=pS, has_state=ok); log(f"PS score {c} K{K} {tag or ''}: eval targets with a state {ok.mean():.3f}")
+TAGS = ("A1", "A4", "A16", "A64", "B50000", "B200000", "B1000000")
+def curve(c, ps2=False):
     bz = np.load(MT.fp(c, "base_content")); n = len(bz["T"]); odd = np.arange(n) % 2 == 1; ev = ~odd; blk = np.arange(n) // 500; ub = np.unique(blk[ev]); g = np.random.default_rng(0)
     def mix(cols):
         M = np.stack(cols, 1); w = np.full(M.shape[1], 1 / M.shape[1])
@@ -69,14 +75,21 @@ def curve(c):
         dl = (a_ - b_)[ev]; sm = np.bincount(blk[ev], weights=dl)[ub]; nn = np.bincount(blk[ev])[ub]
         s_ = [sm[i].sum() / nn[i].sum() for i in (g.integers(0, len(ub), len(ub)) for _ in range(2000))]; return [float(np.percentile(s_, 2.5)), float(np.percentile(s_, 97.5))]
     ltc, w = mix([bz["L"], bz["Tg"], bz["C"]]); lo, _ = mix([bz["L"]]); R = {"L": float(lo[ev].mean()), "L+T+C": dict(bits=float(ltc[ev].mean()), weights=w)}; out = {}
-    for K in KS:
-        q = np.load(MT.fp(c, f"ps_S{K}")); assert np.array_equal(q["T"], bz["T"])
+    for K in (TAGS if ps2 else KS):
+        q = np.load(MT.fp(c, f"ps2_S{K}" if ps2 else f"ps_S{K}")); assert np.array_equal(q["T"], bz["T"])
         b4, w4 = mix([bz["L"], bz["Tg"], bz["C"], q["S"]]); b2, w2 = mix([bz["L"], q["S"]]); out[K] = b4
         R[f"K{K}"] = {"L+T+C+S": dict(bits=float(b4[ev].mean()), weights=w4), "L+S": dict(bits=float(b2[ev].mean()), weights=w2)}
         log(f"PS {c} K{K}: L+S {b2[ev].mean():.4f}; L+T+C+S {b4[ev].mean():.4f} (weights {w4})")
-    R["H1 S16384 minus S256 CI"] = boot(out[16384], out[256]); R["H2 S16384 minus L+T+C CI"] = boot(out[16384], ltc)
-    log(f"PS {c}: L {R['L']:.4f}; L+T+C {R['L+T+C']['bits']:.4f}; H1 interval {R['H1 S16384 minus S256 CI']}; H2 interval {R['H2 S16384 minus L+T+C CI']}")
-    f = os.path.join(HERE, "sieve_mts.json"); A = json.load(open(f)) if os.path.exists(f) else {}; A[c] = R; json.dump(A, open(f, "w"), indent=1)
+    if ps2:
+        R["H_A A64 minus A1 CI"] = boot(out["A64"], out["A1"]); R["H_B B1000000 minus B50000 CI"] = boot(out["B1000000"], out["B50000"]); R["B1000000 minus L+T+C CI"] = boot(out["B1000000"], ltc)
+        log(f"PS2 {c}: L+T+C {R['L+T+C']['bits']:.4f}; H_A interval {R['H_A A64 minus A1 CI']}; H_B interval {R['H_B B1000000 minus B50000 CI']}")
+    else:
+        R["H1 S16384 minus S256 CI"] = boot(out[16384], out[256]); R["H2 S16384 minus L+T+C CI"] = boot(out[16384], ltc)
+        log(f"PS {c}: L {R['L']:.4f}; L+T+C {R['L+T+C']['bits']:.4f}; H1 interval {R['H1 S16384 minus S256 CI']}; H2 interval {R['H2 S16384 minus L+T+C CI']}")
+    f = os.path.join(HERE, "sieve_mts2.json" if ps2 else "sieve_mts.json"); A = json.load(open(f)) if os.path.exists(f) else {}; A[c] = R; json.dump(A, open(f, "w"), indent=1)
 if __name__ == "__main__":
     cmd, c = sys.argv[1], sys.argv[2]
-    dict(prep=prep, curve=curve)[cmd](c) if cmd in ("prep", "curve") else dict(fit=fit, score=score)[cmd](c, int(sys.argv[3]))
+    if cmd == "ps2":                                                                                      # score every Kaggle tag, then the curve
+        for t in TAGS: score(c, 256, t)
+        curve(c, ps2=True)
+    else: dict(prep=prep, curve=curve)[cmd](c) if cmd in ("prep", "curve") else dict(fit=fit, score=score)[cmd](c, int(sys.argv[3]))
