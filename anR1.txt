@@ -1,0 +1,14 @@
+AN books L+T+C+A12: 10.8257 (A alone 13.5374, weights [0.499, 0.163, 0.311, 0.026])
+AN books L+T+C+A48: 10.8149 (A alone 13.7477, weights [0.489, 0.163, 0.31, 0.038])
+AN books L+T+C+A192: 10.8051 (A alone 13.7827, weights [0.48, 0.162, 0.309, 0.049])
+AN books L+T+C+A768: 10.7974 (A alone 13.7235, weights [0.471, 0.161, 0.308, 0.061])
+AN books L+T+C+A3072: 10.7928 (A alone 13.5743, weights [0.464, 0.158, 0.306, 0.072])
+AN books: lambda 4 (exact 2); L+T+C 10.8531; EXACT 10.7763; ADAPT 10.8086; COMBO 10.7808; COMBO+A 10.7350
+AN books intervals: H1 [-0.0395, -0.0273] H2 [0.0116, 0.0215] H3 [0.0089, 0.0139] H4 [-0.0621, -0.0342] vs L+T+C [-0.0813, -0.0468]
+AN wiki L+T+C+A12: 9.7932 (A alone 12.7693, weights [0.442, 0.193, 0.285, 0.08])
+AN wiki L+T+C+A48: 9.7691 (A alone 12.9376, weights [0.429, 0.194, 0.283, 0.095])
+AN wiki L+T+C+A192: 9.7514 (A alone 12.9737, weights [0.419, 0.192, 0.281, 0.107])
+AN wiki L+T+C+A768: 9.7375 (A alone 12.9337, weights [0.411, 0.19, 0.28, 0.119])
+AN wiki L+T+C+A3072: 9.7289 (A alone 12.8172, weights [0.403, 0.186, 0.279, 0.132])
+AN wiki: lambda 4 (exact 4); L+T+C 9.9138; EXACT 9.7170; ADAPT 9.7551; COMBO 9.8579; COMBO+A 9.7024
+AN wiki intervals: H1 [-0.0712, -0.0579] H2 [0.0057, 0.0185] H3 [0.0144, 0.021] H4 [-0.1839, -0.1309] vs L+T+C [-0.2163, -0.1563]
