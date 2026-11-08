@@ -89,3 +89,5 @@ repeat-trigram guard, never <unk>, copy cap 8 (sieve_nounkb_kernel.py / sieve_e2
 37. JX2 (fresh prompts): JX3 replicated (fluency 0.650 [0.550, 0.750]; grammar 0.672 vs 0.585, paired interval above 0). JX10 grammar 0.746 but coherence 0.350 and many short sentences. New best = BEST + Brown junction veto eps 0.03, 4 classes back.
 38. JX3R (191M part): stronger veto with sentence length held (keepb) is worse (JX10B fluency 0.3625 vs JX3); eps 0.03 stays best. 1B arm waiting for a GPU.
 39. JXW: word n-gram junction veto on top of JX3. 3-gram inert (25 texts changed, n.s.); 4-gram fluency 0.6087 [0.493, 0.725] at the edge, grammar flat. JX3 stays best.
+40. Error analysis of JX3 (100 ungrammatical sentences): unfinished clauses 33, grammatical nonsense 25, wrong-role splices 21, verbless fragments 15.
+41. JXV: no sentence end before a verb-like word. Verbless share 0.186 -> 0.000 but fluency 0.395 (n.s., below) and grammar 0.624 vs 0.653. JX3 stays best.

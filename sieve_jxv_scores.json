@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "JX3V over JX3": {
+   "share": 0.3947,
+   "pairs": 38,
+   "interval": [
+    0.237,
+    0.553
+   ]
+  }
+ },
+ "coherence": {
+  "JX3V over JX3": {
+   "share": 0.4474,
+   "pairs": 38,
+   "interval": [
+    0.289,
+    0.605
+   ]
+  }
+ }
+}

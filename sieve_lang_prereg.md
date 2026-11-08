@@ -2593,3 +2593,14 @@ allows two GPU sessions, so kernel 3 (HC x 4, HF) starts when kernel 1 or 2 ends
 - Grammatical share: JX3 0.695 [0.650, 0.738], JX3W3 0.692 (paired [-0.033, 0.025]), JX3W4 0.676 (paired [-0.070, 0.029]), truth 0.858.
 - Predictions: JX3W3 fluency interval above 0.5 — failed; JX3W3 point above 0.5 — failed (0.360); JX3W4 grammar above JX3W3 — failed (0.676 vs 0.692); coherence of both not below 0.45 — failed for JX3W3 (0.400), held for JX3W4.
 - Reading: the 3-gram check is nearly inert (most joins already attested); the 4-gram check edges fluency (interval touches 0.5) without a grammar gain. Not adopted; JX3 stays the best.
+
+## JXV — hold the sentence open until it has a verb (preregistered 2026-11-08, before the run)
+- Error analysis of 100 ungrammatical JX3 sentences (mtest/kaggle_err, one linguist rater): unfinished clauses 33, grammatical nonsense 25, wrong-role splices 21, verbless fragments 15 (mostly a noun or prepositional phrase that ends the sentence), agreement 4, other 2; median first error 8 words in; stock phrases recur across prompts.
+- Rule (the owner's held-state idea in its narrowest form): a sentence may not end until it contains a word from a verb-like Brown class (classes taking more than 0.02 of what follows i/he/she/they/we/you/it in training, boundary class excluded). Arm JX3V = JX3 + this rule; base JX3. 80 fresh prompts (offset 51), 191M, Kaggle CPU. Logged: share of completed sentences with no verb-like word.
+- Judging: pairwise JX3V vs JX3 (one rater, 80 pairs), fluency and coherence; grammatical share of JX3, JX3V, truth (three raters by prompt thirds).
+- **Predictions:** verbless share lower in JX3V (90%); JX3V fluency point above 0.5 (55%); JX3V grammar share above JX3 by 0.03 (45%).
+**JXV results (2026-11-08; Kaggle CPU primasieve-jxv; sieve_jxv_*.json, sieve_gramjxv_*.json).** Fresh prompts (offset 51). Verbless share of completed sentences: JX3 0.186, JX3V 0.000. Texts changed: 38. Sentences: JX3 380, JX3V 322, truth 314.
+- Pairwise JX3V vs JX3 (38 changed pairs): fluency 0.3947 [0.237, 0.553], coherence 0.4474 [0.289, 0.605].
+- Grammatical share: JX3 0.653 [0.605, 0.698], JX3V 0.624 [0.578, 0.670] (paired [-0.073, 0.011]), truth 0.895.
+- Predictions: verbless share lower (90%) — held; JX3V fluency point above 0.5 — failed (0.395); grammar +0.03 — failed (lower).
+- Reading: holding the sentence open removes verbless fragments but the extra words are spliced on badly (run-ons, unfinished clauses), so the sentences that replace the fragments are no better. JX3 stays the best.

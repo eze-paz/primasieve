@@ -52,6 +52,9 @@ if JX:                                                                          
         for i in range(J + 1): kf = (kf << np.uint64(6)) | CLS_[i:NJ - J + i].astype(np.uint64)
         uf, nf = np.unique(kf, return_counts=True); uc, nc = np.unique(kf >> np.uint64(6), return_counts=True); TB[J] = (uf, nf, uc, nc); del kf
         log(f"class {J + 1}-gram table: {len(uf):,} distinct of {NJ - J:,}")
+    PRON = [i for i, w_ in enumerate(vw[:V + 2]) if w_ in ("i", "he", "she", "they", "we", "you", "it")]                  # verb-like classes: what follows subject pronouns
+    nxt = BCL[S[1:NJ][np.isin(S[:NJ - 1], PRON)]]; cf = np.bincount(nxt, minlength=BC) / max(len(nxt), 1); VCL = np.nonzero(cf > 0.02)[0]; VCL = VCL[VCL != 0]
+    VSET = np.zeros(BC, bool); VSET[VCL] = True; log(f"verb-like classes {VCL.tolist()} (share after pronouns {cf[VCL].round(3).tolist()})")
     del CLS_
     WT = {}
     for n in sorted({int(c["wn"]) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values() if c.get("wn")}):     # word n-gram tables (sorted hashes) over the first NJ tokens
@@ -111,6 +114,9 @@ def generate(cfg, pids):
             if cfg.get("wn"):                                                                                    # word junction veto: the n-gram ending in the next word must occur in training
                 n_ = int(cfg["wn"]); Wt = WT[n_]; hv2 = hn(np.c_[np.repeat(np.array([text[-(n_ - 1):]]), len(nx), 0), nx]); seen_ = Wt[np.minimum(np.searchsorted(Wt, hv2), len(Wt) - 1)] == hv2
                 JSTAT[2] += float((w * ~seen_ * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); bad = bad | ~seen_
+            if cfg.get("verbend"):                                                                               # hold the sentence open until it has a verb-like word
+                lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; cur = text[lb + 1:]
+                if not any(VSET[BCL[x_]] for x_ in cur) and len(cur) > 0: bad = bad | (nx == 0)
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
             if cfg.get("keepb") and uw[0] == 0:                                                                  # keep the sentence-end probability at its pre-veto value
@@ -127,7 +133,9 @@ GO = {}
 for nm, cfg in GENS.items():
     if JX: JSTAT[0] = JSTAT[1] = JSTAT[2] = 0
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
-    GO[nm] = dict(veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    if JX:                                                                                                    # share of completed sentences without a verb-like word
+        sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
+    GO[nm] = dict(verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
 GO["truth"] = dict(gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
