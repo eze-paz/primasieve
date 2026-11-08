@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "ncl_pair_ratings.json",
+  "ncl_pair_ratings_r2.json"
+ ],
+ "NCL vs NS coherence": {
+  "b_wins": 0.39166666666666666,
+  "a_wins": 0.425,
+  "mean": -0.0375,
+  "interval": [
+   -0.1959,
+   0.1208
+  ]
+ },
+ "NCL vs NS fluency": {
+  "b_wins": 0.425,
+  "a_wins": 0.4166666666666667,
+  "mean": 0.0125,
+  "interval": [
+   -0.15,
+   0.175
+  ]
+ }
+}
