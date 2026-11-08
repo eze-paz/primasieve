@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "harm2_pair_ratings.json",
+  "harm2_pair_ratings_r2.json"
+ ],
+ "HBlearn vs NET coherence": {
+  "b_wins": 0.4166666666666667,
+  "a_wins": 0.35833333333333334,
+  "mean": 0.0583,
+  "interval": [
+   -0.1002,
+   0.2167
+  ]
+ },
+ "HBlearn vs NET fluency": {
+  "b_wins": 0.525,
+  "a_wins": 0.36666666666666664,
+  "mean": 0.1583,
+  "interval": [
+   -0.0083,
+   0.325
+  ]
+ }
+}

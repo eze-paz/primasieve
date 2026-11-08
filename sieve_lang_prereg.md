@@ -2546,6 +2546,20 @@ Predictions: HB-learned pass (60%) held; HB-fixed pass (40%) held; HA-osc (35%) 
 failed; HD over HB-learned (30%) failed. Reading: oscillators help as the whole model (replacing attention), not as an
 add-on to attention or as a position code; learned periods beat the fixed ladder. Stage 2 for HBlearn pushed
 (primasieve-harm-s2a: HARM_EPOCHS 6, HARM_GEN 1 = CEIL's sampling on the 120 DBIG prompts from the best-dev epoch).
+**HARM stage-1 results, kernel 3 (mtest/kaggle_harm/out3; no FAILED or DIVERGED).** Dev bits/word after epochs 1 / 2:
+HC1 7.7557 / 7.5765 FAIL; HC2 7.6273 / 7.4440 PASS; HC4 7.5699 / 7.3894 PASS; HC8 7.5429 / 7.3683
+PASS; HF 7.5533 / 7.3812 PASS (above HBfix 7.3735). Predictions: HC synergy shape (25%) failed (1 band 7.5765, 2 bands
+7.4440, 4 bands 7.3894, 8 bands 7.3683: largest fall from 1 to 2, smallest from 4 to 8: diminishing returns); HF over
+HB-fixed (20%) failed. Reading: more period bands help, each added band less than the one before; tuning periods to the
+text's measured rhythms does not beat the geometric ladder.
+**HARM stage 2, HBlearn dev (primasieve-harm-s2a).** Dev bits/word by epoch 7.4941, 7.1966, 7.0694, 6.9725, 6.9372,
+6.9264 (best epoch 6; NET after 6 epochs 6.9498). 120 continuations sampled as CEIL, prompts identical to ceil_gen.json
+NET; side-by-side NET:HBlearn items mtest/kaggle_harm2 (sieve_harm2_pair_key.json), two blind raters.
+**HARM stage 2 result, HBlearn vs NET -- FAIL (sieve_harm2_pair_scores.json; rater agreement coherence 0.775, fluency
+0.892).** Coherence 0.0583 [-0.1002, 0.2167] (HBlearn preferred 0.417, NET 0.358); fluency 0.1583 [-0.0083, 0.325]
+(0.525 / 0.367). The coherence interval includes 0, so no replication run. Reading: the oscillator net reaches the same
+quality as attention (dev 6.9264 vs 6.9498, raters split), not better. Remaining preregistered arms: HG and HH (frozen
+HBlearn state fed back into Sieve), which stage 1 unlocked.
 
 ## SA8 — retrieve the contexts with the longest shared history (owner's idea: interpolate between the most similar contexts; preregistered 2026-11-08, before any run)
 - Flaw found: the index orders positions with the same last-4-word key by position, so for frequent keys the 3,072 candidates are the earliest occurrences, not the ones sharing the most history; the decoder already interpolates (softmax over candidates, summed by next word, power 6) but over an arbitrary sample.
@@ -2629,3 +2643,9 @@ add-on to attention or as a position code; learned periods beat the fixed ladder
 - Grammatical share: JX3 0.712 [0.667, 0.756], JX3CZ2 0.689 (paired [-0.084, 0.037]), JX3WZ2 0.648 [0.599, 0.693] (paired [-0.126, -0.003]), truth 0.906.
 - Predictions: a harmonic arm's coherence point above 0.5 — held (JX3WZ2 0.575, n.s.); fluency interval above 0.5 — failed (JX3WZ2 touches 0.487); grammar within 0.03 of JX3 — held for JX3CZ2, failed for JX3WZ2 (lower, paired interval below zero).
 - Reading: word harmonics lean toward the readers' preference on fluency and coherence (both n.s.) but lower the strict grammatical-sentence share, with fewer, longer sentences; class harmonics do nothing. Not adopted; JX3 stays the best.
+
+## HSVD — Brown clustering inside the harmonic model: phases fitted from counts (owner: "can you reproduce brown clustering under a harmonic model? ... Test it"; preregistered 2026-11-08, before the runs)
+- Theory: (1) Brown classes are a special case of the harmonic state (one shared phase per class, a short band with order-bound dims = the last few classes, which is what the JX3 veto counts). (2) Stratos, Kim, Collins & Hsu (2014): Brown classes are recoverable from a scaled SVD of the bigram count matrix; turning each word's singular-vector coordinates into phases gives a soft, continuous Brown code, and each band can be fitted at its own timescale (directed co-occurrence for tau 2 and 4, chunk-level LSA for tau >= 8). Closed-form linear algebra on counts: no gradient, no neural net.
+- sieve_hsvd_kernel.py (MT books 27M, training text only for all fitting): (a) recovery: token-weighted NMI between k-means(64) on the tau-2 SVD vectors and Brown exchange classes (64), against random vectors and the fine k-means classes; (b) information: PH's exact measurement (I(Y; Z | L) about the next fine class beyond the local state, kNN read-out, k and alpha chosen on odd held-out positions, reported on even, 2M sampled training positions, 40,000 queries) for RANDC (random class phases = PH's ALL, which gave 0.0650), RANDW (random word phases), SVDW (fitted word phases), with a paired bootstrap SVDW minus RANDW on ALL.
+- **Decision rule (fixed now):** go to a generation test (JX3 + SVDW harmonics, blind vs JX3) only if SVDW ALL beats RANDW ALL with the paired interval above zero.
+- **Predictions:** NMI(SVD tau 2, Brown) above NMI(fine k-means, Brown) (55%) and far above random (95%); SVDW ALL above RANDW ALL with interval above zero (60%); SVDW ALL above 0.0650 (RANDC / PH) (60%); in SVDW the long bands (tau >= 32) carry more than in RANDW (55%).
