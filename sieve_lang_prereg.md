@@ -2604,3 +2604,8 @@ allows two GPU sessions, so kernel 3 (HC x 4, HF) starts when kernel 1 or 2 ends
 - Grammatical share: JX3 0.653 [0.605, 0.698], JX3V 0.624 [0.578, 0.670] (paired [-0.073, 0.011]), truth 0.895.
 - Predictions: verbless share lower (90%) — held; JX3V fluency point above 0.5 — failed (0.395); grammar +0.03 — failed (lower).
 - Reading: holding the sentence open removes verbless fragments but the extra words are spliced on badly (run-ons, unfinished clauses), so the sentences that replace the fragments are no better. JX3 stays the best.
+**JX3R results, 1B arms (2026-11-08; Kaggle GPU primasieve-jx3r-1b; merged mtest/kaggle_jx3r/jxg_merged.json; sieve_jxg_*.json, sieve_gramjxg_*.json).** Same prompts as the 191M arms (offset 37; prompts and truth checked equal). Vetoed mass: G-JX3 0.300, G-JX10B 0.632. Class 5-gram table over the first 200,543,654 tokens of the 1B stream: 38,191,592 distinct (that stream's ids differ from the 191M stream's, extended vocabulary). Sentence ends: JX3 319, G-JX3 336, G-JX10B 303, truth 242.
+- Pairwise vs JX3 (191M): G-JX3 fluency 0.4875 [0.375, 0.588], coherence 0.525 [0.412, 0.637]; G-JX10B fluency 0.3875 [0.287, 0.487], coherence 0.3875 [0.287, 0.500].
+- Grammatical share (three raters): JX3 0.620 [0.571, 0.664], G-JX3 0.644 [0.597, 0.689] (paired [-0.045, 0.096]), G-JX10B 0.607 (paired [-0.079, 0.056]), truth 0.877.
+- Predictions: G-JX3 over JX3 coherence point above 0.5 (60%) — held weakly (0.525, n.s.).
+- Reading: 5x the data adds nothing measurable on top of the veto at this sample size; JX3 at 191M stays the reference (cheaper).

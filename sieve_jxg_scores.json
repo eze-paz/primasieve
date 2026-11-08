@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "G-JX3 over JX3": {
+   "share": 0.4875,
+   "pairs": 80,
+   "interval": [
+    0.375,
+    0.588
+   ]
+  },
+  "G-JX10B over JX3": {
+   "share": 0.3875,
+   "pairs": 80,
+   "interval": [
+    0.287,
+    0.487
+   ]
+  }
+ },
+ "coherence": {
+  "G-JX3 over JX3": {
+   "share": 0.525,
+   "pairs": 80,
+   "interval": [
+    0.412,
+    0.637
+   ]
+  },
+  "G-JX10B over JX3": {
+   "share": 0.3875,
+   "pairs": 80,
+   "interval": [
+    0.287,
+    0.5
+   ]
+  }
+ }
+}
