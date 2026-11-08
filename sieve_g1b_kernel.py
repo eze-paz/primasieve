@@ -91,22 +91,30 @@ LSTAT = []; HM = {}; SVDTH = None
 if any(c.get("svd") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):
     import scipy.sparse as sp
     from scipy.sparse.linalg import svds
-    Str_ = S[:ntr0].astype(np.int64); SVDTH = {}
+    SVDTH = {}
     def _ph(U):
         U = U / np.maximum(np.linalg.norm(U, axis=1, keepdims=True), 1e-12); th = np.arctan2(U[:, 1::2], U[:, 0::2]); dead = np.linalg.norm(U, axis=1) < 1e-9
         th[dead] = np.random.default_rng(7).random((dead.sum(), th.shape[1])) * 2 * np.pi; return th
-    for tau in (2, 4, 8, 16, 32, 64, 128):
-        lam = 1 - 1 / tau
-        if tau <= 4:
-            M = None
-            for j in range(1, (2 if tau == 2 else 4) + 1):
-                u, n = np.unique(Str_[:-j] * VV + Str_[j:], return_counts=True); m = sp.csr_matrix((n * lam ** (j - 1), (u // VV, u % VV)), shape=(VV, VV)); M = m if M is None else M + m
-            M = M.sqrt(); r = np.asarray(M.sum(1)).ravel(); c_ = np.asarray(M.sum(0)).ravel(); Mt = sp.diags(1 / np.sqrt(np.maximum(r, 1e-12))) @ M @ sp.diags(1 / np.sqrt(np.maximum(c_, 1e-12)))
-            U, s_, Vt = svds(Mt.astype(np.float64), k=128); V_ = U * s_[None]
-        else:
-            n_ = len(Str_) // tau; X = sp.csr_matrix((np.ones(n_ * tau), (np.repeat(np.arange(n_), tau), Str_[:n_ * tau])), shape=(n_, VV)).sqrt(); c_ = np.asarray(X.sum(0)).ravel()
-            X = X @ sp.diags(1 / np.sqrt(np.maximum(c_, 1e-12))); U, s_, Vt = svds(X.astype(np.float64), k=128); V_ = Vt.T * s_[None]
-        SVDTH[tau] = torch.tensor(_ph(V_), dtype=torch.float32, device=dev); log(f"SVD phases tau {tau}")
+    NEED = {(c.get("svdsrc", "mt"), int(c.get("D", 64))) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values() if c.get("svd")}
+    for src, Dp in sorted(NEED):                                                                                # phases per (fit text, phase count): mt = MT 27M training text, all = whole training stream
+        Str_ = (S[:ntr0] if src == "mt" else S[:ntr]).astype(np.int64); TH_ = {}
+        for tau in (2, 4, 8, 16, 32, 64, 128):
+            lam = 1 - 1 / tau
+            if tau <= 4:
+                M = None
+                for j in range(1, (2 if tau == 2 else 4) + 1):
+                    u, n = np.unique(Str_[:-j] * VV + Str_[j:], return_counts=True); m = sp.csr_matrix((n * lam ** (j - 1), (u // VV, u % VV)), shape=(VV, VV)); M = m if M is None else M + m; del u, n
+                M = M.sqrt(); r = np.asarray(M.sum(1)).ravel(); c_ = np.asarray(M.sum(0)).ravel(); Mt = sp.diags(1 / np.sqrt(np.maximum(r, 1e-12))) @ M @ sp.diags(1 / np.sqrt(np.maximum(c_, 1e-12)))
+                U, s_, Vt = svds(Mt.astype(np.float64), k=2 * Dp); V_ = U * s_[None]
+            else:
+                n_ = len(Str_) // tau; cap = 4_000_000                                                                       # svds keeps a dense basis of rows x ~2k floats: cap rows (memory and LAPACK limit)
+                if n_ > cap: keep_ = np.sort(np.random.default_rng(11).choice(n_, cap, replace=False)); log(f"LSA tau {tau}: {cap:,} of {n_:,} chunks sampled")
+                else: keep_ = np.arange(n_)
+                idx_ = (keep_[:, None] * tau + np.arange(tau)[None]).ravel(); n_ = len(keep_)
+                X = sp.csr_matrix((np.ones(n_ * tau, np.float32), (np.repeat(np.arange(n_, dtype=np.int32), tau), Str_[idx_].astype(np.int32))), shape=(n_, VV)); del idx_; X.sum_duplicates(); X.data = np.sqrt(X.data)   # 32-bit to fit 191M
+                c_ = np.asarray(X.sum(0)).ravel(); X = (X @ sp.diags((1 / np.sqrt(np.maximum(c_, 1e-12))).astype(np.float32))).astype(np.float32); U, s_, Vt = svds(X, k=2 * Dp); V_ = (Vt.T * s_[None]).astype(np.float64); del X
+            TH_[tau] = torch.tensor(_ph(V_), dtype=torch.float32, device=dev); log(f"SVD phases {src} D{Dp} tau {tau}")
+        SVDTH[(src, Dp)] = TH_; del Str_
 class Harm:                                                                                                    # harmonic state (from the HSWEEP kernels): damped oscillator bands over the last WIN symbols
     def __init__(s, cfg):
         s.cfg = cfg; g = torch.Generator().manual_seed(1); D = cfg.get("D", 64); s.WIN = cfg.get("WIN", 64); nsym = VV if cfg.get("symbol", "class") == "word" else int(FINE.max()) + 1
@@ -114,7 +122,7 @@ class Harm:                                                                     
         j = torch.arange(s.WIN, dtype=torch.float32, device=dev); s.bands = cfg.get("bands", (2, 4, 8, 16, 32, 64, 128)); s.W = torch.stack([(1 - 1 / t) ** j for t in s.bands]); s.rot = torch.exp(1j * j[:, None] * s.omega[None, :])
     def enc(s, w):
         sym = torch.where(w >= 0, w, torch.zeros_like(w)); sym = sym if s.cfg.get("symbol", "class") == "word" else FINE[sym]
-        if s.cfg.get("svd"): zz = torch.stack([((torch.exp(1j * SVDTH[t][sym]) * s.rot[None] * (w >= 0)[:, :, None]) * s.W[b].to(torch.complex64)[None, :, None]).sum(1) for b, t in enumerate(s.bands)], 1)
+        if s.cfg.get("svd"): TH_ = SVDTH[(s.cfg.get("svdsrc", "mt"), int(s.cfg.get("D", 64)))]; zz = torch.stack([((torch.exp(1j * TH_[t][sym]) * s.rot[None] * (w >= 0)[:, :, None]) * s.W[b].to(torch.complex64)[None, :, None]).sum(1) for b, t in enumerate(s.bands)], 1)
         else: u = torch.exp(1j * s.theta[sym]) * s.rot[None] * (w >= 0)[:, :, None]; zz = torch.einsum("njd,bj->nbd", u, s.W.to(u.dtype))
         v = torch.cat([zz.real, zz.imag], 2); v = v / v.norm(dim=2, keepdim=True).clamp(min=1e-9); return v.reshape(len(w), -1) / math.sqrt(v.shape[1])
 def generate(cfg, pids):

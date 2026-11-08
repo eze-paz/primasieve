@@ -2711,6 +2711,13 @@ counting, and not past its 512-word training length.
 - JT is not end-to-end joint training (that needs Sieve distributions for every training position: about 40 h of CPU); it is the cheapest version in which the state is trained for the counting decoder's use rather than for next-word prediction.
 - **Predictions:** LT-4096 below HB512 with interval (50%); LT-4096 below NET512 with interval (55%); LT-512 above HB512 (60%); LT-16384 at or below LT-4096 (45%); JT's held-out AUC (true word vs other candidates) above the untrained cosine's (75%); JT over MEAN on coherence (20%).
 
+## JXT — tuning the count-fitted harmonics (owner: "do it"; preregistered 2026-11-08, before the runs)
+- Base = JX3S1 (new best). Three single-change arms, each vs JX3S1, 80 fresh prompts (offset 79), 191M, Kaggle GPU:
+  - S1W256: harmonic window 256 words instead of 64 (the generator truncated the tau 64 / 128 bands, which carried the doubled information in HSVD; HSVD's states ran to 4 tau).
+  - S1F191: phases fitted on the whole 191M training stream instead of MT's 27M (about 7x the counts for the SVD).
+  - S1D128: 128 phases per band instead of 64 (superposition capacity grows with dimension).
+- Judging: pairwise each arm vs JX3S1 (one rater each, 80 pairs), fluency and coherence; grammatical share of the four + truth (three raters by prompt thirds).
+- **Predictions:** S1W256 over JX3S1 coherence point above 0.5 (60%); S1F191 fluency point above 0.5 (55%); S1D128 fluency point above 0.5 (50%); at least one arm with a fluency or coherence interval above 0.5 (35%).
 **JT results -- FAIL (2026-11-08; sieve_jt.py, sieve_jt_auc.json, sieve_jt_tau.json, mtest/jt_gen.json, sieve_jt_pair_scores.json; two raters, agreement coherence 0.850 / fluency 0.883).**
 Readout: 23,000 examples (20,000 train, 3,000 held out); held-out AUC (true word vs other candidates) untrained cosine
 0.5941, trained W 0.6223; train loss 7.0562 -> 6.4284 (flat after epoch 6). Calibration (DEC_POFF 27): tau 0.1043 over 225
@@ -2720,6 +2727,9 @@ fluency -0.1583 [-0.325, 0.0083] (0.358 / 0.517). Predictions: AUC above the unt
 (20%) failed. Reading: training the readout for Sieve's job raises how well the state picks the true word (AUC 0.5941 ->
 0.6223) but it remains far weaker than counted passage co-occurrence as a licence; the 32-dim slow state of a
 next-word model carries little of what the licence needs.
+- Amendment: the first full JXT run was killed (host memory) while building the 191M chunk-by-word matrix for S1F191; the LSA matrices now use 32-bit indices and values (same numbers up to float precision). Re-run unchanged otherwise.
+- Amendment 2: the second run failed in scipy's svds (LAPACK 32-bit index limit) on the 191M tau-8 chunk matrix (25M chunks). LSA now samples at most (2^31-1)/(2D) - 1M chunks (about 15.8M for D 64, 7.4M for D 128; fixed seed) when a band has more; this only affects tau 8 for S1F191 (MT has 3.4M tau-8 chunks, so the MT-fitted arms are unaffected). Directed bands (tau 2, 4) use all counts.
+- Amendment 3: the third run was killed (host memory: svds keeps a dense rows x about-2k basis, 15.8M rows = about 16 GB). LSA chunk rows are now capped at 4,000,000 (random chunks, fixed seed). MT-fitted arms are unaffected (MT tau 8 = 3.4M chunks). For S1F191 the long bands (tau >= 8) therefore use about as many chunks as MT, but drawn from the whole 191M stream (more books, not more counts); its short bands (tau 2, 4) use all 191M counts.
 
 ### LT results (2026-11-08)
 
@@ -2732,3 +2742,8 @@ Paired 1,000-word block bootstrap (mean [95% interval]):
 - LT16384 minus LT4096: 0.0001 [0.0001, 0.0001]. Prediction (at or below, 45%): failed.
 Reading: training on long windows makes LT use 4,096 words better than its own 512 (6.9710 vs 6.9808), unlike HB (6.9891 vs 6.9264), but the same 6 epochs on 4,096-word windows leave it behind HB512 at every length. Beyond 4,096 the slow state adds nothing (6.9711).
 Scores: sieve_lt_scores.json.
+**JXT results (2026-11-08; Kaggle GPU primasieve-jxt version 4 after three infrastructure failures, see amendments; sieve_jxt_*.json, sieve_gramjxt_*.json).** Fresh prompts (offset 79). Texts changed vs JX3S1: S1W256 78, S1F191 80, S1D128 80. Sentences: JX3S1 374, S1W256 359, S1F191 366, S1D128 378, truth 284.
+- Pairwise vs JX3S1, fluency: S1W256 0.4744 [0.359, 0.590]; S1F191 0.5875 [0.487, 0.688]; S1D128 0.5375 [0.425, 0.637]. Coherence: 0.500 / 0.5625 [0.450, 0.662] / 0.500.
+- Grammatical share: JX3S1 0.663 [0.612, 0.711], S1W256 0.663 (paired [-0.053, 0.053]), S1F191 0.653 (paired [-0.067, 0.045]), S1D128 0.667 (paired [-0.056, 0.065]), truth 0.937.
+- Predictions: S1W256 coherence point above 0.5 — failed (0.500); S1F191 fluency point above 0.5 — held (0.5875, n.s.); S1D128 fluency point above 0.5 — held (0.5375, n.s.); an interval above 0.5 — failed.
+- Reading: none of the three knobs moves the result; JX3S1 stays the best. The harmonic re-ranker is not limited by window, fit data or dimension; its limit is the candidate pool it can only re-rank.
