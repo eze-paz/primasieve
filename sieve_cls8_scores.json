@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "CLS2 over B1G6": {
+   "share": 0.35,
+   "pairs": 80,
+   "interval": [
+    0.25,
+    0.463
+   ]
+  },
+  "CLS4 over B1G6": {
+   "share": 0.3,
+   "pairs": 80,
+   "interval": [
+    0.2,
+    0.4
+   ]
+  }
+ },
+ "coherence": {
+  "CLS2 over B1G6": {
+   "share": 0.35,
+   "pairs": 80,
+   "interval": [
+    0.25,
+    0.45
+   ]
+  },
+  "CLS4 over B1G6": {
+   "share": 0.45,
+   "pairs": 80,
+   "interval": [
+    0.338,
+    0.562
+   ]
+  }
+ }
+}

@@ -2515,3 +2515,8 @@ HG and HH need a passing HB model first. Stage 2 = about 1.5 h of T4 + 40 min of
 **Predictions (stage 1 pass):** HB-learned 60%; HB-fixed 40%; HA-osc 35%; HA-real 25%; HE 25%; HD over HB-learned 30%;
 HF over HB-fixed 20%; HC synergy shape 25%. If no arm passes stage 1, the next method family to preregister is spiking
 or phase-locked units (binding by synchrony), which this battery does not cover.
+**CLS8 results (2026-11-08; sieve_g1b_kernel.py lamc, sieve_cls8_judge.py; sieve_cls8_gen.json, sieve_cls8_key.json, sieve_cls8_ratings.json, sieve_cls8_scores.json, sieve_gramcls8_*.json).** Sanity passed (lamc 0 reproduced B1G6, 80 of 80); all 80 texts changed in both arms.
+- Pairwise vs B1G6 (one rater each, 80 pairs): CLS2 fluency 0.350 [0.250, 0.463], coherence 0.350 [0.250, 0.450]; CLS4 fluency 0.300 [0.200, 0.400], coherence 0.450 [0.338, 0.562].
+- Grammatical-sentence share (two raters): B1G6 0.634 [0.580, 0.682], CLS2 0.536 [0.487, 0.581], CLS4 0.537 [0.483, 0.588], truth 0.860 [0.810, 0.907].
+- Predictions: CLS4 fluency above 0.5 — failed (below, interval under 0.5); CLS2 point above 0.5 — failed; grammar CLS4 +0.05 — failed (lower); CLS4 coherence not below 0.45 — held (0.450).
+- Reading: class agreement over 8 words, added to word matches, makes grammar worse. A class match buys a score that only an exact word match bought before (2 or 4 points against 8 per word), so the generator now prefers sources that agree in class but not in words at the splice, i.e. more splices, and the 230 k-means classes are distributional clusters, not syntactic roles. Class sequences as a tie-breaker inside the word-match tiers (weight below the smallest word-match step) remain untested.

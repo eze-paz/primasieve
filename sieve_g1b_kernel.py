@@ -22,7 +22,7 @@ VV = max(len(vw), V + 2)
 lens = [len(np.load(p)["S"]) for p in parts]; ntr = ntr0 + sum(lens); N = ntr + (len(S0) - ntr0)
 S = np.empty(N, np.uint16); S[:ntr0] = S0[:ntr0]; o_ = ntr0
 for p, l in zip(parts, lens): S[o_:o_ + l] = np.load(p)["S"]; o_ += l
-S[ntr:] = S0[ntr0:]; del S0; log(f"stream: {ntr:,} training tokens, {N:,} total, vocabulary {VV:,}")
+S[ntr:] = S0[ntr0:]; del S0; fine = np.load([x for x in find("books_cls.npz", "G1_CLS")][0])["fine"]; FINE = torch.tensor(np.r_[fine, np.full(max(0, VV - len(fine)), fine[UNK])].astype(np.int64), device=dev); log(f"stream: {ntr:,} training tokens, {N:,} total, vocabulary {VV:,}")
 St = torch.empty(N, dtype=torch.int32, device=dev)
 for a in range(0, N, CHUNK): St[a:a + CHUNK] = torch.from_numpy(S[a:a + CHUNK].astype(np.int32)).to(dev)
 # 4-word key index: KEYS sorted (host uint64), ORD = positions (GPU int32), positions P = 200..ntr-1, key = (S[P-1], S[P-2], S[P-3], S[P-4]) packed high to low
@@ -63,7 +63,10 @@ def generate(cfg, pids):
         t = PROMPTS[pid]; text = S[t:t + LP].astype(np.int64).tolist(); rng = np.random.default_rng(1000 * pid + 7)
         while len(text) - LP < LG:
             h = text[::-1][:MW]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]))
-            m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2); sc = torch.where(ok, LAM0 * m4, torch.full_like(m4, -1e9))[0]
+            m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2); sc = LAM0 * m4
+            if cfg.get("lamc"):
+                qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
+            sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
             w = torch.exp(sc - sc.max()).cpu().numpy(); nx = St[c[0]].long().cpu().numpy()
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
             bad = bad | (nx == UNK); seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}; bad = bad | np.array([(text[-2], text[-1], int(x_)) in seen for x_ in nx])
@@ -73,7 +76,9 @@ def generate(cfg, pids):
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
 st40 = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; PROMPTS = st40[np.linspace(0, len(st40) - 1, 82).astype(int)[1:-1] + 13]
-NG = 3 if SMOKE else 80; GENS = {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "B1G12": dict(pow=12.0)}; GO = {}
+NG = 3 if SMOKE else 80; GENS = {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
+if SMOKE: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
+GO = {}
 for nm, cfg in GENS.items():
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     GO[nm] = dict(ext_share=len(ext) / max(nw, 1), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
