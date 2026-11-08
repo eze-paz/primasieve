@@ -1,0 +1,70 @@
+{
+ "fluency": {
+  "JX3 over BEST": {
+   "share": 0.65,
+   "pairs": 80,
+   "interval": [
+    0.55,
+    0.75
+   ]
+  },
+  "JX10 over BEST": {
+   "share": 0.625,
+   "pairs": 80,
+   "interval": [
+    0.512,
+    0.725
+   ]
+  },
+  "JX3J5 over BEST": {
+   "share": 0.6125,
+   "pairs": 80,
+   "interval": [
+    0.5,
+    0.713
+   ]
+  },
+  "JX10J5 over BEST": {
+   "share": 0.6125,
+   "pairs": 80,
+   "interval": [
+    0.5,
+    0.725
+   ]
+  }
+ },
+ "coherence": {
+  "JX3 over BEST": {
+   "share": 0.575,
+   "pairs": 80,
+   "interval": [
+    0.463,
+    0.675
+   ]
+  },
+  "JX10 over BEST": {
+   "share": 0.35,
+   "pairs": 80,
+   "interval": [
+    0.25,
+    0.463
+   ]
+  },
+  "JX3J5 over BEST": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.65
+   ]
+  },
+  "JX10J5 over BEST": {
+   "share": 0.4375,
+   "pairs": 80,
+   "interval": [
+    0.325,
+    0.55
+   ]
+  }
+ }
+}

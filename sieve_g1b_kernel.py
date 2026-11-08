@@ -46,10 +46,13 @@ assert off == NP_; del w1; log(f"key index: {NP_:,} positions in {len(cuts) - 1}
 if JX:                                                                                                         # Brown-objective classes (exchange, on the MT 27M text) and class 5-gram table over the training stream
     if "brown" not in globals(): import sys as _s; _s.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from sieve_brown import brown
     BC = 64; BCL = brown(S[:ntr0], VV, C=BC, iters=3 if SMOKE else 15, log=log); BCLu = BCL.astype(np.uint32); CLS_ = BCLu[S[:ntr]]
-    k5 = np.zeros(ntr - 4, np.uint32)
-    for i in range(5): k5 = (k5 << np.uint32(6)) | CLS_[i:ntr - 4 + i]
-    J5u, J5n = np.unique(k5, return_counts=True); J4n = np.bincount((k5 >> np.uint32(6)).astype(np.int64), minlength=1 << 24); del k5, CLS_
-    log(f"class 5-gram table: {len(J5u):,} distinct of {ntr - 4:,}")
+    TB = {}
+    for J in sorted({int(c.get("jn", 4)) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()} | {4}):            # class (J+1)-gram and J-gram counts over the training stream
+        kf = np.zeros(ntr - J, np.uint64)
+        for i in range(J + 1): kf = (kf << np.uint64(6)) | CLS_[i:ntr - J + i].astype(np.uint64)
+        uf, nf = np.unique(kf, return_counts=True); uc, nc = np.unique(kf >> np.uint64(6), return_counts=True); TB[J] = (uf, nf, uc, nc); del kf
+        log(f"class {J + 1}-gram table: {len(uf):,} distinct of {ntr - J:,}")
+    del CLS_
     JSTAT = [0, 0]
 H8 = np.empty(ntr - 8, np.uint64)                                                                             # copy table = sorted hseq(8) of e2b.py
 with np.errstate(over="ignore"):
@@ -94,17 +97,18 @@ def generate(cfg, pids):
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
             bad = bad | (nx == UNK); seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}; bad = bad | np.array([(text[-2], text[-1], int(x_)) in seen for x_ in nx])
             if cfg.get("eps"):                                                                                   # junction veto: next word's class must be a plausible continuation of the last 4 classes
-                c4 = 0
-                for x_ in text[-4:]: c4 = (c4 << 6) | int(BCL[x_])
-                k5c = (np.uint32(c4) << np.uint32(6)) | BCLu[nx]; j = np.minimum(np.searchsorted(J5u, k5c), len(J5u) - 1); n5 = np.where(J5u[j] == k5c, J5n[j], 0)
-                veto = n5 < cfg["eps"] * max(int(J4n[c4]), 1); JSTAT[0] += float((w * veto * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); JSTAT[1] += 1; bad = bad | veto
+                J = int(cfg.get("jn", 4)); uf, nf, uc, nc = TB[J]; c4 = 0
+                for x_ in text[-J:]: c4 = (c4 << 6) | int(BCL[x_])
+                k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
+                jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0
+                veto = n5 < cfg["eps"] * max(n4, 1); JSTAT[0] += float((w * veto * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); JSTAT[1] += 1; bad = bad | veto
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]; text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
         out[pid] = text[LP:]
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
-st40 = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; PROMPTS = st40[np.linspace(0, len(st40) - 1, 82).astype(int)[1:-1] + 13]
-NG = 3 if SMOKE else 80; GENS = {"JX1": dict(pow=6.0, eps=0.01), "JX3": dict(pow=6.0, eps=0.03)} if JX else {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
+st40 = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; PROMPTS = st40[np.linspace(0, len(st40) - 1, 82).astype(int)[1:-1] + int(os.environ.get("G1_POFF", 13))]
+NG = 3 if SMOKE else 80; GENS = (json.loads(os.environ["G1_ARMS"]) if os.environ.get("G1_ARMS") else {"JX1": dict(pow=6.0, eps=0.01), "JX3": dict(pow=6.0, eps=0.03)}) if JX else {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
 if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
