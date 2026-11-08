@@ -87,7 +87,7 @@ def cands(Qrev, Q2=None):
             if hi[j] > i0[j]: i0[j] = i0[j] + np.searchsorted(KEYS2[i0[j]:hi[j]], q2[j])
     i0 = torch.tensor(i0, device=dev); r = torch.arange(K // 2, device=dev)
     idx = torch.cat([i0[:, None] - 1 - r, i0[:, None] + r], 1); ok = (idx >= 0) & (idx < NP_); return ORD[idx.clamp(0, NP_ - 1)].long(), ok
-LSTAT = []; HM = {}; SVDTH = None
+LSTAT = []; HM = {}; SVDTH = None; HG = torch.Generator()
 if any(c.get("svd") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):
     import scipy.sparse as sp
     from scipy.sparse.linalg import svds
@@ -131,6 +131,12 @@ def generate(cfg, pids):
         t = PROMPTS[pid]; text = S[t:t + LP].astype(np.int64).tolist(); rng = np.random.default_rng(1000 * pid + 7)
         while len(text) - LP < LG:
             h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
+            if cfg.get("hr"):                                                                                    # harmonic retrieval: widen the pool with a sample of all positions sharing the last hr words
+                q4 = int(pack(np.array([h[:4]]))[0]); sh_ = 16 * (4 - int(cfg["hr"])); lo_k = (q4 >> sh_) << sh_; hi_k = lo_k + (1 << sh_)
+                lo = int(np.searchsorted(KEYS, np.uint64(lo_k))); hi = int(np.searchsorted(KEYS, np.uint64(hi_k - 1), side="right"))
+                if hi - lo > K:
+                    HG.manual_seed(len(text) * 7919 + int(q4 % 1000003)); extra = torch.randint(lo, hi, (min(int(cfg.get("hrn", 16384)), hi - lo),), generator=HG, device="cpu").to(dev)
+                    pos = torch.unique(torch.cat([c[0][ok[0]], ORD[extra].long()])); c = pos[None]; ok = torch.ones_like(c, dtype=torch.bool)
             if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
                 eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
             else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
@@ -139,7 +145,7 @@ def generate(cfg, pids):
             if cfg.get("beta"):                                                                                  # harmonic similarity of each candidate's history to the text's (z-scored across candidates)
                 hm = HM.setdefault(json.dumps(cfg, sort_keys=True), Harm(cfg)); hw = text[::-1][:hm.WIN]; Qh = torch.tensor([hw + [-1] * (hm.WIN - len(hw))], device=dev)
                 tier = ok[0] & (m4[0] >= m4[0][ok[0]].max() - 1); sel = torch.nonzero(tier)[:, 0][:int(cfg.get("htop", 1024))]       # only candidates that can still win
-                cw = St[(c[0, sel][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long(); sim = (hm.enc(cw) * hm.enc(Qh)).sum(1)
+                eq_ = hm.enc(Qh); sim = torch.cat([(hm.enc(St[(c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long()) * eq_).sum(1) for b0 in range(0, len(sel), 2048)])
                 z = torch.zeros_like(sc[0]); z[sel] = (sim - sim.mean()) / sim.std().clamp(min=1e-6) if len(sel) > 1 else 0.0
                 sc = sc + cfg["beta"] * z[None]
             if cfg.get("lamc"):

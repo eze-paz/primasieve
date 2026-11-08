@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "HR4 over JX3S1": {
+   "share": 0.4675,
+   "pairs": 77,
+   "interval": [
+    0.351,
+    0.571
+   ]
+  },
+  "HR2 over JX3S1": {
+   "share": 0.5316,
+   "pairs": 79,
+   "interval": [
+    0.43,
+    0.646
+   ]
+  }
+ },
+ "coherence": {
+  "HR4 over JX3S1": {
+   "share": 0.5714,
+   "pairs": 77,
+   "interval": [
+    0.455,
+    0.675
+   ]
+  },
+  "HR2 over JX3S1": {
+   "share": 0.5316,
+   "pairs": 79,
+   "interval": [
+    0.418,
+    0.633
+   ]
+  }
+ }
+}
