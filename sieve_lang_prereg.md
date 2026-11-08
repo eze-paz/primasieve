@@ -2361,3 +2361,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - Books 191M, no <unk> + repeat guard: POW3GU and POW12GU vs POW6GU (NOUNK), 80 prompts, 160 pairs.
 - **Predictions:** POW12GU over POW6GU (35%); POW3GU below POW6GU (55%).
 **FINALG2 results (2026-11-08 ~04:18; sieve_gram4_key.json, sieve_gram4_ratings.json, sieve_gram4_scores.json; one rater, prompts 40-79, 900 sentences).** Grammatical-sentence share: books NOH-27M 0.423 [0.357, 0.487]; books POW6G-191M 0.590 [0.518, 0.659]; books POW6GU-191M 0.550 [0.469, 0.627]; true books 0.905 [0.863, 0.948]; wiki POW6GU-200M 0.497 [0.408, 0.577]; true wiki 0.961 [0.926, 0.992]. Rater agreement with FINALG on the same POW6G texts: 157 of 173 sentences. Predictions: books POW6GU at least 0.60 (50%) — failed (0.550); above POW6G (60%) — failed (0.550 vs 0.590, intervals overlap). **Sentence-level grammaticality does not separate POW6GU from POW6G, while pairwise passage judgments prefer POW6GU (0.679): <unk> hurts passages as a whole more than single sentences.**
+
+## SLEN — no premature sentence ends (loop round 29), preregistered 2026-11-08 before any run
+- Error analysis showed clauses ended early ("i am not a man to do."). On POW6GU (books 191M): the boundary's weight is multiplied by sfac before sharpening when the current sentence has fewer than slen words: SL6 (slen 6, sfac 0.1), SL8 (slen 8, sfac 0.02) — after power 6 both nearly forbid an early stop. Pairs vs POW6GU (160 pairs).
+- **Predictions:** SL6 over POW6GU fluency (40%); SL8 over POW6GU (35%).
