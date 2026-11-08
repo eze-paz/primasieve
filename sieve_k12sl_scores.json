@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "K12 over BEST": {
+   "share": 0.5965,
+   "pairs": 57,
+   "interval": [
+    0.474,
+    0.719
+   ]
+  },
+  "BSL over BEST": {
+   "share": 0.475,
+   "pairs": 40,
+   "interval": [
+    0.325,
+    0.625
+   ]
+  }
+ },
+ "coherence": {
+  "K12 over BEST": {
+   "share": 0.4561,
+   "pairs": 57,
+   "interval": [
+    0.316,
+    0.579
+   ]
+  },
+  "BSL over BEST": {
+   "share": 0.6,
+   "pairs": 40,
+   "interval": [
+    0.45,
+    0.75
+   ]
+  }
+ }
+}

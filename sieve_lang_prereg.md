@@ -2376,3 +2376,4 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## K12 + SL — bigger candidate pool at 191M; sentence-length rule on fresh prompts (loop round 31), preregistered 2026-11-08 before any run
 - E2E prompts, books 191M. Arms vs BEST (E2E): K12 = BEST with 12,288 candidates (more of the consensus at 191M); BSL = BEST + SL6. 160 pairs.
 - **Predictions:** K12 over BEST (35%); BSL over BEST coherence (40%).
+**K12 + SL results (2026-11-08 ~04:33; sieve_k12sl_gen.json, sieve_k12sl_key.json, sieve_k12sl_ratings.json, sieve_k12sl_scores.json).** Pythia bits BEST 5.8418, K12 5.8036, BSL 6.0015. Pairwise vs BEST (non-identical pairs): K12 fluency 0.596 [0.474, 0.719] (57), coherence 0.456; BSL fluency 0.475 [0.325, 0.625] (40), coherence 0.600 [0.450, 0.750]. Predictions: K12 over BEST (35%) — failed (n.s.); BSL coherence over BEST (40%) — failed (n.s.).

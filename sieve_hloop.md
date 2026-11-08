@@ -70,3 +70,12 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result SLEN: affects few texts; where it does, SL6 helps coherence (0.792 [0.625, 0.958], 24 pairs), fluency n.s.
    Result E2E (fresh prompts): best over loop start fluency 0.925 [0.863, 0.975], coherence 0.825 [0.738, 0.912]; grammatical share 0.346 -> 0.637 (true 0.867).
 31. K12 + SL (04:27): 12,288 candidates at 191M; sentence-length rule on fresh prompts.
+   Result K12 + SL: neither distinguishable from the best (0.596 / 0.475 fluency).
+
+## Loop stopped at 04:33 (about 2h50m of the 8h), with reasons
+Decoding knobs are exhausted: the last eight rounds (beam, greedy, continuity, copy cap, sentence length, candidate pool,
+harmonics on the strong base, held-state matching) were all null or negative. The levers that still move fluency need
+owner decisions: more books text (new PG-19 shards = new downloads), and a vocabulary that covers the added text
+(re-tokenising, a multi-hour refactor of the 16-bit word keys).
+Best generator: books 191M, exact-match weight 8, 3,072 reversed-prefix candidates, word distribution raised to power 6,
+repeat-trigram guard, never <unk>, copy cap 8 (sieve_nounkb_kernel.py / sieve_e2e_best_kernel.py).
