@@ -2693,3 +2693,13 @@ counting, and not past its 512-word training length.
 - Grammatical share: JX3 0.683 [0.642, 0.723] (batches 0.677 / 0.716 / 0.650), **JX3S1 0.735 [0.688, 0.779] (0.752 / 0.734 / 0.720; paired vs JX3 [-0.005, 0.110])**, JX3S2 0.677 (paired [-0.058, 0.043]), truth 0.937.
 - Predictions: coherence interval above 0.5 — failed (both touch 0.487 / 0.475); fluency point above 0.5 — held (0.600 / 0.5875); better arm's grammar within 0.03 of JX3 — failed upward (0.735 vs 0.683).
 - Reading: unlike random word phases (JXH: grammar 0.648 vs 0.712), fitted phases at beta 1 point the same way on fluency, coherence and grammar in every batch, each interval touching the null. Needs a replication before adoption.
+
+## JXS2 — replication of JX3S1 on fresh prompts (preregistered 2026-11-08, before the run)
+- 80 fresh prompts (offset 73), 191M. Arms: JX3 (base), JX3S1 (beta 1, fitted phases), JX3S05 (beta 0.5). Same judging as JXS. Pooled analysis: JX3S1 vs JX3 over JXS + JXS2 (160 prompts), bootstrap over prompts, reported alongside.
+- **Predictions:** JX3S1 fluency point above 0.5 (65%); pooled JX3S1 fluency interval above 0.5 (50%); pooled grammar paired interval above zero (45%).
+**JXS2 results (2026-11-08; Kaggle GPU primasieve-jxs2; sieve_jxs2_*.json, sieve_gramjxs2_*.json).** Fresh prompts (offset 73). Texts changed: JX3S1 80, JX3S05 79. Sentences: JX3 359, JX3S1 378, JX3S05 372, truth 299.
+- Pairwise vs JX3: **JX3S1 fluency 0.6125 [0.512, 0.713], coherence 0.7625 [0.662, 0.850]**; JX3S05 fluency 0.5949 [0.481, 0.709], coherence 0.5823 [0.468, 0.696].
+- Grammatical share: JX3 0.535 [0.485, 0.582], **JX3S1 0.630 [0.581, 0.676] (paired vs JX3 [0.031, 0.154])**, JX3S05 0.594 (paired [-0.001, 0.119]), truth 0.903.
+- **Pooled JX3S1 vs JX3, JXS + JXS2 (160 prompts): fluency 0.606 [0.531, 0.681]; coherence 0.681 [0.606, 0.750]; grammatical share 0.682 vs 0.611 (paired [0.027, 0.113]).**
+- Predictions: JX3S1 fluency point above 0.5 — held (0.6125); pooled fluency interval above 0.5 — held; pooled grammar paired interval above zero — held.
+- **Replicated: count-fitted harmonics (beta 1) on top of the junction veto improve fluency, coherence and grammar. New best = JX3S1** (191M, power 6, guards, Brown junction veto eps 0.03, SVD-phase harmonics beta 1 over the top two match tiers). First harmonic version that helps generation; random phases (JXH) did not.
