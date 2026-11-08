@@ -1,0 +1,61 @@
+{
+ "fluency": {
+  "POW2 over NOH": {
+   "share": 0.625,
+   "pairs": 80,
+   "interval": [
+    0.525,
+    0.725
+   ]
+  },
+  "CZ4 over NOH": {
+   "share": 0.6375,
+   "pairs": 80,
+   "interval": [
+    0.525,
+    0.738
+   ]
+  },
+  "SB over POW2": {
+   "share": 0.5846153846153846,
+   "pairs": 65,
+   "interval": [
+    0.462,
+    0.692
+   ]
+  }
+ },
+ "coherence": {
+  "POW2 over NOH": {
+   "share": 0.625,
+   "pairs": 80,
+   "interval": [
+    0.512,
+    0.725
+   ]
+  },
+  "CZ4 over NOH": {
+   "share": 0.625,
+   "pairs": 80,
+   "interval": [
+    0.525,
+    0.725
+   ]
+  },
+  "SB over POW2": {
+   "share": 0.5692307692307692,
+   "pairs": 65,
+   "interval": [
+    0.446,
+    0.692
+   ]
+  }
+ },
+ "identical_dropped": 15,
+ "pythia": {
+  "NOH": 7.516072630882263,
+  "POW2": 7.011118084192276,
+  "CZ4": 7.369925516843796,
+  "SB": 6.960973119735717
+ }
+}
