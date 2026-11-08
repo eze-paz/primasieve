@@ -59,3 +59,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result CONT: continuity bonus no gain (0.425 / 0.450).
 25. WIKI (04:00): replication of sharpening and data findings on Wikipedia (27M NOH/POW6G, 200M POW6G).
 26. NOUNK (04:06): never write <unk>, books 191M and wiki 200M.
+   Result WIKI: sharpening replicates (0.700 [0.600, 0.800]); data reverses pairwise (0.313) because 200M output is 13% <unk> (vocab mismatch with the 2023 Wikipedia text); grammatical share 0.437 / 0.557 / 0.689 (inflated by <unk>).
