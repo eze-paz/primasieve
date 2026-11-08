@@ -2520,3 +2520,12 @@ or phase-locked units (binding by synchrony), which this battery does not cover.
 - Grammatical-sentence share (two raters): B1G6 0.634 [0.580, 0.682], CLS2 0.536 [0.487, 0.581], CLS4 0.537 [0.483, 0.588], truth 0.860 [0.810, 0.907].
 - Predictions: CLS4 fluency above 0.5 — failed (below, interval under 0.5); CLS2 point above 0.5 — failed; grammar CLS4 +0.05 — failed (lower); CLS4 coherence not below 0.45 — held (0.450).
 - Reading: class agreement over 8 words, added to word matches, makes grammar worse. A class match buys a score that only an exact word match bought before (2 or 4 points against 8 per word), so the generator now prefers sources that agree in class but not in words at the splice, i.e. more splices, and the 230 k-means classes are distributional clusters, not syntactic roles. Class sequences as a tie-breaker inside the word-match tiers (weight below the smallest word-match step) remain untested.
+**MABL results (2026-11-08; 120 fresh prompts DEC_POFF 11, two side-by-side raters, agreement coherence 0.915 / fluency
+0.921; sieve_mabl_pair_scores.json).** Coherence vs B: L2 0.175 [0.0083, 0.3417] (L2 preferred 0.525, B 0.350); L4 0.250
+[0.075, 0.4167] (0.592 / 0.342); GS 0.1292 [0.0, 0.2542] (0.333 / 0.208; 41 of 120 texts identical to B); MEAN 0.2667
+[0.1083, 0.4333] (0.600 / 0.333). Fluency vs B: L2 0.2333 [0.0583, 0.3917]; L4 0.275 [0.100, 0.4335]; GS 0.1583
+[0.0292, 0.2917]; MEAN 0.2833 [0.1167, 0.4417]. Penalized share of content candidates L2 0.3977, L4 0.3979, MEAN 0.3981.
+**Predictions:** L2 coherence over B excluding 0 (55%) held; GS excluding 0 (25%) failed (lower bound 0.0); MEAN again
+(65%) held (third prompt set); L4 at least L2 on coherence (45%) held; L4 fluency below B (30%) failed (L4 is above B).
+**Reading:** the passage licence is the working part; it alone is above B, and doubling its strength did not hurt.
+Gender + subject alone is borderline. MEAN, with all three, is the highest on this set and has now held on 3 sets.

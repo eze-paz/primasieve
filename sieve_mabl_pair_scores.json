@@ -1,0 +1,78 @@
+{
+ "raters": [
+  "mabl_pair_ratings.json",
+  "mabl_pair_ratings_r2.json"
+ ],
+ "L2 vs B coherence": {
+  "b_wins": 0.525,
+  "a_wins": 0.35,
+  "mean": 0.175,
+  "interval": [
+   0.0083,
+   0.3417
+  ]
+ },
+ "L2 vs B fluency": {
+  "b_wins": 0.5666666666666667,
+  "a_wins": 0.3333333333333333,
+  "mean": 0.2333,
+  "interval": [
+   0.0583,
+   0.3917
+  ]
+ },
+ "L4 vs B coherence": {
+  "b_wins": 0.5916666666666667,
+  "a_wins": 0.3416666666666667,
+  "mean": 0.25,
+  "interval": [
+   0.075,
+   0.4167
+  ]
+ },
+ "L4 vs B fluency": {
+  "b_wins": 0.6083333333333333,
+  "a_wins": 0.3333333333333333,
+  "mean": 0.275,
+  "interval": [
+   0.1,
+   0.4335
+  ]
+ },
+ "GS vs B coherence": {
+  "b_wins": 0.3333333333333333,
+  "a_wins": 0.20833333333333334,
+  "mean": 0.1292,
+  "interval": [
+   0.0,
+   0.2542
+  ]
+ },
+ "GS vs B fluency": {
+  "b_wins": 0.35,
+  "a_wins": 0.19166666666666668,
+  "mean": 0.1583,
+  "interval": [
+   0.0292,
+   0.2917
+  ]
+ },
+ "MEAN vs B coherence": {
+  "b_wins": 0.6,
+  "a_wins": 0.3333333333333333,
+  "mean": 0.2667,
+  "interval": [
+   0.1083,
+   0.4333
+  ]
+ },
+ "MEAN vs B fluency": {
+  "b_wins": 0.6083333333333333,
+  "a_wins": 0.325,
+  "mean": 0.2833,
+  "interval": [
+   0.1167,
+   0.4417
+  ]
+ }
+}
