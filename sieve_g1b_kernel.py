@@ -87,15 +87,35 @@ def cands(Qrev, Q2=None):
             if hi[j] > i0[j]: i0[j] = i0[j] + np.searchsorted(KEYS2[i0[j]:hi[j]], q2[j])
     i0 = torch.tensor(i0, device=dev); r = torch.arange(K // 2, device=dev)
     idx = torch.cat([i0[:, None] - 1 - r, i0[:, None] + r], 1); ok = (idx >= 0) & (idx < NP_); return ORD[idx.clamp(0, NP_ - 1)].long(), ok
-LSTAT = []; HM = {}
+LSTAT = []; HM = {}; SVDTH = None
+if any(c.get("svd") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import svds
+    Str_ = S[:ntr0].astype(np.int64); SVDTH = {}
+    def _ph(U):
+        U = U / np.maximum(np.linalg.norm(U, axis=1, keepdims=True), 1e-12); th = np.arctan2(U[:, 1::2], U[:, 0::2]); dead = np.linalg.norm(U, axis=1) < 1e-9
+        th[dead] = np.random.default_rng(7).random((dead.sum(), th.shape[1])) * 2 * np.pi; return th
+    for tau in (2, 4, 8, 16, 32, 64, 128):
+        lam = 1 - 1 / tau
+        if tau <= 4:
+            M = None
+            for j in range(1, (2 if tau == 2 else 4) + 1):
+                u, n = np.unique(Str_[:-j] * VV + Str_[j:], return_counts=True); m = sp.csr_matrix((n * lam ** (j - 1), (u // VV, u % VV)), shape=(VV, VV)); M = m if M is None else M + m
+            M = M.sqrt(); r = np.asarray(M.sum(1)).ravel(); c_ = np.asarray(M.sum(0)).ravel(); Mt = sp.diags(1 / np.sqrt(np.maximum(r, 1e-12))) @ M @ sp.diags(1 / np.sqrt(np.maximum(c_, 1e-12)))
+            U, s_, Vt = svds(Mt.astype(np.float64), k=128); V_ = U * s_[None]
+        else:
+            n_ = len(Str_) // tau; X = sp.csr_matrix((np.ones(n_ * tau), (np.repeat(np.arange(n_), tau), Str_[:n_ * tau])), shape=(n_, VV)).sqrt(); c_ = np.asarray(X.sum(0)).ravel()
+            X = X @ sp.diags(1 / np.sqrt(np.maximum(c_, 1e-12))); U, s_, Vt = svds(X.astype(np.float64), k=128); V_ = Vt.T * s_[None]
+        SVDTH[tau] = torch.tensor(_ph(V_), dtype=torch.float32, device=dev); log(f"SVD phases tau {tau}")
 class Harm:                                                                                                    # harmonic state (from the HSWEEP kernels): damped oscillator bands over the last WIN symbols
     def __init__(s, cfg):
         s.cfg = cfg; g = torch.Generator().manual_seed(1); D = cfg.get("D", 64); s.WIN = cfg.get("WIN", 64); nsym = VV if cfg.get("symbol", "class") == "word" else int(FINE.max()) + 1
         s.theta = (torch.rand(nsym, D, generator=g) * 2 * math.pi).to(dev); no = int(round(D * cfg.get("order", 0.5))); s.omega = torch.cat([torch.zeros(D - no), torch.rand(no, generator=g) * 2 * math.pi]).to(dev)
-        j = torch.arange(s.WIN, dtype=torch.float32, device=dev); s.W = torch.stack([(1 - 1 / t) ** j for t in cfg.get("bands", (2, 4, 8, 16, 32, 64, 128))]); s.rot = torch.exp(1j * j[:, None] * s.omega[None, :])
+        j = torch.arange(s.WIN, dtype=torch.float32, device=dev); s.bands = cfg.get("bands", (2, 4, 8, 16, 32, 64, 128)); s.W = torch.stack([(1 - 1 / t) ** j for t in s.bands]); s.rot = torch.exp(1j * j[:, None] * s.omega[None, :])
     def enc(s, w):
         sym = torch.where(w >= 0, w, torch.zeros_like(w)); sym = sym if s.cfg.get("symbol", "class") == "word" else FINE[sym]
-        u = torch.exp(1j * s.theta[sym]) * s.rot[None] * (w >= 0)[:, :, None]; zz = torch.einsum("njd,bj->nbd", u, s.W.to(u.dtype))
+        if s.cfg.get("svd"): zz = torch.stack([((torch.exp(1j * SVDTH[t][sym]) * s.rot[None] * (w >= 0)[:, :, None]) * s.W[b].to(torch.complex64)[None, :, None]).sum(1) for b, t in enumerate(s.bands)], 1)
+        else: u = torch.exp(1j * s.theta[sym]) * s.rot[None] * (w >= 0)[:, :, None]; zz = torch.einsum("njd,bj->nbd", u, s.W.to(u.dtype))
         v = torch.cat([zz.real, zz.imag], 2); v = v / v.norm(dim=2, keepdim=True).clamp(min=1e-9); return v.reshape(len(w), -1) / math.sqrt(v.shape[1])
 def generate(cfg, pids):
     out = {}; LSTAT.clear()

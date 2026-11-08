@@ -94,3 +94,4 @@ repeat-trigram guard, never <unk>, copy cap 8 (sieve_nounkb_kernel.py / sieve_e2
 42. JX3 at 1B words: fluency 0.4875, coherence 0.525, grammar 0.644 vs 0.620 — all n.s. Data adds nothing on top of the veto here.
 43. JXH: harmonics (z-scored, beta 2) on top of JX3. Word harmonics: fluency 0.600 [0.487, 0.700], coherence 0.575 (both n.s.), grammar 0.648 vs 0.712 (lower). Class harmonics: nothing. JX3 stays best.
 44. HSVD: harmonic phases fitted from counts (SVD per timescale, Brown-style) instead of random. Information about the next class beyond the local state: 0.1004 vs 0.0559 (random word phases) and 0.0650 (random class phases); long bands doubled. Recovers part of Brown's classes (type NMI 0.261 vs random 0.019). Generation test next.
+45. JXS: JX3 + count-fitted harmonics (beta 1): fluency 0.600, coherence 0.600 (both [0.487, 0.700]), grammar 0.735 vs 0.683 (paired [-0.005, 0.110]); all three point up, none clear. beta 2 flat. Replication next.

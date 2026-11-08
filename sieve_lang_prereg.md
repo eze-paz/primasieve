@@ -2688,3 +2688,8 @@ words from B's samples only weakly, and as a licence it is no better than counte
 weight it pulls Sieve toward sources whose state matches but whose local words do not, which breaks fluency. MEAN
 stays the best Sieve decoder. The oscillator net helps as a model (dev 6.9264 vs 6.9498) but not as a meaning memory for
 counting, and not past its 512-word training length.
+**JXS results (2026-11-08; Kaggle GPU primasieve-jxs; sieve_jxs_*.json, sieve_gramjxs_*.json).** Fresh prompts (offset 67). All 80 texts changed in both arms. Sentences: JX3 382, JX3S1 374, JX3S2 337, truth 317.
+- Pairwise vs JX3: **JX3S1 fluency 0.600 [0.487, 0.700], coherence 0.600 [0.487, 0.700]**; JX3S2 fluency 0.5875 [0.487, 0.700], coherence 0.5875 [0.475, 0.688].
+- Grammatical share: JX3 0.683 [0.642, 0.723] (batches 0.677 / 0.716 / 0.650), **JX3S1 0.735 [0.688, 0.779] (0.752 / 0.734 / 0.720; paired vs JX3 [-0.005, 0.110])**, JX3S2 0.677 (paired [-0.058, 0.043]), truth 0.937.
+- Predictions: coherence interval above 0.5 — failed (both touch 0.487 / 0.475); fluency point above 0.5 — held (0.600 / 0.5875); better arm's grammar within 0.03 of JX3 — failed upward (0.735 vs 0.683).
+- Reading: unlike random word phases (JXH: grammar 0.648 vs 0.712), fitted phases at beta 1 point the same way on fluency, coherence and grammar in every batch, each interval touching the null. Needs a replication before adoption.
