@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "tpl_pair_ratings.json",
+  "tpl_pair_ratings_r2.json"
+ ],
+ "TPL vs NS coherence": {
+  "b_wins": 0.39166666666666666,
+  "a_wins": 0.475,
+  "mean": -0.0833,
+  "interval": [
+   -0.25,
+   0.0917
+  ]
+ },
+ "TPL vs NS fluency": {
+  "b_wins": 0.3333333333333333,
+  "a_wins": 0.49166666666666664,
+  "mean": -0.1583,
+  "interval": [
+   -0.3167,
+   0.0083
+  ]
+ }
+}

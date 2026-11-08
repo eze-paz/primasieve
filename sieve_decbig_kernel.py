@@ -4,6 +4,7 @@ Writes /kaggle/working/dbig_<SIZE>.json."""
 import os, glob, json, time, numpy as np
 SIZE = 200; V = 60000; VV = V + 2; NP, LP, LG, HC = 120, 30, 50, 1536; M64 = np.uint64(0x9E3779B97F4A7C15); T0 = time.time()
 ARMS = {"B": {"T": 0.35, "nounk": 1, "norep": 1}, "NS": {"T": 0.35, "nounk": 1, "norep": 1, "nextsent": 64}}
+ARMS = json.loads(os.environ.get("DBIG_ARMS", "null")) or ARMS                                              # NSP6: arms from the kernel copy
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
 def find(name): return glob.glob("/kaggle/input/**/" + name, recursive=True)[0]
 def pack4(Q):
@@ -48,15 +49,15 @@ class Dec:
                     a, b = s.qst[w], s.qst[w + 1]; np.add.at(sc_, s.qs[a:b], s.sidf[w] * s.qv[a:b])
                 top = np.argpartition(-sc_, cfg["nextsent"])[:cfg["nextsent"]]; top = top[sc_[top] > 0]
                 st_ = s.sstart[np.minimum(top, len(s.sstart) - 1)]; st_ = st_[(st_ > 9) & (st_ < s.ntr - 1)]
-                if len(st_): pos = np.r_[pos, st_]; sc = np.r_[sc, np.full(len(st_), sc.max() + 1.0)]
-        wpos = np.exp(4 * (sc - sc.max())); uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=wpos)
+                if len(st_): pos = np.r_[pos, st_]; sc = np.r_[sc, np.full(len(st_), sc.max() + 4.0 / cfg.get("lam", 4.0))]   # same e^4 bonus at any lam
+        wpos = np.exp(cfg.get("lam", 4.0) * (sc - sc.max())); uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=wpos)
         hv = s.h8v(text[-7:], uw); bad = s.H8[np.minimum(np.searchsorted(s.H8, hv), len(s.H8) - 1)] == hv
         if (~bad).any(): p = p * ~bad
         if cfg.get("nounk") and (uw <= V).any(): p = p * (uw <= V)
         if cfg.get("norep"):
             seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}; rep = np.array([(text[-2], text[-1], int(w)) in seen for w in uw])
             if (~rep).any() and (p * ~rep).sum() > 0: p = p * ~rep
-        p = p ** (1.0 / cfg["T"]); return uw, p / p.sum()
+        p = p ** cfg.get("pow", 1.0 / cfg.get("T", 1.0)); return uw, p / p.sum()
     def gen(s, prompt, cfg, seed):
         g = np.random.default_rng(seed); text = list(prompt)
         while len(text) - len(prompt) < LG:
