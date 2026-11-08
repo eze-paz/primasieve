@@ -1,0 +1,56 @@
+{
+ "coherence": {
+  "BASE": 1.225,
+  "SKEL-RAND": 1.1,
+  "SKEL-PH": 1.075,
+  "truth": 4.85,
+  "SKEL-RAND minus BASE": [
+   -0.275,
+   0.025
+  ],
+  "SKEL-PH minus BASE": [
+   -0.3006,
+   0.0
+  ],
+  "SKEL-PH minus SKEL-RAND": [
+   -0.125,
+   0.075
+  ]
+ },
+ "fluency": {
+  "BASE": 1.975,
+  "SKEL-RAND": 1.625,
+  "SKEL-PH": 1.475,
+  "truth": 4.725,
+  "SKEL-RAND minus BASE": [
+   -0.55,
+   -0.15
+  ],
+  "SKEL-PH minus BASE": [
+   -0.725,
+   -0.275
+  ],
+  "SKEL-PH minus SKEL-RAND": [
+   -0.375,
+   0.05
+  ]
+ },
+ "pythia": {
+  "BASE": 7.648019337654114,
+  "SKEL-RAND": 8.006130695343018,
+  "SKEL-PH": 8.099754285812377,
+  "truth": 5.722517251968384,
+  "SKEL-RAND minus BASE": [
+   0.0772,
+   0.6433
+  ],
+  "SKEL-PH minus BASE": [
+   0.1639,
+   0.7553
+  ],
+  "SKEL-PH minus SKEL-RAND": [
+   -0.198,
+   0.3732
+  ]
+ }
+}
