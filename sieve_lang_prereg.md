@@ -2366,3 +2366,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - Error analysis showed clauses ended early ("i am not a man to do."). On POW6GU (books 191M): the boundary's weight is multiplied by sfac before sharpening when the current sentence has fewer than slen words: SL6 (slen 6, sfac 0.1), SL8 (slen 8, sfac 0.02) — after power 6 both nearly forbid an early stop. Pairs vs POW6GU (160 pairs).
 - **Predictions:** SL6 over POW6GU fluency (40%); SL8 over POW6GU (35%).
 **POWU results (2026-11-08 ~04:22; sieve_powu_gen.json, sieve_powu_key.json, sieve_powu_ratings.json, sieve_powu_scores.json).** Pythia bits POW3GU 6.2837, POW6GU 5.9612, POW12GU 5.6425. Pairwise vs POW6GU, fluency: POW3GU 0.413 [0.300, 0.525]; POW12GU 0.455 [0.351, 0.571] (77 non-identical); coherence 0.475 / 0.429. Predictions: POW12GU over (35%) — failed; POW3GU below (55%) — held in point estimate (interval includes 0.5). Power 6 stays the setting.
+
+## E2E — end-to-end on fresh prompts (loop round 30), preregistered 2026-11-08 before any run
+- 80 new prompts (sentence starts offset by 13 from REP's), books. BASE = the loop's starting generator (MS A4: exact-match weight 4, no harmonics, no sharpening, 27M); BEST = the loop's best (POW6 + repeat guard + no <unk>, 191M). Pairwise (80 pairs, one rater) and grammatical-sentence share (BASE, BEST, true text; one rater).
+- **Predictions:** BEST over BASE fluency with interval above 0.5 (85%); share at least 0.75 (50%); grammatical share BEST minus BASE at least 0.12 (50%).
