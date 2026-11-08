@@ -58,3 +58,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    FINALG (one rater): grammatical share NOH-27M 0.438 -> POW2-27M 0.464 -> POW2-191M 0.470 -> POW6G-191M 0.590; true text 0.966.
    Result CONT: continuity bonus no gain (0.425 / 0.450).
 25. WIKI (04:00): replication of sharpening and data findings on Wikipedia (27M NOH/POW6G, 200M POW6G).
+26. NOUNK (04:06): never write <unk>, books 191M and wiki 200M.
