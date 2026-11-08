@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "B_POW6GU over B_POW6G": {
+   "share": 0.6792,
+   "pairs": 53,
+   "interval": [
+    0.547,
+    0.811
+   ]
+  },
+  "W_POW6GU over W_POW6G": {
+   "share": 0.859,
+   "pairs": 78,
+   "interval": [
+    0.782,
+    0.936
+   ]
+  },
+  "W_POW6GU over W_POW6G27": {
+   "share": 0.65,
+   "pairs": 80,
+   "interval": [
+    0.55,
+    0.75
+   ]
+  }
+ },
+ "coherence": {
+  "B_POW6GU over B_POW6G": {
+   "share": 0.6792,
+   "pairs": 53,
+   "interval": [
+    0.547,
+    0.792
+   ]
+  },
+  "W_POW6GU over W_POW6G": {
+   "share": 0.859,
+   "pairs": 78,
+   "interval": [
+    0.769,
+    0.936
+   ]
+  },
+  "W_POW6GU over W_POW6G27": {
+   "share": 0.6625,
+   "pairs": 80,
+   "interval": [
+    0.562,
+    0.762
+   ]
+  }
+ }
+}
