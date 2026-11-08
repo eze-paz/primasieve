@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "holdw_pair_ratings.json",
+  "holdw_pair_ratings_r2.json"
+ ],
+ "HW2 vs B coherence": {
+  "b_wins": 0.16666666666666666,
+  "a_wins": 0.7416666666666667,
+  "mean": -0.575,
+  "interval": [
+   -0.7083,
+   -0.4333
+  ]
+ },
+ "HW2 vs B fluency": {
+  "b_wins": 0.05,
+  "a_wins": 0.9,
+  "mean": -0.85,
+  "interval": [
+   -0.925,
+   -0.7583
+  ]
+ }
+}
