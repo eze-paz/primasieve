@@ -2225,3 +2225,12 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - Same 80 REP prompts and seeds. Arms: CZP1 / CZP2 / CZP4 = class harmonics z 1 / 2 / 4 + POW2; each judged pairwise against REP's POW2 (240 pairs, two fresh raters of 120). Identical pairs dropped.
 - **Predictions:** CZP2 over POW2 fluency with interval above 0.5 (30%); some CZP over POW2 coherence with interval above 0.5 (35%); CZP4 below 0.5 on fluency (40%).
 **LA results (2026-11-08 ~03:15; sieve_la_gen.json, sieve_la_key.json, sieve_la_ratings.json, sieve_la_scores.json; sieve_pairscore.py).** Pythia bits of samples: POW2 7.0111, LA1 6.7950, LA2 7.0062; repeated trigrams 0.0003 / 0.0016 / 0.0018. Pairwise fluency: LA1 over POW2 0.550 [0.438, 0.650]; LA2 over POW2 0.513 [0.400, 0.625]; coherence 0.538 / 0.513. Predictions: LA1 above (35%) — failed; LA2 above (35%) — failed; LA2 repeated trigrams above POW2's (50%) — held (0.0018 vs 0.0003).
+**NS2 results (2026-11-08; 120 prompts; local 3 processes ~45 min; side-by-side, two raters per comparison, agreement 0.9167 (B:NS) and 0.8167 (B:NSSB); sieve_ns2a_pair_scores.json, sieve_ns2b_pair_scores.json).**
+- **NS vs B:** coherence 0.2167 [0.0500, 0.3833] (NS preferred 0.558, B 0.342); fluency 0.3417 [0.1917, 0.5000] (0.600 vs 0.258).
+- **NSSB vs B:** coherence 0.2500 [0.0917, 0.4000] (0.533 vs 0.283); fluency 0.1333 [-0.0250, 0.2917].
+- **Pythia-410m:** B 6.0756, NS 5.7992, NSSB 5.9472, true 5.7693.
+- **Predictions:** NS coherence over B excluding 0 (40%) held; NSSB coherence over B excluding 0 (45%) held; NSSB fluency over B excluding 0 (35%) failed. First coherence gain confirmed in this project: starting each sentence the way the most similar training sentences were followed.
+
+## NS3 — stronger and wider sentence continuation (new base = NS), preregistered 2026-11-08 before any run
+- **120 prompts as NS2. Arms:** NS (k 64, bonus 1 = weight e^4 over the best 4-word match); NSB2 = bonus 2 (e^8: the similar-sentence starts dominate the first word); NS2S = similarity computed from the last two sentences (content words of both) instead of the last one. Comparisons NS:NSB2 and NS:NS2S, 120 pairs each, two side-by-side raters each. Pythia-410m.
+- **Predictions:** NSB2 preferred over NS on coherence excluding 0 (30%); NS2S preferred over NS on coherence excluding 0 (30%); either one preferred on fluency excluding 0 (25%).

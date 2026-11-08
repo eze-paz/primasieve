@@ -8,7 +8,7 @@ Index: 8-word reversed prefix (MIX onward; TEMP used 4 words). doc (delta: candi
   gender (x: pronouns contradicting the held third-person gender of the last 60 words get e^-x); stick (x: inside a clause, the
   candidate continuing the previous word's source passage gets e^x);
   nextsent (k: at a sentence boundary, add as candidates the starts of the sentences that followed the k training sentences most
-  similar (tf-idf) to the sentence just written, with weight e^(4 x nsbonus) relative to the best 4-word match; needs DEC_SENT=1);
+  similar (tf-idf) to the sentence just written, with weight e^(4 x nsbonus) relative to the best 4-word match; nsctx = sentences used for similarity; needs DEC_SENT=1);
   search ({B, H, C, v}: B rollouts of H words from the same sampler, commit the first C words of the best by verifier v).
 Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPARTS: prompts pid % NPARTS == PART)  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
 import os, sys, json, time
@@ -63,7 +63,9 @@ class Dec:
             top = s.topchunks(text, cfg.get("ndoc", 100)); sc = sc + cfg["doc"] / 4 * np.isin(pos // s.CH, top)              # DOC: bonus for candidates inside the most similar passages
         if cfg.get("nextsent") and text[-1] == 0:                                                                                  # NSENT: start the next sentence the way similar sentences were followed
             j = len(text) - 2
-            while j >= 0 and text[j] != 0: j -= 1
+            for _ in range(cfg.get("nsctx", 1)):                                                                                       # NS3: how many sentences back
+                j -= 1 if text[j] == 0 and j < len(text) - 2 else 0
+                while j >= 0 and text[j] != 0: j -= 1
             last = [w for w in text[j + 1:-1] if 100 < w <= s.V]
             if last:
                 u, n = np.unique(last, return_counts=True); sc_ = np.zeros(s.nsent)
