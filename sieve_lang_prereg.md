@@ -2310,3 +2310,12 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - Error analysis of POW6-191M's ungrammatical sentences (batch 2): mostly splices where a phrase from one source joins another in the wrong grammatical role, clauses ended too early, and recurring stock phrases. BEAM4: beam of 4 partial texts, each expanded by its 5 most probable next words under the POW6 + guard distribution, ranked by cumulative log probability (deterministic). 191M, 80 REP prompts. Pairs: BEAM4 vs POW6G (80 pairs).
 - **Predictions:** BEAM4 over POW6G fluency (40%); BEAM4 repeated trigrams 0 (guard) and distinct words below POW6G's (60%).
 **H6 results (2026-11-08 ~03:52; sieve_h6_gen.json, sieve_h6_key.json, sieve_h6_ratings.json, sieve_h6_scores.json).** Pythia bits: POW6G 5.7520, H6z1 6.2112, H6z2 6.8357. Pairwise vs POW6G, fluency: H6z1 0.538 [0.425, 0.650]; H6z2 0.463 [0.350, 0.575]; coherence 0.463 / 0.525. Predictions: H6z1 fluency above (25%) — failed; an H6 coherence above (30%) — failed. **Harmonics add nothing on the strongest base either.**
+**BEAM results (2026-11-08 ~03:55; sieve_beam_gen.json, sieve_beam_key.json, sieve_beam_ratings.json, sieve_beam_scores.json).** Pythia bits BEAM4 5.6267; distinct words 0.707 (POW6G 0.740). Pairwise vs POW6G: fluency 0.317 [0.228, 0.418], coherence 0.317 [0.215, 0.430] (79 non-identical pairs). Predictions: BEAM4 over POW6G (40%) — failed (clearly worse); distinct below POW6G (60%) — held. **Sequence-level mode seeking makes the text worse: generic run-ons.**
+
+## FINALG — one rater, all stages (loop round 23), preregistered 2026-11-08 before any run
+- Grammatical-sentence share, one fresh blind rater, 40 prompts per arm, 200 texts shuffled: NOH-27M (REP), POW2-27M (REP), POW2-191M (BIGH), POW6G-191M (GR), true text.
+- **Prediction:** strictly increasing NOH-27M < POW2-27M < POW2-191M < POW6G-191M (40%); POW6G-191M at least 0.55 (55%).
+
+## CONT — source continuity: fewer splices (loop round 24), preregistered 2026-11-08 before any run
+- 191M, 80 REP prompts, POW6 + guard; bonus cont x [candidate is the position right after the source position used for the previous word], so the generator keeps reading one source until the copy cap forces a switch. Arms CONT4, CONT8 (and POW6G regenerated in the same run). Reported: share of steps that continue the previous source (smoke: POW6G 0.59, CONT4 0.73, CONT8 0.75). Pairs: CONT4 vs POW6G, CONT8 vs POW6G (160 pairs).
+- **Predictions:** CONT8 over POW6G fluency (45%); CONT4 over POW6G (40%).

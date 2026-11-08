@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "BEAM4 over POW6G": {
+   "share": 0.3165,
+   "pairs": 79,
+   "interval": [
+    0.228,
+    0.418
+   ]
+  }
+ },
+ "coherence": {
+  "BEAM4 over POW6G": {
+   "share": 0.3165,
+   "pairs": 79,
+   "interval": [
+    0.215,
+    0.43
+   ]
+  }
+ }
+}

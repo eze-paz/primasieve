@@ -52,3 +52,6 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Error analysis (POW6-191M ungrammatical sentences): role-mismatched splices, clauses ended early, stock phrases.
 22. BEAM (03:52): beam of 4 over the sharpened consensus at 191M.
    Result H6: harmonics on POW6-191M: nothing (0.538 / 0.463).
+   Result H6/BEAM: harmonics nothing on POW6; beam clearly worse (0.317).
+23. FINALG (03:52): one rater, grammatical-sentence share across all stages (prompts 40-79).
+24. CONT (03:56): source-continuity bonus (fewer splices).
