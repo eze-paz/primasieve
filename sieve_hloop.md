@@ -31,3 +31,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 13. HPOW (03:15): class harmonics (z 1/2/4) on top of sharpening, pairwise vs sharpening alone.
    Result LA (03:15): lookahead not distinguishable from sharpening alone (0.550 [0.438, 0.650]).
 14. BIGH (03:25): best generators over the 191M-word books stream vs 27M, pairwise.
+   Result HPOW (03:25): harmonics on top of sharpening: no detectable gain (CZP2 over POW2 0.563 [0.450, 0.662]).

@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "CZP1 over POW2": {
+   "share": 0.5125,
+   "pairs": 80,
+   "interval": [
+    0.412,
+    0.625
+   ]
+  },
+  "CZP2 over POW2": {
+   "share": 0.5625,
+   "pairs": 80,
+   "interval": [
+    0.45,
+    0.662
+   ]
+  },
+  "CZP4 over POW2": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.638
+   ]
+  }
+ },
+ "coherence": {
+  "CZP1 over POW2": {
+   "share": 0.5,
+   "pairs": 80,
+   "interval": [
+    0.388,
+    0.613
+   ]
+  },
+  "CZP2 over POW2": {
+   "share": 0.525,
+   "pairs": 80,
+   "interval": [
+    0.412,
+    0.637
+   ]
+  },
+  "CZP4 over POW2": {
+   "share": 0.4875,
+   "pairs": 80,
+   "interval": [
+    0.375,
+    0.588
+   ]
+  }
+ }
+}
