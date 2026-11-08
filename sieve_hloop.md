@@ -16,3 +16,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 5. HSWEEP5 (02:35): low-noise proxy N (Pythia surprisal of the generator's whole next-word distribution at 2,000 real contexts, paired), validity check vs the blind result, knob re-sweep.
    Result (02:30): the low-noise proxy resolves about 0.03; z-scored harmonics lower N monotonically (z4 8.4402 vs control 8.6769) but also sharpen q.
 6. HSWEEP6 (02:40): entropy-matched control (temperature frontier of the no-harmonics generator).
+   Result (02:37): temperature cannot sharpen below 2.83 bits (ties); harmonics break ties and beat that frontier; class phases best (class z8 N 8.2717).
+7. HSWEEP7 (02:45): random-similarity control (tie-breaking alone) and power-sharpening frontier.
