@@ -2617,3 +2617,15 @@ add-on to attention or as a position code; learned periods beat the fixed ladder
 - Grammatical share (three raters): JX3 0.620 [0.571, 0.664], G-JX3 0.644 [0.597, 0.689] (paired [-0.045, 0.096]), G-JX10B 0.607 (paired [-0.079, 0.056]), truth 0.877.
 - Predictions: G-JX3 over JX3 coherence point above 0.5 (60%) — held weakly (0.525, n.s.).
 - Reading: 5x the data adds nothing measurable on top of the veto at this sample size; JX3 at 191M stays the reference (cheaper).
+
+## JXH — harmonics on top of the junction veto (owner: "try it"; preregistered 2026-11-08, before the run)
+- Harmonics were dropped once sharpening came in (no fluency gain on top of it: HPOW, H6). The remaining JX3 errors are unfinished clauses and grammatical nonsense, which is where a long-range state could help. Harmonic scoring ported from the HSWEEP kernels into sieve_g1b_kernel.py (Harm: 7 damped bands tau 2..128, D 64, half the dims order-bound, window 64; similarity of each candidate's 64-word history to the text's, z-scored across candidates, added with weight beta).
+- 80 fresh prompts (offset 59), 191M. Arms: JX3 (base), JX3CZ2 (class symbols, beta 2), JX3WZ2 (word symbols, beta 2). Kaggle GPU (CPU too slow for 3,072 x 64-word encodings per step).
+- Judging: pairwise each arm vs JX3 (one rater each, 80 pairs), fluency and coherence; grammatical share of the three + truth (three raters by prompt thirds).
+- **Predictions:** a harmonic arm over JX3 on coherence, point above 0.5 (55%); on fluency, interval above 0.5 (20%); grammar share within 0.03 of JX3 (60%).
+- Amendment before the run (GPU slots full): Kaggle CPU instead; harmonic similarity computed only for candidates in the top two word-match tiers (at most 1,024), z-scored among them, others unchanged. Lower tiers trail by 16+ points and cannot be lifted by beta 2 x |z| <= about 6, so the ranking that matters is unchanged (smoke: same opening text as the full computation).
+**JXH results (2026-11-08; Kaggle CPU primasieve-jxh; sieve_jxh_*.json, sieve_gramjxh_*.json).** Fresh prompts (offset 59). All 80 texts changed in both arms. Sentences: JX3 393, JX3CZ2 341, JX3WZ2 324, truth 267.
+- Pairwise vs JX3: JX3CZ2 fluency 0.525 [0.425, 0.637], coherence 0.4875; JX3WZ2 fluency 0.600 [0.487, 0.700], coherence 0.575 [0.463, 0.675].
+- Grammatical share: JX3 0.712 [0.667, 0.756], JX3CZ2 0.689 (paired [-0.084, 0.037]), JX3WZ2 0.648 [0.599, 0.693] (paired [-0.126, -0.003]), truth 0.906.
+- Predictions: a harmonic arm's coherence point above 0.5 — held (JX3WZ2 0.575, n.s.); fluency interval above 0.5 — failed (JX3WZ2 touches 0.487); grammar within 0.03 of JX3 — held for JX3CZ2, failed for JX3WZ2 (lower, paired interval below zero).
+- Reading: word harmonics lean toward the readers' preference on fluency and coherence (both n.s.) but lower the strict grammatical-sentence share, with fewer, longer sentences; class harmonics do nothing. Not adopted; JX3 stays the best.

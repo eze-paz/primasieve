@@ -5,7 +5,7 @@ time (same order as the stable argsort), the 8-gram copy table filled in chunks 
 G1_MODE=sanity: BIG's 191M stream (four PG-19 half-shards), BEST only -> must equal E2E's BEST texts.
 G1_MODE=1b: MT 27M + tok1b shards 0..11 (extended vocabulary), arms B1G6 / B1G12.
 Smoke: G1_SMOKE=1 G1_DATA=.. G1_OUT=.. (MT 2M + 300k eval, K 256, 3 prompts; compare with e2b.py's smoke)."""
-import glob, os, time, json, numpy as np, torch
+import glob, os, time, json, math, numpy as np, torch
 SMOKE = bool(os.environ.get("G1_SMOKE")); SA = bool(os.environ.get("G1_SA")); JX = bool(os.environ.get("G1_JX")); MODE = os.environ.get("G1_MODE", "1b"); dev = "cuda" if torch.cuda.is_available() else "cpu"; T0 = time.time()
 V = 60000; UNK = V + 1; LP, LG = 30, 50; M64 = np.uint64(0x9E3779B97F4A7C15); K = 256 if SMOKE else 3072; MW = 4; LAM0 = 8.0; CHUNK = int(os.environ.get("G1_CHUNK", 60_000_000))
 OUTD = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.environ.get("G1_OUT", ".")
@@ -87,7 +87,16 @@ def cands(Qrev, Q2=None):
             if hi[j] > i0[j]: i0[j] = i0[j] + np.searchsorted(KEYS2[i0[j]:hi[j]], q2[j])
     i0 = torch.tensor(i0, device=dev); r = torch.arange(K // 2, device=dev)
     idx = torch.cat([i0[:, None] - 1 - r, i0[:, None] + r], 1); ok = (idx >= 0) & (idx < NP_); return ORD[idx.clamp(0, NP_ - 1)].long(), ok
-LSTAT = []
+LSTAT = []; HM = {}
+class Harm:                                                                                                    # harmonic state (from the HSWEEP kernels): damped oscillator bands over the last WIN symbols
+    def __init__(s, cfg):
+        s.cfg = cfg; g = torch.Generator().manual_seed(1); D = cfg.get("D", 64); s.WIN = cfg.get("WIN", 64); nsym = VV if cfg.get("symbol", "class") == "word" else int(FINE.max()) + 1
+        s.theta = (torch.rand(nsym, D, generator=g) * 2 * math.pi).to(dev); no = int(round(D * cfg.get("order", 0.5))); s.omega = torch.cat([torch.zeros(D - no), torch.rand(no, generator=g) * 2 * math.pi]).to(dev)
+        j = torch.arange(s.WIN, dtype=torch.float32, device=dev); s.W = torch.stack([(1 - 1 / t) ** j for t in cfg.get("bands", (2, 4, 8, 16, 32, 64, 128))]); s.rot = torch.exp(1j * j[:, None] * s.omega[None, :])
+    def enc(s, w):
+        sym = torch.where(w >= 0, w, torch.zeros_like(w)); sym = sym if s.cfg.get("symbol", "class") == "word" else FINE[sym]
+        u = torch.exp(1j * s.theta[sym]) * s.rot[None] * (w >= 0)[:, :, None]; zz = torch.einsum("njd,bj->nbd", u, s.W.to(u.dtype))
+        v = torch.cat([zz.real, zz.imag], 2); v = v / v.norm(dim=2, keepdim=True).clamp(min=1e-9); return v.reshape(len(w), -1) / math.sqrt(v.shape[1])
 def generate(cfg, pids):
     out = {}; LSTAT.clear()
     for pid in pids:
@@ -99,6 +108,12 @@ def generate(cfg, pids):
             else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
             eqL = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); LSTAT.append(float(torch.cumprod(eqL, 2).sum(2).max()))
             sc = LAM0 * m4
+            if cfg.get("beta"):                                                                                  # harmonic similarity of each candidate's history to the text's (z-scored across candidates)
+                hm = HM.setdefault(json.dumps(cfg, sort_keys=True), Harm(cfg)); hw = text[::-1][:hm.WIN]; Qh = torch.tensor([hw + [-1] * (hm.WIN - len(hw))], device=dev)
+                tier = ok[0] & (m4[0] >= m4[0][ok[0]].max() - 1); sel = torch.nonzero(tier)[:, 0][:int(cfg.get("htop", 1024))]       # only candidates that can still win
+                cw = St[(c[0, sel][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long(); sim = (hm.enc(cw) * hm.enc(Qh)).sum(1)
+                z = torch.zeros_like(sc[0]); z[sel] = (sim - sim.mean()) / sim.std().clamp(min=1e-6) if len(sel) > 1 else 0.0
+                sc = sc + cfg["beta"] * z[None]
             if cfg.get("lamc"):
                 qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
