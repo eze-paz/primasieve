@@ -12,3 +12,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 3. HSWEEP3 (02:05): 120 prompts; exact-match window MW 6/8; copy-cap 12 (flagged).
    Result (02:15): with 120 prompts harmonics add nothing (7.4075 vs 7.3945 without); the lever is exact-match weight; CAP12 helps by copying (flagged).
 4. HSWEEP4 (02:20): standardised harmonic similarity (z-scored across candidates), exact-match weight curve, per-prompt error bars.
+   Result (02:22): nothing separable from the exact-match control; sampled-text proxy resolution about 0.13 bits at 120 prompts.
+5. HSWEEP5 (02:35): low-noise proxy N (Pythia surprisal of the generator's whole next-word distribution at 2,000 real contexts, paired), validity check vs the blind result, knob re-sweep.
