@@ -51,3 +51,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result CAPT: copy-cap 10/12 no clear fluency gain (0.588 / 0.575, intervals include 0.5) — the cap is not the binding constraint at POW6.
    Error analysis (POW6-191M ungrammatical sentences): role-mismatched splices, clauses ended early, stock phrases.
 22. BEAM (03:52): beam of 4 over the sharpened consensus at 191M.
+   Result H6: harmonics on POW6-191M: nothing (0.538 / 0.463).
