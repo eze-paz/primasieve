@@ -3,7 +3,8 @@ candidates, weight exp(4 x m4), boundaries allowed, copy cap), per-word distribu
   cfg keys: T (temperature, p^(1/T)); topic (lambda: content words x (P_T(w)/P_U(w))^lambda, trigger over the last 50
   content words of the text, MT's trigger counts); cache (kappa: content words x (1 + kappa x share of w among the text's
   content words / P_U(w))^(1/2)); norep (bool: forbid a trigram already in the text); nounk (bool: never write UNK); depth (D: weight by consecutive exact matches up to D words, not m4).
-Index: 8-word reversed prefix (MIX onward; TEMP used 4 words).
+Index: 8-word reversed prefix (MIX onward; TEMP used 4 words). doc (delta: candidates inside the ndoc (100) training
+  passages most similar to the text get weight x e^delta; passages = 1,000-word chunks, tf-idf over content words); cap (6: also no 6-word window from training; needs DEC_H6=1).
 Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}'  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
 import os, sys, json, time
 import numpy as np
@@ -21,6 +22,16 @@ class Dec:
         s.KA = K1[o]; s.KB = K2[o]; s.OA = PA[o]; del K1, K2, o
         s.H8 = np.load(MT.fp(C, "sw_index"))["H8"]; g = np.load(MT.fp(C, "ngram")); n1 = g["n1"].astype(float); s.pU = (n1 + 0.5) / (n1.sum() + 0.5 * len(n1))
         t = np.load(MT.fp(C, "trig")); s.tu, s.tn = t["u"], t["n"]; s.rc = np.bincount(s.tu // MT.VV, weights=s.tn, minlength=MT.VV)
+        if os.environ.get("DEC_H6"):                                                                                                     # COH: 6-word copy cap
+            St = S[:ntr].astype(np.uint64); n6 = len(St) - 5; a6 = np.zeros(n6, np.uint64); b6 = np.zeros(n6, np.uint64)
+            for i in range(4): a6 = (a6 << np.uint64(16)) | St[i:i + n6]
+            for i in range(2): b6 = (b6 << np.uint64(16)) | St[4 + i:4 + i + n6]
+            with np.errstate(over="ignore"): s.H6 = np.sort((a6 * M64) ^ b6)
+            del a6, b6, St
+        s.CH = 1000; pc = np.arange(ntr); cm = (S[:ntr] > 100) & (S[:ntr] <= s.V); ck = (pc[cm] // s.CH) * MT.VV + S[:ntr][cm]; u_, n_ = np.unique(ck, return_counts=True)   # DOC: passage index (1,000-word chunks)
+        ch, w_ = u_ // MT.VV, u_ % MT.VV; nch = ntr // s.CH + 1; df = np.bincount(w_, minlength=MT.VV); idf = np.log(nch / np.maximum(df, 1)); val = np.log1p(n_) * idf[w_]
+        nrm = np.sqrt(np.bincount(ch, weights=val ** 2, minlength=nch)); val = val / np.maximum(nrm[ch], 1e-9); o_ = np.argsort(w_, kind="stable")
+        s.pw, s.pch, s.pval = w_[o_], ch[o_], val[o_]; s.pst = np.searchsorted(s.pw, np.arange(MT.VV + 1)); s.idf = idf; s.nch = nch
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.linspace(0, len(st) - 1, NP).astype(int)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -36,9 +47,18 @@ class Dec:
             for j in range(cfg["depth"]): ok &= S[pos - 1 - j] == text[-1 - j]; dep += ok
             sc = dep
         else: sc = m4
+        if cfg.get("doc"):
+            top = s.topchunks(text, cfg.get("ndoc", 100)); sc = sc + cfg["doc"] / 4 * np.isin(pos // s.CH, top)              # DOC: bonus for candidates inside the most similar passages
         uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=np.exp(4 * (sc - sc.max())))
         hv = s.h8v(text[-7:], uw); bad = s.H8[np.minimum(np.searchsorted(s.H8, hv), len(s.H8) - 1)] == hv
         if (~bad).any(): p = p * ~bad
+        if cfg.get("cap") == 6:
+            a = np.uint64(0); b = np.uint64(0)
+            for i in range(4): a = (a << np.uint64(16)) | np.uint64(text[-5 + i])
+            b = np.uint64(text[-1]) << np.uint64(16)
+            with np.errstate(over="ignore"): hv6 = (a * M64) ^ (b | uw.astype(np.uint64))
+            b6 = s.H6[np.minimum(np.searchsorted(s.H6, hv6), len(s.H6) - 1)] == hv6
+            if (~b6).any() and (p * ~b6).sum() > 0: p = p * ~b6
         if cfg.get("nounk") and (uw <= s.V).any(): p = p * (uw <= s.V)
         con = (uw > 100) & (uw <= s.V)
         if cfg.get("topic") and con.any():
@@ -56,6 +76,14 @@ class Dec:
             if (~rep).any() and (p * ~rep).sum() > 0: p = p * ~rep
         p = p ** (1.0 / cfg.get("T", 1.0)) if cfg.get("T", 1.0) != 1.0 else p
         return uw, p / p.sum()
+    def topchunks(s, text, k):
+        """the k training passages (1,000-word chunks) most similar (tf-idf cosine) to the text's content words; cached per 10 words"""
+        key = len(text) // 10
+        if getattr(s, "_tk", None) == (key, id(text)): return s._tc
+        cw = [w for w in text if 100 < w <= s.V]; u, n = np.unique(cw, return_counts=True); q = np.log1p(n) * s.idf[u]; sc = np.zeros(s.nch)
+        for w, qv in zip(u, q):
+            a, b = s.pst[w], s.pst[w + 1]; np.add.at(sc, s.pch[a:b], qv * s.pval[a:b])
+        s._tk = (key, id(text)); s._tc = np.argpartition(-sc, k)[:k]; return s._tc
     def gen(s, prompt, cfg, seed):
         g = np.random.default_rng(seed); text = list(prompt)
         while len(text) - len(prompt) < LG:
