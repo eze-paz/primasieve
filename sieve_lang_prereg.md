@@ -2377,3 +2377,39 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - E2E prompts, books 191M. Arms vs BEST (E2E): K12 = BEST with 12,288 candidates (more of the consensus at 191M); BSL = BEST + SL6. 160 pairs.
 - **Predictions:** K12 over BEST (35%); BSL over BEST coherence (40%).
 **K12 + SL results (2026-11-08 ~04:33; sieve_k12sl_gen.json, sieve_k12sl_key.json, sieve_k12sl_ratings.json, sieve_k12sl_scores.json).** Pythia bits BEST 5.8418, K12 5.8036, BSL 6.0015. Pairwise vs BEST (non-identical pairs): K12 fluency 0.596 [0.474, 0.719] (57), coherence 0.456; BSL fluency 0.475 [0.325, 0.625] (40), coherence 0.600 [0.450, 0.750]. Predictions: K12 over BEST (35%) — failed (n.s.); BSL coherence over BEST (40%) — failed (n.s.).
+
+## CEIL: coherence ceiling at equal data (preregistered 2026-11-08, before training)
+Question: is the coherence floor a property of the data budget (27M words) or of counting + collage decoding?
+- NET: the fair-control S architecture (29M-class transformer, 512-word window; here 20,115,968 parameters because the
+  books vocabulary is 60,002) trained from scratch on exactly B's books stream S[:ntr], 6 epochs, epoch chosen on held-out
+  words outside every prompt window (sieve_ceil_kernel.py, Kaggle T4). Sampled on the 120 DBIG prompts (prompt text
+  checked equal), the 30-word prompt only, 50 words, temperature 0.8, nucleus 0.9, unknown banned. One sampler, fixed now.
+- Compared side by side against B27 and truth (dbig_27.json): pairs B27:NET and NET:truth, 120 prompts each, two blind
+  raters, coherence and fluency, bootstrap over prompts (sieve_gentools.py pairs/pairscore). +1 = second arm preferred.
+- Bars on NET vs B27 coherence: GAP if the mean is >= 0.3 and the interval excludes 0 (a learned model at the same data
+  is clearly more coherent; the floor is the method, so a meaning state is worth testing and the gap is its target).
+  DATA if the interval includes 0 (27M words cannot buy coherence for either; decoder levers are pointless here).
+  Between (interval excludes 0, mean < 0.3): small gap, reported as such. Fluency reported, no bar.
+
+## SPLICE — does more PG-19 text pay? Coverage extrapolation (preregistered 2026-11-08, before the full run)
+- Theory: the generator continues a real source only where the held-out context + true next word was seen in training; elsewhere it must splice (the dominant grammar error at 191M). Wyner-Ziv: the longest exact match into a corpus of N words grows as log2 N / H (H = entropy rate, bits per word), i.e. a fixed number of words per doubling.
+- Kaggle CPU kernel sieve_splice_kernel.py: BIG books stream (MT 27M, then the four PG-19 half-shards; prefixes 7.1M, 14.3M, 28.5M, then +each half-shard to 191M), 200,000 held-out MT books positions (true word not UNK or boundary). Per prefix: covered share of (k+1)-grams, k = 0..12, and mean longest covered context (grid 0-7, 9, 12). Fits: mean context = a + b log2 N; coverage = a N^b (upper bound, ignores saturation). Fits on prefixes >= 27M (the PG-19 part) and on all.
+- **Decision rule (fixed now):** download more PG-19 only if the >= 27M fit predicts a mean-context gain from 191M to 1.9B at least as large as the measured gain from 27M to 191M (the step that gave pairwise fluency 0.650). Smaller: skip the download.
+- **Predictions:** words per doubling on the >= 27M fit between 0.10 and 0.20 (smoke on MT alone: 0.1647) (60%); the >= 27M slope lower than the MT-only slope (PG-19 text matches the held-out books less) (60%); rule says download (50%).
+
+## MEAN: a minimal meaning state (preregistered 2026-11-08, after a mechanism calibration, before any rating)
+Held state: (1) the referent gender of the last 60 words (ENT's gender, x 3); (2) the held content words = the last 60
+content words with passage idf >= 2, and the set U of 1,000-word training passages containing any of them; a NEW content
+word is licensed if it occurs in U at least as often as chance ((co + 1) / (expected + 1) >= 1), otherwise its weight is
+x e^-2 (penalty only: FUT showed that boosting related words makes the text reuse words); (3) the subject of the last
+sentence (its first word, if a pronoun or content word) gets x e^1 at the next sentence start. Base B (T 0.35, no UNK, no
+repeated trigram, 8-word cap); sieve_dec.py keys gender 3, ms 2, msubj 1.
+- Calibration that chose the passage level (before this prereg, on the 120 DBIG prompts): share of new content words
+  below chance, true continuations 0.227 vs B27 0.394; at sentence level the two did not separate (median lift 1.591 vs
+  1.464), so the sentence-level version was dropped without rating.
+- Mechanism check reported: the same below-chance share on MEAN's output (expected to move from 0.394 toward 0.227).
+- Rated in the same side-by-side batch as CEIL: pair B27:MEAN, 120 DBIG prompts, two blind raters.
+- Bar: coherence mean >= 0.15 with the interval excluding 0 -> replicate on 120 fresh prompts (DEC_POFF) before any
+  claim. Otherwise null. Fluency reported; a fluency loss with interval excluding 0 is reported as a cost.
+**SPLICE results (2026-11-08; sieve_splice.json, Kaggle primasieve-splice).** Training stream is 200,543,654 words (the "191M" stream counted with boundaries). Mean longest covered context: 7.1M 1.565, 14.3M 1.731, 28.5M 1.894, 96.1M 2.164, 113.7M 2.204, 183.5M 2.315, 200.5M 2.334. Covered 5-gram (4-word key + true word): 28.5M 0.0787, 200.5M 0.1531. Fit >= 27M: 0.1566 words per doubling (implied entropy rate about 6.4 bits per word); MT-only points: 0.1648 per doubling. Predicted mean context at 1.9B: 2.841 (fit on all: 2.851); predicted covered 5-gram at 1.9B 0.332 (power law, upper bound). UNK share of training text: 28.5M 0.0080, 200.5M 0.0143.
+- Decision rule: measured 28.5M -> 200.5M went 1.894 -> 2.334; predicted 200.5M -> 1.9B goes 2.334 -> 2.841. The predicted step is larger: **rule says download.** Predictions: words per doubling in [0.10, 0.20] — held; PG-19 slope below MT-only — held (0.1566 vs 0.1648); rule says download — held.
