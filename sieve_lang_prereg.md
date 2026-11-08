@@ -2529,3 +2529,12 @@ or phase-locked units (binding by synchrony), which this battery does not cover.
 (65%) held (third prompt set); L4 at least L2 on coherence (45%) held; L4 fluency below B (30%) failed (L4 is above B).
 **Reading:** the passage licence is the working part; it alone is above B, and doubling its strength did not hurt.
 Gender + subject alone is borderline. MEAN, with all three, is the highest on this set and has now held on 3 sets.
+**HARM stage-1 implementation notes (2026-11-08, before any result; sieve_harm_kernel.py, Kaggle primasieve-harm-1/2/3).**
+Parameters: NET2 20,230,656; HA 20,402,944 (approx., +172k bank); HE 20,107,520 at a 64 window, no position table at
+512 so about 20.1M; HB/HC/HF about 20.49M; HD about 20.69M: all within 5% of NET. HE has no paragraph marker in the
+books stream, so its slow phases run over window position and its fast phases over sentence position (deviation from
+the prereg's "paragraph"). HF periods measured on the training text: clause median 6 words, sentence median 14; periods
+3, 6, 14, 28 ... 896. HC bands: periods 32 (1 band); 4 and 512 (2); 4, 16, 64-ish, 512 (4: octaves rounded from a
+linear grid over 1..8); 4..512 (8); each channel confined to half an octave around its band by a tanh reparameterisation.
+HD: channels with initial period >= 64 are slow; their output gates the fast channels' input by a sigmoid. Kaggle
+allows two GPU sessions, so kernel 3 (HC x 4, HF) starts when kernel 1 or 2 ends.
