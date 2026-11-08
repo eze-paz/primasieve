@@ -22,3 +22,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 8. HSWEEP8 (02:50): harmonics + sharpening combos on N; blind batch NOH / POW2 / class z4 / class z4 + POW1.5 / truth.
    Result (02:48): blind 1-5 ratings floor out (122 of 200 items rated exactly 1/2); class harmonics vs none [0.000, 0.275]; sharpening not confirmed by the rater despite Pythia.
 9. PAIR (02:55): pairwise forced-choice fluency/coherence on round 8's texts.
+   Result (03:00): pairwise fluency: sharpened over none 0.700 [0.575, 0.825]; class harmonics over none 0.500. Sharpening is the lever.
+10. GATE2 (03:05): sharpening curve (POW 2/3/4) + harmonics only at uncertain steps; pairwise.
