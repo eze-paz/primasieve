@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "CONT4 over POW6G": {
+   "share": 0.425,
+   "pairs": 80,
+   "interval": [
+    0.312,
+    0.537
+   ]
+  },
+  "CONT8 over POW6G": {
+   "share": 0.45,
+   "pairs": 80,
+   "interval": [
+    0.338,
+    0.562
+   ]
+  }
+ },
+ "coherence": {
+  "CONT4 over POW6G": {
+   "share": 0.5625,
+   "pairs": 80,
+   "interval": [
+    0.45,
+    0.675
+   ]
+  },
+  "CONT8 over POW6G": {
+   "share": 0.4875,
+   "pairs": 80,
+   "interval": [
+    0.375,
+    0.6
+   ]
+  }
+ }
+}
