@@ -2270,3 +2270,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - **Comparisons:** NS27:NS200 and B27:B200, 120 pairs each, two side-by-side raters each; Pythia-410m on all arms.
 - **Predictions:** NS200 preferred over NS27 on coherence with interval excluding 0 (40%); on fluency (40%); B200 over B27 on fluency (35%).
 **B2 results (2026-11-08 ~03:35; sieve_b2_gen.json, sieve_b2_key.json, sieve_b2_ratings.json, sieve_b2_scores.json).** At 191M, Pythia bits: POW2 6.6245, POW3 6.1511, MW6 7.0540, L12 6.6556; repeated trigrams 0.0049 / 0.0070 / 0.0036 / 0.0063. Pairwise vs POW2-191M, fluency: POW3 0.613 [0.512, 0.713]; MW6 0.488 [0.375, 0.588]; L12 0.313 [0.156, 0.469] (32 non-identical pairs); coherence 0.613 [0.500, 0.713] / 0.463 / 0.313. Prediction POW3 over POW2 at 191M (35%) — held. **At 27M power 3 did not beat power 2 (GATE2: 0.425); at 191M it does: more data supports more sharpening.**
+
+## B3 — how far does sharpening go at 191M? (loop round 18), preregistered 2026-11-08 before any run
+- 191M, 80 REP prompts: POW4 and POW6 vs POW3 (B2), pairwise (160 pairs). Repeated trigrams and distinct words reported (sharpening's known failure is repetition / blandness).
+- **Predictions:** POW4 over POW3 (40%); POW6 over POW3 (25%); POW6 repeated trigrams at least 0.02 (50%).
