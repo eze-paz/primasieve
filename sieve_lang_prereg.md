@@ -2280,3 +2280,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## GR — near-greedy consensus with a repeat guard (loop round 19), preregistered 2026-11-08 before any run
 - 191M, 80 REP prompts. GR = POW 20 (near argmax of the consensus) + guard forbidding a repeated trigram; POW6G = POW6 + the same guard. Pairs: GR vs POW6 (B3), POW6G vs POW6 (160 pairs). Absolute: grammatical-sentence share (fresh rater, 40 prompts each) for POW3-191M, POW6-191M, GR, true text (160 texts).
 - **Predictions:** GR over POW6 (35%); POW6G over POW6 (40%); POW6-191M grammatical share at least 0.55 (40%).
+
+## CAPT — originality vs fluency: copy-cap length (loop round 20), preregistered 2026-11-08 before any run
+- 191M, 80 REP prompts, POW6 + repeat guard (= GR's POW6G) with the copy cap at 10 and 12 words (CAP10 lets 9-word verbatim chunks through, CAP12 11-word). Longest verbatim run from the training text reported per arm (POW6G: cap 8, at most 7). Pairs: CAP10 vs POW6G, CAP12 vs POW6G (160 pairs). This is a disclosed trade-off, not a skill gain.
+- **Predictions:** CAP12 over POW6G fluency (65%); CAP10 over POW6G (45%).
