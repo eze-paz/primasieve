@@ -47,3 +47,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 20. CAPT (03:42): copy-cap 10 / 12 vs 8 at POW6 + guard (originality traded for fluency, disclosed).
    Result GR: near-greedy no further gain (0.449); repeat guard neutral. Sharpening saturates near POW6. Coordinated with the original primasieve session (it does sentence-level coherence: NS).
    Absolute batch 2: grammatical-sentence share POW3-191M 0.517, POW6-191M 0.591, GR 0.611, true text 0.897.
+21. H6 (03:47): class harmonics z1/z2 as tie-breaker on POW6 + guard at 191M.

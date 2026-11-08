@@ -2300,3 +2300,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - **Kaggle sieve_decbig_kernel.py, SIZE 200 (191M words), 120 prompts:** P6 = candidates weighted e^(8 x m4) (8-word reversed-prefix index, 3,072 nearest), per-word sum raised to the power 6, 8-word copy cap, UNK and repeated trigrams allowed (as the parallel loop's POW6; its 4-word index differs from this 8-word one); P6NS = P6 + NS (sentence-boundary candidates from the 64 most similar sentences' followers, bonus e^4).
 - **Comparison P6:P6NS, 120 pairs, two side-by-side raters; Pythia-410m; repeated trigrams.**
 - **Predictions:** P6NS preferred over P6 on coherence with interval excluding 0 (40%); on fluency (35%).
+
+## H6 — harmonics as a tie-breaker on the strongest base (loop round 21), preregistered 2026-11-08 before any run
+- 191M, 80 REP prompts: POW6G + class harmonics z1 (H6z1) and z2 (H6z2). Pairs vs POW6G (160 pairs).
+- **Predictions:** H6z1 over POW6G fluency (25%); some H6 over POW6G coherence (30%).
