@@ -2710,3 +2710,25 @@ counting, and not past its 512-word training length.
 - **JT.** The frozen HBlearn slow state (HGH's 32-dim projection) with a learned linear map W (32 x 32) trained for Sieve's job: at a training position t, Sieve's B candidate set for the text S[t-30:t]; positives = sources of the true next word S[t]; negatives = sources of the other candidate words; score of a word = mean over its sources of (W h_text) . (W h_src) / norms; softmax over candidate words, cross-entropy on the true word. Sources within 2,000 positions of t are dropped (no self-match). 20,000 training positions sampled from S[:ntr] (seed 0), 3,000 more held out for an AUC check; Adam, 20 epochs. Arm JT = HG with the learned similarity in place of the cosine, tau recalibrated the same way (40 prompts, DEC_POFF 27). Run: 120 fresh prompts DEC_POFF 23, arms MEAN and JT, side by side MEAN:JT, two blind raters. Pass = coherence interval excludes 0 in JT's favour, then replication on fresh prompts.
 - JT is not end-to-end joint training (that needs Sieve distributions for every training position: about 40 h of CPU); it is the cheapest version in which the state is trained for the counting decoder's use rather than for next-word prediction.
 - **Predictions:** LT-4096 below HB512 with interval (50%); LT-4096 below NET512 with interval (55%); LT-512 above HB512 (60%); LT-16384 at or below LT-4096 (45%); JT's held-out AUC (true word vs other candidates) above the untrained cosine's (75%); JT over MEAN on coherence (20%).
+
+**JT results -- FAIL (2026-11-08; sieve_jt.py, sieve_jt_auc.json, sieve_jt_tau.json, mtest/jt_gen.json, sieve_jt_pair_scores.json; two raters, agreement coherence 0.850 / fluency 0.883).**
+Readout: 23,000 examples (20,000 train, 3,000 held out); held-out AUC (true word vs other candidates) untrained cosine
+0.5941, trained W 0.6223; train loss 7.0562 -> 6.4284 (flat after epoch 6). Calibration (DEC_POFF 27): tau 0.1043 over 225
+true words; sampled median 0.0836. JT penalized 2,122,117 of 4,083,285 content candidates; 1 of 120 texts identical to
+MEAN. JT vs MEAN (120 prompts, DEC_POFF 23): coherence -0.1417 [-0.3002, 0.025] (JT preferred 0.350, MEAN 0.492);
+fluency -0.1583 [-0.325, 0.0083] (0.358 / 0.517). Predictions: AUC above the untrained cosine (75%) held; JT over MEAN
+(20%) failed. Reading: training the readout for Sieve's job raises how well the state picks the true word (AUC 0.5941 ->
+0.6223) but it remains far weaker than counted passage co-occurrence as a licence; the 32-dim slow state of a
+next-word model carries little of what the licence needs.
+
+### LT results (2026-11-08)
+
+Kernel primasieve-lt (HBlearn retrained on 4,096-word windows, 6 epochs, 6,246 s). Dev by epoch (at 4,096): 7.6084, 7.3106, 7.1280, 7.0328, 6.9786, 6.9710.
+Per-word dev bits on the same 2,368,006 words as LC: NET512 6.9498, HB512 6.9264, LT512 6.9808, LT4096 6.9710, LT16384 6.9711.
+Paired 1,000-word block bootstrap (mean [95% interval]):
+- LT4096 minus HB512: 0.0445 [0.0431, 0.0460]. Pass rule (LT4096 below HB512): FAIL.
+- LT4096 minus NET512: 0.0211 [0.0183, 0.0240]. Prediction (below NET512, 55%): failed.
+- LT512 minus HB512: 0.0544 [0.0529, 0.0559]. Prediction (LT512 above HB512, 60%): held.
+- LT16384 minus LT4096: 0.0001 [0.0001, 0.0001]. Prediction (at or below, 45%): failed.
+Reading: training on long windows makes LT use 4,096 words better than its own 512 (6.9710 vs 6.9808), unlike HB (6.9891 vs 6.9264), but the same 6 epochs on 4,096-word windows leave it behind HB512 at every length. Beyond 4,096 the slow state adds nothing (6.9711).
+Scores: sieve_lt_scores.json.

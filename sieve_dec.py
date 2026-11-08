@@ -109,7 +109,11 @@ class Dec:
             sc = sc + cfg["stick"] / 4 * (pos == s._src + 1)                                                                   # ENT: keep the clause's source passage
         wpos = np.exp(4 * (sc - sc.max())); cs = None
         if cfg.get("hh") or cfg.get("hg") or cfg.get("hgcal"):                                                                      # HGH: cosine of each source's state with the text's
-            v = s.tstate(text); X = s.HS[pos - 1].astype(np.float32) - s.HSmu; cs = X @ v / (np.linalg.norm(X, axis=1) * np.linalg.norm(v) + 1e-9)
+            v = s.tstate(text); X = s.HS[pos - 1].astype(np.float32) - s.HSmu
+            if cfg.get("hgw"):                                                                                                     # JT: learned readout W
+                if getattr(s, "_Wp", None) != cfg["hgw"]: s._Wp = cfg["hgw"]; s._W = np.load(cfg["hgw"]).astype(np.float32)
+                X = X @ s._W.T; v = s._W @ v
+            cs = X @ v / (np.linalg.norm(X, axis=1) * np.linalg.norm(v) + 1e-9)
             if cfg.get("hh"): wpos = wpos * np.exp(cfg["hh"] * (cs - cs.mean()) / (cs.std() + 1e-9))
         s._pos, s._wpos = pos, wpos
         uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=wpos); s._inv = inv
@@ -260,11 +264,12 @@ def hgcal():
     """HG calibration: tau = median cosine of the true next content word over true continuations (B's candidate sets);
     also the median for words sampled from B's distribution over the same eligible candidates"""
     d = Dec(); cfg = {"T": 0.35, "nounk": 1, "norep": 1}; g = np.random.default_rng(0)
+    if os.environ.get("DEC_HGW"): cfg["hgw"] = os.environ["DEC_HGW"]
     for pid, t in enumerate(d.prompts):
         pr = d.S[t:t + LP + LG].tolist()
         for j in range(LP, LP + LG): d.dist(pr[:j], dict(cfg, hgcal=(pr[j], g)))
         if pid % 10 == 0: log(f"cal prompt {pid}: true {len(d._hgc)} median {np.median(d._hgc):.4f}; sampled median {np.median(d._hgs):.4f}")
     out = dict(tau=float(np.median(d._hgc)), n_true=len(d._hgc), sampled_median=float(np.median(d._hgs)), n_sampled=len(d._hgs))
-    json.dump(out, open(os.path.join(HERE, "sieve_hgh_tau.json"), "w"), indent=1); log(json.dumps(out))
+    json.dump(out, open(os.path.join(HERE, "sieve_jt_tau.json" if os.environ.get("DEC_HGW") else "sieve_hgh_tau.json"), "w"), indent=1); log(json.dumps(out))
 if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()
 if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else None)

@@ -13,6 +13,7 @@ import os, glob, json, math, time, sys
 import numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 V = 60000; VT = V + 2; LP, LG = 30, 50
 CTX, STRIDE, BATCH, MICRO, EPOCHS, LR, WARM, DROP, WD = 512, 256, 32, 2, 2, 6e-4, 300, 0.1, 0.1
+CTX = int(os.environ.get("HARM_CTX", CTX)); BATCH = 32 * 512 // CTX; STRIDE = CTX // 2 if CTX > 512 else STRIDE   # LT: same tokens per step
 EPOCHS = int(os.environ.get("HARM_EPOCHS", EPOCHS)); GEN = os.environ.get("HARM_GEN") == "1"   # stage 2: 6 epochs + CEIL sampling
 TINY = os.environ.get("HARM_TINY") == "1"
 if TINY: CTX, STRIDE, BATCH, MICRO, EPOCHS, WARM = 64, 32, 8, 1, 1, 10
@@ -127,8 +128,9 @@ def build(arm):
 @torch.no_grad()
 def dev_bits(model):
     model.eval(); out = np.full(len(ho), np.nan); starts = list(range(0, len(ho) - 1, STRIDE))
-    for i in range(0, len(starts), 8):
-        ss = starts[i:i + 8]; idx = torch.stack([torch.as_tensor(np.pad(ho[s:s + CTX + 1], (0, max(0, s + CTX + 1 - len(ho))))) for s in ss]).to(dev)
+    DB = max(1, 4096 // CTX)
+    for i in range(0, len(starts), DB):
+        ss = starts[i:i + DB]; idx = torch.stack([torch.as_tensor(np.pad(ho[s:s + CTX + 1], (0, max(0, s + CTX + 1 - len(ho))))) for s in ss]).to(dev)
         with torch.autocast(device_type=dev.type, dtype=torch.float16, enabled=dev.type == "cuda"): lp = F.log_softmax(model(idx[:, :-1]).float(), -1)
         b = (-torch.gather(lp, 2, idx[:, 1:, None])[:, :, 0] / math.log(2)).cpu().numpy()
         for r, s in enumerate(ss):
