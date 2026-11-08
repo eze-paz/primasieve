@@ -2214,3 +2214,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## REP — replication on 80 fresh prompts + harmonics at sentence starts (loop round 11), preregistered 2026-11-08 before any run
 - 80 prompts (sentence starts spread over the books eval text, offset from the 40 blind prompts). Arms: NOH; POW2; CZ4 (class z4 every step); SB = POW2 + class harmonics z8 only at sentence starts (the step right after a boundary). Pairs: POW2 vs NOH, CZ4 vs NOH, SB vs POW2 (240 pairs, two rater batches of 120, each batch a fresh blind rater).
 - **Predictions:** POW2 over NOH fluency with interval above 0.5 (70%); CZ4 over NOH within the interval of 0.5 (65%); SB over POW2 coherence with interval above 0.5 (25%).
+
+## LA — one-step lookahead toward strong-consensus contexts (loop round 12), preregistered 2026-11-08 before any run
+- Generator: POW2, but the next word is chosen among the 8 most probable words w with weight q(w)^2 x m(w)^b, m(w) = the largest next-word probability of the no-harmonics generator in the context extended by w (a splice into a context with no strong continuation is penalised); b in {1, 2} (LA1, LA2). Same 80 REP prompts. Pairs: LA1 vs POW2, LA2 vs POW2 (160 pairs; fresh blind raters).
+- **Predictions:** LA1 over POW2 fluency with interval above 0.5 (35%); LA2 over POW2 (35%); LA2 repeated trigrams above POW2's (50%).

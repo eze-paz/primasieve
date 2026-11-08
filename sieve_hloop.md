@@ -26,3 +26,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 10. GATE2 (03:05): sharpening curve (POW 2/3/4) + harmonics only at uncertain steps; pairwise.
    Result (~03:00): beyond power 2 no clear gain (POW3 over POW2 0.425, POW4 over POW3 0.625, both intervals include 0.5); gated harmonics no gain.
 11. REP (03:02): replication on 80 fresh prompts (sharpening vs none, harmonics vs none) + harmonics only at sentence starts.
+12. LA (03:10): one-step lookahead (avoid splices into contexts without a strong continuation); pairwise vs POW2.
