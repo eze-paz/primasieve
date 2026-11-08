@@ -63,3 +63,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result NOUNK: never writing <unk> wins on books (0.679) and wiki (0.859); wiki data effect returns (0.650). New best = POW6 + guard + no <unk>.
 27. FINALG2 (04:13): grammatical share of the new best (books + wiki), one rater.
 28. POWU (04:15): sharpening re-tune with no <unk> (POW3 / POW12 vs POW6).
+   FINALG2: grammatical share books NOH-27M 0.423, POW6G-191M 0.590, POW6GU-191M 0.550 (n.s. vs POW6G), true 0.905; wiki POW6GU-200M 0.497, true 0.961. Peer session: its NS coherence result did not replicate; it paused.

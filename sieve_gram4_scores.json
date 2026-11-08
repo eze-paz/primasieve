@@ -1,0 +1,50 @@
+{
+ "B_NOH27": {
+  "share": 0.4234,
+  "sentences": 137,
+  "interval": [
+   0.357,
+   0.487
+  ]
+ },
+ "B_POW6G": {
+  "share": 0.5896,
+  "sentences": 173,
+  "interval": [
+   0.518,
+   0.659
+  ]
+ },
+ "B_POW6GU": {
+  "share": 0.55,
+  "sentences": 160,
+  "interval": [
+   0.469,
+   0.627
+  ]
+ },
+ "B_truth": {
+  "share": 0.9054,
+  "sentences": 148,
+  "interval": [
+   0.863,
+   0.948
+  ]
+ },
+ "W_POW6GU": {
+  "share": 0.4968,
+  "sentences": 155,
+  "interval": [
+   0.408,
+   0.577
+  ]
+ },
+ "W_truth": {
+  "share": 0.9606,
+  "sentences": 127,
+  "interval": [
+   0.926,
+   0.992
+  ]
+ }
+}
