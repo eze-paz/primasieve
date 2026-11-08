@@ -2447,3 +2447,71 @@ Not separated yet: which of the three parts carries the effect (ablation is the 
 - Extended-vocabulary share of output: B1G6 0.0022, B1G12 0.0016.
 - Predictions: B1G6 fluency interval above 0.5 — failed (n.s.); B1G12 over B1G6 — failed (n.s.); grammatical share B1G6 above BEST-191M — not distinguishable (0.654 vs 0.645); extended-vocabulary share above 0.002 — held (0.0022).
 - Reading: 5x the data bought coherence (interval above 0.5) but no measurable grammar. SPLICE's coverage theory predicted the matched context would rise only from 2.334 to 2.696 words; at that length most steps still splice, so data growth (log N) cannot close the grammar gap (0.65 vs 0.86) at any affordable size: closing it by coverage alone would need the 4-word key + true word seen at most positions, which the fit puts far beyond 1.9B.
+
+## MABL: which part of MEAN works, and does a stronger license help? (preregistered 2026-11-08, before any run)
+120 fresh prompts (DEC_POFF 11; DBIG/NS2 0, NSREP 3, MEANREP 7). Base B (T 0.35, no UNK, no repeated trigram).
+Arms: L2 = license only (ms 2); L4 = license only, stronger (ms 4); GS = held gender (3) + held subject (1), no
+license; MEAN = all three as before. Pairs B:L2, B:L4, B:GS, B:MEAN (480), two blind side-by-side raters.
+- Predictions: L2 coherence over B with interval excluding 0 (55%); GS over B excluding 0 (25%; ENT's gender alone was
+  null); MEAN over B excluding 0 again (65%); L4 over B on coherence at least as high as L2 (45%) and L4 fluency
+  interval excluding 0 below B (30%: a stronger gate may starve the text of words).
+- Mechanism reported per arm: below-chance share of new content words and count of new content words.
+
+## CLS8 — class-sequence matching on the 1B generator (preregistered 2026-11-08, before any run)
+- Theory: the remaining grammar errors are wrong-role splices; the coverage law (matched context grows as log2 N / H) gives class sequences, with lower entropy per step than words, longer exact matches on the same data, so matching on them should pick splice points where the roles line up.
+- Generator = B1G6 (1.03B words, power 6, guard, no <unk>, copy cap 8) with score = 8 x (word matches over the last 4 words) + lamc x (fine-class matches over the last 8 words); 230 fine classes (sieve_ms_cls.py); the 5,533 extension words take UNK's class. Arms: CLS2 (lamc 2), CLS4 (lamc 4). Same 80 E2E prompts and seeds. **Sanity:** the same kernel with lamc 0 must reproduce B1G6's texts exactly.
+- Judging: pairwise vs B1G6 (one rater per comparison, 80 pairs, identical pairs dropped), fluency and coherence; grammatical-sentence share of B1G6, CLS2, CLS4, truth (two raters, prompts split 0-39 / 40-79, all arms in both).
+- **Predictions:** CLS4 over B1G6 fluency, interval above 0.5 (40%); CLS2 over B1G6 fluency point share above 0.5 (60%); grammatical share CLS4 above B1G6 by at least 0.05 (35%); coherence of CLS4 vs B1G6 not below 0.45 (70%).
+
+## HARM battery: find a method by which harmonics improve the model (preregistered 2026-11-08, nothing run)
+**Working presumption (owner, 2026-11-08):** the brain computes with oscillations, so a harmonic test that fails is
+charged to the method, not to the theory. Each test below therefore kills only its METHOD; the search continues with the
+next one. What failed so far, re-read under this presumption: every earlier harmonic arm (MS, MI2, PAR, FUT, H6, HPOW,
+GATE2) read the timescales by counting or nearest-neighbour lookup over random projections. None had (a) a learned
+readout, (b) learned frequencies, (c) oscillation (complex decay) used as phase rather than as a similarity key, or
+(d) multiplicative interaction between scales. The battery varies exactly those four.
+
+**Common protocol.** Books stream S[:ntr] (27M words), vocabulary 60,002, Kaggle T4, the CEIL net as the control (NET:
+d 256, 6 layers, 512-word window, 20,230,656 parameters; dev 6.9498 bits/word after 6 epochs). Every arm is matched to
+within 5% of NET's parameters. Stage 1 (screen): 2 epochs, cosine schedule over 2 epochs, seed 0, dev bits/word on the
+CEIL held-out words (prompt windows excluded); the control NET2 is rerun under the same 2-epoch schedule with seeds 0, 1,
+2 to measure seed spread. Stage 1 pass = the arm's dev bits lie below the lowest of the three control seeds by more than
+the control seeds' range. Stage 2 (only for passes): 6 epochs, then 120 DBIG prompts sampled exactly as CEIL, compared
+side by side against NET (two blind raters). Stage 2 pass = coherence interval excludes 0 in the arm's favour, then a
+replication on 120 fresh prompts. Results reported as absolute bits and preference shares.
+
+**HA — harmonic memory as an input to the net.** A bank of K leaky integrators over the token embeddings (the MI2
+reservoir, now inside the model): h_k(t) = r_k e^{i w_k} h_k(t-1) + x(t), read as [Re, Im], projected and added to the
+residual stream at layer 0. Arms: HA-real (w_k = 0, decays only, half-lives 2..1,024 geometric), HA-osc (same decays,
+w_k > 0: damped oscillators). Tests (c): does oscillation, not just decay, add anything a 512-word attention window lacks?
+**HB — harmonics replace attention (oscillator network).** A recurrent model whose state is a bank of damped oscillators
+with learned decay and frequency per channel (a diagonal complex linear recurrence, the family of S4 / LRU), 6 layers,
+gated MLP between layers, no attention, unbounded context. Arms: HB-learned (frequencies learned), HB-fixed (frequencies
+frozen at a geometric ladder: the owner's 4, 8, 16, 32 ... as periods). Tests (a) + (b). Prior: this model family is
+known to match attention on long text, so HB is the arm most likely to pass stage 1.
+**HC — how many scales.** HB-learned with the oscillator bank restricted to 1, 2, 4 and 8 bands of period (each band a
+geometric octave group), channels held constant. Tests the owner's claim that the scales only work combined: predicted
+shape = dev bits fall more from 4 to 8 bands than from 1 to 2 (synergy), against a diminishing-returns shape.
+**HD — scales that multiply (cross-frequency coupling).** HB-learned plus a gate: the slow bands' state multiplies the
+fast bands' input (theta-gamma nesting: slow phase decides when the fast oscillators listen). Arms HD-gate vs HB-learned.
+Tests (d).
+**HE — phase as position (phase coding).** NET with its learned positional embedding replaced by oscillatory phase
+features: word position within sentence and within paragraph encoded as the phases of a slow and a nested fast
+oscillation, reset at boundaries. Arm HE vs NET. Tests whether the brain-style clock beats a learned position table.
+**HF — tuned resonances.** HB-fixed with periods set to measured linguistic rhythms instead of the geometric ladder:
+clause (median clause length in the training text), sentence, paragraph, and the MI decay knees from MI (books E1).
+Arm HF vs HB-fixed. Tests whether resonance with the data's own periods matters.
+**HG — harmonic state back into Sieve (the MEAN analogue).** Replace MEAN's licence rule with a harmonic one: the
+candidate's training position's oscillator state (from the best stage-1 HB model, frozen) compared with the text's
+current state by cosine; licence = cosine above the median of true continuations. Arm HG vs MEAN, side by side, 120
+fresh prompts. Tests whether a learned harmonic state is a better meaning memory than counted passage co-occurrence.
+**HH — harmonic retrieval with a learned key.** Sieve's 8-word-match candidates re-weighted by the cosine between the
+frozen HB state at the candidate's source and the text's state (keeps counting for words, uses harmonics for choosing
+which source fits). Arm HH vs B and vs MEAN, side by side. Tests (a) inside the counting decoder.
+
+**Order and cost.** Stage 1 runs in this order: NET2 seeds 0-2, HA-real, HA-osc, HB-learned, HB-fixed, HE, then HC x 4,
+HD, HF. About 25 min of T4 per screen, 14 screens = about 6 h (two Kaggle kernels in parallel = about 3 h of wall time).
+HG and HH need a passing HB model first. Stage 2 = about 1.5 h of T4 + 40 min of rating per passing arm.
+**Predictions (stage 1 pass):** HB-learned 60%; HB-fixed 40%; HA-osc 35%; HA-real 25%; HE 25%; HD over HB-learned 30%;
+HF over HB-fixed 20%; HC synergy shape 25%. If no arm passes stage 1, the next method family to preregister is spiking
+or phase-locked units (binding by synchrony), which this battery does not cover.
