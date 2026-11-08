@@ -30,3 +30,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result REP (03:10): pooled over 120 prompts, sharpening over none 0.650 [0.567, 0.733] fluency; class harmonics over none 0.592 [0.500, 0.683] fluency, 0.608 [0.517, 0.692] coherence: harmonics give a small real gain. Sentence-start harmonics over sharpening n.s.
 13. HPOW (03:15): class harmonics (z 1/2/4) on top of sharpening, pairwise vs sharpening alone.
    Result LA (03:15): lookahead not distinguishable from sharpening alone (0.550 [0.438, 0.650]).
+14. BIGH (03:25): best generators over the 191M-word books stream vs 27M, pairwise.

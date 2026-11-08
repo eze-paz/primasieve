@@ -2234,3 +2234,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## NS3 — stronger and wider sentence continuation (new base = NS), preregistered 2026-11-08 before any run
 - **120 prompts as NS2. Arms:** NS (k 64, bonus 1 = weight e^4 over the best 4-word match); NSB2 = bonus 2 (e^8: the similar-sentence starts dominate the first word); NS2S = similarity computed from the last two sentences (content words of both) instead of the last one. Comparisons NS:NSB2 and NS:NS2S, 120 pairs each, two side-by-side raters each. Pythia-410m.
 - **Predictions:** NSB2 preferred over NS on coherence excluding 0 (30%); NS2S preferred over NS on coherence excluding 0 (30%); either one preferred on fluency excluding 0 (25%).
+
+## BIGH — the best generators at 191M words (loop round 14), preregistered 2026-11-08 before any run
+- Same REP prompts (80) and seeds; POW2 and CZ4 rebuilt over BIG's books stream (MT 27M + PG-19 half-shards = 191M training words; copy cap over the 191M text). Pairs: POW2-191M vs POW2-27M (REP), CZ4-191M vs CZ4-27M (REP); 160 pairs, two fresh raters. Pythia bits of samples.
+- **Predictions:** POW2-191M over POW2-27M fluency with interval above 0.5 (50%); CZ4-191M over CZ4-27M (45%); Pythia bits lower at 191M for both (75%).
