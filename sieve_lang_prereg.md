@@ -2671,3 +2671,20 @@ trained do not carry information past 512 words; training on longer windows is t
 - Information about the next fine class beyond the local state (bits, even positions): **RANDC ALL 0.0650 [0.0594, 0.0704]** (reproduces PH exactly; bands 0.0362 0.0446 0.0444 0.0372 0.0353 0.0353 0.0388); **RANDW ALL 0.0559 [0.0503, 0.0613]** (bands 0.0290 0.0384 0.0363 0.0260 0.0227 0.0257 0.0252); **SVDW ALL 0.1004 [0.0921, 0.1086]** (bands 0.0472 0.0522 0.0423 0.0475 0.0460 0.0514 0.0501). Paired SVDW minus RANDW on ALL: interval [0.0368, 0.0520].
 - Predictions: NMI SVD above fine k-means — failed (0.261 vs 0.639); far above random — held; SVDW above RANDW with interval above zero — held; SVDW above 0.0650 — held (0.1004); long bands carry more in SVDW — held (tau 32/64/128: 0.0460 / 0.0514 / 0.0501 vs 0.0227 / 0.0257 / 0.0252).
 - Decision rule met: proceed to the generation test (JX3 + SVDW harmonics, blind vs JX3).
+
+## JXS — generation with count-fitted harmonics on top of JX3 (preregistered 2026-11-08, before the run; follows HSVD's decision rule)
+- Same harmonic scoring as JXH (window 64, 7 bands, z-scored similarity among the top two word-match tiers, weight beta), but word phases per band fitted exactly as in HSVD (SVD on the MT 27M training text, inside the generator kernel). Arms: JX3 (base), JX3S1 (beta 1), JX3S2 (beta 2). 80 fresh prompts (offset 67), 191M.
+- Judging: pairwise each arm vs JX3 (one rater each, 80 pairs), fluency and coherence; grammatical share of the three + truth (three raters by prompt thirds).
+- **Predictions:** JX3S1 or JX3S2 over JX3 on coherence with interval above 0.5 (35%); a point above 0.5 on fluency (55%); grammar share of the better arm within 0.03 of JX3 (55%).
+**HG / HH results -- FAIL (2026-11-08; 120 fresh prompts DEC_POFF 15; sieve_hgh_tau.json, mtest/hgh_gen.json, sieve_hgh_pair_scores.json; two raters, agreement coherence 0.844 / fluency 0.875).**
+Calibration (40 prompts, DEC_POFF 19): tau 0.0605 over 260 true content words; median for words sampled from B 0.0475
+(2,000). HG penalized 2,044,699 of 4,186,685 content candidates (MEAN's licence about 0.398 of them). No text identical
+to its base. Coherence: HG vs MEAN -0.075 [-0.2333, 0.0833] (HG preferred 0.375, MEAN 0.450); HH vs B -0.1333 [-0.300,
+0.0169] (0.367 / 0.500); HH vs MEAN -0.125 [-0.2833, 0.0335] (0.358 / 0.483). Fluency: HG vs MEAN -0.0083 [-0.175,
+0.1583]; HH vs B -0.2333 [-0.4083, -0.0667]; HH vs MEAN -0.3167 [-0.475, -0.1583].
+Predictions: HG over MEAN (20%) failed; HH over B (35%) failed (fluency worse, interval below 0); HH over MEAN (15%)
+failed; tau above the sampled median (60%) held (0.0605 vs 0.0475). Reading: the learned slow-state cosine separates true
+words from B's samples only weakly, and as a licence it is no better than counted passage co-occurrence; as a source
+weight it pulls Sieve toward sources whose state matches but whose local words do not, which breaks fluency. MEAN
+stays the best Sieve decoder. The oscillator net helps as a model (dev 6.9264 vs 6.9498) but not as a meaning memory for
+counting, and not past its 512-word training length.

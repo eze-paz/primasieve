@@ -1,0 +1,60 @@
+{
+ "raters": [
+  "hgh_pair_ratings.json",
+  "hgh_pair_ratings_r2.json"
+ ],
+ "HG vs MEAN coherence": {
+  "b_wins": 0.375,
+  "a_wins": 0.45,
+  "mean": -0.075,
+  "interval": [
+   -0.2333,
+   0.0833
+  ]
+ },
+ "HG vs MEAN fluency": {
+  "b_wins": 0.4166666666666667,
+  "a_wins": 0.425,
+  "mean": -0.0083,
+  "interval": [
+   -0.175,
+   0.1583
+  ]
+ },
+ "HH vs B coherence": {
+  "b_wins": 0.36666666666666664,
+  "a_wins": 0.5,
+  "mean": -0.1333,
+  "interval": [
+   -0.3,
+   0.0169
+  ]
+ },
+ "HH vs B fluency": {
+  "b_wins": 0.3333333333333333,
+  "a_wins": 0.5666666666666667,
+  "mean": -0.2333,
+  "interval": [
+   -0.4083,
+   -0.0667
+  ]
+ },
+ "HH vs MEAN coherence": {
+  "b_wins": 0.35833333333333334,
+  "a_wins": 0.48333333333333334,
+  "mean": -0.125,
+  "interval": [
+   -0.2833,
+   0.0335
+  ]
+ },
+ "HH vs MEAN fluency": {
+  "b_wins": 0.2833333333333333,
+  "a_wins": 0.6,
+  "mean": -0.3167,
+  "interval": [
+   -0.475,
+   -0.1583
+  ]
+ }
+}

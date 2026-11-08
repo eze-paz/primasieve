@@ -52,6 +52,11 @@ class Dec:
         ch, w_ = u_ // MT.VV, u_ % MT.VV; nch = ntr // s.CH + 1; df = np.bincount(w_, minlength=MT.VV); idf = np.log(nch / np.maximum(df, 1)); val = np.log1p(n_) * idf[w_]
         nrm = np.sqrt(np.bincount(ch, weights=val ** 2, minlength=nch)); val = val / np.maximum(nrm[ch], 1e-9); o_ = np.argsort(w_, kind="stable")
         s.pw, s.pch, s.pval = w_[o_], ch[o_], val[o_]; s.pst = np.searchsorted(s.pw, np.arange(MT.VV + 1)); s.idf = idf; s.nch = nch
+        if os.environ.get("DEC_HS"):                                                                                                     # HGH: learned oscillator states (sieve_hs_part.py)
+            hd = os.environ["DEC_HS"]; s.HS = np.load(os.path.join(hd, "hs_states.npy"), mmap_mode="r"); pz = np.load(os.path.join(hd, "hs_proj.npz")); s.HSmu = pz["mu"].astype(np.float32)
+            os.environ["HARM_ARMS"] = ""; os.environ.setdefault("HARM_DATA", MT.fp(C, "data")); import torch, sieve_harm_kernel as HK; s.torch, s.HK = torch, HK
+            HK.PROJ = torch.from_numpy(pz["proj"]); s.hb = HK.OLM("HBlearn"); s.hb.load_state_dict(torch.load(os.environ["DEC_HB"], map_location="cpu")); s.hb.eval(); torch.set_num_threads(4)
+            s._hgc = []; s._hgs = []
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -102,7 +107,11 @@ class Dec:
                 if add: add = np.array(add); pos = np.r_[pos, add]; m4 = np.r_[m4, np.zeros(len(add))]; sc = np.r_[sc, np.full(len(add), sc.max() + 1.0)]
         if cfg.get("stick") and getattr(s, "_src", None) is not None and text[-1] != 0 and text[-1] not in s.CLAUSE:
             sc = sc + cfg["stick"] / 4 * (pos == s._src + 1)                                                                   # ENT: keep the clause's source passage
-        wpos = np.exp(4 * (sc - sc.max())); s._pos, s._wpos = pos, wpos
+        wpos = np.exp(4 * (sc - sc.max())); cs = None
+        if cfg.get("hh") or cfg.get("hg") or cfg.get("hgcal"):                                                                      # HGH: cosine of each source's state with the text's
+            v = s.tstate(text); X = s.HS[pos - 1].astype(np.float32) - s.HSmu; cs = X @ v / (np.linalg.norm(X, axis=1) * np.linalg.norm(v) + 1e-9)
+            if cfg.get("hh"): wpos = wpos * np.exp(cfg["hh"] * (cs - cs.mean()) / (cs.std() + 1e-9))
+        s._pos, s._wpos = pos, wpos
         uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=wpos); s._inv = inv
         hv = s.h8v(text[-7:], uw); bad = s.H8[np.minimum(np.searchsorted(s.H8, hv), len(s.H8) - 1)] == hv
         if (~bad).any(): p = p * ~bad
@@ -143,6 +152,16 @@ class Dec:
                     sl = s.pch[s.pst[c]:s.pst[c + 1]]; co = int((U[np.minimum(np.searchsorted(U, sl), len(U) - 1)] == sl).sum()); ex = len(sl) * len(U) / s.nch
                     if (co + 1) / (ex + 1) < cfg.get("mslift", 1.0): p[i] *= np.exp(-cfg["ms"]); s._msn += 1
                 s._mst += int(con.sum())
+        if (cfg.get("hg") or cfg.get("hgcal")) and con.any():                                                                     # HG: licence by the oscillator state
+            E = s.held_entities(text); cc = np.bincount(inv, weights=cs, minlength=len(uw)) / np.maximum(np.bincount(inv, minlength=len(uw)), 1)
+            el = np.array([bool(con[i]) and int(uw[i]) not in E and s.idf[int(uw[i])] >= 2 for i in range(len(uw))])
+            if cfg.get("hgcal"):
+                nx = cfg["hgcal"][0]
+                if nx in uw and el[np.searchsorted(uw, nx)]: s._hgc.append(float(cc[np.searchsorted(uw, nx)]))
+                q = p * el
+                if q.sum() > 0: s._hgs.append(float(cc[cfg["hgcal"][1].choice(len(uw), p=q / q.sum())]))
+            if cfg.get("hg"):
+                bad = el & (cc < cfg["hgtau"]); p = p * np.where(bad, np.exp(-cfg["hg"]), 1.0); s._msn += int(bad.sum()); s._mst += int(con.sum())
         if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
             j = len(text) - 2
             while j >= 0 and text[j] != 0: j -= 1
@@ -164,6 +183,10 @@ class Dec:
             if (~rep).any() and (p * ~rep).sum() > 0: p = p * ~rep
         p = p ** (1.0 / cfg.get("T", 1.0)) if cfg.get("T", 1.0) != 1.0 else p
         return uw, p / p.sum()
+    def tstate(s, text):
+        if getattr(s, "_tsk", None) == tuple(text): return s._tsv
+        with s.torch.no_grad(): f = s.HK.hstate(s.hb, s.torch.as_tensor([min(w, s.V + 1) for w in text])[None])[0, -1].float().numpy()
+        s._tsk = tuple(text); s._tsv = f - s.HSmu; return s._tsv
     def held_entities(s, text):
         """MEAN: held content words = those with passage idf >= 2 among the text's last 60 content words; U = sorted ids of the
         1,000-word training passages containing any of them (cached until the set changes). A new content word is licensed when
@@ -227,9 +250,21 @@ def run(tag, arms, part=None):
         pr = d.S[t:t + LP].tolist(); G.append(dict(pid=pid, B="truth", prompt=d.words(pr), text=d.words(d.S[t + LP:t + LP + LG]), ids=d.S[t + LP:t + LP + LG].tolist()))
         for arm, cfg in arms.items():
             ids = d.gen(pr, cfg, 1000 * pid + 7); G.append(dict(pid=pid, B=arm, prompt=d.words(pr), text=d.words(ids), ids=ids))
+            if cfg.get("hg"): G[-1]["hg_penalized"] = d._msn; G[-1]["hg_content_cands"] = d._mst; d._msn = d._mst = 0
             if cfg.get("ms"): G[-1]["ms_penalized"] = d._msn; G[-1]["ms_content_cands"] = d._mst; d._msn = d._mst = 0
             if cfg.get("holdw"): G[-1]["plan"] = d.words(d._plan0); G[-1]["plan_written"] = float(np.mean([w in ids for w in d._plan0])) if d._plan0 else 0.0
         if pid % 10 == 0: log(f"prompt {pid}: " + " | ".join(f"{x['B']}: {x['text'][:60]}" for x in G[-len(arms):]))
         if part is not None: json.dump(G, open(os.path.join(MT.OUT, f"{tag}_gen_p{part}.json"), "w"), indent=0)
     out = os.path.join(MT.OUT, f"{tag}_gen.json" if part is None else f"{tag}_gen_p{part}.json"); json.dump(G, open(out, "w"), indent=0); log(f"saved {out}: {len(G)} items")
+def hgcal():
+    """HG calibration: tau = median cosine of the true next content word over true continuations (B's candidate sets);
+    also the median for words sampled from B's distribution over the same eligible candidates"""
+    d = Dec(); cfg = {"T": 0.35, "nounk": 1, "norep": 1}; g = np.random.default_rng(0)
+    for pid, t in enumerate(d.prompts):
+        pr = d.S[t:t + LP + LG].tolist()
+        for j in range(LP, LP + LG): d.dist(pr[:j], dict(cfg, hgcal=(pr[j], g)))
+        if pid % 10 == 0: log(f"cal prompt {pid}: true {len(d._hgc)} median {np.median(d._hgc):.4f}; sampled median {np.median(d._hgs):.4f}")
+    out = dict(tau=float(np.median(d._hgc)), n_true=len(d._hgc), sampled_median=float(np.median(d._hgs)), n_sampled=len(d._hgs))
+    json.dump(out, open(os.path.join(HERE, "sieve_hgh_tau.json"), "w"), indent=1); log(json.dumps(out))
+if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()
 if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else None)

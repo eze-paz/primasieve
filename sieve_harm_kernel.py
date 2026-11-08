@@ -105,6 +105,7 @@ class OscLayer(nn.Module):
                 sm = s.slowm.to(x.device); ys = fftconv(u[..., sm], ker[sm]); g = torch.sigmoid(s.G(torch.cat([ys.real, ys.imag], -1)))
                 uf = u[..., ~sm] * g; yf = fftconv(uf, ker[~sm]); y = torch.zeros_like(u); y[..., sm] = ys; y[..., ~sm] = yf
             else: y = fftconv(u, ker)
+            if getattr(s, "keep_y", False): s.y = y                                                                          # HGH: expose the oscillator state
             o = s.Cre(y.real) - s.Cim(y.imag) + s.D * h
         x = x + s.dr(o * torch.sigmoid(s.g(h0)))
         return x + s.ff(s.n2(x))
@@ -177,7 +178,18 @@ def gen(arm, model, curve):                                                     
         if TINY and pid >= 3: break
     b = int(np.nanargmin([x if x is not None else np.nan for x in curve]))
     json.dump(dict(best_epoch=b, dev_bits=curve[b], gen=G), open(os.path.join(OUT, f"harm_{arm}_gen.json"), "w"), indent=0); log(f"{arm}: gen saved")
-for arm in os.environ.get("HARM_ARMS", "NET2s0").split(","):
+SLOW_DIMS, PROJ = 32, None
+@torch.no_grad()
+def hstate(model, idx):
+    """HGH: last-layer slow oscillator state (initial period >= 64), [Re, Im] -> fixed Gaussian projection to 32 dims (seed 0)"""
+    global PROJ
+    L = model.layers[-1]; L.keep_y = True; x = model.emb(idx)
+    for l in model.layers: x = l(x)                                                                    # no output projection needed
+    y = L.y; L.keep_y = False; sm = L.P0 >= 64
+    f = torch.cat([y.real[..., sm], y.imag[..., sm]], -1)
+    if PROJ is None: PROJ = (torch.randn(f.shape[-1], SLOW_DIMS, generator=torch.Generator().manual_seed(0)) / math.sqrt(SLOW_DIMS))
+    return f @ PROJ.to(f.device)
+for arm in filter(None, os.environ.get("HARM_ARMS", "NET2s0").split(",")):
     try: run(arm)
     except Exception as e: log(f"{arm}: FAILED {type(e).__name__}: {e}"); json.dump(dict(arm=arm, error=str(e)), open(os.path.join(OUT, f"harm_{arm}.json"), "w"))
     if dev.type == "cuda": torch.cuda.empty_cache()
