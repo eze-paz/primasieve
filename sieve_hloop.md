@@ -20,3 +20,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 7. HSWEEP7 (02:45): random-similarity control (tie-breaking alone) and power-sharpening frontier.
    Result (02:42): harmonics beat random tie-breaking clearly, but plain sharpening (power on the word distribution) beats harmonics far more on N.
 8. HSWEEP8 (02:50): harmonics + sharpening combos on N; blind batch NOH / POW2 / class z4 / class z4 + POW1.5 / truth.
+   Result (02:48): blind 1-5 ratings floor out (122 of 200 items rated exactly 1/2); class harmonics vs none [0.000, 0.275]; sharpening not confirmed by the rater despite Pythia.
+9. PAIR (02:55): pairwise forced-choice fluency/coherence on round 8's texts.
