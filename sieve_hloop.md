@@ -55,3 +55,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result H6/BEAM: harmonics nothing on POW6; beam clearly worse (0.317).
 23. FINALG (03:52): one rater, grammatical-sentence share across all stages (prompts 40-79).
 24. CONT (03:56): source-continuity bonus (fewer splices).
+   FINALG (one rater): grammatical share NOH-27M 0.438 -> POW2-27M 0.464 -> POW2-191M 0.470 -> POW6G-191M 0.590; true text 0.966.
