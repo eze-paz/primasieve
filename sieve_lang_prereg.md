@@ -2538,6 +2538,14 @@ the prereg's "paragraph"). HF periods measured on the training text: clause medi
 linear grid over 1..8); 4..512 (8); each channel confined to half an octave around its band by a tanh reparameterisation.
 HD: channels with initial period >= 64 are slow; their output gates the fast channels' input by a sigmoid. Kaggle
 allows two GPU sessions, so kernel 3 (HC x 4, HF) starts when kernel 1 or 2 ends.
+**HARM stage-1 results, kernels 1-2 (2026-11-08; mtest/kaggle_harm/out1, out2; no FAILED or DIVERGED).** Dev bits/word
+after epochs 1 / 2: NET2s0 7.7421 / 7.4845; NET2s1 7.7174 / 7.4714; NET2s2 7.7117 / 7.4729 (lowest 7.4714, range 0.0131,
+pass line 7.4583). HAreal 7.8261 / 7.5602 FAIL; HAosc 7.7470 / 7.4938 FAIL; HE 7.9455 / 7.6474 FAIL; HBlearn 7.5043 /
+7.3259 PASS; HBfix 7.5438 / 7.3735 PASS; HD 7.5090 / 7.3324 PASS (but above HBlearn, so the gate adds nothing).
+Predictions: HB-learned pass (60%) held; HB-fixed pass (40%) held; HA-osc (35%) failed; HA-real (25%) failed; HE (25%)
+failed; HD over HB-learned (30%) failed. Reading: oscillators help as the whole model (replacing attention), not as an
+add-on to attention or as a position code; learned periods beat the fixed ladder. Stage 2 for HBlearn pushed
+(primasieve-harm-s2a: HARM_EPOCHS 6, HARM_GEN 1 = CEIL's sampling on the 120 DBIG prompts from the best-dev epoch).
 
 ## SA8 — retrieve the contexts with the longest shared history (owner's idea: interpolate between the most similar contexts; preregistered 2026-11-08, before any run)
 - Flaw found: the index orders positions with the same last-4-word key by position, so for frequent keys the 3,072 candidates are the earliest occurrences, not the ones sharing the most history; the decoder already interpolates (softmax over candidates, summed by next word, power 6) but over an arbitrary sample.

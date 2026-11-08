@@ -13,12 +13,13 @@ import os, glob, json, math, time, sys
 import numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 V = 60000; VT = V + 2; LP, LG = 30, 50
 CTX, STRIDE, BATCH, MICRO, EPOCHS, LR, WARM, DROP, WD = 512, 256, 32, 2, 2, 6e-4, 300, 0.1, 0.1
+EPOCHS = int(os.environ.get("HARM_EPOCHS", EPOCHS)); GEN = os.environ.get("HARM_GEN") == "1"   # stage 2: 6 epochs + CEIL sampling
 TINY = os.environ.get("HARM_TINY") == "1"
 if TINY: CTX, STRIDE, BATCH, MICRO, EPOCHS, WARM = 64, 32, 8, 1, 1, 10
 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu"); T0 = time.time()
 OUT = os.environ.get("HARM_OUT") or ("/kaggle/working" if os.path.isdir("/kaggle/working") else ".")
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
-z = np.load(os.environ.get("HARM_DATA") or glob.glob("/kaggle/input/**/books_data.npz", recursive=True)[0]); S = np.minimum(z["S"].astype(np.int64), V + 1); ntr = int(z["ntr"])
+z = np.load(os.environ.get("HARM_DATA") or glob.glob("/kaggle/input/**/books_data.npz", recursive=True)[0]); S = np.minimum(z["S"].astype(np.int64), V + 1); ntr = int(z["ntr"]); vw = z["vw"]
 tr = S[:ntr]; ho = S[ntr:]
 st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; prompts = st[np.linspace(0, len(st) - 1, 120).astype(int)]
 keep = np.ones(len(ho), bool)
@@ -157,8 +158,25 @@ def run(arm):
             if TINY and bi >= 10: break
         if curve and curve[-1] is None: break
         d = dev_bits(model); curve.append(d); log(f"{arm}: epoch {ep} done: dev {d:.4f} bits/word")
+        if GEN and d <= min(curve): torch.save(model.state_dict(), os.path.join(OUT, f"harm_{arm}_best.pt"))
     if arm.startswith(("HB", "HC", "HD", "HF")): torch.save(model.state_dict(), os.path.join(OUT, f"harm_{arm}.pt"))
     json.dump(dict(arm=arm, params=NP, dev_curve=curve, seconds=time.time() - t0), open(os.path.join(OUT, f"harm_{arm}.json"), "w"))
+    if GEN: gen(arm, model, curve)
+def words(ids): return " ".join("." if i == 0 else "<unk>" if i > V else str(vw[i]) for i in ids).replace(" .", ".")
+@torch.no_grad()
+def gen(arm, model, curve):                                                                                    # = sieve_ceil_kernel.py sampling
+    model.load_state_dict(torch.load(os.path.join(OUT, f"harm_{arm}_best.pt"), map_location=dev)); model.eval(); G = []
+    for pid, t in enumerate(prompts):
+        pr = S[t:t + LP].tolist(); g = torch.Generator(device="cpu").manual_seed(1000 * pid + 7); text = list(pr)
+        for _ in range(LG):
+            x = torch.as_tensor(text[-CTX:])[None].to(dev); lg = model(x)[0, -1].float().cpu(); lg[V + 1] = -1e9
+            p = F.softmax(lg / 0.8, -1); sp, si = torch.sort(p, descending=True); c = torch.cumsum(sp, 0); m = c - sp < 0.9
+            sp = sp * m; sp = sp / sp.sum(); text.append(int(si[torch.multinomial(sp, 1, generator=g)]))
+        ids = text[LP:]; G.append(dict(pid=pid, B=arm, prompt=words(pr), text=words(ids), ids=ids))
+        if pid % 20 == 0: log(f"{arm} prompt {pid}: {G[-1]['text'][:100]}")
+        if TINY and pid >= 3: break
+    b = int(np.nanargmin([x if x is not None else np.nan for x in curve]))
+    json.dump(dict(best_epoch=b, dev_bits=curve[b], gen=G), open(os.path.join(OUT, f"harm_{arm}_gen.json"), "w"), indent=0); log(f"{arm}: gen saved")
 for arm in os.environ.get("HARM_ARMS", "NET2s0").split(","):
     try: run(arm)
     except Exception as e: log(f"{arm}: FAILED {type(e).__name__}: {e}"); json.dump(dict(arm=arm, error=str(e)), open(os.path.join(OUT, f"harm_{arm}.json"), "w"))
