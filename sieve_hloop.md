@@ -100,3 +100,4 @@ repeat-trigram guard, never <unk>, copy cap 8 (sieve_nounkb_kernel.py / sieve_e2
 48. HR (harmonic retrieval: up to 16,384 extra candidates sharing the last 4 or 2 words, harmonics pick among them): no clear gain (fluency 0.4675 / 0.5316, coherence 0.571 / 0.532, grammar 0.655 / 0.662 vs 0.619, all n.s.). JX3S1 stays best.
 49. GPROXY: Pythia grammar proxy calibrated on 20,363 rated sentences: AUC 0.817, 40/50 arm pairs ordered as raters (length-heavy). Usable for small steps with a sentence-count check.
 50. HLIN: trained linear readout on the fitted harmonic state: 0.1399 bits (kNN 0.1004; random phases 0.0753). Over-fits after epoch 1, so a lower bound. Middle zone of the decision rule.
+51. HLIN2: tuned linear readout 0.1795 bits (kNN 0.1004 on the same state). LIN: readout as re-ranker, 20 prompts, proxy: no gain (0.686 / 0.702 vs 0.726) — but the proxy ranks human text below the generator (0.681), so the proxy is not usable for steering near the top.

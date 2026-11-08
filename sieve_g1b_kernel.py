@@ -87,7 +87,18 @@ def cands(Qrev, Q2=None):
             if hi[j] > i0[j]: i0[j] = i0[j] + np.searchsorted(KEYS2[i0[j]:hi[j]], q2[j])
     i0 = torch.tensor(i0, device=dev); r = torch.arange(K // 2, device=dev)
     idx = torch.cat([i0[:, None] - 1 - r, i0[:, None] + r], 1); ok = (idx >= 0) & (idx < NP_); return ORD[idx.clamp(0, NP_ - 1)].long(), ok
-LSTAT = []; HM = {}; SVDTH = None; HG = torch.Generator()
+LSTAT = []; HM = {}; SVDTH = None; HG = torch.Generator(); LIN = None
+if any(c.get("lin") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                             # trained linear readout on the fitted harmonic state (HLIN2), next fine class
+    _lp = glob.glob("/kaggle/input/**/hlin_readout.pt", recursive=True) or [os.environ.get("G1_LIN", "hlin_readout.pt")]
+    _r = torch.load(_lp[0], map_location=dev); LIN = dict(W=_r["W"].to(dev).float(), sc=float(_r["cfg"]["sc"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]))
+    log(f"linear readout loaded: {_r['cfg']}")
+def lin_logits(text):
+    """the HLIN state of the next position (words 3 back and older, full 4 tau kernels), times the readout -> (230,) logits"""
+    w = torch.tensor(text[::-1][2:], device=dev); vs = []
+    for t in LIN["TAUS"]:
+        J = min(4 * t, len(w)); j = torch.arange(J, device=dev, dtype=torch.float32); k = ((1 - 1 / t) ** j)[:, None] * torch.exp(1j * j[:, None] * LIN["om"][None, :])
+        z = (torch.exp(1j * LIN["TH"][t][w[:J]]) * k).sum(0); v = torch.cat([z.real, z.imag]); vs.append(v / v.norm().clamp(min=1e-9))
+    return (torch.cat(vs).half().float() @ LIN["W"]) * LIN["sc"]
 if any(c.get("svd") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):
     import scipy.sparse as sp
     from scipy.sparse.linalg import svds
@@ -150,6 +161,8 @@ def generate(cfg, pids):
                 sc = sc + cfg["beta"] * z[None]
             if cfg.get("lamc"):
                 qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
+            if cfg.get("lin"):                                                                                    # readout bonus for each candidate's next-word class (beyond the local state)
+                sc = sc + cfg["lin"] * lin_logits(text)[FINE[St[c[0]].long()]][None]
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
             w = torch.exp(sc - sc.max()).cpu().numpy(); nx = St[c[0]].long().cpu().numpy()
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
@@ -176,7 +189,7 @@ def generate(cfg, pids):
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
 st40 = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; PROMPTS = st40[np.linspace(0, len(st40) - 1, 82).astype(int)[1:-1] + int(os.environ.get("G1_POFF", 13))]
-NG = 3 if SMOKE else 80; GENS = (json.loads(os.environ["G1_ARMS"]) if os.environ.get("G1_ARMS") else {"JX1": dict(pow=6.0, eps=0.01), "JX3": dict(pow=6.0, eps=0.03)}) if JX else {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
+NG = 3 if SMOKE else int(os.environ.get("G1_NG", 80)); GENS = (json.loads(os.environ["G1_ARMS"]) if os.environ.get("G1_ARMS") else {"JX1": dict(pow=6.0, eps=0.01), "JX3": dict(pow=6.0, eps=0.03)}) if JX else {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
 if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
