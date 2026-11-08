@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "STR2 over POW2": {
+   "share": 0.4625,
+   "pairs": 80,
+   "interval": [
+    0.35,
+    0.575
+   ]
+  },
+  "STR4 over POW2": {
+   "share": 0.5,
+   "pairs": 80,
+   "interval": [
+    0.388,
+    0.6
+   ]
+  }
+ },
+ "coherence": {
+  "STR2 over POW2": {
+   "share": 0.5125,
+   "pairs": 80,
+   "interval": [
+    0.4,
+    0.625
+   ]
+  },
+  "STR4 over POW2": {
+   "share": 0.4,
+   "pairs": 80,
+   "interval": [
+    0.287,
+    0.512
+   ]
+  }
+ }
+}

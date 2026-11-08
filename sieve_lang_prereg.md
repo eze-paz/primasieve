@@ -2274,3 +2274,4 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## B3 — how far does sharpening go at 191M? (loop round 18), preregistered 2026-11-08 before any run
 - 191M, 80 REP prompts: POW4 and POW6 vs POW3 (B2), pairwise (160 pairs). Repeated trigrams and distinct words reported (sharpening's known failure is repetition / blandness).
 - **Predictions:** POW4 over POW3 (40%); POW6 over POW3 (25%); POW6 repeated trigrams at least 0.02 (50%).
+**STR results (2026-11-08 ~03:35; sieve_str_gen.json, sieve_str_key.json, sieve_str_ratings.json, sieve_str_scores.json).** Pythia bits STR2 6.8246, STR4 6.9165 (POW2-191M 6.6245). Pairwise vs POW2-191M, fluency: STR2 0.463 [0.350, 0.575]; STR4 0.500 [0.388, 0.600]; coherence 0.513 / 0.400 [0.287, 0.512]. Predictions: STR2 above (30%) — failed; STR4 above (25%) — failed. **The held clause state as a matching constraint does not help.**

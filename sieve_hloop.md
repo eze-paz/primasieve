@@ -41,3 +41,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 17. STR (03:35): held clause state + sentence position as a matching bonus at 191M; pairwise vs POW2-191M.
    Result B2: at 191M, POW3 beats POW2 (0.613 [0.512, 0.713]); new best = POW3-191M. MW6 n.s.; lam0 12 worse.
 18. B3 (03:30): sharpening curve at 191M (POW4, POW6 vs POW3).
+   Result STR: held-state matching bonus: no gain (0.463 / 0.500).
