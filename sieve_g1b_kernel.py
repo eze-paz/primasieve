@@ -6,7 +6,7 @@ G1_MODE=sanity: BIG's 191M stream (four PG-19 half-shards), BEST only -> must eq
 G1_MODE=1b: MT 27M + tok1b shards 0..11 (extended vocabulary), arms B1G6 / B1G12.
 Smoke: G1_SMOKE=1 G1_DATA=.. G1_OUT=.. (MT 2M + 300k eval, K 256, 3 prompts; compare with e2b.py's smoke)."""
 import glob, os, time, json, numpy as np, torch
-SMOKE = bool(os.environ.get("G1_SMOKE")); MODE = os.environ.get("G1_MODE", "1b"); dev = "cuda" if torch.cuda.is_available() else "cpu"; T0 = time.time()
+SMOKE = bool(os.environ.get("G1_SMOKE")); SA = bool(os.environ.get("G1_SA")); MODE = os.environ.get("G1_MODE", "1b"); dev = "cuda" if torch.cuda.is_available() else "cpu"; T0 = time.time()
 V = 60000; UNK = V + 1; LP, LG = 30, 50; M64 = np.uint64(0x9E3779B97F4A7C15); K = 256 if SMOKE else 3072; MW = 4; LAM0 = 8.0; CHUNK = int(os.environ.get("G1_CHUNK", 60_000_000))
 OUTD = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.environ.get("G1_OUT", ".")
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
@@ -14,7 +14,7 @@ def find(pat, env): return glob.glob(f"/kaggle/input/**/{pat}", recursive=True) 
 z = np.load([x for x in find("books_data.npz", "G1_DATA")][0]); S0 = z["S"]; ntr0 = int(z["ntr"]); vw = [str(w) for w in z["vw"]]; del z
 if SMOKE: S0 = np.r_[S0[:2_000_000], S0[ntr0:ntr0 + 300_000]]; ntr0 = 2_000_000
 if SMOKE: parts = []
-elif MODE == "sanity": parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
+elif MODE in ("sanity", "sa"): parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
 else:
     parts = [glob.glob(f"/kaggle/input/**/tok1b_{k}.npz", recursive=True)[0] for k in range(12)]
     vw = vw + [None] * (V + 2 - len(vw)) if len(vw) < V + 2 else vw[:V + 2]; vw = vw + json.load(open(glob.glob("/kaggle/input/**/tok1b_vocab.json", recursive=True)[0]))
@@ -26,7 +26,7 @@ S[ntr:] = S0[ntr0:]; del S0; fine = np.load([x for x in find("books_cls.npz", "G
 St = torch.empty(N, dtype=torch.int32, device=dev)
 for a in range(0, N, CHUNK): St[a:a + CHUNK] = torch.from_numpy(S[a:a + CHUNK].astype(np.int32)).to(dev)
 # 4-word key index: KEYS sorted (host uint64), ORD = positions (GPU int32), positions P = 200..ntr-1, key = (S[P-1], S[P-2], S[P-3], S[P-4]) packed high to low
-w1 = S[199:ntr - 1]; cnt = np.bincount(w1, minlength=1 << 16); NP_ = len(w1); KEYS = np.empty(NP_, np.uint64); ORD = torch.empty(NP_, dtype=torch.int32, device=dev)
+w1 = S[199:ntr - 1]; cnt = np.bincount(w1, minlength=1 << 16); NP_ = len(w1); KEYS = np.empty(NP_, np.uint64); KEYS2 = np.empty(NP_ if SA else 0, np.uint64); ORD = torch.empty(NP_, dtype=torch.int32, device=dev)
 cum = np.cumsum(cnt); cuts = [0]
 while cuts[-1] < (1 << 16):
     b = int(np.searchsorted(cum, (cum[cuts[-1] - 1] if cuts[-1] else 0) + CHUNK, side="right")); cuts.append(min(max(b, cuts[-1] + 1), 1 << 16))
@@ -36,7 +36,12 @@ for a, b in zip(cuts[:-1], cuts[1:]):
     if not len(P): continue
     kk = np.zeros(len(P), np.uint64)
     for i in range(4): kk = (kk << np.uint64(16)) | S[P - 1 - i].astype(np.uint64)
-    o = np.argsort(kk, kind="stable"); KEYS[off:off + len(P)] = kk[o]; ORD[off:off + len(P)] = torch.from_numpy(P[o].astype(np.int32)).to(dev); off += len(P); del kk, o, P
+    if SA:                                                                                                   # ties on the 4-word key ordered by words 5-8 back (longest shared history adjacent)
+        k2 = np.zeros(len(P), np.uint64)
+        for i in range(4): k2 = (k2 << np.uint64(16)) | S[P - 5 - i].astype(np.uint64)
+        o = np.lexsort((k2, kk)); KEYS2[off:off + len(P)] = k2[o]; del k2
+    else: o = np.argsort(kk, kind="stable")
+    KEYS[off:off + len(P)] = kk[o]; ORD[off:off + len(P)] = torch.from_numpy(P[o].astype(np.int32)).to(dev); off += len(P); del kk, o, P
 assert off == NP_; del w1; log(f"key index: {NP_:,} positions in {len(cuts) - 1} ranges")
 H8 = np.empty(ntr - 8, np.uint64)                                                                             # copy table = sorted hseq(8) of e2b.py
 with np.errstate(over="ignore"):
@@ -54,16 +59,26 @@ def pack(Q):
     k = np.zeros(len(Q), np.uint64)
     for i in range(4): k = (k << np.uint64(16)) | Q[:, i].astype(np.uint64)
     return k
-def cands(Qrev):
-    i0 = torch.tensor(np.searchsorted(KEYS, pack(Qrev)).astype(np.int64), device=dev); r = torch.arange(K // 2, device=dev)
+def cands(Qrev, Q2=None):
+    q = pack(Qrev); i0 = np.searchsorted(KEYS, q).astype(np.int64)
+    if SA:
+        hi = np.searchsorted(KEYS, q, side="right"); q2 = pack(Q2)
+        for j in range(len(q)):
+            if hi[j] > i0[j]: i0[j] = i0[j] + np.searchsorted(KEYS2[i0[j]:hi[j]], q2[j])
+    i0 = torch.tensor(i0, device=dev); r = torch.arange(K // 2, device=dev)
     idx = torch.cat([i0[:, None] - 1 - r, i0[:, None] + r], 1); ok = (idx >= 0) & (idx < NP_); return ORD[idx.clamp(0, NP_ - 1)].long(), ok
+LSTAT = []
 def generate(cfg, pids):
-    out = {}
+    out = {}; LSTAT.clear()
     for pid in pids:
         t = PROMPTS[pid]; text = S[t:t + LP].astype(np.int64).tolist(); rng = np.random.default_rng(1000 * pid + 7)
         while len(text) - LP < LG:
-            h = text[::-1][:MW]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]))
-            m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2); sc = LAM0 * m4
+            h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
+            if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
+                eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
+            else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
+            eqL = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); LSTAT.append(float(torch.cumprod(eqL, 2).sum(2).max()))
+            sc = LAM0 * m4
             if cfg.get("lamc"):
                 qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
@@ -76,12 +91,12 @@ def generate(cfg, pids):
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
 st40 = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; PROMPTS = st40[np.linspace(0, len(st40) - 1, 82).astype(int)[1:-1] + 13]
-NG = 3 if SMOKE else 80; GENS = {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
-if SMOKE: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
+NG = 3 if SMOKE else 80; GENS = {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
+if SMOKE and not SA: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
-    GO[nm] = dict(ext_share=len(ext) / max(nw, 1), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
-    log(f"G1B {MODE} {nm}: extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
+    GO[nm] = dict(ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    log(f"G1B {MODE} {nm}: longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
 GO["truth"] = dict(gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
