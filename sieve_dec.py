@@ -14,7 +14,7 @@ Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPA
 import os, sys, json, time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); import sieve_mtest as MT
-C = "books"; NP, LP, LG, HC = 40, 30, 50, 1536; M64 = np.uint64(0x9E3779B97F4A7C15); T0 = time.time()
+C = "books"; NP, LP, LG, HC = int(os.environ.get("DEC_NP", 40)), 30, 50, 1536; M64 = np.uint64(0x9E3779B97F4A7C15); T0 = time.time()
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
 def pack4(Q):
     k = np.zeros(len(Q), np.uint64)

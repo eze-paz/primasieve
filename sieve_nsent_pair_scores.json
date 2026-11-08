@@ -1,0 +1,60 @@
+{
+ "raters": [
+  "nsent_pair_ratings.json",
+  "nsent_pair_ratings_r2.json"
+ ],
+ "NS vs B coherence": {
+  "b_wins": 0.525,
+  "a_wins": 0.45,
+  "mean": 0.075,
+  "interval": [
+   -0.25,
+   0.375
+  ]
+ },
+ "NS vs B fluency": {
+  "b_wins": 0.475,
+  "a_wins": 0.4,
+  "mean": 0.075,
+  "interval": [
+   -0.225,
+   0.35
+  ]
+ },
+ "NSG vs B coherence": {
+  "b_wins": 0.525,
+  "a_wins": 0.425,
+  "mean": 0.1,
+  "interval": [
+   -0.2,
+   0.4
+  ]
+ },
+ "NSG vs B fluency": {
+  "b_wins": 0.5,
+  "a_wins": 0.4,
+  "mean": 0.1,
+  "interval": [
+   -0.2,
+   0.375
+  ]
+ },
+ "NSG vs NS coherence": {
+  "b_wins": 0.15,
+  "a_wins": 0.325,
+  "mean": -0.175,
+  "interval": [
+   -0.375,
+   0.025
+  ]
+ },
+ "NSG vs NS fluency": {
+  "b_wins": 0.125,
+  "a_wins": 0.3,
+  "mean": -0.175,
+  "interval": [
+   -0.35,
+   0.025
+  ]
+ }
+}
