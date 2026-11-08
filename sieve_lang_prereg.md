@@ -2784,3 +2784,14 @@ Scores: sieve_lt_scores.json.
 - Use rule: AUC >= 0.75 and >= 75% of arm pairs — **passed** (0.8171; 40 of 50).
 - Predictions: AUC >= 0.75 — held; SLOR best single feature — failed (length dominates; SLOR 0.418); ordering >= 75% — held (40 of 50).
 - Caveat: the proxy leans heavily on sentence length (length alone 0.774), so it can be gamed by shorter sentences (as JX10 did); every proxy-scored step must also report sentences per text, and milestones still go to blind raters.
+
+### KM results (2026-11-08; kernels primasieve-km-a/b, sieve_km_synth.json, sieve_km_scores.json)
+- Proxy validity: Spearman 0.8214 (proxy epoch-2 dev NET2s0 8.8358, HAreal 8.7765, HE 9.2607, HBlearn 8.6725, HBfix 8.6771, HC1 8.7702, HC8 8.6863). Valid. Each proxy arm took about 200 s.
+- Proxy dev (epoch 2): NET seeds 8.8358 / 8.8315 / 8.8452 (range 0.0137); HBlearn 8.6725; HM 8.6342; HMonly 8.6768; HMsel 8.6134.
+  Per word vs HBlearn at 256 (mean [95%]): HM -0.0384 [-0.0396, -0.0370]; HMonly 0.0042 [0.0013, 0.0073]; HMsel -0.0592 [-0.0608, -0.0576]. HMsel and HM clear the seed range.
+- Eval windows (trained at 256): HBlearn 8.6725 / 8.7155 / 8.7217 at 256 / 1,024 / 4,096; HM 8.6342 / 8.6495 / 8.6662; HMonly 8.6768 / 8.7477 / 8.7499; HMsel 8.6134 / 8.6400 / 8.6491. HMsel 4,096 minus 256: 0.0357 [0.0342, 0.0373]. Second condition fails for every arm.
+- Proxy pass: FAIL (HMsel beats HBlearn but does not gain from longer text).
+- Synthetic recall (accuracy at n 4 / 8 / 16 / 32 / 64; 1,024-token far test n 16): NET 0.2583 / 0.1377 / 0.0804 / 0.0497 / 0.0320; HBlearn 0.0400 / 0.0212 / 0.0123 / 0.0090 / 0.0076, far 0.0033; HM 0.7783 / 0.4944 / 0.2567 / 0.1166 / 0.0558, far 0.1392; HMonly 0.2261 / 0.1021 / 0.0499 / 0.0273 / 0.0162, far 0.0366; HMsel 0.9873 / 0.9482 / 0.7657 / 0.4316 / 0.1760, far 0.7656.
+- Synthetic pass: FAIL (best n 32 0.4316). Method fault: the attention control, which solves this task in the literature, reached 0.0497 at n 32; training losses jumped (NET 1.852 at step 1,000, 5.010 at step 2,000), so 4,000 mixed-n steps at lr 1e-3 under-train every arm. The test ranks arms but cannot certify recall.
+- Predictions: NET n 64 at least 0.95 failed; HBlearn n 32 below 0.5 held; HM n 32 at least 0.9 failed; HMonly n 32 at least 0.9 failed; HMsel n 64 above HM held; a memory arm at 1,024 at least 0.8 failed (HMsel 0.7656); Spearman at least 0.75 held; a memory arm below HBlearn beyond the seed range held; that arm better at 4,096 than 256 failed.
+- Reading: selective keyed memory is the first mechanism to beat HBlearn on bits at proxy scale and the only arm with real recall (HMsel 0.9482 at 8 pairs, 0.7656 across 1,024 tokens, vs HBlearn 0.0212 / 0.0033). Longer eval windows still hurt, but every arm was trained at 256 only, so this tests length extrapolation, not long-text use.
