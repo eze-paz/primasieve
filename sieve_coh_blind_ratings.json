@@ -1,0 +1,802 @@
+{
+"U000": {
+"coherence": 1,
+"fluency": 2
+},
+"U001": {
+"coherence": 5,
+"fluency": 5
+},
+"U002": {
+"coherence": 2,
+"fluency": 3
+},
+"U003": {
+"coherence": 1,
+"fluency": 2
+},
+"U004": {
+"coherence": 1,
+"fluency": 3
+},
+"U005": {
+"coherence": 2,
+"fluency": 2
+},
+"U006": {
+"coherence": 5,
+"fluency": 4
+},
+"U007": {
+"coherence": 1,
+"fluency": 2
+},
+"U008": {
+"coherence": 2,
+"fluency": 3
+},
+"U009": {
+"coherence": 2,
+"fluency": 2
+},
+"U010": {
+"coherence": 1,
+"fluency": 2
+},
+"U011": {
+"coherence": 5,
+"fluency": 5
+},
+"U012": {
+"coherence": 1,
+"fluency": 2
+},
+"U013": {
+"coherence": 1,
+"fluency": 2
+},
+"U014": {
+"coherence": 5,
+"fluency": 5
+},
+"U015": {
+"coherence": 1,
+"fluency": 2
+},
+"U016": {
+"coherence": 1,
+"fluency": 2
+},
+"U017": {
+"coherence": 2,
+"fluency": 3
+},
+"U018": {
+"coherence": 2,
+"fluency": 2
+},
+"U019": {
+"coherence": 1,
+"fluency": 2
+},
+"U020": {
+"coherence": 1,
+"fluency": 2
+},
+"U021": {
+"coherence": 1,
+"fluency": 2
+},
+"U022": {
+"coherence": 1,
+"fluency": 2
+},
+"U023": {
+"coherence": 1,
+"fluency": 2
+},
+"U024": {
+"coherence": 2,
+"fluency": 3
+},
+"U025": {
+"coherence": 1,
+"fluency": 2
+},
+"U026": {
+"coherence": 1,
+"fluency": 2
+},
+"U027": {
+"coherence": 2,
+"fluency": 2
+},
+"U028": {
+"coherence": 2,
+"fluency": 3
+},
+"U029": {
+"coherence": 5,
+"fluency": 5
+},
+"U030": {
+"coherence": 2,
+"fluency": 3
+},
+"U031": {
+"coherence": 2,
+"fluency": 2
+},
+"U032": {
+"coherence": 5,
+"fluency": 5
+},
+"U033": {
+"coherence": 1,
+"fluency": 2
+},
+"U034": {
+"coherence": 2,
+"fluency": 3
+},
+"U035": {
+"coherence": 1,
+"fluency": 2
+},
+"U036": {
+"coherence": 2,
+"fluency": 3
+},
+"U037": {
+"coherence": 1,
+"fluency": 2
+},
+"U038": {
+"coherence": 1,
+"fluency": 2
+},
+"U039": {
+"coherence": 5,
+"fluency": 5
+},
+"U040": {
+"coherence": 1,
+"fluency": 3
+},
+"U041": {
+"coherence": 1,
+"fluency": 2
+},
+"U042": {
+"coherence": 2,
+"fluency": 3
+},
+"U043": {
+"coherence": 5,
+"fluency": 5
+},
+"U044": {
+"coherence": 1,
+"fluency": 2
+},
+"U045": {
+"coherence": 5,
+"fluency": 5
+},
+"U046": {
+"coherence": 2,
+"fluency": 2
+},
+"U047": {
+"coherence": 1,
+"fluency": 2
+},
+"U048": {
+"coherence": 1,
+"fluency": 2
+},
+"U049": {
+"coherence": 2,
+"fluency": 3
+},
+"U050": {
+"coherence": 1,
+"fluency": 2
+},
+"U051": {
+"coherence": 2,
+"fluency": 3
+},
+"U052": {
+"coherence": 2,
+"fluency": 2
+},
+"U053": {
+"coherence": 1,
+"fluency": 2
+},
+"U054": {
+"coherence": 1,
+"fluency": 2
+},
+"U055": {
+"coherence": 1,
+"fluency": 2
+},
+"U056": {
+"coherence": 5,
+"fluency": 5
+},
+"U057": {
+"coherence": 1,
+"fluency": 2
+},
+"U058": {
+"coherence": 1,
+"fluency": 2
+},
+"U059": {
+"coherence": 1,
+"fluency": 2
+},
+"U060": {
+"coherence": 2,
+"fluency": 3
+},
+"U061": {
+"coherence": 1,
+"fluency": 2
+},
+"U062": {
+"coherence": 1,
+"fluency": 2
+},
+"U063": {
+"coherence": 1,
+"fluency": 2
+},
+"U064": {
+"coherence": 2,
+"fluency": 2
+},
+"U065": {
+"coherence": 1,
+"fluency": 2
+},
+"U066": {
+"coherence": 1,
+"fluency": 2
+},
+"U067": {
+"coherence": 1,
+"fluency": 2
+},
+"U068": {
+"coherence": 1,
+"fluency": 2
+},
+"U069": {
+"coherence": 1,
+"fluency": 2
+},
+"U070": {
+"coherence": 2,
+"fluency": 3
+},
+"U071": {
+"coherence": 2,
+"fluency": 2
+},
+"U072": {
+"coherence": 1,
+"fluency": 2
+},
+"U073": {
+"coherence": 5,
+"fluency": 5
+},
+"U074": {
+"coherence": 2,
+"fluency": 3
+},
+"U075": {
+"coherence": 5,
+"fluency": 5
+},
+"U076": {
+"coherence": 1,
+"fluency": 2
+},
+"U077": {
+"coherence": 2,
+"fluency": 2
+},
+"U078": {
+"coherence": 1,
+"fluency": 2
+},
+"U079": {
+"coherence": 5,
+"fluency": 4
+},
+"U080": {
+"coherence": 1,
+"fluency": 2
+},
+"U081": {
+"coherence": 1,
+"fluency": 2
+},
+"U082": {
+"coherence": 1,
+"fluency": 2
+},
+"U083": {
+"coherence": 1,
+"fluency": 2
+},
+"U084": {
+"coherence": 2,
+"fluency": 2
+},
+"U085": {
+"coherence": 5,
+"fluency": 5
+},
+"U086": {
+"coherence": 1,
+"fluency": 2
+},
+"U087": {
+"coherence": 2,
+"fluency": 2
+},
+"U088": {
+"coherence": 1,
+"fluency": 2
+},
+"U089": {
+"coherence": 2,
+"fluency": 3
+},
+"U090": {
+"coherence": 1,
+"fluency": 2
+},
+"U091": {
+"coherence": 1,
+"fluency": 2
+},
+"U092": {
+"coherence": 2,
+"fluency": 3
+},
+"U093": {
+"coherence": 2,
+"fluency": 3
+},
+"U094": {
+"coherence": 1,
+"fluency": 2
+},
+"U095": {
+"coherence": 2,
+"fluency": 3
+},
+"U096": {
+"coherence": 1,
+"fluency": 2
+},
+"U097": {
+"coherence": 1,
+"fluency": 2
+},
+"U098": {
+"coherence": 1,
+"fluency": 2
+},
+"U099": {
+"coherence": 1,
+"fluency": 2
+},
+"U100": {
+"coherence": 2,
+"fluency": 3
+},
+"U101": {
+"coherence": 1,
+"fluency": 1
+},
+"U102": {
+"coherence": 1,
+"fluency": 2
+},
+"U103": {
+"coherence": 4,
+"fluency": 4
+},
+"U104": {
+"coherence": 1,
+"fluency": 2
+},
+"U105": {
+"coherence": 1,
+"fluency": 2
+},
+"U106": {
+"coherence": 5,
+"fluency": 5
+},
+"U107": {
+"coherence": 1,
+"fluency": 2
+},
+"U108": {
+"coherence": 2,
+"fluency": 2
+},
+"U109": {
+"coherence": 1,
+"fluency": 2
+},
+"U110": {
+"coherence": 5,
+"fluency": 5
+},
+"U111": {
+"coherence": 2,
+"fluency": 2
+},
+"U112": {
+"coherence": 1,
+"fluency": 2
+},
+"U113": {
+"coherence": 1,
+"fluency": 2
+},
+"U114": {
+"coherence": 2,
+"fluency": 3
+},
+"U115": {
+"coherence": 2,
+"fluency": 3
+},
+"U116": {
+"coherence": 2,
+"fluency": 3
+},
+"U117": {
+"coherence": 1,
+"fluency": 2
+},
+"U118": {
+"coherence": 1,
+"fluency": 2
+},
+"U119": {
+"coherence": 2,
+"fluency": 2
+},
+"U120": {
+"coherence": 2,
+"fluency": 3
+},
+"U121": {
+"coherence": 1,
+"fluency": 2
+},
+"U122": {
+"coherence": 1,
+"fluency": 2
+},
+"U123": {
+"coherence": 5,
+"fluency": 5
+},
+"U124": {
+"coherence": 1,
+"fluency": 2
+},
+"U125": {
+"coherence": 1,
+"fluency": 2
+},
+"U126": {
+"coherence": 2,
+"fluency": 3
+},
+"U127": {
+"coherence": 5,
+"fluency": 5
+},
+"U128": {
+"coherence": 1,
+"fluency": 2
+},
+"U129": {
+"coherence": 1,
+"fluency": 2
+},
+"U130": {
+"coherence": 1,
+"fluency": 2
+},
+"U131": {
+"coherence": 1,
+"fluency": 2
+},
+"U132": {
+"coherence": 5,
+"fluency": 4
+},
+"U133": {
+"coherence": 1,
+"fluency": 2
+},
+"U134": {
+"coherence": 1,
+"fluency": 1
+},
+"U135": {
+"coherence": 1,
+"fluency": 2
+},
+"U136": {
+"coherence": 2,
+"fluency": 3
+},
+"U137": {
+"coherence": 1,
+"fluency": 2
+},
+"U138": {
+"coherence": 1,
+"fluency": 2
+},
+"U139": {
+"coherence": 5,
+"fluency": 5
+},
+"U140": {
+"coherence": 1,
+"fluency": 2
+},
+"U141": {
+"coherence": 2,
+"fluency": 3
+},
+"U142": {
+"coherence": 1,
+"fluency": 2
+},
+"U143": {
+"coherence": 1,
+"fluency": 2
+},
+"U144": {
+"coherence": 5,
+"fluency": 5
+},
+"U145": {
+"coherence": 5,
+"fluency": 5
+},
+"U146": {
+"coherence": 5,
+"fluency": 5
+},
+"U147": {
+"coherence": 5,
+"fluency": 5
+},
+"U148": {
+"coherence": 1,
+"fluency": 2
+},
+"U149": {
+"coherence": 2,
+"fluency": 2
+},
+"U150": {
+"coherence": 5,
+"fluency": 5
+},
+"U151": {
+"coherence": 5,
+"fluency": 4
+},
+"U152": {
+"coherence": 1,
+"fluency": 2
+},
+"U153": {
+"coherence": 1,
+"fluency": 2
+},
+"U154": {
+"coherence": 1,
+"fluency": 2
+},
+"U155": {
+"coherence": 1,
+"fluency": 2
+},
+"U156": {
+"coherence": 2,
+"fluency": 3
+},
+"U157": {
+"coherence": 5,
+"fluency": 5
+},
+"U158": {
+"coherence": 1,
+"fluency": 2
+},
+"U159": {
+"coherence": 5,
+"fluency": 5
+},
+"U160": {
+"coherence": 1,
+"fluency": 2
+},
+"U161": {
+"coherence": 2,
+"fluency": 3
+},
+"U162": {
+"coherence": 2,
+"fluency": 3
+},
+"U163": {
+"coherence": 5,
+"fluency": 5
+},
+"U164": {
+"coherence": 1,
+"fluency": 2
+},
+"U165": {
+"coherence": 1,
+"fluency": 2
+},
+"U166": {
+"coherence": 5,
+"fluency": 5
+},
+"U167": {
+"coherence": 1,
+"fluency": 2
+},
+"U168": {
+"coherence": 1,
+"fluency": 2
+},
+"U169": {
+"coherence": 1,
+"fluency": 2
+},
+"U170": {
+"coherence": 1,
+"fluency": 2
+},
+"U171": {
+"coherence": 1,
+"fluency": 1
+},
+"U172": {
+"coherence": 1,
+"fluency": 2
+},
+"U173": {
+"coherence": 2,
+"fluency": 2
+},
+"U174": {
+"coherence": 2,
+"fluency": 2
+},
+"U175": {
+"coherence": 1,
+"fluency": 2
+},
+"U176": {
+"coherence": 1,
+"fluency": 2
+},
+"U177": {
+"coherence": 5,
+"fluency": 4
+},
+"U178": {
+"coherence": 5,
+"fluency": 5
+},
+"U179": {
+"coherence": 5,
+"fluency": 5
+},
+"U180": {
+"coherence": 1,
+"fluency": 2
+},
+"U181": {
+"coherence": 2,
+"fluency": 2
+},
+"U182": {
+"coherence": 4,
+"fluency": 4
+},
+"U183": {
+"coherence": 1,
+"fluency": 2
+},
+"U184": {
+"coherence": 1,
+"fluency": 2
+},
+"U185": {
+"coherence": 1,
+"fluency": 2
+},
+"U186": {
+"coherence": 1,
+"fluency": 2
+},
+"U187": {
+"coherence": 2,
+"fluency": 2
+},
+"U188": {
+"coherence": 4,
+"fluency": 4
+},
+"U189": {
+"coherence": 5,
+"fluency": 5
+},
+"U190": {
+"coherence": 4,
+"fluency": 4
+},
+"U191": {
+"coherence": 1,
+"fluency": 2
+},
+"U192": {
+"coherence": 1,
+"fluency": 2
+},
+"U193": {
+"coherence": 1,
+"fluency": 2
+},
+"U194": {
+"coherence": 1,
+"fluency": 2
+},
+"U195": {
+"coherence": 1,
+"fluency": 2
+},
+"U196": {
+"coherence": 1,
+"fluency": 2
+},
+"U197": {
+"coherence": 5,
+"fluency": 5
+},
+"U198": {
+"coherence": 2,
+"fluency": 3
+},
+"U199": {
+"coherence": 5,
+"fluency": 5
+}
+}

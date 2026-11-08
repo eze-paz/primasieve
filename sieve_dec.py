@@ -4,8 +4,9 @@ candidates, weight exp(4 x m4), boundaries allowed, copy cap), per-word distribu
   content words of the text, MT's trigger counts); cache (kappa: content words x (1 + kappa x share of w among the text's
   content words / P_U(w))^(1/2)); norep (bool: forbid a trigram already in the text); nounk (bool: never write UNK); depth (D: weight by consecutive exact matches up to D words, not m4).
 Index: 8-word reversed prefix (MIX onward; TEMP used 4 words). doc (delta: candidates inside the ndoc (100) training
-  passages most similar to the text get weight x e^delta; passages = 1,000-word chunks, tf-idf over content words); cap (6: also no 6-word window from training; needs DEC_H6=1).
-Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}'  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
+  passages most similar to the text get weight x e^delta; passages = 1,000-word chunks, tf-idf over content words); cap (6: also no 6-word window from training; needs DEC_H6=1);
+  search ({B, H, C, v}: B rollouts of H words from the same sampler, commit the first C words of the best by verifier v).
+Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPARTS: prompts pid % NPARTS == PART)  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
 import os, sys, json, time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); import sieve_mtest as MT
@@ -84,18 +85,43 @@ class Dec:
         for w, qv in zip(u, q):
             a, b = s.pst[w], s.pst[w + 1]; np.add.at(sc, s.pch[a:b], qv * s.pval[a:b])
         s._tk = (key, id(text)); s._tc = np.argpartition(-sc, k)[:k]; return s._tc
+    def verify(s, text, R, kind):
+        """SRCH verifier for rollouts R (list of word lists): topic = mean log(P_T / P_U) of the rollout's content words given the
+        text's last 50 content words (trigger counts); both = topic + 4 x share of the rollout's trigrams (2 words of context) seen in training"""
+        if not hasattr(s, "u3"): s.u3 = np.load(MT.fp(C, "ngram"))["u3"]
+        W = [w for w in text if 100 < w <= s.V][-50:]; W = [w for w in W if s.rc[w] > 0]; out = np.zeros(len(R))
+        for i, r in enumerate(R):
+            y = np.array([w for w in r if 100 < w <= s.V])
+            if len(y) and W:
+                pT = np.zeros(len(y))
+                for w in W: pT += MT.look(s.tu, s.tn, w * MT.VV + y) / s.rc[w]
+                out[i] = np.log((pT / len(W) + 1e-6) / (s.pU[y] + 1e-6)).mean()
+            if kind == "both":
+                e = list(text[-2:]) + list(r); k = np.array([(e[j] * MT.VV + e[j + 1]) * MT.VV + e[j + 2] for j in range(len(r))], np.int64)
+                out[i] += 4 * float((MT.look(s.u3, np.ones(len(s.u3), np.int64), k) > 0).mean())
+        return out
     def gen(s, prompt, cfg, seed):
-        g = np.random.default_rng(seed); text = list(prompt)
+        g = np.random.default_rng(seed); text = list(prompt); sr = cfg.get("search")
         while len(text) - len(prompt) < LG:
-            uw, p = s.dist(text, cfg); text.append(int(uw[g.choice(len(uw), p=p)]))
-        return text[len(prompt):]
+            if not sr:
+                uw, p = s.dist(text, cfg); text.append(int(uw[g.choice(len(uw), p=p)])); continue
+            R = []
+            for _ in range(sr["B"]):
+                t2 = list(text)
+                for _ in range(sr["H"]):
+                    uw, p = s.dist(t2, cfg); t2.append(int(uw[g.choice(len(uw), p=p)]))
+                R.append(t2[len(text):])
+            text.extend(R[int(np.argmax(s.verify(text, R, sr["v"])))][:sr["C"]])
+        return text[len(prompt):len(prompt) + LG]
     def words(s, ids): return " ".join("." if i == 0 else "<unk>" if i > s.V else str(s.vw[i]) for i in ids).replace(" .", ".")
-def run(tag, arms):
-    d = Dec(); G = []
+def run(tag, arms, part=None):
+    d = Dec(); G = []; nparts = int(os.environ.get("DEC_NPARTS", 1))
     for pid, t in enumerate(d.prompts):
+        if part is not None and pid % nparts != part: continue
         pr = d.S[t:t + LP].tolist(); G.append(dict(pid=pid, B="truth", prompt=d.words(pr), text=d.words(d.S[t + LP:t + LP + LG]), ids=d.S[t + LP:t + LP + LG].tolist()))
         for arm, cfg in arms.items():
             ids = d.gen(pr, cfg, 1000 * pid + 7); G.append(dict(pid=pid, B=arm, prompt=d.words(pr), text=d.words(ids), ids=ids))
         if pid % 10 == 0: log(f"prompt {pid}: " + " | ".join(f"{x['B']}: {x['text'][:60]}" for x in G[-len(arms):]))
-    out = os.path.join(MT.OUT, f"{tag}_gen.json"); json.dump(G, open(out, "w"), indent=0); log(f"saved {out}: {len(G)} items")
-if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]))
+        if part is not None: json.dump(G, open(os.path.join(MT.OUT, f"{tag}_gen_p{part}.json"), "w"), indent=0)
+    out = os.path.join(MT.OUT, f"{tag}_gen.json" if part is None else f"{tag}_gen_p{part}.json"); json.dump(G, open(out, "w"), indent=0); log(f"saved {out}: {len(G)} items")
+if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else None)
