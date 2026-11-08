@@ -42,6 +42,7 @@ class Dec:
         s.FINE = np.load(os.path.join(MT.OUT, "kaggle_ms", "data", f"{C}_cls.npz"))["fine"]
         wid = {str(w): i for i, w in enumerate(s.vw)}; s.MALE = {wid[w] for w in ("he", "him", "his", "himself") if w in wid}; s.FEM = {wid[w] for w in ("she", "her", "hers", "herself") if w in wid}
         s.CLAUSE = {wid[w] for w in "and but or who which that when while where if because though as so then".split() if w in wid}; s._src = None
+        s.PRON = {wid[w] for w in "he she they i we it you".split() if w in wid}; s._msn = 0; s._mst = 0
         if os.environ.get("DEC_SENT"):                                                                                                   # NSENT: sentence index
             sid = np.cumsum(S[:ntr] == 0); s.sid = sid; s.sstart = np.nonzero(S[:ntr] == 0)[0] + 1; s.sstart = s.sstart[s.sstart < ntr - 1]   # sentence k starts at sstart[k-1]
             cm2 = (S[:ntr] > 100) & (S[:ntr] <= s.V); kk_ = sid[cm2] * MT.VV + S[:ntr][cm2]; u2_, n2_ = np.unique(kk_, return_counts=True); sw_ = u2_ % MT.VV; ss_ = u2_ // MT.VV
@@ -133,6 +134,21 @@ class Dec:
                         uw = np.r_[uw, h]; p = np.r_[p, p.max()]
         if cfg.get("nounk") and (uw <= s.V).any(): p = p * (uw <= s.V)
         con = (uw > 100) & (uw <= s.V)
+        if cfg.get("ms") and con.any():                                                                                             # MEAN: license new content words by the held ones
+            E = s.held_entities(text); U = s._msU
+            if len(U):
+                for i in np.nonzero(con)[0]:
+                    c = int(uw[i])
+                    if c in E or s.idf[c] < 2: continue                                                                              # held, or a very common word: licensed
+                    sl = s.pch[s.pst[c]:s.pst[c + 1]]; co = int((U[np.minimum(np.searchsorted(U, sl), len(U) - 1)] == sl).sum()); ex = len(sl) * len(U) / s.nch
+                    if (co + 1) / (ex + 1) < cfg.get("mslift", 1.0): p[i] *= np.exp(-cfg["ms"]); s._msn += 1
+                s._mst += int(con.sum())
+        if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
+            j = len(text) - 2
+            while j >= 0 and text[j] != 0: j -= 1
+            if j + 1 < len(text) - 1:
+                subj = text[j + 1]
+                if (subj in s.PRON or 100 < subj <= s.V) and subj in uw: p = p * np.where(uw == subj, np.exp(cfg["msubj"]), 1.0)
         if cfg.get("topic") and con.any():
             W = [w for w in text if 100 < w <= s.V][-50:]; W = [w for w in W if s.rc[w] > 0]
             if W:
@@ -148,6 +164,14 @@ class Dec:
             if (~rep).any() and (p * ~rep).sum() > 0: p = p * ~rep
         p = p ** (1.0 / cfg.get("T", 1.0)) if cfg.get("T", 1.0) != 1.0 else p
         return uw, p / p.sum()
+    def held_entities(s, text):
+        """MEAN: held content words = those with passage idf >= 2 among the text's last 60 content words; U = sorted ids of the
+        1,000-word training passages containing any of them (cached until the set changes). A new content word is licensed when
+        it occurs in those passages at least as often as chance: (co + 1) / (expected + 1) >= mslift."""
+        E = frozenset(w for w in [w for w in text if 100 < w <= s.V][-60:] if s.idf[w] >= 2)
+        if getattr(s, "_msE", None) != E:
+            s._msE = E; s._msU = np.unique(np.concatenate([s.pch[s.pst[w]:s.pst[w + 1]] for w in E])) if E else np.zeros(0, np.int64)
+        return E
     def topchunks(s, text, k):
         """the k training passages (1,000-word chunks) most similar (tf-idf cosine) to the text's content words; cached per 10 words"""
         key = len(text) // 10
@@ -203,6 +227,7 @@ def run(tag, arms, part=None):
         pr = d.S[t:t + LP].tolist(); G.append(dict(pid=pid, B="truth", prompt=d.words(pr), text=d.words(d.S[t + LP:t + LP + LG]), ids=d.S[t + LP:t + LP + LG].tolist()))
         for arm, cfg in arms.items():
             ids = d.gen(pr, cfg, 1000 * pid + 7); G.append(dict(pid=pid, B=arm, prompt=d.words(pr), text=d.words(ids), ids=ids))
+            if cfg.get("ms"): G[-1]["ms_penalized"] = d._msn; G[-1]["ms_content_cands"] = d._mst; d._msn = d._mst = 0
             if cfg.get("holdw"): G[-1]["plan"] = d.words(d._plan0); G[-1]["plan_written"] = float(np.mean([w in ids for w in d._plan0])) if d._plan0 else 0.0
         if pid % 10 == 0: log(f"prompt {pid}: " + " | ".join(f"{x['B']}: {x['text'][:60]}" for x in G[-len(arms):]))
         if part is not None: json.dump(G, open(os.path.join(MT.OUT, f"{tag}_gen_p{part}.json"), "w"), indent=0)

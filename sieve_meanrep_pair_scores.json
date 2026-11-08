@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "meanrep_pair_ratings.json",
+  "meanrep_pair_ratings_r2.json"
+ ],
+ "MEAN vs B coherence": {
+  "b_wins": 0.55,
+  "a_wins": 0.3333333333333333,
+  "mean": 0.2167,
+  "interval": [
+   0.0583,
+   0.375
+  ]
+ },
+ "MEAN vs B fluency": {
+  "b_wins": 0.5166666666666667,
+  "a_wins": 0.35,
+  "mean": 0.1667,
+  "interval": [
+   0.0,
+   0.325
+  ]
+ }
+}

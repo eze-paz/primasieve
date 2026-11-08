@@ -1,0 +1,60 @@
+{
+ "raters": [
+  "ceil_pair_ratings.json",
+  "ceil_pair_ratings_r2.json"
+ ],
+ "NET vs B27 coherence": {
+  "b_wins": 0.775,
+  "a_wins": 0.15,
+  "mean": 0.625,
+  "interval": [
+   0.5,
+   0.75
+  ]
+ },
+ "NET vs B27 fluency": {
+  "b_wins": 0.6916666666666667,
+  "a_wins": 0.2,
+  "mean": 0.4917,
+  "interval": [
+   0.3498,
+   0.6333
+  ]
+ },
+ "truth vs NET coherence": {
+  "b_wins": 1.0,
+  "a_wins": 0.0,
+  "mean": 1.0,
+  "interval": [
+   1.0,
+   1.0
+  ]
+ },
+ "truth vs NET fluency": {
+  "b_wins": 1.0,
+  "a_wins": 0.0,
+  "mean": 1.0,
+  "interval": [
+   1.0,
+   1.0
+  ]
+ },
+ "MEAN vs B27 coherence": {
+  "b_wins": 0.6,
+  "a_wins": 0.3333333333333333,
+  "mean": 0.2667,
+  "interval": [
+   0.1,
+   0.4333
+  ]
+ },
+ "MEAN vs B27 fluency": {
+  "b_wins": 0.6,
+  "a_wins": 0.3,
+  "mean": 0.3,
+  "interval": [
+   0.1333,
+   0.4667
+  ]
+ }
+}

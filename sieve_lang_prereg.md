@@ -2413,3 +2413,29 @@ repeated trigram, 8-word cap); sieve_dec.py keys gender 3, ms 2, msubj 1.
   claim. Otherwise null. Fluency reported; a fluency loss with interval excluding 0 is reported as a cost.
 **SPLICE results (2026-11-08; sieve_splice.json, Kaggle primasieve-splice).** Training stream is 200,543,654 words (the "191M" stream counted with boundaries). Mean longest covered context: 7.1M 1.565, 14.3M 1.731, 28.5M 1.894, 96.1M 2.164, 113.7M 2.204, 183.5M 2.315, 200.5M 2.334. Covered 5-gram (4-word key + true word): 28.5M 0.0787, 200.5M 0.1531. Fit >= 27M: 0.1566 words per doubling (implied entropy rate about 6.4 bits per word); MT-only points: 0.1648 per doubling. Predicted mean context at 1.9B: 2.841 (fit on all: 2.851); predicted covered 5-gram at 1.9B 0.332 (power law, upper bound). UNK share of training text: 28.5M 0.0080, 200.5M 0.0143.
 - Decision rule: measured 28.5M -> 200.5M went 1.894 -> 2.334; predicted 200.5M -> 1.9B goes 2.334 -> 2.841. The predicted step is larger: **rule says download.** Predictions: words per doubling in [0.10, 0.20] — held; PG-19 slope below MT-only — held (0.1566 vs 0.1648); rule says download — held.
+
+## BIG1B — the best generator over ~1B words with an extended vocabulary (preregistered 2026-11-08, before tokenizing)
+- Owner approved ("do as you see fit") after SPLICE predicted mean matched context 2.334 at 200.5M -> 2.696 at 1B. Data: PG-19 train shards 0..11 (whole shards, fetched inside Kaggle; about 3.7 GB parquet), tokenized as BIG (same regexes, same 8-word contamination filter, computed with new words as UNK so drop decisions match BIG) by sieve_tok1b_kernel.py, with the vocabulary extended by the 5,533 most frequent non-MT words over these shards (ids 60002..65534; keys stay 16-bit; the MT 27M text and the MT eval text keep their old ids). Training stream = MT 27M training text, then shards 0..11.
+- Generator: sieve_g1b_kernel.py = E2E's BEST (exact-match weight 8, 3,072 reversed-prefix candidates, power 6, repeat guard, never <unk>, copy cap 8), storage refactored to fit (uint16 tokens, 4-word key index built per first-word range, int32 positions and tokens on the GPU, 8-gram copy table sorted in place). **Sanity (must pass before any 1B result is read):** the refactored kernel on BIG's 191M stream reproduces E2E's BEST texts exactly on all 80 E2E prompts.
+- Arms on the 80 E2E prompts and seeds: B1G6 (BEST at 1B, power 6), B1G12 (power 12; the best power rose with data: 2 at 27M, 6 at 191M). Pairwise vs E2E's BEST (191M) for fluency and coherence, one rater per pair set, bootstrap over prompts; grammatical-sentence share (one rater) of BEST-191M, B1G6, B1G12, truth.
+- **Predictions:** B1G6 over BEST-191M fluency, interval above 0.5 (55%); B1G12 over B1G6 (40%); grammatical share B1G6 above BEST-191M (60%); the share of the extended vocabulary words in B1G6 output above 0.002 (70%).
+
+**CEIL results (2026-11-08; Kaggle primasieve-ceil, 20,230,656 parameters (the prereg's figure came from a 64-word smoke
+window), dev bits/word per epoch 7.7011, 7.2954, 7.1213, 7.0155, 6.9627, 6.9498, best epoch 5; 120 DBIG prompts, two
+side-by-side raters, agreement coherence 0.953 / fluency 0.931; sieve_ceil_pair_scores.json).** NET vs B27: coherence
+0.625 [0.500, 0.750] (NET preferred 0.775, B27 0.150); fluency 0.4917 [0.3498, 0.6333]. Truth vs NET: coherence 1.0,
+fluency 1.0 (truth preferred on every prompt). **Verdict: GAP.** At the same 27M words a 20M-parameter network is far
+more coherent than the counting decoder, so the floor is the method, not the data budget; it is still far from real text.
+**MEAN results (same batch).** Mechanism: share of new content words below chance, MEAN 0.112 (B27 0.394, truth 0.227);
+new content words written 856 (B27 1,095, truth 1,584). MEAN vs B27: coherence 0.2667 [0.1000, 0.4333] (MEAN preferred
+0.600, B27 0.333); fluency 0.3000 [0.1333, 0.4667]. **Bar met -> replication MEANREP on 120 fresh prompts (DEC_POFF 7:
+offset 7 in the sentence-start list from DBIG/NS2's, 3 for NSREP), same arms and settings, B:MEAN, two raters. Replicates
+if the coherence interval excludes 0 in the same direction.**
+**MEANREP results (2026-11-08; 120 fresh prompts DEC_POFF 7, two side-by-side raters, agreement coherence 0.883 /
+fluency 0.867; sieve_meanrep_pair_scores.json).** MEAN vs B: coherence 0.2167 [0.0583, 0.3750] (MEAN preferred 0.550,
+B 0.333); fluency 0.1667 [0.0000, 0.3250]. Penalized share of content candidates 0.3952 (first set 0.3963).
+**Pooled 240 prompts:** coherence 0.2417 [0.1250, 0.3583]; fluency 0.2333 [0.1250, 0.3583].
+**Verdict: REPLICATED — the first coherence lever that holds on fresh prompts.** Licensing new content words by the
+passages of the held ones (penalty only) + held gender + held subject makes the counting decoder more coherent and,
+pooled, more fluent. The equal-data network (CEIL: 0.625 over B) remains well ahead; MEAN closes part of that gap at most.
+Not separated yet: which of the three parts carries the effect (ablation is the next round).
