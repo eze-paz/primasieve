@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "SL6 over POW6GU": {
+   "share": 0.6667,
+   "pairs": 24,
+   "interval": [
+    0.458,
+    0.833
+   ]
+  },
+  "SL8 over POW6GU": {
+   "share": 0.6136,
+   "pairs": 44,
+   "interval": [
+    0.477,
+    0.75
+   ]
+  }
+ },
+ "coherence": {
+  "SL6 over POW6GU": {
+   "share": 0.7917,
+   "pairs": 24,
+   "interval": [
+    0.625,
+    0.958
+   ]
+  },
+  "SL8 over POW6GU": {
+   "share": 0.6136,
+   "pairs": 44,
+   "interval": [
+    0.477,
+    0.75
+   ]
+  }
+ }
+}
