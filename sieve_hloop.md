@@ -18,3 +18,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 6. HSWEEP6 (02:40): entropy-matched control (temperature frontier of the no-harmonics generator).
    Result (02:37): temperature cannot sharpen below 2.83 bits (ties); harmonics break ties and beat that frontier; class phases best (class z8 N 8.2717).
 7. HSWEEP7 (02:45): random-similarity control (tie-breaking alone) and power-sharpening frontier.
+   Result (02:42): harmonics beat random tie-breaking clearly, but plain sharpening (power on the word distribution) beats harmonics far more on N.
+8. HSWEEP8 (02:50): harmonics + sharpening combos on N; blind batch NOH / POW2 / class z4 / class z4 + POW1.5 / truth.
