@@ -68,3 +68,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result POWU: power 6 remains best without <unk> (POW3 0.413, POW12 0.455 vs POW6).
 30. E2E (04:25): end-to-end, loop start vs loop best on 80 fresh prompts.
    Result SLEN: affects few texts; where it does, SL6 helps coherence (0.792 [0.625, 0.958], 24 pairs), fluency n.s.
+   Result E2E (fresh prompts): best over loop start fluency 0.925 [0.863, 0.975], coherence 0.825 [0.738, 0.912]; grammatical share 0.346 -> 0.637 (true 0.867).
+31. K12 + SL (04:27): 12,288 candidates at 191M; sentence-length rule on fresh prompts.

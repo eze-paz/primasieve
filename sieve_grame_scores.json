@@ -1,0 +1,30 @@
+{
+ "BASE": {
+  "share": 0.3455,
+  "sentences": 275,
+  "interval": [
+   0.291,
+   0.398
+  ]
+ },
+ "BEST": {
+  "share": 0.6371,
+  "sentences": 372,
+  "interval": [
+   0.592,
+   0.681
+  ]
+ },
+ "truth": {
+  "share": 0.8669,
+  "sentences": 293,
+  "interval": [
+   0.817,
+   0.913
+  ]
+ },
+ "BEST minus BASE (per-prompt mean)": [
+  0.23,
+  0.39
+ ]
+}

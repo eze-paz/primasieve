@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "BEST over BASE": {
+   "share": 0.925,
+   "pairs": 80,
+   "interval": [
+    0.863,
+    0.975
+   ]
+  }
+ },
+ "coherence": {
+  "BEST over BASE": {
+   "share": 0.825,
+   "pairs": 80,
+   "interval": [
+    0.738,
+    0.912
+   ]
+  }
+ }
+}
