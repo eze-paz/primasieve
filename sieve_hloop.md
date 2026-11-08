@@ -65,3 +65,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 28. POWU (04:15): sharpening re-tune with no <unk> (POW3 / POW12 vs POW6).
    FINALG2: grammatical share books NOH-27M 0.423, POW6G-191M 0.590, POW6GU-191M 0.550 (n.s. vs POW6G), true 0.905; wiki POW6GU-200M 0.497, true 0.961. Peer session: its NS coherence result did not replicate; it paused.
 29. SLEN (04:18): no premature sentence ends on the new best.
+   Result POWU: power 6 remains best without <unk> (POW3 0.413, POW12 0.455 vs POW6).
