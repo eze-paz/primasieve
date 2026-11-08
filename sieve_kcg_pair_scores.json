@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "kcg_pair_ratings.json",
+  "kcg_pair_ratings_r2.json"
+ ],
+ "CM vs MEAN coherence": {
+  "b_wins": 0.39166666666666666,
+  "a_wins": 0.5083333333333333,
+  "mean": -0.1167,
+  "interval": [
+   -0.2833,
+   0.0583
+  ]
+ },
+ "CM vs MEAN fluency": {
+  "b_wins": 0.38333333333333336,
+  "a_wins": 0.45,
+  "mean": -0.0667,
+  "interval": [
+   -0.2333,
+   0.1
+  ]
+ }
+}

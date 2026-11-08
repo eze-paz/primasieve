@@ -2847,3 +2847,10 @@ Scores: sieve_lt_scores.json.
 - Metric (kernel primasieve-kv, CPU): 4,000 held-out positions with a content true word (context up to 120 words); Sieve B (T 0.35) reweighted by e^(beta z / T) on eligible content candidates; beta from {0, 0.1, 0.25, 0.5, 1} chosen on the first 2,000 positions; reported: mean log probability of the true word on the other 2,000 at beta 0 and at the chosen beta, with a bootstrap interval for the difference; AUC of z.
 - Decision: the variant with the highest held-out log probability, if its interval against beta 0 excludes 0 and its log probability is above CMRL's, goes to a rater round inside MEAN (KCG's protocol).
 - **Predictions:** CMRL gain interval excludes 0 (60%); LONG above CMRL (50%); RF4096 above CMRL (45%); LOCAL above CMRL (40%); W2 below CMRL (55%); D512 above CMRL (55%).
+
+### KCG results -- FAIL (2026-11-09; sieve_kcg_beta.json, mtest/kcg_gen.json, sieve_kcg_pair_scores.json; two raters, agreement coherence 0.917 / fluency 0.850)
+- Calibration (40 prompts, DEC_POFF 31, 1,677 true words): mean log probability of the true word at beta 0 / 0.25 / 0.5 / 1 / 2: -26.3400 / -26.3158 / -26.3266 / -26.5032 / -27.9848; beta 0.25.
+- Generation (120 prompts, DEC_POFF 35): 1 of 120 CM texts identical to MEAN.
+- CM vs MEAN: coherence -0.1167 [-0.2833, 0.0583] (CM preferred 0.392, MEAN 0.508); fluency -0.0667 [-0.2333, 0.1000] (0.383 / 0.450).
+- Predictions: beta above 0 held; CM coherence point above MEAN failed; coherence pass failed; fluency interval excluding 0 failed.
+- Reading: the count matrix ranks the true word better (KC AUC 0.6433) but at the strength the data supports (beta 0.25) it barely moves Sieve's likelihood (-26.3158 vs -26.3400), and raters lean to MEAN, as with HG (-0.075), HH and JT (-0.1417). Licences layered on MEAN have not yet helped coherence.
