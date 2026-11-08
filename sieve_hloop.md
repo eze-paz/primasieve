@@ -42,3 +42,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result B2: at 191M, POW3 beats POW2 (0.613 [0.512, 0.713]); new best = POW3-191M. MW6 n.s.; lam0 12 worse.
 18. B3 (03:30): sharpening curve at 191M (POW4, POW6 vs POW3).
    Result STR: held-state matching bonus: no gain (0.463 / 0.500).
+   Result B3 (03:34): POW6 over POW3 0.613 [0.500, 0.713] (edge); POW4 n.s.; Pythia bits now below true text (5.63 vs 5.72): blandness.
+19. GR (03:36): near-greedy consensus + repeat guard; absolute grammatical share re-measured.

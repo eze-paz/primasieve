@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "POW4 over POW3": {
+   "share": 0.525,
+   "pairs": 80,
+   "interval": [
+    0.412,
+    0.637
+   ]
+  },
+  "POW6 over POW3": {
+   "share": 0.6125,
+   "pairs": 80,
+   "interval": [
+    0.5,
+    0.713
+   ]
+  }
+ },
+ "coherence": {
+  "POW4 over POW3": {
+   "share": 0.5,
+   "pairs": 80,
+   "interval": [
+    0.388,
+    0.613
+   ]
+  },
+  "POW6 over POW3": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.65
+   ]
+  }
+ }
+}
