@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "B1G6 over BEST191": {
+   "share": 0.5625,
+   "pairs": 80,
+   "interval": [
+    0.45,
+    0.662
+   ]
+  },
+  "B1G12 over B1G6": {
+   "share": 0.5132,
+   "pairs": 76,
+   "interval": [
+    0.395,
+    0.632
+   ]
+  }
+ },
+ "coherence": {
+  "B1G6 over BEST191": {
+   "share": 0.6125,
+   "pairs": 80,
+   "interval": [
+    0.512,
+    0.713
+   ]
+  },
+  "B1G12 over B1G6": {
+   "share": 0.4737,
+   "pairs": 76,
+   "interval": [
+    0.368,
+    0.592
+   ]
+  }
+ }
+}

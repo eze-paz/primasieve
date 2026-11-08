@@ -79,3 +79,7 @@ owner decisions: more books text (new PG-19 shards = new downloads), and a vocab
 (re-tokenising, a multi-hour refactor of the 16-bit word keys).
 Best generator: books 191M, exact-match weight 8, 3,072 reversed-prefix candidates, word distribution raised to power 6,
 repeat-trigram guard, never <unk>, copy cap 8 (sieve_nounkb_kernel.py / sieve_e2e_best_kernel.py).
+
+## After the loop (owner-approved data step, 2026-11-08)
+32. SPLICE: coverage of real continuations vs training words; Wyner-Ziv fit 0.1566 words of matched context per doubling; predicted 2.334 (200.5M) -> 2.696 (1B) -> 2.841 (1.9B). Rule said download.
+33. BIG1B: PG-19 shards 0..11 (1.03B training tokens, vocabulary extended by 5,533 words), generator refactored to fit (exact reproduction at 191M). Result: coherence 0.6125 [0.512, 0.713] over 191M; fluency 0.5625 n.s.; grammatical share flat (0.645 vs 0.654; truth 0.863). Data now moves coherence, not grammar.
