@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "POW2_191 over POW2_27": {
+   "share": 0.65,
+   "pairs": 80,
+   "interval": [
+    0.55,
+    0.75
+   ]
+  },
+  "CZ4_191 over CZ4_27": {
+   "share": 0.5875,
+   "pairs": 80,
+   "interval": [
+    0.475,
+    0.688
+   ]
+  }
+ },
+ "coherence": {
+  "POW2_191 over POW2_27": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.65
+   ]
+  },
+  "CZ4_191 over CZ4_27": {
+   "share": 0.525,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.625
+   ]
+  }
+ }
+}

@@ -33,3 +33,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 14. BIGH (03:25): best generators over the 191M-word books stream vs 27M, pairwise.
    Result HPOW (03:25): harmonics on top of sharpening: no detectable gain (CZP2 over POW2 0.563 [0.450, 0.662]).
 15. FUT (03:35): harmonics comparing the source's future with the passage (topic continuity) + trigram-repeat guard.
+   Result BIGH: with sharpening, 191M words beats 27M on fluency 0.650 [0.550, 0.750]; harmonic arm n.s.
