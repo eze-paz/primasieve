@@ -38,6 +38,7 @@ def run(c):
     dist = np.where(has, np.minimum(np.log2(np.maximum(np.arange(N) - lo, 1)).astype(np.int64), 4), 0); cop = np.cumsum(oid > 0); nop = np.minimum(shift(cop, 1) - cop[ss], 3)
     H = np.unique(((np.where(has, oid[lo], 0) * 2 + vafter) * 5 + dist) * 4 + nop, return_inverse=True)[1]; P = np.minimum(np.log2(np.maximum(np.arange(N) - ss, 1)).astype(np.int64), 6)
     items = dict(H=H, F8=shift(h[8], 2), HP=np.unique(H * 7 + P, return_inverse=True)[1])
+    if os.environ.get("HOLD_SAVE"): np.savez(os.path.join(os.environ["HOLD_SAVE"], f"{c}_states.npz"), L=h[2].astype(np.uint8), F8=items["F8"].astype(np.uint8), H=H.astype(np.uint16), verb=verb); log(f"{c}: states saved")
     L = h[2]; pl = pcond(L, pU[Y[ev]]); Lev = L[ev]; m = len(ev); odd = np.arange(m) % 2 == 1; evn = ~odd
     synt = (verb[Y[ev]] & has[ev] & ~vafter[ev])                                                            # a verb arrives while a clause waits for one
     R = dict(local_bits_even=float(-np.log2(pl)[evn].mean()), syntax_positions_even=int((synt & evn).sum()))
