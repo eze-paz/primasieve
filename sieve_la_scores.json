@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "LA1 over POW2": {
+   "share": 0.55,
+   "pairs": 80,
+   "interval": [
+    0.438,
+    0.65
+   ]
+  },
+  "LA2 over POW2": {
+   "share": 0.5125,
+   "pairs": 80,
+   "interval": [
+    0.4,
+    0.625
+   ]
+  }
+ },
+ "coherence": {
+  "LA1 over POW2": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.637
+   ]
+  },
+  "LA2 over POW2": {
+   "share": 0.5125,
+   "pairs": 80,
+   "interval": [
+    0.4,
+    0.625
+   ]
+  }
+ }
+}
