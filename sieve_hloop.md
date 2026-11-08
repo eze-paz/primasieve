@@ -37,3 +37,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result FUT: topic-continuity harmonics hurt fluency (0.388 [0.287, 0.487] at beta 4).
    (Clock note: round start times logged above after round 9 were estimates and ran ahead of the real clock by up to ~15 min; real time at round 16 launch: 03:23.)
 16. B2 (03:23): tuning at 191M (POW3, MW6, lam0 12) vs POW2-191M; absolute measure = share of grammatical sentences.
+   Absolute: grammatical-sentence share NOH-27M 0.360, POW2-27M 0.440, POW2-191M 0.456, true text 0.855.

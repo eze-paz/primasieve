@@ -1,0 +1,34 @@
+{
+ "POW2_27": {
+  "share": 0.44,
+  "sentences": 150,
+  "interval": [
+   0.354,
+   0.524
+  ]
+ },
+ "POW2_191": {
+  "share": 0.4559,
+  "sentences": 136,
+  "interval": [
+   0.394,
+   0.514
+  ]
+ },
+ "NOH_27": {
+  "share": 0.36,
+  "sentences": 125,
+  "interval": [
+   0.283,
+   0.427
+  ]
+ },
+ "truth": {
+  "share": 0.8552,
+  "sentences": 145,
+  "interval": [
+   0.792,
+   0.916
+  ]
+ }
+}
