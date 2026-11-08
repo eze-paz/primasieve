@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "CAP10 over POW6G": {
+   "share": 0.5875,
+   "pairs": 80,
+   "interval": [
+    0.475,
+    0.7
+   ]
+  },
+  "CAP12 over POW6G": {
+   "share": 0.575,
+   "pairs": 80,
+   "interval": [
+    0.475,
+    0.675
+   ]
+  }
+ },
+ "coherence": {
+  "CAP10 over POW6G": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.65
+   ]
+  },
+  "CAP12 over POW6G": {
+   "share": 0.5375,
+   "pairs": 80,
+   "interval": [
+    0.425,
+    0.65
+   ]
+  }
+ }
+}

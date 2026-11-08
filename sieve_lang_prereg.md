@@ -2304,3 +2304,4 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## H6 — harmonics as a tie-breaker on the strongest base (loop round 21), preregistered 2026-11-08 before any run
 - 191M, 80 REP prompts: POW6G + class harmonics z1 (H6z1) and z2 (H6z2). Pairs vs POW6G (160 pairs).
 - **Predictions:** H6z1 over POW6G fluency (25%); some H6 over POW6G coherence (30%).
+**CAPT results (2026-11-08 ~03:50; sieve_capt_gen.json, sieve_capt_key.json, sieve_capt_ratings.json, sieve_capt_scores.json).** Pythia bits: POW6G 5.7520, CAP10 5.2689, CAP12 5.2069; mean longest verbatim run from training: CAP10 8.99 words, CAP12 10.63 (POW6G at most 7). Pairwise fluency: CAP10 over POW6G 0.588 [0.475, 0.700]; CAP12 over POW6G 0.575 [0.475, 0.675]; coherence 0.538 / 0.538. Predictions: CAP12 over POW6G (65%) — failed; CAP10 over POW6G (45%) — failed. **Allowing longer verbatim chunks does not buy clear fluency at this sharpness.**
