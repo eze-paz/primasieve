@@ -1,0 +1,86 @@
+{
+ "fluency": {
+  "truth": 4.7375,
+  "B": 2.2,
+  "GEN": 2.2375,
+  "STICK": 2.025,
+  "BOTH": 2.0,
+  "GEN minus B": [
+   -0.05,
+   0.125
+  ],
+  "STICK minus B": [
+   -0.2875,
+   -0.0625
+  ],
+  "BOTH minus B": [
+   -0.3,
+   -0.1125
+  ]
+ },
+ "coherence": {
+  "truth": 4.8375,
+  "B": 1.075,
+  "GEN": 1.1125,
+  "STICK": 1.0375,
+  "BOTH": 1.0125,
+  "GEN minus B": [
+   0.0,
+   0.0875
+  ],
+  "STICK minus B": [
+   -0.1125,
+   0.025
+  ],
+  "BOTH minus B": [
+   -0.1375,
+   -0.0125
+  ]
+ },
+ "pythia": {
+  "truth": 5.7225,
+  "B": 5.8716,
+  "GEN": 6.034,
+  "STICK": 6.5348,
+  "BOTH": 6.5831,
+  "GEN minus B": [
+   0.0093,
+   0.3422
+  ],
+  "STICK minus B": [
+   0.4423,
+   0.9052
+  ],
+  "BOTH minus B": [
+   0.4743,
+   0.9622
+  ]
+ },
+ "stats": {
+  "truth": {
+   "copy8": 0.0,
+   "copy6": 0.0161,
+   "repeat3": 0.0036
+  },
+  "B": {
+   "copy8": 0.0,
+   "copy6": 0.4539,
+   "repeat3": 0.0
+  },
+  "GEN": {
+   "copy8": 0.0,
+   "copy6": 0.4378,
+   "repeat3": 0.0
+  },
+  "STICK": {
+   "copy8": 0.0,
+   "copy6": 0.4706,
+   "repeat3": 0.0
+  },
+  "BOTH": {
+   "copy8": 0.0,
+   "copy6": 0.4611,
+   "repeat3": 0.0
+  }
+ }
+}

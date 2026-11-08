@@ -5,6 +5,10 @@ candidates, weight exp(4 x m4), boundaries allowed, copy cap), per-word distribu
   content words / P_U(w))^(1/2)); norep (bool: forbid a trigram already in the text); nounk (bool: never write UNK); depth (D: weight by consecutive exact matches up to D words, not m4).
 Index: 8-word reversed prefix (MIX onward; TEMP used 4 words). doc (delta: candidates inside the ndoc (100) training
   passages most similar to the text get weight x e^delta; passages = 1,000-word chunks, tf-idf over content words); cap (6: also no 6-word window from training; needs DEC_H6=1);
+  gender (x: pronouns contradicting the held third-person gender of the last 60 words get e^-x); stick (x: inside a clause, the
+  candidate continuing the previous word's source passage gets e^x);
+  nextsent (k: at a sentence boundary, add as candidates the starts of the sentences that followed the k training sentences most
+  similar (tf-idf) to the sentence just written, with weight e^(4 x nsbonus) relative to the best 4-word match; needs DEC_SENT=1);
   search ({B, H, C, v}: B rollouts of H words from the same sampler, commit the first C words of the best by verifier v).
 Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPARTS: prompts pid % NPARTS == PART)  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
 import os, sys, json, time
@@ -29,6 +33,13 @@ class Dec:
             for i in range(2): b6 = (b6 << np.uint64(16)) | St[4 + i:4 + i + n6]
             with np.errstate(over="ignore"): s.H6 = np.sort((a6 * M64) ^ b6)
             del a6, b6, St
+        wid = {str(w): i for i, w in enumerate(s.vw)}; s.MALE = {wid[w] for w in ("he", "him", "his", "himself") if w in wid}; s.FEM = {wid[w] for w in ("she", "her", "hers", "herself") if w in wid}
+        s.CLAUSE = {wid[w] for w in "and but or who which that when while where if because though as so then".split() if w in wid}; s._src = None
+        if os.environ.get("DEC_SENT"):                                                                                                   # NSENT: sentence index
+            sid = np.cumsum(S[:ntr] == 0); s.sid = sid; s.sstart = np.nonzero(S[:ntr] == 0)[0] + 1; s.sstart = s.sstart[s.sstart < ntr - 1]   # sentence k starts at sstart[k-1]
+            cm2 = (S[:ntr] > 100) & (S[:ntr] <= s.V); kk_ = sid[cm2] * MT.VV + S[:ntr][cm2]; u2_, n2_ = np.unique(kk_, return_counts=True); sw_ = u2_ % MT.VV; ss_ = u2_ // MT.VV
+            ns_ = int(sid[-1]) + 1; df2 = np.bincount(sw_, minlength=MT.VV); s.sidf = np.log(ns_ / np.maximum(df2, 1)); v2 = s.sidf[sw_]; nr2 = np.sqrt(np.bincount(ss_, weights=v2 ** 2, minlength=ns_)); v2 = v2 / np.maximum(nr2[ss_], 1e-9)
+            o2 = np.argsort(sw_, kind="stable"); s.qw, s.qs, s.qv = sw_[o2], ss_[o2], v2[o2]; s.qst = np.searchsorted(s.qw, np.arange(MT.VV + 1)); s.nsent = ns_; del kk_, u2_, n2_, sw_, ss_, v2, o2
         s.CH = 1000; pc = np.arange(ntr); cm = (S[:ntr] > 100) & (S[:ntr] <= s.V); ck = (pc[cm] // s.CH) * MT.VV + S[:ntr][cm]; u_, n_ = np.unique(ck, return_counts=True)   # DOC: passage index (1,000-word chunks)
         ch, w_ = u_ // MT.VV, u_ % MT.VV; nch = ntr // s.CH + 1; df = np.bincount(w_, minlength=MT.VV); idf = np.log(nch / np.maximum(df, 1)); val = np.log1p(n_) * idf[w_]
         nrm = np.sqrt(np.bincount(ch, weights=val ** 2, minlength=nch)); val = val / np.maximum(nrm[ch], 1e-9); o_ = np.argsort(w_, kind="stable")
@@ -50,7 +61,22 @@ class Dec:
         else: sc = m4
         if cfg.get("doc"):
             top = s.topchunks(text, cfg.get("ndoc", 100)); sc = sc + cfg["doc"] / 4 * np.isin(pos // s.CH, top)              # DOC: bonus for candidates inside the most similar passages
-        uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=np.exp(4 * (sc - sc.max())))
+        if cfg.get("nextsent") and text[-1] == 0:                                                                                  # NSENT: start the next sentence the way similar sentences were followed
+            j = len(text) - 2
+            while j >= 0 and text[j] != 0: j -= 1
+            last = [w for w in text[j + 1:-1] if 100 < w <= s.V]
+            if last:
+                u, n = np.unique(last, return_counts=True); sc_ = np.zeros(s.nsent)
+                for w in u:
+                    a, b = s.qst[w], s.qst[w + 1]; np.add.at(sc_, s.qs[a:b], s.sidf[w] * s.qv[a:b])
+                top = np.argpartition(-sc_, cfg["nextsent"])[:cfg["nextsent"]]; top = top[sc_[top] > 0]
+                nxt = top + 1                                                                                                        # the sentence after each similar sentence
+                st_ = s.sstart[np.minimum(nxt - 1, len(s.sstart) - 1)]; st_ = st_[(st_ > 9) & (st_ < s.ntr - 1)]
+                if len(st_): pos = np.r_[pos, st_]; m4 = np.r_[m4, np.zeros(len(st_))]; sc = np.r_[sc, np.full(len(st_), sc.max() + cfg.get("nsbonus", 1.0))]
+        if cfg.get("stick") and getattr(s, "_src", None) is not None and text[-1] != 0 and text[-1] not in s.CLAUSE:
+            sc = sc + cfg["stick"] / 4 * (pos == s._src + 1)                                                                   # ENT: keep the clause's source passage
+        wpos = np.exp(4 * (sc - sc.max())); s._pos, s._wpos = pos, wpos
+        uw, inv = np.unique(S[pos], return_inverse=True); p = np.bincount(inv, weights=wpos); s._inv = inv
         hv = s.h8v(text[-7:], uw); bad = s.H8[np.minimum(np.searchsorted(s.H8, hv), len(s.H8) - 1)] == hv
         if (~bad).any(): p = p * ~bad
         if cfg.get("cap") == 6:
@@ -60,6 +86,10 @@ class Dec:
             with np.errstate(over="ignore"): hv6 = (a * M64) ^ (b | uw.astype(np.uint64))
             b6 = s.H6[np.minimum(np.searchsorted(s.H6, hv6), len(s.H6) - 1)] == hv6
             if (~b6).any() and (p * ~b6).sum() > 0: p = p * ~b6
+        if cfg.get("gender"):                                                                                                       # ENT: held referent gender
+            last = text[-60:]; m = sum(w in s.MALE for w in last); f = sum(w in s.FEM for w in last)
+            if m > 0 and f == 0: p = p * np.where(np.isin(uw, list(s.FEM)), np.exp(-cfg["gender"]), 1.0)
+            elif f > 0 and m == 0: p = p * np.where(np.isin(uw, list(s.MALE)), np.exp(-cfg["gender"]), 1.0)
         if cfg.get("nounk") and (uw <= s.V).any(): p = p * (uw <= s.V)
         con = (uw > 100) & (uw <= s.V)
         if cfg.get("topic") and con.any():
@@ -101,10 +131,12 @@ class Dec:
                 out[i] += 4 * float((MT.look(s.u3, np.ones(len(s.u3), np.int64), k) > 0).mean())
         return out
     def gen(s, prompt, cfg, seed):
-        g = np.random.default_rng(seed); text = list(prompt); sr = cfg.get("search")
+        g = np.random.default_rng(seed); text = list(prompt); sr = cfg.get("search"); s._src = None
         while len(text) - len(prompt) < LG:
             if not sr:
-                uw, p = s.dist(text, cfg); text.append(int(uw[g.choice(len(uw), p=p)])); continue
+                uw, p = s.dist(text, cfg); k = int(g.choice(len(uw), p=p)); text.append(int(uw[k]))
+                cand = np.nonzero(s._inv == k)[0]; s._src = int(s._pos[cand[g.choice(len(cand), p=s._wpos[cand] / s._wpos[cand].sum())]]) if len(cand) else None   # ENT: source of the written word
+                continue
             R = []
             for _ in range(sr["B"]):
                 t2 = list(text)

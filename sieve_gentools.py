@@ -2,6 +2,8 @@
   py -3.12 -I sieve_gentools.py blind TAG GEN.json         -> mtest/kaggle_<tag>/blind/<tag>_blind_items.json + sieve_<tag>_blind_key.json
   py -3.12 -I sieve_gentools.py judge TAG GEN.json         -> Kaggle dataset primasieve-<tag>-gen + kernel primasieve-<tag>-judge (Pythia-410m),
                                                               waits, downloads mtest/kaggle_<tag>/judge_out/<tag>_pythia.json
+  py -3.12 -I sieve_gentools.py pairs TAG GEN.json A:B,A:C  -> side-by-side items (first/second in random order)
+  py -3.12 -I sieve_gentools.py pairscore TAG A:B,A:C       -> sieve_<tag>_pair_scores.json (+1 = second arm of the comparison preferred)
   py -3.12 -I sieve_gentools.py score TAG GEN.json BASEARM -> sieve_<tag>_gen_scores.json (per-arm means, arm minus BASEARM intervals over prompts,
                                                               copied 8-word windows, repeated trigrams)"""
 import os, sys, json, time, shutil, subprocess
@@ -71,5 +73,31 @@ def score(tag, gen, basearm):
             h_ = np.array([h6(ids[i:i + 6]) for i in range(len(ids) - 5)]); c6.append(float((H6[np.minimum(np.searchsorted(H6, h_), len(H6) - 1)] == h_).mean()))
         out["stats"][B] = dict(copy8=round(float(np.mean(cp)), 4), copy6=round(float(np.mean(c6)), 4), repeat3=round(float(np.mean(rp)), 4))
     print("stats", out["stats"]); json.dump(out, open(os.path.join(HERE, f"sieve_{tag}_gen_scores.json"), "w"), indent=1)
+def pairs(tag, gen, comps):
+    """side-by-side items: for each prompt and each comparison A:B, the two continuations in random order"""
+    G = json.load(open(gen)); by = {(g["pid"], g["B"]): g for g in G}; npid = len({g["pid"] for g in G}); rng = np.random.default_rng(len(tag)); items, key = [], {}
+    for a, b in comps:
+        for p in range(npid):
+            x, y = (a, b) if rng.random() < 0.5 else (b, a); u = f"P{len(items):03d}"
+            items.append(dict(id=u, prompt=by[(p, x)]["prompt"], first=by[(p, x)]["text"], second=by[(p, y)]["text"])); key[u] = [p, x, y]
+    o = rng.permutation(len(items)); items = [items[i] for i in o]
+    d = os.path.join(kd(tag), "blind"); os.makedirs(d, exist_ok=True); json.dump(items, open(os.path.join(d, f"{tag}_pair_items.json"), "w"), indent=0)
+    json.dump(key, open(os.path.join(HERE, f"sieve_{tag}_pair_key.json"), "w")); print(f"{len(items)} pair items -> {d}")
+def pairscore(tag, comps):
+    import glob as _g
+    key = json.load(open(os.path.join(HERE, f"sieve_{tag}_pair_key.json"))); RF = sorted(_g.glob(os.path.join(kd(tag), "blind", f"{tag}_pair_ratings*.json"))); RS = [json.load(open(f)) for f in RF]; out = {}; g = np.random.default_rng(0)
+    for a, b in comps:
+        for m in ("coherence", "fluency"):
+            sc = {}
+            for u, (p, x, y) in key.items():
+                if {x, y} != {a, b}: continue
+                v = np.mean([{"first": 1, "second": -1, "tie": 0}[r[u][m]] for r in RS]); sc[p] = v if x == b else -v           # +1 = b preferred
+            d = np.array([sc[p] for p in sorted(sc)]); s = [d[g.integers(0, len(d), len(d))].mean() for _ in range(2000)]
+            out[f"{b} vs {a} {m}"] = dict(b_wins=float((d > 0).mean()), a_wins=float((d < 0).mean()), mean=round(float(d.mean()), 4), interval=[round(float(np.percentile(s, 2.5)), 4), round(float(np.percentile(s, 97.5)), 4)])
+    for k_, v in out.items(): print(k_, v)
+    json.dump(dict(raters=[os.path.basename(f) for f in RF], **out), open(os.path.join(HERE, f"sieve_{tag}_pair_scores.json"), "w"), indent=1)
 if __name__ == "__main__":
+    if sys.argv[1] in ("pairs", "pairscore"):
+        cs = [tuple(x.split(":")) for x in sys.argv[-1].split(",")]
+        (pairs(sys.argv[2], sys.argv[3], cs) if sys.argv[1] == "pairs" else pairscore(sys.argv[2], cs)); sys.exit()
     cmd = sys.argv[1]; dict(blind=lambda: blind(sys.argv[2], sys.argv[3]), judge=lambda: judge(sys.argv[2], sys.argv[3]), score=lambda: score(sys.argv[2], sys.argv[3], sys.argv[4]))[cmd]()
