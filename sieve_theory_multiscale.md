@@ -114,3 +114,28 @@ uncertainty signals of the gate, and whether the gated model changes generated t
 - Fluency moved only with how words are *chosen* (sharpening, bans on UNK and repeats) — not with what the model knows. The prediction-side gains of PAR/MI2 (~0.02 bits) never showed in text.
 - Coherence never moved reliably. Every mechanism that tried to carry meaning across clauses with counts or retrieval — topic, passages, rollouts, held gender, held clause source, the next sentence of a similar sentence, a retrieved skeleton, held planned words — was null after replication or hurt. The one apparent win (NS) did not replicate on fresh prompts.
 - Reading: the text is a collage of 6-7-word training fragments joined where 4-8 words overlap. Each fragment is locally fluent; the joins carry no meaning, because nothing in the decoder represents what the passage is *about* at the level of events and referents. Holding a word, a class skeleton or a topic only constrains surface form. This is the same capacity wall as MI/MI2 at a larger scale: coherence needs a state that represents propositions, and counted fragments do not provide one.
+
+## 7. What the 8-hour refinement loop found (2026-11-08; details in sieve_hloop.md and sieve_lang_prereg.md)
+**Measurement.** Blind 1-5 ratings floor out (most generated texts get 1-2); sampled-text Pythia bits are too noisy
+(about ±0.13 at 120 prompts) and reward blandness. What works: pairwise forced-choice judging (win share with an
+interval over prompts) plus a strict share of grammatical sentences.
+
+**Levers, in order of effect (books unless noted, pairwise fluency win share):**
+1. **Sharpening the corpus consensus** (word distribution raised to a power): POW2 over none 0.650 [0.567, 0.733]
+   (120 prompts); replicated on wiki (POW6 over none 0.700 [0.600, 0.800]). At 27M it saturates at power 2; at 191M
+   power 3 beats 2 and power 6 beats 3 — more data supports more sharpening; greedy, beam search and lookahead do not help.
+2. **More data, once sharpened:** POW2-191M over POW2-27M 0.650 [0.550, 0.750] (without sharpening, BIG found none).
+3. **Never writing <unk>:** books 0.679 [0.547, 0.811], wiki 200M 0.859 [0.782, 0.936]; it also restores the wiki data
+   effect (0.650 [0.550, 0.750]), which <unk> had reversed.
+4. **End to end** (fresh prompts): best (POW6 + repeat guard + no <unk>, 191M) over the loop's start: fluency 0.925
+   [0.863, 0.975], coherence 0.825 [0.738, 0.912]; grammatical sentences 0.346 -> 0.637 (true text 0.867).
+
+**Harmonics.** The harmonic state carries real information (it beats random source selection on the low-noise proxy by a
+wide margin) and gives a small gain on a plain sampler (pooled 0.592 [0.500, 0.683] fluency, 0.608 [0.517, 0.692]
+coherence), but adds nothing on top of sharpening (27M and 191M), and harmonics on the source's future topic hurt.
+Held-state matching (clause stack + sentence position), source continuity, longer copy chunks: no gain.
+
+**Reading.** Fluency in this system comes from agreeing with the corpus's consensus continuation, and the consensus
+gets better with more text. Long-range state (harmonic or held) is real information but does not fix what breaks the
+text: role-mismatched splices between sources, early sentence ends and stock phrases. Remaining levers need owner
+decisions: more books text (downloads), a vocabulary that covers the added text (re-tokenisation).
