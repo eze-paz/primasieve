@@ -1,0 +1,631 @@
+[
+ {
+  "tag": "default",
+  "cfg": {
+   "beta": 4.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.586170625686646,
+  "repeat3": 0.0,
+  "distinct": 0.8442311158376823,
+  "heldout_bits": 9.110351540364311,
+  "sample": "him as i knew him and took hold of a framed engraving rather than miss writing to him. but even at that early time of one of its inmates which must not be within the reach at a meeting. it was lying open where he trod and pools",
+  "secs": 16.534297943115234
+ },
+ {
+  "tag": "beta=0.0",
+  "cfg": {
+   "beta": 0.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.574209666252136,
+  "repeat3": 0.0,
+  "distinct": 0.8462404010464668,
+  "heldout_bits": 9.170234231968246,
+  "sample": "him rather than to the man of superior strength that they had no security either for the market. as the crowd began to dominate the man. we will not drown ourselves said holmes that your arms about them care monsieur gravier and at last they neared the end",
+  "secs": 2.0124106407165527
+ },
+ {
+  "tag": "beta=2.0",
+  "cfg": {
+   "beta": 2.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.540102481842041,
+  "repeat3": 0.0010416666666666686,
+  "distinct": 0.8536734898399692,
+  "heldout_bits": 9.137411852867867,
+  "sample": "him that he would serve his white hair crimson with blood but the matter was explained. about five years i was at york standing amidst a little book adventures while preaching the bars it swung backwards and dropped her trail rope which was leaning against a pillar with drooping",
+  "secs": 13.42192006111145
+ },
+ {
+  "tag": "beta=8.0",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.277175927162171,
+  "repeat3": 0.0010416666666666686,
+  "distinct": 0.8314402108361074,
+  "heldout_bits": 9.068285579968643,
+  "sample": "him all his life long and arduous trial and practice and saturate his mind with characteristic brevity got to work. i am not a man of puny physique employed the paraphrases in the street. now comes the question does the power with which he was agitated he expressed",
+  "secs": 13.45870590209961
+ },
+ {
+  "tag": "beta=16.0",
+  "cfg": {
+   "beta": 16.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.621799111366272,
+  "repeat3": 0.0,
+  "distinct": 0.8464093261572282,
+  "heldout_bits": 9.015424787227714,
+  "sample": "him as to appointing marneffe to drop his fore feet to the ground below. it was he thought about it a good enough reason but it the bubble had long since folded their wings for coolness. all were interested however and they must conform their lives to effect",
+  "secs": 13.490662097930908
+ },
+ {
+  "tag": "symbol=class",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "class",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.43296902179718,
+  "repeat3": 0.0,
+  "distinct": 0.8353271205322876,
+  "heldout_bits": 9.056249695377385,
+  "sample": "him her maidenly heart filled with disgust he leaped out and the new year commenced we broke. there had been a contract of betrothal is as active in <unk> as elsewhere we know how strong they break into the bushes searching for the bird that she had probably killed",
+  "secs": 13.464897394180298
+ },
+ {
+  "tag": "bands=(1, 2, 4, 8)",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    1,
+    2,
+    4,
+    8
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.623193025588989,
+  "repeat3": 0.0,
+  "distinct": 0.8640224403230734,
+  "heldout_bits": 9.183541064114237,
+  "sample": "him. he had even been at some pains to learn and it is thy desire to leave her now he never would get married that it will yet be found. at present the morse recorder actually marks the message was being read the crowd suddenly parted right and",
+  "secs": 13.133780479431152
+ },
+ {
+  "tag": "bands=(8, 16, 32, 64, 128)",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.641702175140381,
+  "repeat3": 0.0,
+  "distinct": 0.8460374474797627,
+  "heldout_bits": 9.018112799841377,
+  "sample": "him for he thought perhaps he might have written to rome by claudius caesar from arabia in herrenhausen gardens had all ceased singing and was at last the thought flashed into his mind that the scene itself are safe as soon as i could. then i gasped it even",
+  "secs": 13.418656349182129
+ },
+ {
+  "tag": "bands=(4, 16, 64)",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    4,
+    16,
+    64
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.643245077133178,
+  "repeat3": 0.0,
+  "distinct": 0.8653351626861603,
+  "heldout_bits": 9.07289120678826,
+  "sample": "him. but the college would have heard him tell father story of <unk> baxter. the other doones being left behind you. <unk> smiled. with mathematical accuracy of the artillery of the three bears a london street this chill damp night against it. naseby the battle",
+  "secs": 13.03957724571228
+ },
+ {
+  "tag": "decay=power",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "power",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.612191081047058,
+  "repeat3": 0.0,
+  "distinct": 0.8507289468053643,
+  "heldout_bits": 9.015434729308275,
+  "sample": "him. it was done by the people turning the scale in favour of the upon the view view of the town. as the years go on they are ready too and the slender feet were for the invited guests and at the same time it becomes impossible that",
+  "secs": 12.1237633228302
+ },
+ {
+  "tag": "order=0.0",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.0,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.453852033615112,
+  "repeat3": 0.0,
+  "distinct": 0.8243821658789943,
+  "heldout_bits": 9.052658023205579,
+  "sample": "him. sometimes he has regular fits he began to reckon what a serious charge. i was the business i was eager to be gone. my dear chap you understand. but i might find you alone in a printed book. o poet for you are true",
+  "secs": 13.568912267684937
+ },
+ {
+  "tag": "order=1.0",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 1.0,
+   "D": 64,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.584544086456299,
+  "repeat3": 0.0,
+  "distinct": 0.8407055360997313,
+  "heldout_bits": 9.066751257162515,
+  "sample": "him. landlady gone to romford or may not. she was at some distance hemmed in by the gods of an ruling planet be disposed or forced aid to those interested. i thought i had better take myself away. blood was there a more wet or weary",
+  "secs": 13.573092937469482
+ },
+ {
+  "tag": "D=32",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 32,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.39994101524353,
+  "repeat3": 0.0,
+  "distinct": 0.8533322871239152,
+  "heldout_bits": 9.066734331704996,
+  "sample": "him. but in one incarnation of roses. footnote ibid xxxiii. truth has been to your father said mrs todgers. not nearly as much as i could do to make his first trip to frankfort was to get him bandaged up and in her eyes as his",
+  "secs": 8.24013900756836
+ },
+ {
+  "tag": "D=128",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 128,
+   "lam0": 4.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.412863683700562,
+  "repeat3": 0.0,
+  "distinct": 0.8501078093895591,
+  "heldout_bits": 9.087053134797067,
+  "sample": "him and even more his own master and is desirous that the man was liff hyatt. but today she was fairly caught. there was a little piece of advice. my teeth chattered in my labours and that he the thing were well presented to him that day",
+  "secs": 25.15477418899536
+ },
+ {
+  "tag": "lam0=2.0",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 2.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 8.160123777389526,
+  "repeat3": 0.0,
+  "distinct": 0.8345286125284639,
+  "heldout_bits": 8.981091655649784,
+  "sample": "mandalay. i reckon old bum a human beings not to work whenever you will understand. nevertheless the harbour office. the refused very properly but at least said the clerk. no man ever honored me that he was destined by the ancients themselves just back from the",
+  "secs": 13.686172723770142
+ },
+ {
+  "tag": "lam0=8.0",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.176266813278199,
+  "repeat3": 0.0,
+  "distinct": 0.8424584252729488,
+  "heldout_bits": 9.581337588784868,
+  "sample": "him he at all events imagined himself to have been guilty of a cowardly and abominable practice. he proscribes with words and finally when pinned down and suffocating. he opened it at the breech of his pet rifle and stepped over to where his friend sat with eyes",
+  "secs": 13.637492179870605
+ },
+ {
+  "tag": "T=0.7",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 0.7,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.154338049888611,
+  "repeat3": 0.0,
+  "distinct": 0.8389123276507643,
+  "heldout_bits": 9.581337588784868,
+  "sample": "him he at all events imagined himself to have been guilty of a cowardly and abominable practice. he proscribes with words and finally when pinned down and suffocating. he opened it and stuck his head out of the gordian knot of the drama already immemorial drama of my",
+  "secs": 13.604048013687134
+ },
+ {
+  "tag": "T=0.5",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 0.5,
+   "K": 3072,
+   "WIN": 64
+  },
+  "pythia": 7.500555634498596,
+  "repeat3": 0.0,
+  "distinct": 0.8559146177743375,
+  "heldout_bits": 9.581337588784868,
+  "sample": "him he at last though with reasonable profits. the band ran fainter and slow from his heart as if to stop its fitness and then quietly removed it from the table and achieved a communication to the magazine for a series of brilliant victories over superior numbers. heideck",
+  "secs": 13.608614683151245
+ },
+ {
+  "tag": "K=1024",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 1.0,
+   "K": 1024,
+   "WIN": 64
+  },
+  "pythia": 7.389278721809387,
+  "repeat3": 0.0,
+  "distinct": 0.8328929027670272,
+  "heldout_bits": 9.599312094689639,
+  "sample": "him he at all events imagined himself to have been guilty of a cowardly and abominable practice. he proscribes with them oftener he thinks himself and pointing with his finger to michael who rose at her approach and they walked through west ninth street she was as enthusiastic as",
+  "secs": 5.848402500152588
+ },
+ {
+  "tag": "K=8192",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 1.0,
+   "K": 8192,
+   "WIN": 64
+  },
+  "pythia": 7.159358429908752,
+  "repeat3": 0.0010416666666666686,
+  "distinct": 0.8495065230644719,
+  "heldout_bits": 9.544537738053572,
+  "sample": "him he at all events imagined himself to have been guilty of a cowardly and abominable practice. he proscribes with doubt as he climbed the stairs to wash herself but made her follow <unk> incredulously she was having fun with the russian infantry which in spite also of the",
+  "secs": 33.7229118347168
+ },
+ {
+  "tag": "WIN=32",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 32
+  },
+  "pythia": 7.444993257522583,
+  "repeat3": 0.0010416666666666686,
+  "distinct": 0.8409751445289801,
+  "heldout_bits": 9.566456812763745,
+  "sample": "him he at all events imagined himself to have been right in his identification he was at me this along the lonely country road at all. he moved nearer to wardour. wardour pointed to <unk> i had it brought over the whole face of the country in its",
+  "secs": 8.440335512161255
+ },
+ {
+  "tag": "WIN=128",
+  "cfg": {
+   "beta": 8.0,
+   "symbol": "word",
+   "bands": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+   ],
+   "decay": "exp",
+   "order": 0.5,
+   "D": 64,
+   "lam0": 8.0,
+   "T": 1.0,
+   "K": 3072,
+   "WIN": 128
+  },
+  "pythia": 7.129206395149231,
+  "repeat3": 0.0010416666666666686,
+  "distinct": 0.8303599972282244,
+  "heldout_bits": 9.594730228509967,
+  "sample": "him he at all events imagined himself to have been guilty of a cowardly and abominable practice. he proscribes with words and finally when pinned down and suffocating. he opened it always by assuring him that none would be made. it should be mentioned that the constantly",
+  "secs": 24.780044555664062
+ }
+]

@@ -1,0 +1,38 @@
+{
+ "coherence": {
+  "BASE": 1.05,
+  "DEFAULT": 1.025,
+  "BEST": 1.175,
+  "truth": 4.925,
+  "BEST minus BASE": [
+   0.0,
+   0.275
+  ],
+  "DEFAULT minus BASE": [
+   -0.125,
+   0.05
+  ],
+  "BEST minus DEFAULT": [
+   0.05,
+   0.275
+  ]
+ },
+ "fluency": {
+  "BASE": 1.95,
+  "DEFAULT": 2.0,
+  "BEST": 2.15,
+  "truth": 4.75,
+  "BEST minus BASE": [
+   0.025,
+   0.375
+  ],
+  "DEFAULT minus BASE": [
+   -0.1,
+   0.2
+  ],
+  "BEST minus DEFAULT": [
+   0.025,
+   0.3
+  ]
+ }
+}
