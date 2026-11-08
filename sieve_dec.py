@@ -57,6 +57,8 @@ class Dec:
             os.environ["HARM_ARMS"] = ""; os.environ.setdefault("HARM_DATA", MT.fp(C, "data")); import torch, sieve_harm_kernel as HK; s.torch, s.HK = torch, HK
             HK.PROJ = torch.from_numpy(pz["proj"]); s.hb = HK.OLM("HBlearn"); s.hb.load_state_dict(torch.load(os.environ["DEC_HB"], map_location="cpu")); s.hb.eval(); torch.set_num_threads(4)
             s._hgc = []; s._hgs = []
+        if os.environ.get("DEC_KC"):                                                                                                     # KCG: count-built corpus matrix (sieve_kc_rank_part.py)
+            kz = np.load(os.environ["DEC_KC"]); s.kcE = kz["E"].astype(np.float32); s.kcML = kz["ML"]; s.kcidf = kz["idf"]; s.kcHL = kz["HL"]; s._cmcal = []
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -166,6 +168,13 @@ class Dec:
                 if q.sum() > 0: s._hgs.append(float(cc[cfg["hgcal"][1].choice(len(uw), p=q / q.sum())]))
             if cfg.get("hg"):
                 bad = el & (cc < cfg["hgtau"]); p = p * np.where(bad, np.exp(-cfg["hg"]), 1.0); s._msn += int(bad.sum()); s._mst += int(con.sum())
+        if (cfg.get("cm") or cfg.get("cmcal")) and con.any():                                                                     # KCG: count corpus matrix licence
+            el = con & (s.kcidf[np.minimum(uw, len(s.kcidf) - 1)] >= 2)
+            if el.sum() >= 2:
+                z_ = s.cmz(text, uw[el])
+                if cfg.get("cmcal"): s._cmel, s._cmzv = el, z_
+                if cfg.get("cm"): p[el] *= np.exp(cfg["cm"] * z_)
+            elif cfg.get("cmcal"): s._cmel = None
         if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
             j = len(text) - 2
             while j >= 0 and text[j] != 0: j -= 1
@@ -187,6 +196,13 @@ class Dec:
             if (~rep).any() and (p * ~rep).sum() > 0: p = p * ~rep
         p = p ** (1.0 / cfg.get("T", 1.0)) if cfg.get("T", 1.0) != 1.0 else p
         return uw, p / p.sum()
+    def cmz(s, text, cw):
+        """standardised cosine of each candidate's count vector with ML x (idf-weighted context state at three decays, last 30 words)"""
+        win = np.array(text[-30:]); L = len(win); idf = s.kcidf[np.minimum(win, len(s.kcidf) - 1)]; ks = []
+        for h in s.kcHL:
+            k = (idf * 2.0 ** (-(L - 1 - np.arange(L)) / h)).astype(np.float32) @ s.kcE[win]; ks.append(k / max(np.linalg.norm(k), 1e-9))
+        r = s.kcML @ np.concatenate(ks); A = s.kcE[cw]; sc = (A @ r) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(r), 1e-9))
+        return (sc - sc.mean()) / max(sc.std(), 1e-9)
     def tstate(s, text):
         if getattr(s, "_tsk", None) == tuple(text): return s._tsv
         with s.torch.no_grad(): f = s.HK.hstate(s.hb, s.torch.as_tensor([min(w, s.V + 1) for w in text])[None])[0, -1].float().numpy()
@@ -271,5 +287,19 @@ def hgcal():
         if pid % 10 == 0: log(f"cal prompt {pid}: true {len(d._hgc)} median {np.median(d._hgc):.4f}; sampled median {np.median(d._hgs):.4f}")
     out = dict(tau=float(np.median(d._hgc)), n_true=len(d._hgc), sampled_median=float(np.median(d._hgs)), n_sampled=len(d._hgs))
     json.dump(out, open(os.path.join(HERE, "sieve_jt_tau.json" if os.environ.get("DEC_HGW") else "sieve_hgh_tau.json"), "w"), indent=1); log(json.dumps(out))
+def cmcal():
+    """KCG: choose beta on calibration prompts: mean log probability of the true next word under MEAN x e^(beta z) (z only on eligible content words)"""
+    d = Dec(); cfg = {"T": 0.35, "nounk": 1, "norep": 1, "gender": 3, "ms": 2, "msubj": 1, "cmcal": 1}; B = [0.0, 0.25, 0.5, 1.0, 2.0]; LPs = {b: [] for b in B}
+    for pid, t in enumerate(d.prompts):
+        pr = d.S[t:t + LP + LG].tolist()
+        for j in range(LP, LP + LG):
+            uw, p = d.dist(pr[:j], cfg); y = pr[j]
+            if y not in uw or d._cmel is None: continue
+            zf = np.zeros(len(uw)); zf[d._cmel] = d._cmzv; yi = int(np.searchsorted(uw, y))
+            for b in B: q = p * np.exp(b * zf / cfg["T"]); LPs[b].append(float(np.log(q[yi] / q.sum() + 1e-300)))
+        if pid % 10 == 0: log(f"cal prompt {pid}: " + ", ".join(f"{b}: {np.mean(v):.4f}" for b, v in LPs.items()))
+    out = {str(b): float(np.mean(v)) for b, v in LPs.items()}; out["n"] = len(LPs[0.0]); out["beta"] = max(B, key=lambda b: np.mean(LPs[b]))
+    json.dump(out, open(os.path.join(HERE, "sieve_kcg_beta.json"), "w"), indent=1); log(json.dumps(out))
+if __name__ == "__main__" and sys.argv[1] == "cmcal": cmcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()
 if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else None)

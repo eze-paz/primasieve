@@ -35,6 +35,8 @@ for i in range(0, len(pos), 10000):
 log("corpus matrices")
 def ridge(cvk, ckk): return cvk @ np.linalg.inv(ckk + 1e-3 * np.trace(ckk) / len(ckk) * np.eye(len(ckk)))
 MH = C["e"][0]; MR = ridge(*C["e"]); ML = ridge(*C["e3"]); MRR = ridge(*C["r"])
+if os.environ.get("KC_SAVE"):                                                                                     # KCG: artifacts for the decoder
+    np.savez(os.path.join(OUTD, "kc_cm.npz"), E=E.astype(np.float16), ML=ML.astype(np.float32), idf=idf, HL=np.array(HL)); log("saved kc_cm.npz"); sys.exit(0)
 def cosv(A, b): return (A @ b) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(b), 1e-9))
 def dm_read(win):
     """decode-time delta memory over the context window only: keys E[w_{s-1}] -> values E[w_s]; read with the last word"""
