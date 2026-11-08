@@ -45,13 +45,13 @@ for a, b in zip(cuts[:-1], cuts[1:]):
 assert off == NP_; del w1; log(f"key index: {NP_:,} positions in {len(cuts) - 1} ranges")
 if JX:                                                                                                         # Brown-objective classes (exchange, on the MT 27M text) and class 5-gram table over the training stream
     if "brown" not in globals(): import sys as _s; _s.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from sieve_brown import brown
-    BC = 64; BCL = brown(S[:ntr0], VV, C=BC, iters=3 if SMOKE else 15, log=log); BCLu = BCL.astype(np.uint32); CLS_ = BCLu[S[:ntr]]
+    BC = 64; BCL = brown(S[:ntr0], VV, C=BC, iters=3 if SMOKE else 15, log=log); BCLu = BCL.astype(np.uint32); NJ = min(ntr, int(os.environ.get("G1_JXN", ntr))); CLS_ = BCLu[S[:NJ]]               # class tables over the first NJ training tokens
     TB = {}
     for J in sorted({int(c.get("jn", 4)) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()} | {4}):            # class (J+1)-gram and J-gram counts over the training stream
-        kf = np.zeros(ntr - J, np.uint64)
-        for i in range(J + 1): kf = (kf << np.uint64(6)) | CLS_[i:ntr - J + i].astype(np.uint64)
+        kf = np.zeros(NJ - J, np.uint64)
+        for i in range(J + 1): kf = (kf << np.uint64(6)) | CLS_[i:NJ - J + i].astype(np.uint64)
         uf, nf = np.unique(kf, return_counts=True); uc, nc = np.unique(kf >> np.uint64(6), return_counts=True); TB[J] = (uf, nf, uc, nc); del kf
-        log(f"class {J + 1}-gram table: {len(uf):,} distinct of {ntr - J:,}")
+        log(f"class {J + 1}-gram table: {len(uf):,} distinct of {NJ - J:,}")
     del CLS_
     JSTAT = [0, 0]
 H8 = np.empty(ntr - 8, np.uint64)                                                                             # copy table = sorted hseq(8) of e2b.py
@@ -101,9 +101,13 @@ def generate(cfg, pids):
                 for x_ in text[-J:]: c4 = (c4 << 6) | int(BCL[x_])
                 k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
                 jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0
-                veto = n5 < cfg["eps"] * max(n4, 1); JSTAT[0] += float((w * veto * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); JSTAT[1] += 1; bad = bad | veto
+                WPV = w * ~bad if (w * ~bad).sum() > 0 else w; veto = n5 < cfg["eps"] * max(n4, 1); JSTAT[0] += float((w * veto * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); JSTAT[1] += 1; bad = bad | veto
             if (w * ~bad).sum() > 0: w = w * ~bad
-            uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]; text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
+            uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
+            if cfg.get("keepb") and uw[0] == 0:                                                                  # keep the sentence-end probability at its pre-veto value
+                wp = np.bincount(inv, weights=WPV) ** cfg["pow"]; pb = wp[0] / wp.sum(); ww = ww / ww.sum(); rest = ww[1:].sum()
+                if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
+            text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
         out[pid] = text[LP:]
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
