@@ -2769,3 +2769,18 @@ Scores: sieve_lt_scores.json.
 - Grammatical share: JX3S1 0.619 [0.571, 0.663], HR4 0.655 (paired [-0.020, 0.093]), HR2 0.662 (paired [-0.014, 0.101]), truth 0.951.
 - Predictions: HR4 coherence point above 0.5 — held (0.571, n.s.); HR4 fluency point above 0.5 — failed (0.4675); HR2 fluency below HR4's — failed (0.532); an interval above 0.5 — failed.
 - Reading: widening the pool for the harmonics gives no measurable gain (grammar leans up in both arms, intervals include zero). JX3S1 stays the best. The pool was not the binding limit either: with sharpening at power 6 the consensus of exact matches already decides most steps, and the harmonics only break near-ties.
+
+## GPROXY — a cheap automatic grammar score calibrated on the raters (owner: smaller faster iterative steps; preregistered 2026-11-08, before the run)
+- Data: every rater-labelled sentence with its generation file present (16 rounds, 20,363 sentences, 14,280 marked grammatical; mtest/kaggle_gramlab/data/gramlab.json). Pythia-410m scores each sentence alone; acceptability features after Lau, Clark & Lappin (2017): log P, mean and min token log P, SLOR (unigram from MT books), Norm-LP, length, edge flag. Logistic regression, 5-fold CV grouped by text item (sieve_gramproxy_kernel.py, Kaggle GPU).
+- Use rule (fixed now): the proxy replaces rater batches for small iterative steps only if the CV AUC is at least 0.75 and it orders at least 75% of within-round arm pairs as the raters did; milestone results still go to blind raters.
+- **Predictions:** CV AUC at least 0.75 (60%); SLOR the best single feature (50%); arm-pair ordering agreement at least 75% (45%).
+
+## HLIN — trained linear readout on the count-fitted harmonic state (owner: "do 1 then 2"; preregistered 2026-11-08, before the run)
+- Same text, states, training sample (2M positions), queries (40,000) and target (next fine class beyond L) as HSVD; the kNN read-out is replaced by a linear softmax: logits = log P(Y|L) + 30 Z W + b_L (Z = the 7 normalised bands concatenated, 896 dims; W 896 x 230), Adam, 12 epochs, best epoch on a 5% validation split of the training sample; mixed with P(Y|L) at alpha chosen on odd queries, reported on even. Arms RANDW and SVDW (sieve_hlin_kernel.py).
+- Reference (HSVD, kNN): SVDW 0.1004, RANDW 0.0559 bits.
+- **Decision rule (fixed now):** if linear SVDW reaches at least 0.20 bits, the state holds far more than search extracts and the next step is to put the linear readout into the generator; if it is below 0.13, the state itself is the limit.
+- **Predictions:** linear SVDW above kNN SVDW (0.1004) (75%); at least 0.20 (40%); SVDW above RANDW with the linear readout too (80%).
+**GPROXY results (2026-11-08; Kaggle GPU primasieve-gproxy; numbers from the log: the run crashed writing gproxy.json on a numpy int, fixed in the script afterwards).** CV AUC (5-fold, grouped by text) 0.8171. Single features (AUC, label = grammatical): logP 0.771, meanLP 0.402, minLP 0.565, SLOR 0.418, normLP 0.412, words 0.226 (i.e. shorter sentences are more often grammatical: 0.774 inverted), edge flag 0.599. Arm level: Pearson r 0.613 between proxy and rater shares; 40 of 50 within-round arm pairs ordered as the raters.
+- Use rule: AUC >= 0.75 and >= 75% of arm pairs — **passed** (0.8171; 40 of 50).
+- Predictions: AUC >= 0.75 — held; SLOR best single feature — failed (length dominates; SLOR 0.418); ordering >= 75% — held (40 of 50).
+- Caveat: the proxy leans heavily on sentence length (length alone 0.774), so it can be gamed by shorter sentences (as JX10 did); every proxy-scored step must also report sentences per text, and milestones still go to blind raters.
