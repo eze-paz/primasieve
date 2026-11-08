@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "POW3 over POW2": {
+   "share": 0.6125,
+   "pairs": 80,
+   "interval": [
+    0.512,
+    0.713
+   ]
+  },
+  "MW6 over POW2": {
+   "share": 0.4875,
+   "pairs": 80,
+   "interval": [
+    0.375,
+    0.588
+   ]
+  },
+  "L12 over POW2": {
+   "share": 0.3125,
+   "pairs": 32,
+   "interval": [
+    0.156,
+    0.469
+   ]
+  }
+ },
+ "coherence": {
+  "POW3 over POW2": {
+   "share": 0.6125,
+   "pairs": 80,
+   "interval": [
+    0.5,
+    0.713
+   ]
+  },
+  "MW6 over POW2": {
+   "share": 0.4625,
+   "pairs": 80,
+   "interval": [
+    0.35,
+    0.575
+   ]
+  },
+  "L12 over POW2": {
+   "share": 0.3125,
+   "pairs": 32,
+   "interval": [
+    0.156,
+    0.469
+   ]
+  }
+ }
+}

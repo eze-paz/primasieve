@@ -39,3 +39,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 16. B2 (03:23): tuning at 191M (POW3, MW6, lam0 12) vs POW2-191M; absolute measure = share of grammatical sentences.
    Absolute: grammatical-sentence share NOH-27M 0.360, POW2-27M 0.440, POW2-191M 0.456, true text 0.855.
 17. STR (03:35): held clause state + sentence position as a matching bonus at 191M; pairwise vs POW2-191M.
+   Result B2: at 191M, POW3 beats POW2 (0.613 [0.512, 0.713]); new best = POW3-191M. MW6 n.s.; lam0 12 worse.
