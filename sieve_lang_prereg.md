@@ -2582,3 +2582,14 @@ allows two GPU sessions, so kernel 3 (HC x 4, HF) starts when kernel 1 or 2 ends
 - Grammatical share: JX3 0.607 [0.559, 0.650], JX5B 0.595 (paired [-0.069, 0.048]), JX10B 0.627 (paired [-0.038, 0.080]), truth 0.881.
 - Predictions: JX10B fluency above 0.5 — failed (below); JX10B coherence not below 0.45 — failed (0.4375); best arm +0.05 grammar — failed; JX10B sentence count within 10% of JX3 — held (350 vs 319). G-JX3 (1B) pending a GPU.
 - Reading: once sentence length is held fixed, a veto stronger than 0.03 hurts; JX10's earlier grammar gain was largely shorter sentences. JX3 stays the best.
+
+## JXW — word n-gram junction veto on top of JX3 (preregistered 2026-11-08, before the run)
+- Theory: the class veto checks roles; a word-level check is stricter: the n-gram ending in the next word must occur in training. At 200M words a held-out text's 3-grams are covered 0.7365 and 4-grams 0.3961 (SPLICE), so the 3-gram veto removes mostly unattested joins while still leaving most true continuations; the 4-gram veto is far stricter (falls back to unvetoed when everything is vetoed).
+- 80 fresh prompts (offset 43), 191M, Kaggle CPU. Arms: JX3 (base), JX3W3 (JX3 + word 3-gram veto), JX3W4 (JX3 + word 4-gram veto). Smoke: the old paths still reproduce.
+- Judging: pairwise JX3W3, JX3W4 vs JX3 (one rater each, 80 pairs); grammatical-sentence share of the three + truth (three raters by prompt thirds); sentence ends counted.
+- **Predictions:** JX3W3 over JX3 fluency, interval above 0.5 (40%); JX3W3 point above 0.5 (65%); JX3W4 grammar share above JX3W3's (45%); coherence of both not below 0.45 (60%).
+**JXW results (2026-11-08; Kaggle CPU primasieve-jxw; sieve_jxw_*.json, sieve_gramjxw_*.json).** Fresh prompts (offset 43). Texts changed vs JX3: JX3W3 25, JX3W4 69. Sentence ends: JX3 309, JX3W3 299, JX3W4 281, truth 234.
+- Pairwise vs JX3 (changed pairs only): JX3W3 fluency 0.360 [0.199, 0.560] (25), coherence 0.400; JX3W4 fluency 0.6087 [0.493, 0.725] (69), coherence 0.5507 [0.435, 0.667].
+- Grammatical share: JX3 0.695 [0.650, 0.738], JX3W3 0.692 (paired [-0.033, 0.025]), JX3W4 0.676 (paired [-0.070, 0.029]), truth 0.858.
+- Predictions: JX3W3 fluency interval above 0.5 — failed; JX3W3 point above 0.5 — failed (0.360); JX3W4 grammar above JX3W3 — failed (0.676 vs 0.692); coherence of both not below 0.45 — failed for JX3W3 (0.400), held for JX3W4.
+- Reading: the 3-gram check is nearly inert (most joins already attested); the 4-gram check edges fluency (interval touches 0.5) without a grammar gain. Not adopted; JX3 stays the best.

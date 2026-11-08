@@ -53,7 +53,13 @@ if JX:                                                                          
         uf, nf = np.unique(kf, return_counts=True); uc, nc = np.unique(kf >> np.uint64(6), return_counts=True); TB[J] = (uf, nf, uc, nc); del kf
         log(f"class {J + 1}-gram table: {len(uf):,} distinct of {NJ - J:,}")
     del CLS_
-    JSTAT = [0, 0]
+    WT = {}
+    for n in sorted({int(c["wn"]) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values() if c.get("wn")}):     # word n-gram tables (sorted hashes) over the first NJ tokens
+        h = np.zeros(NJ - n + 1, np.uint64)
+        with np.errstate(over="ignore"):
+            for i in range(n): h = h * M64 + S[i:NJ - n + 1 + i].astype(np.uint64) + np.uint64(1)
+        h.sort(); WT[n] = h; log(f"word {n}-gram table: {len(h):,}")
+    JSTAT = [0, 0, 0]
 H8 = np.empty(ntr - 8, np.uint64)                                                                             # copy table = sorted hseq(8) of e2b.py
 with np.errstate(over="ignore"):
     for a in range(0, ntr - 8, CHUNK):
@@ -102,6 +108,9 @@ def generate(cfg, pids):
                 k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
                 jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0
                 WPV = w * ~bad if (w * ~bad).sum() > 0 else w; veto = n5 < cfg["eps"] * max(n4, 1); JSTAT[0] += float((w * veto * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); JSTAT[1] += 1; bad = bad | veto
+            if cfg.get("wn"):                                                                                    # word junction veto: the n-gram ending in the next word must occur in training
+                n_ = int(cfg["wn"]); Wt = WT[n_]; hv2 = hn(np.c_[np.repeat(np.array([text[-(n_ - 1):]]), len(nx), 0), nx]); seen_ = Wt[np.minimum(np.searchsorted(Wt, hv2), len(Wt) - 1)] == hv2
+                JSTAT[2] += float((w * ~seen_ * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); bad = bad | ~seen_
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
             if cfg.get("keepb") and uw[0] == 0:                                                                  # keep the sentence-end probability at its pre-veto value
@@ -116,9 +125,9 @@ NG = 3 if SMOKE else 80; GENS = (json.loads(os.environ["G1_ARMS"]) if os.environ
 if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
-    if JX: JSTAT[0] = JSTAT[1] = 0
+    if JX: JSTAT[0] = JSTAT[1] = JSTAT[2] = 0
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
-    GO[nm] = dict(veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    GO[nm] = dict(veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
 GO["truth"] = dict(gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
