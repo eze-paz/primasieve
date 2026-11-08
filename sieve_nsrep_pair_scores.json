@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "nsrep_pair_ratings.json",
+  "nsrep_pair_ratings_r2.json"
+ ],
+ "NS vs B coherence": {
+  "b_wins": 0.325,
+  "a_wins": 0.5333333333333333,
+  "mean": -0.2083,
+  "interval": [
+   -0.3667,
+   -0.0417
+  ]
+ },
+ "NS vs B fluency": {
+  "b_wins": 0.4,
+  "a_wins": 0.475,
+  "mean": -0.075,
+  "interval": [
+   -0.25,
+   0.0917
+  ]
+ }
+}

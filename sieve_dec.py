@@ -13,6 +13,8 @@ Index: 8-word reversed prefix (MIX onward; TEMP used 4 words). doc (delta: candi
   sentence so far, weight e^4 over the best 4-word match; needs DEC_SENT=1);
   tpl (x: with nextsent, hold the class skeleton of the follower of the most similar sentence; matching class at word k x e^x,
   boundary x e^x once the skeleton is used up);
+  holdw (x: hold the content words that followed the training sentence most similar to the prompt, head word x e^x until
+  written, released after 12 words; needs DEC_SENT=1);
   search ({B, H, C, v}: B rollouts of H words from the same sampler, commit the first C words of the best by verifier v).
 Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPARTS: prompts pid % NPARTS == PART)  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
 import os, sys, json, time
@@ -120,6 +122,15 @@ class Dec:
             while k < len(text) and text[-1 - k] != 0: k += 1                                                                      # words written since the boundary
             if k < len(s._tpl): p = p * np.where(s.FINE[uw] == s._tpl[k], np.exp(cfg["tpl"]), 1.0)
             else: p = p * np.where(uw == 0, np.exp(cfg["tpl"]), 1.0)
+        if cfg.get("holdw") and getattr(s, "_plan", None):                                                                         # HOLDW: the held planned word
+            while s._plan and s._held_for >= 12: s._plan.pop(0); s._held_for = 0
+            if s._plan:
+                h = s._plan[0]
+                if h in uw: p = p * np.where(uw == h, np.exp(cfg["holdw"]), 1.0)
+                elif cfg.get("inject"):                                                                                                # HW2: bigram-licensed injection
+                    if not hasattr(s, "u2"): g_ = np.load(MT.fp(C, "ngram")); s.u2, s.n2 = g_["u2"], g_["n2"]
+                    if MT.look(s.u2, s.n2, np.array([text[-1] * MT.VV + h]))[0] >= 2 and not (s.H8[min(np.searchsorted(s.H8, s.h8v(text[-7:], np.array([h]))[0]), len(s.H8) - 1)] == s.h8v(text[-7:], np.array([h]))[0]):
+                        uw = np.r_[uw, h]; p = np.r_[p, p.max()]
         if cfg.get("nounk") and (uw <= s.V).any(): p = p * (uw <= s.V)
         con = (uw > 100) & (uw <= s.V)
         if cfg.get("topic") and con.any():
@@ -161,10 +172,19 @@ class Dec:
                 out[i] += 4 * float((MT.look(s.u3, np.ones(len(s.u3), np.int64), k) > 0).mean())
         return out
     def gen(s, prompt, cfg, seed):
-        g = np.random.default_rng(seed); text = list(prompt); sr = cfg.get("search"); s._src = None; s._tpl = None
+        g = np.random.default_rng(seed); text = list(prompt); sr = cfg.get("search"); s._src = None; s._tpl = None; s._plan = None; s._held_for = 0
+        if cfg.get("holdw"):                                                                                                         # HOLDW: plan from the most similar training sentence's follower
+            cw = [w for w in prompt if 100 < w <= s.V]; u = np.unique(cw); sc_ = np.zeros(s.nsent)
+            for w in u:
+                a, b = s.qst[w], s.qst[w + 1]; np.add.at(sc_, s.qs[a:b], s.sidf[w] * s.qv[a:b])
+            k0 = int(np.argmax(sc_)); st0 = s.sstart[min(k0, len(s.sstart) - 1)]; fol = s.S[st0:min(st0 + 60, s.ntr)]
+            s._plan = [int(w) for w in fol if 100 < w <= s.V]; s._plan0 = list(s._plan)
         while len(text) - len(prompt) < LG:
             if not sr:
                 uw, p = s.dist(text, cfg); k = int(g.choice(len(uw), p=p)); text.append(int(uw[k]))
+                if s._plan:
+                    if text[-1] == s._plan[0]: s._plan.pop(0); s._held_for = 0
+                    else: s._held_for += 1
                 cand = np.nonzero(s._inv == k)[0]; s._src = int(s._pos[cand[g.choice(len(cand), p=s._wpos[cand] / s._wpos[cand].sum())]]) if len(cand) else None   # ENT: source of the written word
                 continue
             R = []
@@ -183,6 +203,7 @@ def run(tag, arms, part=None):
         pr = d.S[t:t + LP].tolist(); G.append(dict(pid=pid, B="truth", prompt=d.words(pr), text=d.words(d.S[t + LP:t + LP + LG]), ids=d.S[t + LP:t + LP + LG].tolist()))
         for arm, cfg in arms.items():
             ids = d.gen(pr, cfg, 1000 * pid + 7); G.append(dict(pid=pid, B=arm, prompt=d.words(pr), text=d.words(ids), ids=ids))
+            if cfg.get("holdw"): G[-1]["plan"] = d.words(d._plan0); G[-1]["plan_written"] = float(np.mean([w in ids for w in d._plan0])) if d._plan0 else 0.0
         if pid % 10 == 0: log(f"prompt {pid}: " + " | ".join(f"{x['B']}: {x['text'][:60]}" for x in G[-len(arms):]))
         if part is not None: json.dump(G, open(os.path.join(MT.OUT, f"{tag}_gen_p{part}.json"), "w"), indent=0)
     out = os.path.join(MT.OUT, f"{tag}_gen.json" if part is None else f"{tag}_gen_p{part}.json"); json.dump(G, open(out, "w"), indent=0); log(f"saved {out}: {len(G)} items")
