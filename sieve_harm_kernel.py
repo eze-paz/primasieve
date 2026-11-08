@@ -8,12 +8,16 @@ bits/word on CEIL's held-out words (prompt windows excluded). Arms (env HARM_ARM
   HC1 HC2 HC4 HC8       HBlearn with the periods confined to 1/2/4/8 octave bands (each channel within half an octave of its band)
   HD                    HBlearn + cross-frequency gating: the slow channels' output gates the fast channels' input
   HF                    HBfix with periods at the text's own rhythms: half clause 3, clause 6, sentence 14, then 28..896
+  HM / HMonly / HMsel   keyed matrix memory (KM): per head a dh x dh state S_t = lam S_{t-1} + v_t k_t^T read by q_t, lam on the
+                        oscillator ladder (complex: decay + rotation). HM alternates oscillator and memory layers; HMonly is memory
+                        layers only; HMsel = HM with data-dependent decay and write gate.
+Scale (KM proxy): HARM_D width, HARM_L layers, HARM_TRW training positions, HARM_DEVW held-out positions, HARM_LCW eval widths.
 Writes /kaggle/working/harm_<arm>.json (dev bits per epoch, parameters, seconds) and harm_<arm>.pt for HB arms."""
 import os, glob, json, math, time, sys
 import numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 V = 60000; VT = V + 2; LP, LG = 30, 50
 CTX, STRIDE, BATCH, MICRO, EPOCHS, LR, WARM, DROP, WD = 512, 256, 32, 2, 2, 6e-4, 300, 0.1, 0.1
-CTX = int(os.environ.get("HARM_CTX", CTX)); BATCH = 32 * 512 // CTX; STRIDE = CTX // 2 if CTX > 512 else STRIDE   # LT: same tokens per step
+CTX = int(os.environ.get("HARM_CTX", CTX)); BATCH = 32 * 512 // CTX; STRIDE = CTX // 2   # LT: same tokens per step
 EPOCHS = int(os.environ.get("HARM_EPOCHS", EPOCHS)); GEN = os.environ.get("HARM_GEN") == "1"   # stage 2: 6 epochs + CEIL sampling
 TINY = os.environ.get("HARM_TINY") == "1"
 if TINY: CTX, STRIDE, BATCH, MICRO, EPOCHS, WARM = 64, 32, 8, 1, 1, 10
@@ -27,6 +31,11 @@ keep = np.ones(len(ho), bool)
 for t in prompts: keep[max(t - ntr - 10, 0):t - ntr + LP + LG + 10] = False
 dvm = np.nonzero(keep[1:] & (ho[1:] != 0) & (ho[:-1] != 0))[0] + 1
 if TINY: tr = tr[:200000]; ho = ho[:20000]; dvm = dvm[dvm < 20000]
+D = int(os.environ.get("HARM_D", 256)); NL = int(os.environ.get("HARM_L", 6)); FF = 4 * D                    # KM proxy scale
+TRW = int(os.environ.get("HARM_TRW", 0)); DEVW = int(os.environ.get("HARM_DEVW", 0))
+if TRW: tr = tr[:TRW]
+if DEVW: dvm = dvm[dvm < DEVW]
+HOLIM = min(len(ho) - 1, DEVW + 2 * CTX) if DEVW else len(ho) - 1
 LADDER = [2.0 ** k for k in range(1, 11)]                                                    # periods 2..1024
 RHYTHM = [3.0, 6.0, 14.0, 28.0, 56.0, 112.0, 224.0, 448.0, 896.0]                              # HF: measured clause 6, sentence 14 (median)
 
@@ -55,7 +64,8 @@ class HarmBank(nn.Module):
             h = fftconv(uu, kk); f = torch.cat([h.real, h.imag], -1) / 4.0
             return s.out(f)
 class TLM(nn.Module):
-    def __init__(s, kind, d=256, L=6, H=4, ff=1024):
+    def __init__(s, kind, d=None, L=None, H=4, ff=None):
+        d = d or D; L = L or NL; ff = ff or FF
         super().__init__(); s.kind = kind; s.emb = nn.Embedding(VT, d); s.dr = nn.Dropout(DROP)
         if kind == "HE":
             s.slow = torch.tensor([16.0, 32.0, 64.0, 128.0, 256.0, 512.0]); s.fast = torch.tensor([2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 16.0, 24.0, 32.0])
@@ -110,13 +120,47 @@ class OscLayer(nn.Module):
             o = s.Cre(y.real) - s.Cim(y.imag) + s.D * h
         x = x + s.dr(o * torch.sigmoid(s.g(h0)))
         return x + s.ff(s.n2(x))
+class MemLayer(nn.Module):
+    """KM: keyed matrix memory (multi-head retention). Head h keeps S_t = lam_h S_{t-1} + v_t k_t^T (dh x dh) and reads o_t = S_t q_t.
+    lam_h = exp(-exp(nu_h) + i th_h) with half-life and period P_h from the oscillator ladder (learned); the rotation is applied to
+    q and k (dimension pairs as complex numbers), so the parallel form is Re(q_t k_s^*) lam^(t-s) summed over v_s.
+    sel: the decay rate is scaled per step by 2 sigmoid(a x_t) (selective forgetting) and v_t by sigmoid(w x_t) (write gate)."""
+    def __init__(s, d, H, periods, sel=False, ff=1024):
+        super().__init__(); s.n1 = nn.LayerNorm(d); s.n2 = nn.LayerNorm(d); s.H = H; s.dh = d // H; s.sel = sel
+        P = torch.tensor([float(periods[int(round(i * (len(periods) - 1) / max(1, H - 1)))]) for i in range(H)])
+        s.nu = nn.Parameter(torch.log(math.log(2) / P)); s.th = nn.Parameter(2 * math.pi / P)
+        s.q = nn.Linear(d, d, bias=False); s.k = nn.Linear(d, d, bias=False); s.v = nn.Linear(d, d, bias=False); s.g = nn.Linear(d, d); s.o = nn.Linear(d, d)
+        s.gn = nn.GroupNorm(H, d); s.dr = nn.Dropout(DROP); s.ff = nn.Sequential(nn.Linear(d, ff), nn.GELU(), nn.Linear(ff, d), nn.Dropout(DROP))
+        if sel: s.a = nn.Linear(d, H); s.w = nn.Linear(d, H); nn.init.zeros_(s.a.weight); nn.init.zeros_(s.a.bias); nn.init.zeros_(s.w.weight); nn.init.constant_(s.w.bias, 2.0)
+    def forward(s, x):
+        h0 = s.n1(x)
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            h = h0.float(); B, T, d = h.shape; H, dh = s.H, s.dh; t = torch.arange(T, device=x.device, dtype=torch.float32)
+            q = s.q(h).view(B, T, H, dh); k = s.k(h).view(B, T, H, dh) / math.sqrt(dh); v = s.v(h).view(B, T, H, dh)
+            rot = torch.polar(torch.ones(T, H, 1, device=x.device), t[:, None, None] * s.th[None, :, None])               # e^{i th t}
+            qc = torch.complex(q[..., 0::2], q[..., 1::2]) * rot; kc = torch.complex(k[..., 0::2], k[..., 1::2]) * rot
+            sc = torch.einsum("bthc,bshc->bhts", qc, kc.conj()).real; rate = torch.exp(s.nu)
+            causal = t[:, None] >= t[None, :]
+            if s.sel:
+                r = rate[None, :, None] * 2 * torch.sigmoid(s.a(h)).transpose(1, 2); c = torch.cumsum(-r, -1)                 # (B,H,T)
+                logm = c[..., :, None] - c[..., None, :]; v = v * torch.sigmoid(s.w(h))[..., None]
+            else: logm = (-rate[:, None, None] * (t[:, None] - t[None, :]))[None]
+            m = torch.exp(logm.masked_fill(~causal, float("-inf")))
+            o = torch.einsum("bhts,bshd->bthd", sc * m, v).reshape(B * T, d); o = s.gn(o).view(B, T, d)
+        x = x + s.dr(s.o(o * F.silu(s.g(h0))))
+        return x + s.ff(s.n2(x))
 class OLM(nn.Module):
-    def __init__(s, kind, d=256, L=6, N=256):
+    def __init__(s, kind, d=None, L=None, N=None, ff=None):
+        d = d or D; L = L or NL; N = N or d; ff = ff or FF
         super().__init__(); s.emb = nn.Embedding(VT, d); nn.init.normal_(s.emb.weight, std=0.02); s.dr = nn.Dropout(DROP)
         learn = kind not in ("HBfix", "HF"); periods = RHYTHM if kind == "HF" else LADDER; band = None
         if kind.startswith("HC"):
             nb = int(kind[2:]); idx = np.unique(np.round(np.linspace(1, 8, nb)).astype(int)) if nb > 1 else np.array([4]); periods = [2.0 ** (k + 1) for k in idx]; band = True   # 1 band = period 32
-        s.layers = nn.ModuleList(OscLayer(d, N, periods, learn, band, gate_slow=(kind == "HD")) for _ in range(L)); s.nf = nn.LayerNorm(d)
+        if kind.startswith("HM"):                                                                    # KM: memory layers (alternating with oscillator layers unless HMonly)
+            mem = lambda: MemLayer(d, 4, LADDER, sel=(kind == "HMsel"), ff=ff); osc = lambda: OscLayer(d, N, LADDER, True, ff=ff)
+            s.layers = nn.ModuleList((mem() if (kind == "HMonly" or i % 2 == 1) else osc()) for i in range(L))
+        else: s.layers = nn.ModuleList(OscLayer(d, N, periods, learn, band, gate_slow=(kind == "HD"), ff=ff) for _ in range(L))
+        s.nf = nn.LayerNorm(d)
     def forward(s, idx):
         x = s.dr(s.emb(idx))
         for l in s.layers: x = l(x)
@@ -127,7 +171,7 @@ def build(arm):
     return OLM(arm)
 @torch.no_grad()
 def dev_bits(model):
-    model.eval(); out = np.full(len(ho), np.nan); starts = list(range(0, len(ho) - 1, STRIDE))
+    model.eval(); out = np.full(len(ho), np.nan); starts = list(range(0, HOLIM, STRIDE))
     DB = max(1, 4096 // CTX)
     for i in range(0, len(starts), DB):
         ss = starts[i:i + DB]; idx = torch.stack([torch.as_tensor(np.pad(ho[s:s + CTX + 1], (0, max(0, s + CTX + 1 - len(ho))))) for s in ss]).to(dev)
@@ -137,6 +181,19 @@ def dev_bits(model):
             lo = 0 if s == 0 else STRIDE; hi = min(CTX, len(ho) - 1 - s)
             if hi > lo: out[s + 1 + lo:s + 1 + hi] = b[r, lo:hi]
     model.train(); return float(np.nanmean(out[dvm]))
+@torch.no_grad()
+def bits_at_w(model, W):
+    """per-word dev bits at eval window W (stride W/2), over the dev positions dvm"""
+    model.eval(); out = np.full(len(ho), np.nan, np.float32); stride = W // 2; lim = min(len(ho) - 1, (DEVW + 2 * W) if DEVW else len(ho) - 1)
+    starts = list(range(0, lim, stride)); B = max(1, 4096 // W)
+    for i in range(0, len(starts), B):
+        ss = starts[i:i + B]; idx = torch.stack([torch.as_tensor(np.pad(ho[s:s + W + 1], (0, max(0, s + W + 1 - len(ho))))) for s in ss]).to(dev)
+        with torch.autocast(device_type=dev.type, dtype=torch.float16, enabled=dev.type == "cuda"): lp = F.log_softmax(model(idx[:, :-1]).float(), -1)
+        b = (-torch.gather(lp, 2, idx[:, 1:, None])[:, :, 0] / math.log(2)).cpu().numpy()
+        for r, s in enumerate(ss):
+            lo = 0 if s == 0 else stride; hi = min(W, len(ho) - 1 - s)
+            if hi > lo: out[s + 1 + lo:s + 1 + hi] = b[r, lo:hi]
+    model.train(); return out[dvm]
 def run(arm):
     seed = int(arm[-1]) if arm.startswith("NET2s") else 0; torch.manual_seed(seed); np.random.seed(seed); t0 = time.time()
     model = build(arm).to(dev); NP = sum(p.numel() for p in model.parameters()); log(f"{arm}: parameters {NP:,}")
@@ -163,7 +220,13 @@ def run(arm):
         d = dev_bits(model); curve.append(d); log(f"{arm}: epoch {ep} done: dev {d:.4f} bits/word")
         if GEN and d <= min(curve): torch.save(model.state_dict(), os.path.join(OUT, f"harm_{arm}_best.pt"))
     if arm.startswith(("HB", "HC", "HD", "HF")): torch.save(model.state_dict(), os.path.join(OUT, f"harm_{arm}.pt"))
-    json.dump(dict(arm=arm, params=NP, dev_curve=curve, seconds=time.time() - t0), open(os.path.join(OUT, f"harm_{arm}.json"), "w"))
+    lc = {}
+    if os.environ.get("HARM_LCW") and curve and curve[-1] is not None:                                   # KM: per-word bits at several eval windows
+        ws = [int(w) for w in os.environ["HARM_LCW"].split(",") if isinstance(model, OLM) or int(w) <= CTX]; R = {}
+        for W in ws:
+            R[f"W{W}"] = bits_at_w(model, W); lc[f"W{W}"] = float(np.nanmean(R[f"W{W}"])); log(f"{arm}: bits at {W}: {lc[f'W{W}']:.4f}")
+        np.savez_compressed(os.path.join(OUT, f"harm_{arm}_bits.npz"), **R)
+    json.dump(dict(arm=arm, params=NP, dev_curve=curve, lc=lc, seconds=time.time() - t0), open(os.path.join(OUT, f"harm_{arm}.json"), "w"))
     if GEN: gen(arm, model, curve)
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i > V else str(vw[i]) for i in ids).replace(" .", ".")
 @torch.no_grad()
