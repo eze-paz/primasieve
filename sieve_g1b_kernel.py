@@ -6,7 +6,7 @@ G1_MODE=sanity: BIG's 191M stream (four PG-19 half-shards), BEST only -> must eq
 G1_MODE=1b: MT 27M + tok1b shards 0..11 (extended vocabulary), arms B1G6 / B1G12.
 Smoke: G1_SMOKE=1 G1_DATA=.. G1_OUT=.. (MT 2M + 300k eval, K 256, 3 prompts; compare with e2b.py's smoke)."""
 import glob, os, time, json, numpy as np, torch
-SMOKE = bool(os.environ.get("G1_SMOKE")); SA = bool(os.environ.get("G1_SA")); MODE = os.environ.get("G1_MODE", "1b"); dev = "cuda" if torch.cuda.is_available() else "cpu"; T0 = time.time()
+SMOKE = bool(os.environ.get("G1_SMOKE")); SA = bool(os.environ.get("G1_SA")); JX = bool(os.environ.get("G1_JX")); MODE = os.environ.get("G1_MODE", "1b"); dev = "cuda" if torch.cuda.is_available() else "cpu"; T0 = time.time()
 V = 60000; UNK = V + 1; LP, LG = 30, 50; M64 = np.uint64(0x9E3779B97F4A7C15); K = 256 if SMOKE else 3072; MW = 4; LAM0 = 8.0; CHUNK = int(os.environ.get("G1_CHUNK", 60_000_000))
 OUTD = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.environ.get("G1_OUT", ".")
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
@@ -14,7 +14,7 @@ def find(pat, env): return glob.glob(f"/kaggle/input/**/{pat}", recursive=True) 
 z = np.load([x for x in find("books_data.npz", "G1_DATA")][0]); S0 = z["S"]; ntr0 = int(z["ntr"]); vw = [str(w) for w in z["vw"]]; del z
 if SMOKE: S0 = np.r_[S0[:2_000_000], S0[ntr0:ntr0 + 300_000]]; ntr0 = 2_000_000
 if SMOKE: parts = []
-elif MODE in ("sanity", "sa"): parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
+elif MODE in ("sanity", "sa", "jx"): parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
 else:
     parts = [glob.glob(f"/kaggle/input/**/tok1b_{k}.npz", recursive=True)[0] for k in range(12)]
     vw = vw + [None] * (V + 2 - len(vw)) if len(vw) < V + 2 else vw[:V + 2]; vw = vw + json.load(open(glob.glob("/kaggle/input/**/tok1b_vocab.json", recursive=True)[0]))
@@ -43,6 +43,14 @@ for a, b in zip(cuts[:-1], cuts[1:]):
     else: o = np.argsort(kk, kind="stable")
     KEYS[off:off + len(P)] = kk[o]; ORD[off:off + len(P)] = torch.from_numpy(P[o].astype(np.int32)).to(dev); off += len(P); del kk, o, P
 assert off == NP_; del w1; log(f"key index: {NP_:,} positions in {len(cuts) - 1} ranges")
+if JX:                                                                                                         # Brown-objective classes (exchange, on the MT 27M text) and class 5-gram table over the training stream
+    if "brown" not in globals(): import sys as _s; _s.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from sieve_brown import brown
+    BC = 64; BCL = brown(S[:ntr0], VV, C=BC, iters=3 if SMOKE else 15, log=log); BCLu = BCL.astype(np.uint32); CLS_ = BCLu[S[:ntr]]
+    k5 = np.zeros(ntr - 4, np.uint32)
+    for i in range(5): k5 = (k5 << np.uint32(6)) | CLS_[i:ntr - 4 + i]
+    J5u, J5n = np.unique(k5, return_counts=True); J4n = np.bincount((k5 >> np.uint32(6)).astype(np.int64), minlength=1 << 24); del k5, CLS_
+    log(f"class 5-gram table: {len(J5u):,} distinct of {ntr - 4:,}")
+    JSTAT = [0, 0]
 H8 = np.empty(ntr - 8, np.uint64)                                                                             # copy table = sorted hseq(8) of e2b.py
 with np.errstate(over="ignore"):
     for a in range(0, ntr - 8, CHUNK):
@@ -85,18 +93,24 @@ def generate(cfg, pids):
             w = torch.exp(sc - sc.max()).cpu().numpy(); nx = St[c[0]].long().cpu().numpy()
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
             bad = bad | (nx == UNK); seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}; bad = bad | np.array([(text[-2], text[-1], int(x_)) in seen for x_ in nx])
+            if cfg.get("eps"):                                                                                   # junction veto: next word's class must be a plausible continuation of the last 4 classes
+                c4 = 0
+                for x_ in text[-4:]: c4 = (c4 << 6) | int(BCL[x_])
+                k5c = (np.uint32(c4) << np.uint32(6)) | BCLu[nx]; j = np.minimum(np.searchsorted(J5u, k5c), len(J5u) - 1); n5 = np.where(J5u[j] == k5c, J5n[j], 0)
+                veto = n5 < cfg["eps"] * max(int(J4n[c4]), 1); JSTAT[0] += float((w * veto * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); JSTAT[1] += 1; bad = bad | veto
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]; text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
         out[pid] = text[LP:]
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
 st40 = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; PROMPTS = st40[np.linspace(0, len(st40) - 1, 82).astype(int)[1:-1] + 13]
-NG = 3 if SMOKE else 80; GENS = {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
-if SMOKE and not SA: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
+NG = 3 if SMOKE else 80; GENS = {"JX1": dict(pow=6.0, eps=0.01), "JX3": dict(pow=6.0, eps=0.03)} if JX else {"SA8": dict(pow=6.0), "SA8L": dict(pow=6.0, len=1)} if SA else {"BEST": dict(pow=6.0)} if (SMOKE or MODE == "sanity") else {"B1G6": dict(pow=6.0), "CLS2": dict(pow=6.0, lamc=2.0), "CLS4": dict(pow=6.0, lamc=4.0)}
+if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
+    if JX: JSTAT[0] = JSTAT[1] = 0
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
-    GO[nm] = dict(ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
-    log(f"G1B {MODE} {nm}: longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
+    GO[nm] = dict(veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
 GO["truth"] = dict(gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")

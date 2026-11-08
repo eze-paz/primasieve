@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "JX1 over BEST191": {
+   "share": 0.5658,
+   "pairs": 76,
+   "interval": [
+    0.46,
+    0.671
+   ]
+  },
+  "JX3 over BEST191": {
+   "share": 0.6375,
+   "pairs": 80,
+   "interval": [
+    0.525,
+    0.75
+   ]
+  }
+ },
+ "coherence": {
+  "JX1 over BEST191": {
+   "share": 0.5658,
+   "pairs": 76,
+   "interval": [
+    0.447,
+    0.671
+   ]
+  },
+  "JX3 over BEST191": {
+   "share": 0.5625,
+   "pairs": 80,
+   "interval": [
+    0.462,
+    0.675
+   ]
+  }
+ }
+}
