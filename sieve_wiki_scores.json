@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "POW6G_27 over NOH_27": {
+   "share": 0.7,
+   "pairs": 80,
+   "interval": [
+    0.6,
+    0.8
+   ]
+  },
+  "POW6G_200 over POW6G_27": {
+   "share": 0.3125,
+   "pairs": 80,
+   "interval": [
+    0.212,
+    0.412
+   ]
+  }
+ },
+ "coherence": {
+  "POW6G_27 over NOH_27": {
+   "share": 0.575,
+   "pairs": 80,
+   "interval": [
+    0.475,
+    0.688
+   ]
+  },
+  "POW6G_200 over POW6G_27": {
+   "share": 0.5125,
+   "pairs": 80,
+   "interval": [
+    0.4,
+    0.613
+   ]
+  }
+ }
+}
