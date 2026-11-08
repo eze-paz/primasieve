@@ -2305,3 +2305,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 - 191M, 80 REP prompts: POW6G + class harmonics z1 (H6z1) and z2 (H6z2). Pairs vs POW6G (160 pairs).
 - **Predictions:** H6z1 over POW6G fluency (25%); some H6 over POW6G coherence (30%).
 **CAPT results (2026-11-08 ~03:50; sieve_capt_gen.json, sieve_capt_key.json, sieve_capt_ratings.json, sieve_capt_scores.json).** Pythia bits: POW6G 5.7520, CAP10 5.2689, CAP12 5.2069; mean longest verbatim run from training: CAP10 8.99 words, CAP12 10.63 (POW6G at most 7). Pairwise fluency: CAP10 over POW6G 0.588 [0.475, 0.700]; CAP12 over POW6G 0.575 [0.475, 0.675]; coherence 0.538 / 0.538. Predictions: CAP12 over POW6G (65%) — failed; CAP10 over POW6G (45%) — failed. **Allowing longer verbatim chunks does not buy clear fluency at this sharpness.**
+
+## BEAM — sequence-level mode seeking (loop round 22), preregistered 2026-11-08 before any run
+- Error analysis of POW6-191M's ungrammatical sentences (batch 2): mostly splices where a phrase from one source joins another in the wrong grammatical role, clauses ended too early, and recurring stock phrases. BEAM4: beam of 4 partial texts, each expanded by its 5 most probable next words under the POW6 + guard distribution, ranked by cumulative log probability (deterministic). 191M, 80 REP prompts. Pairs: BEAM4 vs POW6G (80 pairs).
+- **Predictions:** BEAM4 over POW6G fluency (40%); BEAM4 repeated trigrams 0 (guard) and distinct words below POW6G's (60%).

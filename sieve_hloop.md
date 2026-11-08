@@ -49,3 +49,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Absolute batch 2: grammatical-sentence share POW3-191M 0.517, POW6-191M 0.591, GR 0.611, true text 0.897.
 21. H6 (03:47): class harmonics z1/z2 as tie-breaker on POW6 + guard at 191M.
    Result CAPT: copy-cap 10/12 no clear fluency gain (0.588 / 0.575, intervals include 0.5) — the cap is not the binding constraint at POW6.
+   Error analysis (POW6-191M ungrammatical sentences): role-mismatched splices, clauses ended early, stock phrases.
+22. BEAM (03:52): beam of 4 over the sharpened consensus at 191M.
