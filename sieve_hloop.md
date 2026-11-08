@@ -24,3 +24,5 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
 9. PAIR (02:55): pairwise forced-choice fluency/coherence on round 8's texts.
    Result (03:00): pairwise fluency: sharpened over none 0.700 [0.575, 0.825]; class harmonics over none 0.500. Sharpening is the lever.
 10. GATE2 (03:05): sharpening curve (POW 2/3/4) + harmonics only at uncertain steps; pairwise.
+   Result (~03:00): beyond power 2 no clear gain (POW3 over POW2 0.425, POW4 over POW3 0.625, both intervals include 0.5); gated harmonics no gain.
+11. REP (03:02): replication on 80 fresh prompts (sharpening vs none, harmonics vs none) + harmonics only at sentence starts.

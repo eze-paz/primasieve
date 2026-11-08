@@ -1,0 +1,48 @@
+{
+ "fluency": {
+  "POW3 over POW2": {
+   "share": 0.425,
+   "interval": [
+    0.275,
+    0.575
+   ]
+  },
+  "POW4 over POW3": {
+   "share": 0.625,
+   "interval": [
+    0.475,
+    0.775
+   ]
+  },
+  "G3 over POW3": {
+   "share": 0.45,
+   "interval": [
+    0.3,
+    0.6
+   ]
+  }
+ },
+ "coherence": {
+  "POW3 over POW2": {
+   "share": 0.4,
+   "interval": [
+    0.25,
+    0.55
+   ]
+  },
+  "POW4 over POW3": {
+   "share": 0.575,
+   "interval": [
+    0.425,
+    0.725
+   ]
+  },
+  "G3 over POW3": {
+   "share": 0.55,
+   "interval": [
+    0.4,
+    0.7
+   ]
+  }
+ }
+}
