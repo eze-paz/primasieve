@@ -1,0 +1,482 @@
+{
+ "P084": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P117": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P046": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P020": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P045": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P113": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P043": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P059": {
+  "coherence": "second",
+  "fluency": "first"
+ },
+ "P116": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P016": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P082": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P072": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P098": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P041": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P106": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P024": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P022": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P040": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P012": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P029": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P071": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P115": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P091": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P111": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P037": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P107": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P077": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P027": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P074": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P055": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P092": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P056": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P102": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P038": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P118": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P001": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P086": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P049": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P063": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P088": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P070": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P080": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P101": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P100": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P099": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P013": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P089": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P096": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P087": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P062": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P026": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P103": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P114": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P104": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P110": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P017": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P019": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P023": {
+  "coherence": "first",
+  "fluency": "second"
+ },
+ "P050": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P097": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P052": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P039": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P053": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P090": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P058": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P021": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P047": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P011": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P048": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P076": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P068": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P105": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P069": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P061": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P009": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P083": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P044": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P065": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P051": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P030": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P067": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P005": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P119": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P085": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P004": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P093": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P075": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P036": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P066": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P109": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P035": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P060": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P031": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P081": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P042": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P003": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P064": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P033": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P015": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P000": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P032": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P007": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P018": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P095": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P006": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P057": {
+  "coherence": "first",
+  "fluency": "second"
+ },
+ "P078": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P108": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P034": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P025": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P079": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P112": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P028": {
+  "coherence": "second",
+  "fluency": "first"
+ },
+ "P014": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P008": {
+  "coherence": "first",
+  "fluency": "first"
+ },
+ "P073": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P010": {
+  "coherence": "second",
+  "fluency": "first"
+ },
+ "P002": {
+  "coherence": "tie",
+  "fluency": "tie"
+ },
+ "P054": {
+  "coherence": "second",
+  "fluency": "second"
+ },
+ "P094": {
+  "coherence": "first",
+  "fluency": "first"
+ }
+}

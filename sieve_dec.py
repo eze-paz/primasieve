@@ -9,6 +9,8 @@ Index: 8-word reversed prefix (MIX onward; TEMP used 4 words). doc (delta: candi
   candidate continuing the previous word's source passage gets e^x);
   nextsent (k: at a sentence boundary, add as candidates the starts of the sentences that followed the k training sentences most
   similar (tf-idf) to the sentence just written, with weight e^(4 x nsbonus) relative to the best 4-word match; nsctx = sentences used for similarity; needs DEC_SENT=1);
+  nclause (k: after a clause word, add the positions after the same word inside the k training sentences most similar to the
+  sentence so far, weight e^4 over the best 4-word match; needs DEC_SENT=1);
   search ({B, H, C, v}: B rollouts of H words from the same sampler, commit the first C words of the best by verifier v).
 Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPARTS: prompts pid % NPARTS == PART)  -> mtest/<tag>_gen.json (40 SW prompts, 50 words, same seed per prompt)"""
 import os, sys, json, time
@@ -75,6 +77,19 @@ class Dec:
                 nxt = top + 1                                                                                                        # the sentence after each similar sentence
                 st_ = s.sstart[np.minimum(nxt - 1, len(s.sstart) - 1)]; st_ = st_[(st_ > 9) & (st_ < s.ntr - 1)]
                 if len(st_): pos = np.r_[pos, st_]; m4 = np.r_[m4, np.zeros(len(st_))]; sc = np.r_[sc, np.full(len(st_), sc.max() + cfg.get("nsbonus", 1.0))]
+        if cfg.get("nclause") and text[-1] in s.CLAUSE:                                                                            # NCL: continue the clause as similar sentences did
+            j = len(text) - 2
+            while j >= 0 and text[j] != 0: j -= 1
+            cur = [w for w in text[j + 1:-1] if 100 < w <= s.V]
+            if cur:
+                u, n = np.unique(cur, return_counts=True); sc_ = np.zeros(s.nsent)
+                for w in u:
+                    a, b = s.qst[w], s.qst[w + 1]; np.add.at(sc_, s.qs[a:b], s.sidf[w] * s.qv[a:b])
+                top = np.argpartition(-sc_, cfg["nclause"])[:cfg["nclause"]]; top = top[sc_[top] > 0]; add = []
+                for k_ in top:
+                    a = s.sstart[k_ - 1] if k_ > 0 else 0; b = s.sstart[k_] - 1 if k_ < len(s.sstart) else s.ntr
+                    hit = np.nonzero(S[a:b] == text[-1])[0] + a + 1; add.extend(hit[(hit > 9) & (hit < s.ntr - 1)].tolist())
+                if add: add = np.array(add); pos = np.r_[pos, add]; m4 = np.r_[m4, np.zeros(len(add))]; sc = np.r_[sc, np.full(len(add), sc.max() + 1.0)]
         if cfg.get("stick") and getattr(s, "_src", None) is not None and text[-1] != 0 and text[-1] not in s.CLAUSE:
             sc = sc + cfg["stick"] / 4 * (pos == s._src + 1)                                                                   # ENT: keep the clause's source passage
         wpos = np.exp(4 * (sc - sc.max())); s._pos, s._wpos = pos, wpos
