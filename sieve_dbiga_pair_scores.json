@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "dbiga_pair_ratings.json",
+  "dbiga_pair_ratings_r2.json"
+ ],
+ "NS200 vs NS27 coherence": {
+  "b_wins": 0.44166666666666665,
+  "a_wins": 0.44166666666666665,
+  "mean": 0.0,
+  "interval": [
+   -0.1583,
+   0.1667
+  ]
+ },
+ "NS200 vs NS27 fluency": {
+  "b_wins": 0.425,
+  "a_wins": 0.4583333333333333,
+  "mean": -0.0333,
+  "interval": [
+   -0.2,
+   0.1333
+  ]
+ }
+}

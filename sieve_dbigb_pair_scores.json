@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "dbigb_pair_ratings.json",
+  "dbigb_pair_ratings_r2.json"
+ ],
+ "B200 vs B27 coherence": {
+  "b_wins": 0.48333333333333334,
+  "a_wins": 0.425,
+  "mean": 0.0583,
+  "interval": [
+   -0.1083,
+   0.225
+  ]
+ },
+ "B200 vs B27 fluency": {
+  "b_wins": 0.475,
+  "a_wins": 0.4,
+  "mean": 0.075,
+  "interval": [
+   -0.0917,
+   0.2333
+  ]
+ }
+}
