@@ -62,3 +62,4 @@ Goal: fluency (blind rating, within-batch only) with Pythia-410m bits per token 
    Result WIKI: sharpening replicates (0.700 [0.600, 0.800]); data reverses pairwise (0.313) because 200M output is 13% <unk> (vocab mismatch with the 2023 Wikipedia text); grammatical share 0.437 / 0.557 / 0.689 (inflated by <unk>).
    Result NOUNK: never writing <unk> wins on books (0.679) and wiki (0.859); wiki data effect returns (0.650). New best = POW6 + guard + no <unk>.
 27. FINALG2 (04:13): grammatical share of the new best (books + wiki), one rater.
+28. POWU (04:15): sharpening re-tune with no <unk> (POW3 / POW12 vs POW6).

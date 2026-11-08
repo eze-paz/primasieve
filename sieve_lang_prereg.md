@@ -2356,3 +2356,7 @@ Owner: "do it" (after SW: more search -> more fluent, still word salad). Same ge
 ## FINALG2 — grammatical share of the new best (loop round 27), preregistered 2026-11-08 before any run
 - One fresh rater, prompts 40-79: books NOH-27M (REP), books POW6G-191M, books POW6GU-191M, wiki POW6GU-200M, true books text, true wiki text (240 texts). <unk> now absent from the generated arms.
 - **Predictions:** books POW6GU-191M at least 0.60 (50%); above books POW6G-191M (60%).
+
+## POWU — re-tune sharpening without <unk> (loop round 28), preregistered 2026-11-08 before any run
+- Books 191M, no <unk> + repeat guard: POW3GU and POW12GU vs POW6GU (NOUNK), 80 prompts, 160 pairs.
+- **Predictions:** POW12GU over POW6GU (35%); POW3GU below POW6GU (55%).
