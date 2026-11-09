@@ -3076,3 +3076,8 @@ Motivation: decoding is one word at a time with no revision, so an early bad jun
 - LEXB vs CM4: coherence -0.0146 [-0.1208, 0.0917] (LEXB preferred 0.375, CM4 0.388); fluency -0.0583 [-0.1688, 0.0521] (0.358 / 0.417).
 - Pooled 480: coherence 0.0521 [-0.0281, 0.1302] (0.431 / 0.379); fluency 0.0292 [-0.05, 0.1115].
 - Reading: the first-round pass was at the edge of chance (interval low end 0.0042); the seed lexicon (1,000 entries, about 0.11 of the written words' weight) gives no reliable gain over CM4. CM4 stays the decoder.
+
+### CORPB results (2026-11-09; sieve_corpb2_lexcal.json, mtest/lex1/corpb2_loop.json)
+- Store (sieve_corpb_build.py): 18,355 corpus sentences, 345,932 tokens.
+- Ranking score (2,000 positions, T 1): CORPB 0.7541 (present 0.827) vs LEXB 0.7538 (0.8265), CM4 0.7524 (0.825). Loop check: distinct 613, sentence ends 0.072 (CM4 600 / 0.0695); share of written words' weight from the store 0.0768.
+- Prediction CORPB below LEXB (65%) failed. Fixed reading: the small ranking gain is the lookup structure (an extra topic-gated sentence source with a bonus), not the written content. With LEX1 not replicating with raters, neither store gives a reliable gain over CM4; no rater round for CORPB.
