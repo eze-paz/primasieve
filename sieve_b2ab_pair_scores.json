@@ -1,0 +1,24 @@
+{
+ "coherence": {
+  "n": 240,
+  "books2_wins": 0.412,
+  "books_wins": 0.45,
+  "mean": -0.0375,
+  "interval": [
+   -0.1583,
+   0.0792
+  ],
+  "agreement": 0.863
+ },
+ "fluency": {
+  "n": 240,
+  "books2_wins": 0.388,
+  "books_wins": 0.475,
+  "mean": -0.0875,
+  "interval": [
+   -0.2,
+   0.025
+  ],
+  "agreement": 0.863
+ }
+}

@@ -20,7 +20,7 @@ Run: py -3.12 -I sieve_dec.py TAG '{"ARM": {cfg}, ...}' [PART]  (PART of DEC_NPA
 import os, sys, json, time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); import sieve_mtest as MT
-C = "books"; NP, LP, LG, HC = int(os.environ.get("DEC_NP", 40)), 30, 50, 1536; M64 = np.uint64(0x9E3779B97F4A7C15); T0 = time.time()
+C = os.environ.get("DEC_C", "books"); NP, LP, LG, HC = int(os.environ.get("DEC_NP", 40)), 30, 50, 1536; M64 = np.uint64(0x9E3779B97F4A7C15); T0 = time.time()
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
 def pack4(Q):
     k = np.zeros(len(Q), np.uint64)
@@ -57,7 +57,8 @@ class Dec:
         s.FINE = np.load(os.path.join(MT.OUT, "kaggle_ms", "data", f"{C}_cls.npz"))["fine"]
         wid = {str(w): i for i, w in enumerate(s.vw)}; s.MALE = {wid[w] for w in ("he", "him", "his", "himself") if w in wid}; s.FEM = {wid[w] for w in ("she", "her", "hers", "herself") if w in wid}
         s.CLAUSE = {wid[w] for w in "and but or who which that when while where if because though as so then".split() if w in wid}; s._src = None
-        s.PRON = {wid[w] for w in "he she they i we it you".split() if w in wid}; s._msn = 0; s._mst = 0
+        s.PRON = {wid[w] for w in "he she they i I we it you".split() if w in wid}; s._msn = 0; s._mst = 0
+        PUN = set(',;:!?"()') | {"--"}; s.unit = np.r_[[i == 0 or str(w) not in PUN for i, w in enumerate(s.vw)], True]    # BOOKS2: a length unit = a word or a sentence end (books: every token)
         if os.environ.get("DEC_SENT"):                                                                                                   # NSENT: sentence index
             sid = np.cumsum(S[:ntr] == 0); s.sid = sid; s.sstart = np.nonzero(S[:ntr] == 0)[0] + 1; s.sstart = s.sstart[s.sstart < ntr - 1]   # sentence k starts at sstart[k-1]
             cm2 = (S[:ntr] > 100) & (S[:ntr] <= s.V); kk_ = sid[cm2] * MT.VV + S[:ntr][cm2]; u2_, n2_ = np.unique(kk_, return_counts=True); sw_ = u2_ % MT.VV; ss_ = u2_ // MT.VV
@@ -314,7 +315,7 @@ class Dec:
                 a, b = s.qst[w], s.qst[w + 1]; np.add.at(sc_, s.qs[a:b], s.sidf[w] * s.qv[a:b])
             k0 = int(np.argmax(sc_)); st0 = s.sstart[min(k0, len(s.sstart) - 1)]; fol = s.S[st0:min(st0 + 60, s.ntr)]
             s._plan = [int(w) for w in fol if 100 < w <= s.V]; s._plan0 = list(s._plan)
-        while len(text) - len(prompt) < LG:
+        while s.nunit(text[len(prompt):]) < LG:
             if not sr:
                 uw, p = s.dist(text, cfg); k = int(g.choice(len(uw), p=p)); text.append(int(uw[k]))
                 if s._plan:
@@ -329,13 +330,43 @@ class Dec:
                     uw, p = s.dist(t2, cfg); t2.append(int(uw[g.choice(len(uw), p=p)]))
                 R.append(t2[len(text):])
             text.extend(R[int(np.argmax(s.verify(text, R, sr["v"])))][:sr["C"]])
-        return text[len(prompt):len(prompt) + LG]
-    def words(s, ids): return " ".join("." if i == 0 else "<unk>" if i > s.V else str(s.vw[i]) for i in ids).replace(" .", ".")
+        out = text[len(prompt):]
+        while s.nunit(out) > LG: out = out[:-1]
+        return out
+    def nunit(s, ids): return int(s.unit[np.minimum(np.asarray(ids, np.int64), len(s.unit) - 1)].sum()) if len(ids) else 0
+    def span(s, t, n):
+        """end index e with exactly n length units in S[t:e]"""
+        e = t; k = 0
+        while k < n: k += int(s.unit[min(int(s.S[e]), len(s.unit) - 1)]); e += 1
+        return e
+    def words(s, ids):
+        if C == "books": return " ".join("." if i == 0 else "<unk>" if i > s.V else str(s.vw[i]) for i in ids).replace(" .", ".")
+        out = []; q = 0; cap = True; prev = None
+        for i in ids:
+            if i == 0:
+                if prev not in ("!", "?"): out.append(".")
+                cap = True; prev = "."; continue
+            w = "<unk>" if i > s.V else str(s.vw[i])
+            if w == '"':
+                q += 1
+                if q % 2: out.append(" " + w); prev = 'open'; continue
+                out.append(w); prev = w; continue
+            if w in (",", ";", ":", "!", "?", ")"): out.append(w)
+            elif prev in ('open', "("): out.append((w[:1].upper() + w[1:]) if cap else w)
+            else: out.append(" " + ((w[:1].upper() + w[1:]) if cap else w))
+            if w not in PUNC_: cap = False
+            prev = w
+        return "".join(out).strip()
+PUNC_ = set(',;:!?"()') | {"--"}
+PROMPTS = json.load(open(os.environ["DEC_PROMPTS"])) if os.environ.get("DEC_PROMPTS") else None                     # BOOKS2: shared prompts (both corpora)
 def run(tag, arms, part=None):
     d = Dec(); G = []; nparts = int(os.environ.get("DEC_NPARTS", 1))
-    for pid, t in enumerate(d.prompts):
+    for pid, t in enumerate(d.prompts if PROMPTS is None else [None] * len(PROMPTS)):
         if part is not None and pid % nparts != part: continue
-        pr = d.S[t:t + LP].tolist(); G.append(dict(pid=pid, B="truth", prompt=d.words(pr), text=d.words(d.S[t + LP:t + LP + LG]), ids=d.S[t + LP:t + LP + LG].tolist()))
+        if PROMPTS is not None: pr, tr_ = PROMPTS[pid][C]["prompt"], PROMPTS[pid][C]["truth"]
+        elif C == "books": pr = d.S[t:t + LP].tolist(); tr_ = d.S[t + LP:t + LP + LG].tolist()
+        else: e1 = d.span(t, LP); e2 = d.span(e1, LG); pr = d.S[t:e1].tolist(); tr_ = d.S[e1:e2].tolist()
+        G.append(dict(pid=pid, B="truth", prompt=d.words(pr), text=d.words(tr_), ids=tr_))
         for arm, cfg in arms.items():
             ids = d.gen(pr, cfg, 1000 * pid + 7); G.append(dict(pid=pid, B=arm, prompt=d.words(pr), text=d.words(ids), ids=ids))
             if cfg.get("hg"): G[-1]["hg_penalized"] = d._msn; G[-1]["hg_content_cands"] = d._mst; d._msn = d._mst = 0
