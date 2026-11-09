@@ -2991,3 +2991,7 @@ Scores: sieve_lt_scores.json.
 - sieve_g1b_kernel.py option ssm: candidate score += ssm x log p_HSSM(candidate word | last 512 words of text), before the word aggregation and power 6 (so ssm 1/6 = multiply by p_HSSM once). JX3S1 settings otherwise. Arms on the 20 PW prompts (offset 113): JX3S1 (must reproduce sieve_pw_gen.json's JX3S1 texts), S1 (ssm 1/6), S2 (2/6), S4 (4/6). Judged with sieve_armjudge.py (tag SR, base JX3S1).
 - Unlike the earlier readouts (best alone 8.01 bits), this scorer is 7.04 bits alone, so it can tell candidates apart.
 - **Predictions:** at least one arm's coherence share above 0.6 (40%); best arm's grammar share above JX3S1's (45%); S4 grammar below JX3S1 (55%: too much weight lets the 7-bit model pick odd splices).
+
+## HSSML — a larger HSSM (loop 2; preregistered 2026-11-09, before the run)
+- Same kernel, HM_DM 512, HM_L 4 layers, harmonic start only, 150 minutes on a T4, same data, evaluation and trigram as HSSM (115,200 held-out positions). Purpose: a stronger scorer for SSMR-style hybrids; the bits are compared with HSSM's 7.0379.
+- **Predictions:** HSSML below 7.0379 (85%); below 6.7 (40%); best trigram mixture below 6.6 (35%).

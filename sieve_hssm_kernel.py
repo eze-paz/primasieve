@@ -16,7 +16,7 @@ z = np.load(dp[0]); S = z["S"].astype(np.int64); ntr = int(z["ntr"]); VV = int(S
 if SMOKE: S = np.r_[S[:1_000_000], S[ntr:ntr + 200_000]]; ntr = 1_000_000
 Str = S[:ntr]; NV = 8192; cntw = np.bincount(Str, minlength=VV); top = np.argsort(-cntw)[:NV - 1]; vid = np.full(VV, NV - 1, np.int64); vid[top] = np.arange(NV - 1)
 oov_tot = cntw[vid == NV - 1].sum(); p_in_oov = np.maximum(cntw, 1) / max(oov_tot, 1)
-T = 512; WARM = 128; TAUS = (2, 4, 8, 16, 32, 64, 128); DB = 64; N = DB * len(TAUS); DM = 256
+T = 512; WARM = 128; TAUS = (2, 4, 8, 16, 32, 64, 128); DB = 64; N = DB * len(TAUS); DM = int(os.environ.get("HM_DM", 256)); NL = int(os.environ.get("HM_L", 2)); INITS = tuple(os.environ.get("HM_INITS", "harm,rand").split(",")); TAG = os.environ.get("HM_TAG", "")
 # trigram baseline (as HWORD)
 def keyn(a, b): return a * VV + b
 D_ = 0.75; u1 = (cntw + 0.5) / (cntw.sum() + 0.5 * VV)
@@ -50,14 +50,14 @@ class SSM(nn.Module):
         x = x + y; return x + s.ff(s.ln2(x))
 class LM(nn.Module):
     def __init__(s, init):
-        super().__init__(); s.emb = nn.Embedding(VV, DM); s.layers = nn.ModuleList([SSM(init), SSM(init)]); s.lnf = nn.LayerNorm(DM); s.head = nn.Linear(DM, NV)
+        super().__init__(); s.emb = nn.Embedding(VV, DM); s.layers = nn.ModuleList([SSM(init) for _ in range(NL)]); s.lnf = nn.LayerNorm(DM); s.head = nn.Linear(DM, NV)
     def forward(s, w):
         x = s.emb(w)
         for l in s.layers: x = l(x)
         return s.head(s.lnf(x))
 VIDt = torch.tensor(vid, device=dev); POOv = torch.tensor(np.log(p_in_oov), dtype=torch.float32, device=dev)
 def train_eval(init, minutes):
-    torch.manual_seed(0); m = LM(init).to(dev); opt = torch.optim.AdamW(m.parameters(), lr=1e-3, weight_decay=0.01); g = np.random.default_rng(1); step = 0; t0 = time.time(); BS = 4 if SMOKE else 24
+    torch.manual_seed(0); m = LM(init).to(dev); opt = torch.optim.AdamW(m.parameters(), lr=1e-3, weight_decay=0.01); g = np.random.default_rng(1); step = 0; t0 = time.time(); BS = 4 if SMOKE else int(os.environ.get("HM_BS", 24))
     sched = lambda st: min(1.0, st / 300)
     while time.time() - t0 < minutes * 60:
         st = g.integers(0, len(Str) - T - 1, BS); X = torch.tensor(np.stack([Str[a:a + T + 1] for a in st]), device=dev)
@@ -72,11 +72,12 @@ def train_eval(init, minutes):
             y = X[:, WARM:T]; vy = VIDt[y]; l = lp.gather(2, vy[..., None])[..., 0] + torch.where(vy == NV - 1, POOv[y], torch.zeros_like(POOv[y])); bits.append((-l / math.log(2)).reshape(-1).cpu().numpy())
     b = np.concatenate(bits); log(f"HSSM {init}: {step} steps, bits/word {b.mean():.4f}"); return b, step, m
 OUT = {}
-for init in ("harm", "rand"):
+for init in INITS:
     b, steps, m = train_eval(init, float(os.environ.get("HM_SMOKE_MIN", 1)) if SMOKE else int(os.environ.get("HM_MIN", 40))); OUT[init] = b; R[init] = dict(bits=float(b.mean()), steps=steps)
     pm = 2.0 ** (-b); AL = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95); mix = {a_: float(-np.log2(a_ * pm + (1 - a_) * ptri).mean()) for a_ in AL}; R[init]["mix_with_trigram"] = mix
-    if init == "harm": torch.save(m.state_dict(), os.path.join(OUTD, "hssm_harm.pt"))
+    if init == "harm": torch.save(m.state_dict(), os.path.join(OUTD, f"hssm{TAG}_harm.pt"))
     del m; torch.cuda.empty_cache() if dev == "cuda" else None
-d = OUT["harm"] - OUT["rand"]; g = np.random.default_rng(0); blk = d[: len(d) // 384 * 384].reshape(-1, 384).mean(1)
-R["harm_minus_rand_interval"] = [float(np.percentile([blk[g.integers(0, len(blk), len(blk))].mean() for _ in range(2000)], q_)) for q_ in (2.5, 97.5)]
-log(f"HSSM result: {R}"); json.dump(R, open(os.path.join(OUTD, "hssm.json"), "w"), indent=1); log("saved")
+if len(OUT) == 2:
+    d = OUT["harm"] - OUT["rand"]; g = np.random.default_rng(0); blk = d[: len(d) // 384 * 384].reshape(-1, 384).mean(1)
+    R["harm_minus_rand_interval"] = [float(np.percentile([blk[g.integers(0, len(blk), len(blk))].mean() for _ in range(2000)], q_)) for q_ in (2.5, 97.5)]
+log(f"HSSM result: {R}"); json.dump(R, open(os.path.join(OUTD, f"hssm{TAG}.json"), "w"), indent=1); log("saved")
