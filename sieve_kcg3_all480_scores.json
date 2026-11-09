@@ -1,0 +1,22 @@
+{
+ "coherence": {
+  "n": 480,
+  "cm4_wins": 0.531,
+  "mean_wins": 0.369,
+  "mean": 0.1625,
+  "interval": [
+   0.0771,
+   0.2437
+  ]
+ },
+ "fluency": {
+  "n": 480,
+  "cm4_wins": 0.479,
+  "mean_wins": 0.423,
+  "mean": 0.0563,
+  "interval": [
+   -0.0271,
+   0.1458
+  ]
+ }
+}

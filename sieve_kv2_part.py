@@ -65,6 +65,6 @@ for arm, (dim, seed, kind) in ARMS.items():
     a = np.array(REC); bi = int(np.argmax(a[:h].mean(0))); dd = a[h:, bi] - a[h:, 0]; gg = np.random.default_rng(0); s = [dd[gg.integers(0, len(dd), len(dd))].mean() for _ in range(2000)]
     out[arm] = dict(auc=round(float(np.mean(AU)), 4), auc_with_P=round(float(np.mean(CB)), 4), beta=BETAS[bi], logp_beta0=round(float(a[h:, 0].mean()), 4), logp_best=round(float(a[h:, bi].mean()), 4), gain_interval=[round(float(np.percentile(s, 2.5)), 4), round(float(np.percentile(s, 97.5)), 4)])
     log(f"{arm}: {json.dumps(out[arm])}"); json.dump(out, open(os.path.join(OUTD, "kv2.json"), "w"), indent=1)
-    if arm in SAVE: np.savez(os.path.join(OUTD, f"kv2_{arm}.npz"), E=E.cpu().numpy().astype(np.float16), ML=M.cpu().numpy(), idf=idf)
+    if arm in SAVE: np.savez(os.path.join(OUTD, f"kv2_{arm}.npz"), E=E.cpu().numpy().astype(np.float16), ML=M.cpu().numpy().astype(np.float16 if dim >= 8192 else np.float32), idf=idf)
     del E, R, M; torch.cuda.empty_cache()
 log("kv2 done")

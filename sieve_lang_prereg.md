@@ -2938,3 +2938,9 @@ Scores: sieve_lt_scores.json.
 - Identical arms and settings; 240 fresh prompts DEC_POFF 53; same rater brief, two raters per half. Pass = coherence interval over the 240 excludes 0 in CM4's favour.
 - **Predictions:** replication pass (55%); coherence point above MEAN (80%).
 **PW results (loop 2, 2026-11-09; 20 prompts; sieve_pw_*.json, sieve_grampw_*.json).** Pairwise vs JX3S1, fluency / coherence: P3 0.450 / 0.400; P3LW 0.550 / 0.550; P3L 0.650 [0.450, 0.850] / 0.600. Grammatical share: JX3S1 0.602 (93), P3 0.578 (83), P3LW 0.619 (97), P3L 0.553 (85), truth 0.933 (75). Predictions: P3 below JX3S1 on fluency — held (0.450); P3LW above P3 — held (0.550 vs 0.450); P3LW at least JX3S1 — held weakly (0.550). All within the noise of 20 prompts; no arm stands out across fluency and grammar together.
+
+### KCG3R results -- PASS, replicated (2026-11-09; mtest/kcg3r_gen.json, sieve_kcg3r_pair_scores.json; 240 prompts DEC_POFF 53, agreement 0.917 / 0.921)
+- 0 of 240 CM4 texts identical to MEAN. CM4 vs MEAN: coherence 0.1333 [0.0125, 0.25] (CM4 preferred 0.525, MEAN 0.392); fluency 0.1042 [-0.0125, 0.2208] (0.512 / 0.408). Halves: coherence 0.2333 [0.0667, 0.3917] and 0.0333 [-0.1333, 0.2083].
+- Predictions: replication pass held; coherence point above MEAN held.
+- KCG3 + KCG3R pooled (480 prompts, sieve_kcg3_all480_scores.json): see that file.
+- Reading: CM4 (MEAN + a no-training 4,096-dim count matrix reordering content words) is the new best Sieve decoder; it is the first change over MEAN to pass and replicate on coherence.
