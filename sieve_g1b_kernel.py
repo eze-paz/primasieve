@@ -205,7 +205,7 @@ def class_ok(ctx4, nx, eps):
     k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
     jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0; return n5 >= eps * max(n4, 1)
 NG5 = None
-if any(c.get("accept") or c.get("flag") or c.get("crit") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
+if any(c.get("accept") or c.get("flag") or c.get("crit") or c.get("block") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
     NG5 = {"c1": np.bincount(S[:ntr].astype(np.int64), minlength=VV).astype(np.float64)}; NG5["N"] = NG5["c1"].sum()
     with np.errstate(over="ignore"):
         hc = S[:ntr].astype(np.uint64) + np.uint64(1)                                                          # hash of the 1-word context at each position
@@ -287,6 +287,37 @@ def mw_step(text, rng, cfg):
     MWSTAT[0] += 1; MWSTAT[1] += float(ok_.any())
     if ok_.any(): q = q * ok_
     return int(nx[rng.choice(len(nx), p=q / q.sum())])
+def span_propose(text, i, sl, rng, cfg):
+    """regenerate text[i:i+sl] left to right with the collage's candidate step (left context only); guards as in decoding"""
+    t = text[:i]; new = []
+    for k in range(sl):
+        h = t[::-1][:8]; c, ok = cands(np.array([h[:4]]), np.array([h[4:8]])); c = c[0][ok[0]]
+        if len(c) == 0: return None
+        m4 = (St[(c[:, None] - 1 - torch.arange(4, device=dev)).clamp(min=0)].long() == torch.tensor([h[:4]], device=dev)).float().sum(1).cpu().numpy(); nx = St[c].long().cpu().numpy().astype(np.int64)
+        bad = (nx == UNK) | inH8(np.c_[np.repeat(np.array([t[-7:]]), len(nx), 0), nx]); seen = {tuple(t[j:j + 3]) for j in range(len(t) - 2)}; bad |= np.array([(t[-2], t[-1], int(x_)) in seen for x_ in nx])
+        w = np.exp(8.0 * (m4 - m4.max())) * ~bad
+        if w.sum() <= 0: return None
+        uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg.get("pow", 6.0); x_ = int(uw[rng.choice(len(uw), p=ww / ww.sum())]); t = t + [x_]; new.append(x_)
+    full = t + text[i + sl:]
+    for a in range(max(0, i - 7), min(i + sl, len(full) - 8) + 1):                                         # copy cap across the right junction too
+        if inH8(np.array([full[a:a + 8]]))[0]: return None
+    return new
+def gibbs_block(text, rng, cfg):
+    """GIBBS3: blocked Metropolis revision with simulated annealing on the whole-text 5-gram score"""
+    G = [0, 0]; draft = list(text); nsw = int(cfg["block"]); T0, T1 = cfg.get("T0", 0.0), cfg.get("T1", 0.0)
+    for sw in range(nsw):
+        T = T0 * (T1 / T0) ** (sw / max(nsw - 1, 1)) if T0 > 0 else 0.0
+        pos = list(range(LP, len(text)))
+        con = np.array([float(np.sum(ng5_terms(text, range(i, i + 5)))) for i in pos]); pos = sorted(np.array(pos)[np.argsort(con)[:max(1, int(round(cfg.get("flag", 0.3) * len(con))))]].tolist())
+        for i in pos:
+            sl = int(rng.integers(1, 4)); sl = min(sl, len(text) - i)
+            new = span_propose(text, i, sl, rng, cfg); G[0] += 1
+            if new is None or new == text[i:i + sl]: continue
+            js = range(i, min(i + sl + 4, len(text))); before = float(np.sum(ng5_terms(text, js))); old = text[i:i + sl]; text[i:i + sl] = new; after = float(np.sum(ng5_terms(text, js)))
+            d = after - before
+            if d > 0 or (T > 0 and rng.random() < np.exp(d / T)): G[1] += sum(a != b for a, b in zip(new, old))
+            else: text[i:i + sl] = old
+    GSTAT.append(sum(a != b for a, b in zip(text[LP:], draft[LP:])) / max(len(text) - LP, 1)); return text
 def gibbs(text, rng, cfg):
     """revision sweeps over the generated words: re-choose each word given 4 words left (collage candidates) and up to 2 words right (training n-grams)"""
     G = [0, 0]
@@ -388,6 +419,7 @@ def generate(cfg, pids):
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
+        if cfg.get("block"): text = gibbs_block(text, np.random.default_rng(1000 * pid + 13), cfg)
         out[pid] = text[LP:]
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
