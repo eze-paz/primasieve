@@ -2949,3 +2949,9 @@ Scores: sieve_lt_scores.json.
 - CEIL's 120 prompts (DEC_POFF 0) and seeds. Generate MEAN and CM4 with today's decoder; NET = CEIL's transformer texts (mtest/ceil_gen.json). Side by side NET:MEAN and NET:CM4 (120 pairs each, two blind raters each). Reported: preference shares and intervals; the question is whether CM4 narrows the gap (CM4's share against NET above MEAN's).
 - **Predictions:** NET preferred over CM4 on coherence with interval excluding 0 (85%); CM4's coherence share against NET above MEAN's (60%).
 **HMLP results (2026-11-09; Kaggle GPU primasieve-hmlp; sieve_hmlp.json).** Bits per word (even): one-hidden-layer readout alone 8.0146 (linear: 8.1105), **mixture (alpha 0.4) 7.5205** (linear: 7.5594), trigram 7.8928. Predictions: readout alone below the trigram — failed; mixture below 7.3 — failed. **Decision: the fixed count-fitted features are the binding limit, not the readout's capacity.**
+
+### GAP2 results (2026-11-09; mtest/gap2_gen.json, sieve_gap2m_pair_scores.json, sieve_gap2c_pair_scores.json; agreement coherence 0.883 / 0.858)
+- MEAN vs NET: coherence -0.6667 [-0.775, -0.5498] (NET preferred 0.775, MEAN 0.108); fluency -0.5583 [-0.6917, -0.4248] (0.717 / 0.158).
+- CM4 vs NET: coherence -0.5583 [-0.6917, -0.4167] (NET 0.708, CM4 0.150); fluency -0.525 [-0.6583, -0.3831] (0.717 / 0.192).
+- Predictions: NET over CM4 with interval held; CM4's share against NET above MEAN's held (0.150 vs 0.108).
+- Reading: CM4 narrows the gap a little; the transformer is still preferred on about 7 of 10 prompts.
