@@ -1,0 +1,32 @@
+{
+ "JX3S1": {
+  "sentences": 95,
+  "mention_prompt_referent": 0.3789,
+  "subject_is_prompt_referent": 0.2632
+ },
+ "SYMP": {
+  "sentences": 84,
+  "mention_prompt_referent": 0.3333,
+  "subject_is_prompt_referent": 0.1905
+ },
+ "SYMPF": {
+  "sentences": 84,
+  "mention_prompt_referent": 0.3333,
+  "subject_is_prompt_referent": 0.1905
+ },
+ "SYM2H": {
+  "sentences": 98,
+  "mention_prompt_referent": 0.2449,
+  "subject_is_prompt_referent": 0.1531
+ },
+ "SYM2M": {
+  "sentences": 86,
+  "mention_prompt_referent": 0.3721,
+  "subject_is_prompt_referent": 0.1628
+ },
+ "truth": {
+  "sentences": 66,
+  "mention_prompt_referent": 0.4394,
+  "subject_is_prompt_referent": 0.3485
+ }
+}

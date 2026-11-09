@@ -15,7 +15,7 @@
    - Revision is capped by its judge: checked Gibbs is preferred on 16 of 22 changed texts but moves grammar only +0.02; critic-guided revision fools the critic and raters reject it 0 of 20; count diffusion is rejected (fluency 0.05); annealing's edits read better in 4 of 13 blind cases.
 3. **Theory says coherence is designed into a plan, not sampled into words.** DRT (Kamp 1981) and Centering (Grosz, Joshi & Weinstein 1995) model discourse as tracked referents and their transitions; the NLG pipeline produced coherent text without neural networks by planning content first. SYM's result fits: the plan alone (SYMP) carried the coherence gain; boosting entity words alone (SYME) raised continuity numbers but not rated coherence (0.55).
 4. **It has a clear, theory-backed path to grow, with no neural network and no extra compute:**
-   - sampled Centering transitions and plan fallback (SYM2, running);
+   - sampled Centering transitions with human frequencies (SYM2H: coherence 0.7368 [0.526, 0.895] over JX3S1, round SY2; plan fallback never triggered);
    - event planning: who does what next, from verb-subject and verb-object counts over parsed books;
    - dictionary-derived world knowledge: IS-A taxonomy from definition genus terms (Amsler 1980), animacy and gender for pronouns, selectional preferences over classes (Resnik 1997).
 5. **It keeps the strengths we already have:** the collage's fluency and the count veto. SYM adds the content-planning layer the system lacked.
