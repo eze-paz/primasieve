@@ -166,6 +166,10 @@ if any(c.get("svd") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
         th[dead] = np.random.default_rng(7).random((dead.sum(), th.shape[1])) * 2 * np.pi; return th
     NEED = {(c.get("svdsrc", "mt"), int(c.get("D", 64))) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values() if c.get("svd")}
     for src, Dp in sorted(NEED):                                                                                # phases per (fit text, phase count): mt = MT 27M training text, all = whole training stream
+        _sc = os.environ.get("G1_SVDCACHE")                                                                      # disk cache of the fitted phases (same text, same D) -> skips minutes of SVD per run
+        _scf = f"{_sc}_{src}_D{Dp}_n{ntr0 if src == 'mt' else ntr}.npz" if _sc else None
+        if _scf and os.path.exists(_scf):
+            _z = np.load(_scf); SVDTH[(src, Dp)] = {int(k[3:]): torch.tensor(_z[k], device=dev) for k in _z.files}; log(f"SVD phases {src} D{Dp} from cache {_scf}"); continue
         Str_ = (S[:ntr0] if src == "mt" else S[:ntr]).astype(np.int64); TH_ = {}
         for tau in (2, 4, 8, 16, 32, 64, 128):
             lam = 1 - 1 / tau
@@ -184,6 +188,7 @@ if any(c.get("svd") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
                 c_ = np.asarray(X.sum(0)).ravel(); X = (X @ sp.diags((1 / np.sqrt(np.maximum(c_, 1e-12))).astype(np.float32))).astype(np.float32); U, s_, Vt = svds(X, k=2 * Dp); V_ = (Vt.T * s_[None]).astype(np.float64); del X
             TH_[tau] = torch.tensor(_ph(V_), dtype=torch.float32, device=dev); log(f"SVD phases {src} D{Dp} tau {tau}")
         SVDTH[(src, Dp)] = TH_; del Str_
+        if _scf: np.savez(_scf, **{f"tau{t}": v.cpu().numpy() for t, v in TH_.items()}); log(f"SVD phases saved to {_scf}")
 class Harm:                                                                                                    # harmonic state (from the HSWEEP kernels): damped oscillator bands over the last WIN symbols
     def __init__(s, cfg):
         s.cfg = cfg; g = torch.Generator().manual_seed(1); D = cfg.get("D", 64); s.WIN = cfg.get("WIN", 64); nsym = VV if cfg.get("symbol", "class") == "word" else int(FINE.max()) + 1
