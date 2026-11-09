@@ -59,6 +59,9 @@ class Dec:
             s._hgc = []; s._hgs = []
         if os.environ.get("DEC_KC"):                                                                                                     # KCG: count-built corpus matrix (sieve_kc_rank_part.py)
             kc_ = os.environ["DEC_KC"]; kz = {k: np.load(os.path.join(kc_, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(kc_, "R.npy")) else ())} if os.path.isdir(kc_) else np.load(kc_); s.kcE = kz["E"]; s.kcML = np.asarray(kz["ML"], np.float32); s.kcidf = np.asarray(kz["idf"]); s.kcHL = kz["HL"] if not isinstance(kz, dict) and "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s.kcR = kz["R"] if "R" in (kz.keys() if isinstance(kz, dict) else kz.files) else None; s._cmcal = []
+        if os.environ.get("DEC_KC2"):                                                                                                    # KCG5: second (all-word) matrix in the same process
+            k2 = os.environ["DEC_KC2"]; kz = {k: np.load(os.path.join(k2, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(k2, "R.npy")) else ())}
+            s.kc2 = (kz["E"], np.asarray(kz["ML"], np.float32), np.asarray(kz["idf"]), np.array([2.0, 8.0, 30.0]), kz.get("R"))
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -179,6 +182,9 @@ class Dec:
                     if cfg.get("cmnorm"): w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300)                                      # KCG3: keep the content words' total mass
                     p[el] *= w_
             elif cfg.get("cmcal"): s._cmel = None
+        if cfg.get("cma") and getattr(s, "kc2", None) is not None:                                                            # KCG5: all-word matrix reorders every word, same total mass
+            el = (uw > 0) & (uw <= s.V)
+            if el.sum() >= 2: w_ = np.exp(cfg["cma"] * s.cmz(text, uw[el], s.kc2)); w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300); p = p.copy(); p[el] *= w_
         if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
             j = len(text) - 2
             while j >= 0 and text[j] != 0: j -= 1
@@ -202,13 +208,14 @@ class Dec:
         if cfg.get("cmpost") and getattr(s, "_cmpost", None) is not None:                                                    # KCG3: reorder content words, same total mass
             el, z_ = s._cmpost; s._cmpost = None; q_ = p[el]; w_ = np.exp(cfg["cmpost"] * z_); p = p.copy(); p[el] = q_ * w_ * q_.sum() / max((q_ * w_).sum(), 1e-300)
         return uw, p / p.sum()
-    def cmz(s, text, cw):
+    def cmz(s, text, cw, m=None):
         """standardised cosine of each candidate's count vector with ML x (idf-weighted context state at three decays, last 30 words)"""
-        win = np.array(text[-30:]); L = len(win); idf = s.kcidf[np.minimum(win, len(s.kcidf) - 1)]; ks = []
-        for h in s.kcHL:
-            k = (idf * 2.0 ** (-(L - 1 - np.arange(L)) / h)).astype(np.float32) @ s.kcE[win].astype(np.float32); ks.append(k / max(np.linalg.norm(k), 1e-9))
-        if getattr(s, "kcR", None) is not None: ks += [s.kcR[win[-1]].astype(np.float32), s.kcR[win[-2]].astype(np.float32)]   # KV5 local key
-        r = s.kcML @ np.concatenate(ks); A = s.kcE[cw].astype(np.float32); sc = (A @ r) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(r), 1e-9))
+        kE, kML, kidf, kHL, kR = m if m is not None else (s.kcE, s.kcML, s.kcidf, s.kcHL, getattr(s, "kcR", None))
+        win = np.array(text[-30:]); L = len(win); idf = kidf[np.minimum(win, len(kidf) - 1)]; ks = []
+        for h in kHL:
+            k = (idf * 2.0 ** (-(L - 1 - np.arange(L)) / h)).astype(np.float32) @ kE[win].astype(np.float32); ks.append(k / max(np.linalg.norm(k), 1e-9))
+        if kR is not None: ks += [kR[win[-1]].astype(np.float32), kR[win[-2]].astype(np.float32)]   # KV5 local key
+        r = kML @ np.concatenate(ks); A = kE[cw].astype(np.float32); sc = (A @ r) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(r), 1e-9))
         return (sc - sc.mean()) / max(sc.std(), 1e-9)
     def tstate(s, text):
         if getattr(s, "_tsk", None) == tuple(text): return s._tsv

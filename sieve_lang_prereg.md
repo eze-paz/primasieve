@@ -3006,3 +3006,8 @@ Scores: sieve_lt_scores.json.
 ## SRM — milestone: S1 (HSSM scorer, ssm 1/6) vs JX3S1 on 80 fresh prompts (offset 119; preregistered 2026-11-09, before the run)
 - Same kernel and settings as SSMR; arms JX3S1, S1; G1_POFF 119, 80 prompts; sieve_armjudge.py tag SRM (one pairwise batch of 80, three grammar batches).
 - **Predictions:** S1 coherence share above 0.5 (60%); interval above 0.5 (20%); S1 grammar at or above JX3S1 (45%).
+
+### KCG5 gate -- PASS (2026-11-09; mtest/kaggle_kv5/out/kv2.json, sieve_kcg5auc_beta.json)
+- Kernel primasieve-kv5 (all-word targets, 1,000 positions): P 0.7941; A4096L AUC 0.7222, with P 0.8172.
+- Inside MEAN, every candidate, all positions (1,506 true words in the candidate set, T 1): weight 0 / 0.5 / 1 / 2 / 4: 0.914 / 0.9188 / 0.9185 / 0.9168 / 0.9126; weight 0.5. Gate passes (prediction 60%: held).
+- Amendment before generation: the decoder holds both matrices in one process (DEC_KC = D4096 content matrix, DEC_KC2 = A4096L all-word matrix; cfg "cma" = weight, mass-preserving over all words, before the temperature). Arms CM4 and CM4A (CM4 + cma 0.5), 240 fresh prompts DEC_POFF 67, two raters per half; pass = coherence interval excludes 0 in CM4A's favour.
