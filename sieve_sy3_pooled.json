@@ -1,0 +1,62 @@
+{
+ "SYMPH_fluency": {
+  "r1": 0.55,
+  "r2": 0.6,
+  "pooled": 0.575,
+  "interval": [
+   0.35,
+   0.775
+  ],
+  "agree": 0.95
+ },
+ "SYMPH_coherence": {
+  "r1": 0.65,
+  "r2": 0.65,
+  "pooled": 0.65,
+  "interval": [
+   0.45,
+   0.85
+  ],
+  "agree": 1.0
+ },
+ "SYM3C_fluency": {
+  "r1": 0.6,
+  "r2": 0.5,
+  "pooled": 0.55,
+  "interval": [
+   0.349,
+   0.75
+  ],
+  "agree": 0.9
+ },
+ "SYM3C_coherence": {
+  "r1": 0.75,
+  "r2": 0.75,
+  "pooled": 0.75,
+  "interval": [
+   0.55,
+   0.95
+  ],
+  "agree": 1.0
+ },
+ "SYM3_fluency": {
+  "r1": 0.6,
+  "r2": 0.5,
+  "pooled": 0.55,
+  "interval": [
+   0.35,
+   0.75
+  ],
+  "agree": 0.8
+ },
+ "SYM3_coherence": {
+  "r1": 0.6,
+  "r2": 0.5,
+  "pooled": 0.55,
+  "interval": [
+   0.35,
+   0.75
+  ],
+  "agree": 0.9
+ }
+}
