@@ -12,6 +12,8 @@ about) -> constrained corpus collage as surface realiser. It is the only NN-free
 coherence across the board (SYM coherence 0.70 and fluency 0.70 over JX3S1; plan-only grammar 0.735 vs 0.663), while
 every judge-, revision- and spectral-based NN-free line hit a ceiling. Full justification and caveats:
 `RESEARCH_TARGET.md`; theory: `sieve_theory_symbolic.md`; preregistrations and results: `sieve_lang_prereg.md`.
+**Update 2026-11-09: SYM3C (subject + event planning) PASSED its 80-prompt two-rater milestone** (coherence 0.775
+[0.6875, 0.85], fluency 0.6188 [0.5188, 0.7188] over JX3S1, grammar not worse) and is the default decoder.
 
 ## Model names (agreed 2026-11-01) -- use these, never mix them: Sieve, Counter, Stack, LM
 

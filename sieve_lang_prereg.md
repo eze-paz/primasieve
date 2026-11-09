@@ -3347,3 +3347,10 @@ Theory: scripts (Schank & Abelson 1977) and their count-based form, narrative ev
 - Local bench (MT 27M), G1_POFF 185, 80 prompts; arms JX3S1 and SYM3C (hard subject + verb plan, always CONTINUE, prompt referents weighted 3, no expletive it, verbs from direct pronoun-verb events). Tag SY3M: 80 pairs judged independently by two blind raters (pair_ratings.json, pair_ratings_r2.json), grammar in 3 batches (one rater); 3 prompts traced.
 - **Decision rule (as SYM2M80):** SYM3C becomes the default decoder if the pooled coherence share has its interval above 0.5 and the grammar paired interval's lower bound is above -0.05.
 - **Predictions:** pooled coherence above 0.5 (70%); its interval above 0.5 (45%); pooled fluency above 0.5 (50%); grammar lower bound above -0.05 (45%); decision rule passes (35%).
+
+### SY3M80 results — milestone PASSED (2026-11-09; local bench MT 27M, 80 prompts offset 185; sieve_sy3m_pooled.json, sieve_sy3m_scores.json, sieve_gramsy3m_scores.json, mtest/bench/sy3m/trace.txt)
+- Trace (3 prompts): planned subjects realised 13 of 13, planned verbs 12 of 12. 80 of 80 texts differ. 5-gram copy share: JX3S1 0.7296, SYM3C 0.6139, truth 0.0929.
+- SYM3C over JX3S1, two independent blind raters: **coherence 0.75 / 0.80, pooled 0.775 [0.6875, 0.85]**; **fluency 0.5875 / 0.65, pooled 0.6188 [0.5188, 0.7188]**. Agreement: coherence 0.875, fluency 0.9375.
+- Grammatical share: JX3S1 0.597 (375 sentences), **SYM3C 0.625 (376; paired [-0.032, 0.087])**, truth 0.923.
+- Predictions: pooled coherence above 0.5 held; interval above 0.5 held; pooled fluency above 0.5 held (interval also above 0.5); grammar lower bound above -0.05 held (-0.032); decision rule **passed** (predicted 35%).
+- **Decision: SYM3C becomes the default decoder** (subject + event planning from a symbolic discourse state: Centering CONTINUE with prompt referents weighted 3, narrative-chain verbs, hard plan realised by the corpus collage). This is the first NN-free change to pass an 80-prompt two-rater milestone on coherence and fluency together, and it copies less from the books. Gap to human text remains large (grammar 0.625 vs 0.923).

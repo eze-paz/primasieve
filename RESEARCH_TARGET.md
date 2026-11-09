@@ -2,6 +2,13 @@
 
 **SYM is the leading, primary research target of primasieve and the most promising direction we have.** SYM = an NN-free hybrid in the shape of the classic NLG pipeline (Reiter & Dale 2000): a symbolic *reader* builds a discourse state (DRT-lite referents with Centering salience, from our count-trained tagger and dependency parser), a *planner* decides what each next sentence is about (Centering transitions), and the corpus collage (JX3S1) is the *surface realiser*, constrained to carry out the plan. Theory: `sieve_theory_symbolic.md`. Preregistrations and results: `sieve_lang_prereg.md` (sections SYM, SYM2). Code: `sieve_g1b_kernel.py` (options `sym`, `ptr`), `sieve_parse.py` (reader), `sieve_symcont.py`, `sieve_symtrans.py`.
 
+## Current best: SYM3C — milestone PASSED (2026-11-09)
+
+**SYM3C is the default decoder.** It plans each sentence's subject (Centering CONTINUE, prompt referents weighted 3, no expletive "it") and its verb (narrative event chains, Chambers & Jurafsky 2008, counted from the books), and the collage realises the plan as a hard constraint. 80 fresh prompts, two independent blind raters, against JX3S1:
+- coherence pooled **0.775 [0.6875, 0.85]**; fluency pooled **0.6188 [0.5188, 0.7188]**;
+- grammatical share 0.625 vs 0.597 (paired [-0.032, 0.087]); 5-gram copy share 0.6139 vs 0.7296; human text 0.923 grammatical.
+It is the first NN-free change to pass an 80-prompt two-rater milestone. It was found by step-by-step tracing: the earlier SYM2H milestone failed because its plan almost never acted (weak boost, vetoes), which batch scores could not show. Preregistration and results: `sieve_lang_prereg.md` (sections SYM3, SY3, SY3M80). Run options: `sym` "pfhv", `pw` 3.0 (`sieve_g1b_kernel.py`; `G1_TRACE` for step traces).
+
 ## Justification
 
 1. **It is the only NN-free change that blind raters preferred on coherence across the board.** SYM round (20 prompts, one rater, local bench MT 27M):
