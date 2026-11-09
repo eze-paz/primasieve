@@ -431,7 +431,7 @@ if any("v" in str(c.get("sym", "")) for c in json.loads(os.environ.get("G1_ARMS"
     w1, w2, w3 = _Str[_pos + 1], _Str[_pos + 2], _Str[_pos + 3]; a1, a2 = np.isin(w1, AUXW), np.isin(w2, AUXW)
     _verb = np.where(_vl(w1), w1, np.where(a1 & _vl(w2), w2, np.where(a1 & a2 & _vl(w3), w3, -1))); _k = _verb >= 0
     EP, EV, EG = _pos[_k], _verb[_k], np.array([SUBJID[int(x_)] for x_ in _Str[_pos[_k]]])
-    PVG = np.zeros((len(GRPS), VV)); np.add.at(PVG, (EG, EV), 1.0)
+    PVG = np.zeros((len(GRPS), VV)); _dir = (_verb == w1)[_k]; np.add.at(PVG, (EG[_dir], EV[_dir]), 1.0)          # verb choice only from verbs directly after the pronoun (agreement: "he goes", not "he go")
     keys = []
     for g_ in range(len(GRPS)):
         m_ = EG == g_; p_, v_ = EP[m_], EV[m_]
@@ -453,7 +453,7 @@ def plan_verb(grp, recent, rng):
     top = np.argsort(-sc_)[:20]; pr = np.exp(sc_[top] - sc_[top].max()); return int(cand[top][rng.choice(len(top), p=pr / pr.sum())])
 class Disc:
     """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
-    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1
+    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1; s.pref = set(); s.pw = 1.0
     def read(s, ids):
         ws = [vw[i] if i < len(vw) and vw[i] is not None else "<unk>" for i in ids]
         if not ws: return
@@ -472,14 +472,17 @@ class Disc:
     def plan(s, rng=None, ptr=None):
         """Centering: CONTINUE (most salient referent), SHIFT (another referent, by salience) or NEW (no plan), sampled with ptr; default always CONTINUE"""
         if not s.sal: return []
-        cb = max(s.sal, key=lambda r: s.sal[r])
+        key_ = lambda r: s.sal[r] * (s.pw if r in s.pref else 1.0)                                                # prompt characters weigh pw times more (they should stay the protagonists)
+        cands_ = [r for r in s.sal if r != "IT"]                                                                   # "it" is mostly expletive, never the planned protagonist
+        if not cands_: return []
+        cb = max(cands_, key=key_)
         if ptr is not None:
             u = rng.random()
             if u >= ptr[0] + ptr[1]: return []
             if u >= ptr[0]:
-                oth = [r for r in s.sal if r != cb]
+                oth = [r for r in cands_ if r != cb]
                 if not oth: return []
-                wv = np.array([s.sal[r] for r in oth]); cb = oth[int(rng.choice(len(oth), p=wv / wv.sum()))]
+                wv = np.array([key_(r) for r in oth]); cb = oth[int(rng.choice(len(oth), p=wv / wv.sum()))]
         s.vplan = plan_verb(cb, s.ev.get(cb, []), rng) if (EVC is not None and s.useverb and cb in SUBJ and rng is not None) else -1
         if cb in SUBJ: return [_wid.get(SUBJ[cb], -1)]
         return [_wid.get("the", -1), _wid.get(cb, -1)]
@@ -499,6 +502,7 @@ def generate(cfg, pids):
                 if x_ == 0: DS.read(cur); cur = []
                 else: cur.append(x_)
             if cur: DS.read(cur)
+            DS.pref = set(DS.sal); DS.pw = float(cfg.get("pw", 1.0))
             PLAN = DS.plan(rng, cfg.get("ptr")) if text[-1] == 0 else []; REFS = DS.ref_ids(); SYMST[0] += 1
             if TRACE and pid < TRACE: TRL.append(f"   [prompt state p{pid}] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
         while len(text) - LP < LG:
