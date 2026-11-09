@@ -1,0 +1,27 @@
+# Primary research target: SYM — symbolic understanding for fluent, coherent text (set 2026-11-09)
+
+**SYM is the leading, primary research target of primasieve and the most promising direction we have.** SYM = an NN-free hybrid in the shape of the classic NLG pipeline (Reiter & Dale 2000): a symbolic *reader* builds a discourse state (DRT-lite referents with Centering salience, from our count-trained tagger and dependency parser), a *planner* decides what each next sentence is about (Centering transitions), and the corpus collage (JX3S1) is the *surface realiser*, constrained to carry out the plan. Theory: `sieve_theory_symbolic.md`. Preregistrations and results: `sieve_lang_prereg.md` (sections SYM, SYM2). Code: `sieve_g1b_kernel.py` (options `sym`, `ptr`), `sieve_parse.py` (reader), `sieve_symcont.py`, `sieve_symtrans.py`.
+
+## Justification
+
+1. **It is the only NN-free change that blind raters preferred on coherence across the board.** SYM round (20 prompts, one rater, local bench MT 27M):
+   - Preferred over JX3S1: SYM fluency 0.70, coherence 0.70; SYMP (plan only) fluency 0.70, coherence 0.70.
+   - Grammatical share: SYMP 0.735, JX3S1 0.663, human text 0.933.
+   - Sentences whose subject is a prompt referent: SYM 0.4516, SYMP 0.3163, JX3S1 0.1939, human 0.3167.
+   - 5-gram copy share: SYM 0.6728, JX3S1 0.7043 (it does not copy more).
+2. **Every other NN-free line tested on 2026-11-09 hit a ceiling, and each failure points at the same missing piece: a representation of who is in the scene and what happens.**
+   - Judges of form plateau: 5-gram critic, harmonic reservoir critic (human vs generated AUC 0.8980, but grammar AUC 0.8608 against 0.8352 for length alone), treebank parser (0.8476), entity grid (coherence pair accuracy 0.5679 against 0.5218 baseline).
+   - Spectral learning of the recurrence: 9.5690 bits per word alone.
+   - Revision is capped by its judge: checked Gibbs is preferred on 16 of 22 changed texts but moves grammar only +0.02; critic-guided revision fools the critic and raters reject it 0 of 20; count diffusion is rejected (fluency 0.05); annealing's edits read better in 4 of 13 blind cases.
+3. **Theory says coherence is designed into a plan, not sampled into words.** DRT (Kamp 1981) and Centering (Grosz, Joshi & Weinstein 1995) model discourse as tracked referents and their transitions; the NLG pipeline produced coherent text without neural networks by planning content first. SYM's result fits: the plan alone (SYMP) carried the coherence gain; boosting entity words alone (SYME) raised continuity numbers but not rated coherence (0.55).
+4. **It has a clear, theory-backed path to grow, with no neural network and no extra compute:**
+   - sampled Centering transitions and plan fallback (SYM2, running);
+   - event planning: who does what next, from verb-subject and verb-object counts over parsed books;
+   - dictionary-derived world knowledge: IS-A taxonomy from definition genus terms (Amsler 1980), animacy and gender for pronouns, selectional preferences over classes (Resnik 1997).
+5. **It keeps the strengths we already have:** the collage's fluency and the count veto. SYM adds the content-planning layer the system lacked.
+
+## Caveats (honest status)
+
+- The SYM result is 20 prompts with one rater: intervals [0.50, 0.90] touch 0.5. A milestone on more prompts with two raters is required before adoption as the default decoder.
+- Its components are crude: tag-only parser (attachment accuracy 0.6152), coreference by pronoun groups, no gender for nouns.
+- The neural MW (HSSM writes, counts veto) also beat JX3S1 (0.80 / 0.80), but it is an NN. SYM is the leading **NN-free** direction and the primary target by the owner's decision of 2026-11-09.

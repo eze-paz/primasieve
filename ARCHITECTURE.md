@@ -4,6 +4,15 @@
 record; it is not an architecture. `README.md`, `NEXT.md`, `HANDOFF.md`, `METAPLAN.md`,
 `GENERAL_REASONER_PLAN.md` are per-arc plans. This file is the one that says what the code *is*.
 
+## PRIMARY RESEARCH TARGET (set 2026-11-09): SYM — symbolic understanding
+
+**SYM is the leading, primary and most promising research target.** It is an NN-free reader (count-trained tagger +
+dependency parser) -> discourse state (DRT-lite referents, Centering salience) -> planner (what each next sentence is
+about) -> constrained corpus collage as surface realiser. It is the only NN-free change that blind raters preferred on
+coherence across the board (SYM coherence 0.70 and fluency 0.70 over JX3S1; plan-only grammar 0.735 vs 0.663), while
+every judge-, revision- and spectral-based NN-free line hit a ceiling. Full justification and caveats:
+`RESEARCH_TARGET.md`; theory: `sieve_theory_symbolic.md`; preregistrations and results: `sieve_lang_prereg.md`.
+
 ## Model names (agreed 2026-11-01) -- use these, never mix them: Sieve, Counter, Stack, LM
 
 - **Sieve** -- the original deterministic operator deriver: the rejection-first loop GENERATE -> REJECT -> COMPRESS ->
