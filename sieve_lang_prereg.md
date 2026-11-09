@@ -3219,3 +3219,10 @@ Theory: masked discrete diffusion (D3PM, Austin et al. 2021; MDLM, Sahoo et al. 
 - 50 blind before/after pairs (all 13 downhill + 37 random uphill; order and A/B position randomised; edit type hidden until after judging), judged by the session model by hand (mtest/bench/ann/ann_items.txt, my_choices.txt, ann_key.json).
 - After-edit text preferred: **downhill 4 of 13 = 0.308 [0.077, 0.538]**; uphill 16 of 37 = 0.432 [0.27, 0.595].
 - Reading: annealing is not helping: it rarely acts (13 edits in 40 texts) and its edits are mostly worse. Even the score-improving block edits are preferred less than half the time, matching GIBBS3: the 5-gram scorer cannot tell good span swaps from bad ones. Caveat: one judge (the same model family as the blind raters), 50 pairs.
+
+### CDIFF results (2026-11-09; local bench MT 27M, 20 prompts offset 149, one rater; sieve_G4_scores.json, sieve_gramG4_scores.json)
+- Words changed: CD 42.4%, CDA 2.8% (texts changed 20, 13). 5-gram log p per word: JX3S1 -2.1767, CD -2.6330, CDA -2.0998. 5-gram copy share: JX3S1 0.6804, CD 0.6109, CDA 0.6891, truth 0.0576.
+- Pairwise over JX3S1: CD fluency 0.05 [0.0, 0.15], coherence 0.15 (20); CDA 0.3846 / 0.4615 (13 changed).
+- Grammatical share: JX3S1 0.629; CD 0.446 (paired [-0.283, -0.079]); CDA 0.614 ([-0.065, 0.033]); truth 0.931.
+- Predictions: CD changes more than BLKA held (42.4% vs 8.1%); CD fluency above 0.5 failed (0.05); CDA fluency above 0.6 failed (0.38); CDA grammar +0.03 failed; copy share of CD and CDA above JX3S1 failed for CD (0.6109), held for CDA (0.6891).
+- Reading: the count denoiser is far weaker than a trained one: matching 4 words left and 1-2 right finds book words that fit locally but break the sentence, and unchecked it rewrites 42% of words into worse text. With the 5-gram check it is neutral. Masked-diffusion sampling needs a denoiser that understands the whole sentence; counts of short windows are not that.
