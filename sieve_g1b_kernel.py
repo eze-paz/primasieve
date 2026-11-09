@@ -92,6 +92,24 @@ if any(c.get("lin") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
     _lp = glob.glob("/kaggle/input/**/hlin_readout.pt", recursive=True) or [os.environ.get("G1_LIN", "hlin_readout.pt")]
     _r = torch.load(_lp[0], map_location=dev); LIN = dict(W=_r["W"].to(dev).float(), sc=float(_r["cfg"]["sc"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]))
     log(f"linear readout loaded: {_r['cfg']}")
+LW = None
+if any(c.get("linw") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                            # next-word log-bilinear readout (HWORD2)
+    _lp = glob.glob("/kaggle/input/**/hword_readout.pt", recursive=True) or [os.environ.get("G1_LW", "hword_readout.pt")]
+    _r = torch.load(_lp[0], map_location=dev); _vid = _r["vid"].to(dev); _cw = np.bincount(S[:ntr0], minlength=VV).astype(np.float64); _oov = (_r["vid"].numpy()[:VV] == _r["NV"] - 1)
+    _lin_oov = torch.tensor(np.log(np.maximum(_cw, 1) / max(_cw[_oov].sum(), 1)), dtype=torch.float32, device=dev)
+    LW = dict(W=_r["W"].to(dev).float(), b=_r["b"].to(dev).float(), vid=_vid, NV=int(_r["NV"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]), loov=_lin_oov)
+    log("next-word readout loaded")
+def linw_logprob(text, nx):
+    """log p(next word) for candidate words nx under the HWORD readout (state of words 3+ back + fitted codes of the last two words)"""
+    w = torch.tensor(text[::-1][2:], device=dev); vs = []
+    for t in LW["TAUS"]:
+        J = min(4 * t, len(w)); j = torch.arange(J, device=dev, dtype=torch.float32); k = ((1 - 1 / t) ** j)[:, None] * torch.exp(1j * j[:, None] * LW["om"][None, :])
+        z = (torch.exp(1j * LW["TH"][t][w[:J]]) * k).sum(0); v = torch.cat([z.real, z.imag]); vs.append((v / v.norm().clamp(min=1e-9)).half().float())
+    e = []
+    for t in (2, 4):
+        for w_ in (text[-1], text[-2]): e += [torch.cos(LW["TH"][t][w_]), torch.sin(LW["TH"][t][w_])]
+    f = torch.cat(vs + [(torch.cat(e) / 8.0).half().float()]); lp = torch.log_softmax(f @ LW["W"] * 10 + LW["b"], 0)
+    v_ = LW["vid"][nx]; return lp[v_] + torch.where(v_ == LW["NV"] - 1, LW["loov"][nx], torch.zeros_like(LW["loov"][nx]))
 def lin_logits(text):
     """the HLIN state of the next position (words 3 back and older, full 4 tau kernels), times the readout -> (230,) logits"""
     w = torch.tensor(text[::-1][2:], device=dev); vs = []
@@ -161,6 +179,8 @@ def generate(cfg, pids):
                 sc = sc + cfg["beta"] * z[None]
             if cfg.get("lamc"):
                 qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
+            if cfg.get("linw"):                                                                                   # next-word readout bonus (log p, nats)
+                sc = sc + cfg["linw"] * linw_logprob(text, St[c[0]].long())[None]
             if cfg.get("lin"):                                                                                    # readout bonus for each candidate's next-word class (beyond the local state)
                 sc = sc + cfg["lin"] * lin_logits(text)[FINE[St[c[0]].long()]][None]
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]

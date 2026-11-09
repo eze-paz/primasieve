@@ -92,7 +92,7 @@ W = torch.zeros(Ftr.shape[1], NV, device=dev, requires_grad=True); b = torch.zer
 with torch.no_grad(): b += torch.log(torch.tensor(np.bincount(vid[S[trs]], minlength=NV) + 1.0, dtype=torch.float32, device=dev))
 opt = torch.optim.AdamW([W, b], lr=float(os.environ.get("HW_LR", 3e-4)), weight_decay=1e-4); best = (1e9, None, 0); step = 0
 def nll(idx): return torch.nn.functional.cross_entropy(Ftr[idx].float() @ W * 10 + b, ytr[idx])
-for ep in range(6):
+for ep in range(int(os.environ.get("HW_EPOCHS", 6))):
     for b0 in range(0, len(tr_), 8192):
         bi = tr_[b0:b0 + 8192]; loss = nll(bi); opt.zero_grad(); loss.backward(); opt.step(); step += 1
         if step % 50 == 0:

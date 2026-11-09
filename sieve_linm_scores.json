@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "LIN3 over JX3S1": {
+   "share": 0.55,
+   "pairs": 80,
+   "interval": [
+    0.45,
+    0.662
+   ]
+  }
+ },
+ "coherence": {
+  "LIN3 over JX3S1": {
+   "share": 0.55,
+   "pairs": 80,
+   "interval": [
+    0.45,
+    0.65
+   ]
+  }
+ }
+}
