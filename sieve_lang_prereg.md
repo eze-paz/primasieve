@@ -2955,3 +2955,8 @@ Scores: sieve_lt_scores.json.
 - CM4 vs NET: coherence -0.5583 [-0.6917, -0.4167] (NET 0.708, CM4 0.150); fluency -0.525 [-0.6583, -0.3831] (0.717 / 0.192).
 - Predictions: NET over CM4 with interval held; CM4's share against NET above MEAN's held (0.150 vs 0.108).
 - Reading: CM4 narrows the gap a little; the transformer is still preferred on about 7 of 10 prompts.
+
+## CM8 / KCG5 — next no-training steps (autonomous; preregistered 2026-11-09, before the runs)
+- CM8: the 8,192-dim matrix (kernel primasieve-kv4) in place of D4096, weight chosen by ranking AUC inside MEAN on the calibration prompts (DEC_POFF 39, T 1, grid 0/0.5/1/2/4); CM8 vs CM4 on 240 fresh prompts (DEC_POFF 59), two raters per half. Pass = coherence interval excludes 0 in CM8's favour.
+- KCG5: an all-word matrix (kernel primasieve-kv5: targets = every word, key = CMRL key + random vectors of the last two words, 4,096 dims) reordering every candidate (not only content words), mass-preserving. Gate before generation: ranking AUC of the true word over all candidates inside MEAN (all positions, T 1) must rise above MEAN's own at the best weight; then CM4+all vs CM4 on 240 fresh prompts.
+- **Predictions:** CM8 vs CM4 coherence point above 0 (55%), pass (20%); KCG5 gate passes (60%); KCG5 coherence pass over CM4 (20%).

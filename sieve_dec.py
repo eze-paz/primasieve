@@ -58,7 +58,7 @@ class Dec:
             HK.PROJ = torch.from_numpy(pz["proj"]); s.hb = HK.OLM("HBlearn"); s.hb.load_state_dict(torch.load(os.environ["DEC_HB"], map_location="cpu")); s.hb.eval(); torch.set_num_threads(4)
             s._hgc = []; s._hgs = []
         if os.environ.get("DEC_KC"):                                                                                                     # KCG: count-built corpus matrix (sieve_kc_rank_part.py)
-            kc_ = os.environ["DEC_KC"]; kz = {k: np.load(os.path.join(kc_, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf")} if os.path.isdir(kc_) else np.load(kc_); s.kcE = kz["E"]; s.kcML = np.asarray(kz["ML"], np.float32); s.kcidf = np.asarray(kz["idf"]); s.kcHL = kz["HL"] if not isinstance(kz, dict) and "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s._cmcal = []
+            kc_ = os.environ["DEC_KC"]; kz = {k: np.load(os.path.join(kc_, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(kc_, "R.npy")) else ())} if os.path.isdir(kc_) else np.load(kc_); s.kcE = kz["E"]; s.kcML = np.asarray(kz["ML"], np.float32); s.kcidf = np.asarray(kz["idf"]); s.kcHL = kz["HL"] if not isinstance(kz, dict) and "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s.kcR = kz["R"] if "R" in (kz.keys() if isinstance(kz, dict) else kz.files) else None; s._cmcal = []
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -168,8 +168,8 @@ class Dec:
                 if q.sum() > 0: s._hgs.append(float(cc[cfg["hgcal"][1].choice(len(uw), p=q / q.sum())]))
             if cfg.get("hg"):
                 bad = el & (cc < cfg["hgtau"]); p = p * np.where(bad, np.exp(-cfg["hg"]), 1.0); s._msn += int(bad.sum()); s._mst += int(con.sum())
-        if (cfg.get("cm") or cfg.get("cmcal")) and con.any():                                                                     # KCG: count corpus matrix licence
-            el = con & (s.kcidf[np.minimum(uw, len(s.kcidf) - 1)] >= 2)
+        if (cfg.get("cm") or cfg.get("cmcal") or cfg.get("cmpost")) and (con.any() or cfg.get("cmall")):                                                                     # KCG: count corpus matrix licence
+            el = ((uw > 0) & (uw <= s.V)) if cfg.get("cmall") else con & (s.kcidf[np.minimum(uw, len(s.kcidf) - 1)] >= 2)   # KCG5: all words
             if el.sum() >= 2:
                 z_ = s.cmz(text, uw[el])
                 if cfg.get("cmcal"): s._cmel, s._cmzv = el, z_
@@ -207,6 +207,7 @@ class Dec:
         win = np.array(text[-30:]); L = len(win); idf = s.kcidf[np.minimum(win, len(s.kcidf) - 1)]; ks = []
         for h in s.kcHL:
             k = (idf * 2.0 ** (-(L - 1 - np.arange(L)) / h)).astype(np.float32) @ s.kcE[win].astype(np.float32); ks.append(k / max(np.linalg.norm(k), 1e-9))
+        if getattr(s, "kcR", None) is not None: ks += [s.kcR[win[-1]].astype(np.float32), s.kcR[win[-2]].astype(np.float32)]   # KV5 local key
         r = s.kcML @ np.concatenate(ks); A = s.kcE[cw].astype(np.float32); sc = (A @ r) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(r), 1e-9))
         return (sc - sc.mean()) / max(sc.std(), 1e-9)
     def tstate(s, text):
@@ -295,7 +296,7 @@ def hgcal():
     json.dump(out, open(os.path.join(HERE, "sieve_jt_tau.json" if os.environ.get("DEC_HGW") else "sieve_hgh_tau.json"), "w"), indent=1); log(json.dumps(out))
 def cmcal():
     """KCG: choose beta on calibration prompts: mean log probability of the true next word under MEAN x e^(beta z) (z only on eligible content words)"""
-    d = Dec(); cfg = {"T": float(os.environ.get("DEC_CMT", 0.35)), "nounk": 1, "norep": 1, "gender": 3, "ms": 2, "msubj": 1, "cmcal": 1}; AUC = {}; B = [float(x) for x in os.environ.get("DEC_CMB", "0,0.25,0.5,1,2").split(",")]; LPs = {b: [] for b in B}
+    d = Dec(); cfg = {"T": float(os.environ.get("DEC_CMT", 0.35)), "nounk": 1, "norep": 1, "gender": 3, "ms": 2, "msubj": 1, "cmcal": 1, "cmall": int(bool(os.environ.get("DEC_CMALL")))}; AUC = {}; B = [float(x) for x in os.environ.get("DEC_CMB", "0,0.25,0.5,1,2").split(",")]; LPs = {b: [] for b in B}
     for pid, t in enumerate(d.prompts):
         pr = d.S[t:t + LP + LG].tolist()
         for j in range(LP, LP + LG):

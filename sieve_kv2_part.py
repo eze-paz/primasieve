@@ -29,8 +29,9 @@ if os.environ.get("KV_ARMS"): ARMS = {k: tuple(v) for k, v in json.loads(os.envi
 SAVE = set(os.environ.get("KV_SAVE", "D2048").split(","))
 def keyf(win, E, R, kind):
     if kind == "short": return dstate(win[:, -30:], E, (2.0, 8.0, 30.0))
+    if kind == "local": return torch.cat([dstate(win[:, -30:], E, (2.0, 8.0, 30.0)), R[win[:, -1]], R[win[:, -2]]], 1)   # KV5
     return torch.cat([dstate(win, E, (2.0, 8.0, 30.0, 120.0)), R[win[:, -1]], R[win[:, -2]]], 1)                   # LONG + LOCAL
-g = np.random.default_rng(1); pos = np.nonzero((Str[LW:] > 100) & (Str[LW:] <= V))[0] + LW; pos = g.choice(pos, min(NCM, len(pos)), replace=False)
+g = np.random.default_rng(1); TMIN = 0 if os.environ.get("KV_TARGET") == "all" else 100; pos = np.nonzero((Str[LW:] > TMIN) & (Str[LW:] <= V))[0] + LW   # KV5: all-word targets; pos = g.choice(pos, min(NCM, len(pos)), replace=False)
 HO = np.nonzero((S[ntr + LW:] > 100) & (S[ntr + LW:] <= V))[0] + ntr + LW; HO = HO[idf[S[HO]] >= 2]; order = np.random.default_rng(0).permutation(HO)
 cfg = {"T": 0.35, "nounk": 1, "norep": 1}; EX = []
 for t in order:                                                                                                       # evaluation positions (shared by all arms)
@@ -65,6 +66,6 @@ for arm, (dim, seed, kind) in ARMS.items():
     a = np.array(REC); bi = int(np.argmax(a[:h].mean(0))); dd = a[h:, bi] - a[h:, 0]; gg = np.random.default_rng(0); s = [dd[gg.integers(0, len(dd), len(dd))].mean() for _ in range(2000)]
     out[arm] = dict(auc=round(float(np.mean(AU)), 4), auc_with_P=round(float(np.mean(CB)), 4), beta=BETAS[bi], logp_beta0=round(float(a[h:, 0].mean()), 4), logp_best=round(float(a[h:, bi].mean()), 4), gain_interval=[round(float(np.percentile(s, 2.5)), 4), round(float(np.percentile(s, 97.5)), 4)])
     log(f"{arm}: {json.dumps(out[arm])}"); json.dump(out, open(os.path.join(OUTD, "kv2.json"), "w"), indent=1)
-    if arm in SAVE: np.savez(os.path.join(OUTD, f"kv2_{arm}.npz"), E=E.cpu().numpy().astype(np.float16), ML=M.cpu().numpy().astype(np.float16 if dim >= 8192 else np.float32), idf=idf)
+    if arm in SAVE: np.savez(os.path.join(OUTD, f"kv2_{arm}.npz"), E=E.cpu().numpy().astype(np.float16), ML=M.cpu().numpy().astype(np.float16 if dim >= 8192 else np.float32), idf=idf, **({"R": R.cpu().numpy().astype(np.float16)} if kind == "local" else {}))
     del E, R, M; torch.cuda.empty_cache()
 log("kv2 done")
