@@ -1,0 +1,24 @@
+{
+ "coherence": {
+  "n": 240,
+  "nec_wins": 0.113,
+  "cm4_wins": 0.113,
+  "mean": -0.0021,
+  "interval": [
+   -0.0625,
+   0.0583
+  ],
+  "agreement": 0.967
+ },
+ "fluency": {
+  "n": 240,
+  "nec_wins": 0.117,
+  "cm4_wins": 0.117,
+  "mean": 0.0021,
+  "interval": [
+   -0.0583,
+   0.0625
+  ],
+  "agreement": 0.975
+ }
+}
