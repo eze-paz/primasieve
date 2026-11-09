@@ -3226,3 +3226,24 @@ Theory: masked discrete diffusion (D3PM, Austin et al. 2021; MDLM, Sahoo et al. 
 - Grammatical share: JX3S1 0.629; CD 0.446 (paired [-0.283, -0.079]); CDA 0.614 ([-0.065, 0.033]); truth 0.931.
 - Predictions: CD changes more than BLKA held (42.4% vs 8.1%); CD fluency above 0.5 failed (0.05); CDA fluency above 0.6 failed (0.38); CDA grammar +0.03 failed; copy share of CD and CDA above JX3S1 failed for CD (0.6109), held for CDA (0.6891).
 - Reading: the count denoiser is far weaker than a trained one: matching 4 words left and 1-2 right finds book words that fit locally but break the sentence, and unchecked it rewrites 42% of words into worse text. With the 5-gram check it is neutral. Masked-diffusion sampling needs a denoiser that understands the whole sentence; counts of short windows are not that.
+
+## PARSE — an NN-free grammar judge from a treebank (owner, 2026-11-09: "Do it"; preregistered before any run)
+Theory: n-gram and count critics are finite-state (Chomsky 1957: English needs hierarchical structure); treebank-trained probabilistic grammars capture hierarchy by counting, no neural network.
+- Data: UD English EWT 2.x (Universal Dependencies; 12,544 train / 2,001 dev / 2,077 test sentences of web English with UPOS tags and dependency trees; CC BY-SA 4.0; mtest/ud). Normalised to our text: lowercased, punctuation tokens removed (their dependents re-attached to the punctuation's head), contractions split at the apostrophe as in our books ("do n't" -> "don t", "'s" -> "s").
+- Model (all counts): (1) trigram HMM tagger over the 17 UPOS tags, emissions with suffix back-off for unseen words; (2) arc-factored generative dependency model over tags (Eisner 1996 style): per head tag and direction, P(dependent tag), P(continue/stop), and a distance bucket; best projective tree by Eisner's algorithm on the Viterbi tags.
+- Sanity (before judging): tagging accuracy and unlabelled attachment score on EWT test.
+- Judge features per sentence: tag-model log-likelihood per word, best-tree log probability per word, tree minus tag score, verb/aux count, share of unseen words, length, edge flag. Same protocol as CRIT (5-fold CV grouped by item on the 20,363 rated sentences; G AUC on all and on generated sentences; arm ordering). Reference: length alone 0.8352 (generated), NG5 0.8410, RES 0.8608, RES+NG5 0.8627.
+- **Decision rule:** useful as a revision judge if G AUC (generated) is at least 0.86 alone or adds at least 0.02 over RES+NG5, and it orders arms as the raters in at least 38 of 50 pairs.
+- **Predictions:** tagging accuracy at least 0.88 on EWT test (70%); UAS at least 0.60 (55%); PARSE alone G AUC (generated) above length alone (75%); PARSE alone at least 0.86 (35%); PARSE+RES+NG5 adds at least 0.02 (30%); arm ordering at least 38 of 50 (30%).
+
+### PARSE results (2026-11-09; local CPU; sieve_parse.json, sieve_crit_parse.json, mtest/parse_feats.npy)
+- Sanity on 1,000 EWT test sentences (normalised): tagging accuracy 0.9205; UAS 0.6411 with gold tags, 0.6152 with predicted tags (arc-factored model over tags only; a single-root penalty of 30 nats per extra root child was added after a one-sentence check showed many root attachments).
+| judge | G AUC all | G AUC generated | H AUC | arm pairs ordered as raters | arm r |
+|---|---|---|---|---|---|
+| length + edge only | 0.7865 | 0.8352 | 0.5800 | — | — |
+| PARSE (+ length, edge) | 0.8067 | 0.8476 | 0.7768 | 35 of 50 | 0.268 |
+| PARSE+NG5 | 0.8173 | 0.8508 | 0.8766 | 35 of 50 | 0.123 |
+| PARSE+RES+NG5 | 0.8413 | 0.8637 | 0.9253 | 35 of 50 | 0.147 |
+| RES+NG5 (rerun) | 0.8401 | 0.8627 | 0.9252 | 36 of 50 | 0.138 |
+- Predictions: tagging at least 0.88 held; UAS at least 0.60 held; PARSE above length alone held (0.8476 vs 0.8352); PARSE at least 0.86 failed; PARSE+RES+NG5 adds 0.02 failed (+0.001); arm ordering at least 38 failed (35).
+- Reading: the treebank parser sees grammar a little (+0.012 AUC over length, the best arm-level correlation so far at r 0.268) but adds nothing on top of the reservoir and 5-gram critic. A tag-only arc-factored model is too coarse: our generated sentences usually have plausible tag sequences and parse trees; what breaks them is word-level (which noun, which verb, which preposition), which a tag grammar cannot see. A lexicalised grammar (word-level heads) is the next NN-free step, but EWT's 200k words are too few to estimate word-word statistics; it would need a parsed corpus of our books.
