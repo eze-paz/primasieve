@@ -412,6 +412,13 @@ if any(c.get("sym") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
     for w, i in _wid.items():
         if w in _cw and max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w][k]) == _ptag: ISPROPN[i] = True
     log(f"SYM: {int(ISPROPN.sum()):,} vocabulary words mostly tagged PROPN in EWT")
+_PP = {}
+def plan_positions(prev, w):
+    """training positions p (p >= 200) with S[p] == w and S[p-1] == prev (cached)"""
+    k = (prev, w)
+    if k not in _PP:
+        P_ = np.nonzero(S[200:ntr] == w)[0] + 200; _PP[k] = P_[S[P_ - 1] == prev]
+    return _PP[k]
 class Disc:
     """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
     def __init__(s): s.sal = {}; s.last = {}; s.k = 0
@@ -428,10 +435,17 @@ class Disc:
             else: continue
             h = hd[j]; role = (3.0 if j + 1 < h else 2.0) if h > 0 and TAGS_[tg[h - 1]] in ("VERB", "AUX") else 1.0
             s.sal[r] = s.sal.get(r, 0.0) + role; s.last[r] = s.k
-    def plan(s):
-        """Centering CONTINUE: the next subject is the most salient referent; pronoun for pronoun groups, else 'the' + noun"""
+    def plan(s, rng=None, ptr=None):
+        """Centering: CONTINUE (most salient referent), SHIFT (another referent, by salience) or NEW (no plan), sampled with ptr; default always CONTINUE"""
         if not s.sal: return []
         cb = max(s.sal, key=lambda r: s.sal[r])
+        if ptr is not None:
+            u = rng.random()
+            if u >= ptr[0] + ptr[1]: return []
+            if u >= ptr[0]:
+                oth = [r for r in s.sal if r != cb]
+                if not oth: return []
+                wv = np.array([s.sal[r] for r in oth]); cb = oth[int(rng.choice(len(oth), p=wv / wv.sum()))]
         if cb in SUBJ: return [_wid.get(SUBJ[cb], -1)]
         return [_wid.get("the", -1), _wid.get(cb, -1)]
     def ref_ids(s):
@@ -450,7 +464,7 @@ def generate(cfg, pids):
                 if x_ == 0: DS.read(cur); cur = []
                 else: cur.append(x_)
             if cur: DS.read(cur)
-            PLAN = DS.plan() if text[-1] == 0 else []; REFS = DS.ref_ids(); SYMST[0] += 1
+            PLAN = DS.plan(rng, cfg.get("ptr")) if text[-1] == 0 else []; REFS = DS.ref_ids(); SYMST[0] += 1
         while len(text) - LP < LG:
             if cfg.get("gen") == "ssm": text.append(mw_step(text, rng, cfg)); continue
             h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
@@ -460,6 +474,13 @@ def generate(cfg, pids):
                 if hi - lo > K:
                     HG.manual_seed(len(text) * 7919 + int(q4 % 1000003)); extra = torch.randint(lo, hi, (min(int(cfg.get("hrn", 16384)), hi - lo),), generator=HG, device="cpu").to(dev)
                     pos = torch.unique(torch.cat([c[0][ok[0]], ORD[extra].long()])); c = pos[None]; ok = torch.ones_like(c, dtype=torch.bool)
+            if cfg.get("sym") and "f" in cfg["sym"] and PLAN:                                                       # SYM2 fix 2: if no candidate carries the planned word, add book positions that start a sentence with it
+                lbq = len(text) - 1 - text[::-1].index(0) if 0 in text else None; kq = len(text) - 1 - lbq if lbq is not None else 99
+                if kq < len(PLAN) and PLAN[kq] >= 0 and not bool((St[c[0]][ok[0]] == PLAN[kq]).any()):
+                    prev = 0 if kq == 0 else PLAN[kq - 1]; ex = plan_positions(prev, PLAN[kq])
+                    if len(ex):
+                        HG.manual_seed(len(text) * 7919 + PLAN[kq]); ex = ex[torch.randperm(len(ex), generator=HG)[:256].numpy()]
+                        c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool); SYMST[1] += 1
             if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
                 eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
             else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
@@ -508,7 +529,7 @@ def generate(cfg, pids):
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
             if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
-                lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; DS.read(text[lb2 + 1:-1]); PLAN = DS.plan(); REFS = DS.ref_ids()
+                lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; DS.read(text[lb2 + 1:-1]); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
                 SYMST[1] += 1
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
         if cfg.get("cdiff"): text = count_diffuse(text, np.random.default_rng(1000 * pid + 17), cfg)
