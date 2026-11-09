@@ -9,6 +9,8 @@
 - grammatical share 0.625 vs 0.597 (paired [-0.032, 0.087]); 5-gram copy share 0.6139 vs 0.7296; human text 0.923 grammatical.
 It is the first NN-free change to pass an 80-prompt two-rater milestone. It was found by step-by-step tracing: the earlier SYM2H milestone failed because its plan almost never acted (weak boost, vetoes), which batch scores could not show. Preregistration and results: `sieve_lang_prereg.md` (sections SYM3, SY3, SY3M80). Run options: `sym` "pfhv", `pw` 3.0 (`sieve_g1b_kernel.py`; `G1_TRACE` for step traces).
 
+**Update 2026-11-10: default is SYM3N** (SYM3C without the harmonic tie-breaker): at 80 prompts with two raters removing it is level (coherence 0.475 [0.375, 0.581], grammar 0.674 vs 0.653) and generation is about 8x faster; the junction veto and power 6 were tested and kept (removing them rated 0.20 and 0.35 on coherence). The phasor (FHRR) state holds the scene as well as the symbolic state (Test A) but has no job in decoding yet. Options: `sym` "pfhv", `pw` 3.0, `eps` 0.03, `pow` 6.
+
 ## Justification
 
 1. **It is the only NN-free change that blind raters preferred on coherence across the board.** SYM round (20 prompts, one rater, local bench MT 27M):

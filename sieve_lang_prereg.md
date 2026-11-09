@@ -3411,3 +3411,10 @@ Theory: complementary learning systems (McClelland, McNaughton & O'Reilly 1995) 
 - SYM3N-P3 (power 3) over SYM3N: coherence 0.35, fluency 0.45; grammar 0.516 vs 0.670 (paired [-0.285, -0.016]). Copy share 0.6141.
 - Predictions: NV grammar lower by more than 0.03 held (0.584 vs 0.670); P3 fluency below 0.45 failed narrowly (0.45).
 - Decision (preregistered rule): both components stay: the junction veto clearly helps (removing it is rejected 0.20 / 0.20), and power 6 beats power 3 (coherence 0.35, grammar -0.154).
+
+### NOH80 results (2026-11-10; local bench MT 27M, 80 prompts offset 197, two raters + grammar; sieve_noh_pooled.json, sieve_noh_scores.json, sieve_gramnoh_scores.json)
+- Generation time: SYM3C (harmonic term) 2,047 s for 80 prompts after setup; SYM3N 250 s.
+- SYM3N over SYM3C: coherence 0.525 / 0.425, pooled **0.475 [0.375, 0.581]**; fluency 0.525 / 0.4875, pooled 0.506 [0.406, 0.613]; agreement 0.875 / 0.8875.
+- Grammatical share: SYM3C 0.653 (378 sentences), SYM3N 0.674 (405; paired [-0.043, 0.087]); truth 0.906. 5-gram copy share: SYM3C 0.6019, SYM3N 0.6391, truth 0.0910.
+- Predictions: coherence pooled above 0.5 failed (0.475); interval above 0.5 failed. The COMB 20-prompt result (0.75) did not replicate.
+- Decision (preregistered fallback): coherence point at least 0.45 and grammar not worse -> **the harmonic term is removed from the default decoder for speed (about 8x faster generation) and simplicity**; it neither helps nor hurts rated quality at 80 prompts. Cost: copying rises (5-gram share 0.6391 vs 0.6019). New default: SYM3N = SYM3C without the harmonic term (`sym` "pfhv", `pw` 3, no beta/svd).

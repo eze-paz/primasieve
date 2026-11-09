@@ -1,0 +1,24 @@
+{
+ "SYM3N_coherence": {
+  "r1": 0.525,
+  "r2": 0.425,
+  "pooled": 0.475,
+  "interval": [
+   0.375,
+   0.581
+  ],
+  "agree": 0.875,
+  "pairs": 80
+ },
+ "SYM3N_fluency": {
+  "r1": 0.525,
+  "r2": 0.487,
+  "pooled": 0.506,
+  "interval": [
+   0.406,
+   0.613
+  ],
+  "agree": 0.887,
+  "pairs": 80
+ }
+}
