@@ -1,0 +1,50 @@
+{
+ "rep": {
+  "coherence": {
+   "n": 240,
+   "lexb_wins": 0.375,
+   "cm4_wins": 0.388,
+   "mean": -0.0146,
+   "interval": [
+    -0.1208,
+    0.0917
+   ],
+   "agreement": 0.879
+  },
+  "fluency": {
+   "n": 240,
+   "lexb_wins": 0.358,
+   "cm4_wins": 0.417,
+   "mean": -0.0583,
+   "interval": [
+    -0.1688,
+    0.0521
+   ],
+   "agreement": 0.883
+  }
+ },
+ "pooled": {
+  "coherence": {
+   "n": 480,
+   "lexb_wins": 0.431,
+   "cm4_wins": 0.379,
+   "mean": 0.0521,
+   "interval": [
+    -0.0281,
+    0.1302
+   ],
+   "agreement": 0.908
+  },
+  "fluency": {
+   "n": 480,
+   "lexb_wins": 0.425,
+   "cm4_wins": 0.396,
+   "mean": 0.0292,
+   "interval": [
+    -0.05,
+    0.1115
+   ],
+   "agreement": 0.917
+  }
+ }
+}

@@ -3071,3 +3071,8 @@ Motivation: decoding is one word at a time with no revision, so an early bad jun
 - Same gate as LEX1 (ranking score on DEC_POFF 39, 40 prompts, T 1; loop check on 40 texts). Raters only if CORPB passes the gate.
 - Reading fixed in advance: CORPB ranking score >= LEXB's (0.7538) and loop check passed -> structure is what matters; CORPB below LEXB -> the written content matters.
 - **Prediction:** CORPB below LEXB (65%).
+
+### LEX1 replication -- NOT REPLICATED (2026-11-09; mtest/lex1r_gen.json, sieve_lex1r_pair_scores.json; 240 prompts DEC_POFF 79, agreement 0.879 / 0.883; 25 of 240 pairs identical)
+- LEXB vs CM4: coherence -0.0146 [-0.1208, 0.0917] (LEXB preferred 0.375, CM4 0.388); fluency -0.0583 [-0.1688, 0.0521] (0.358 / 0.417).
+- Pooled 480: coherence 0.0521 [-0.0281, 0.1302] (0.431 / 0.379); fluency 0.0292 [-0.05, 0.1115].
+- Reading: the first-round pass was at the edge of chance (interval low end 0.0042); the seed lexicon (1,000 entries, about 0.11 of the written words' weight) gives no reliable gain over CM4. CM4 stays the decoder.
