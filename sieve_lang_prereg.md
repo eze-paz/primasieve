@@ -2965,3 +2965,9 @@ Scores: sieve_lt_scores.json.
 - HMLP showed the fixed features are the limit. Model (sieve_hssm_kernel.py): word embedding (width 256) -> 2 layers of [complex diagonal recurrence, N = 7 bands x 64, + gated MLP, residual, layer norm] -> softmax over 8,191 words + rare bucket. HARM: recurrence magnitudes 1 - 1/tau per band (tau 2..128) and the harmonic frequencies (half zero, half random), i.e. the PH/HSVD state as the starting point; RAND: random magnitudes in [0.5, 0.999] and random angles. Everything trained (AdamW 1e-3, warm-up 300 steps, 24 x 512-word chunks, loss on positions 128+), 40 minutes each on a T4, MT books 27M training text only. Evaluation: 300 held-out chunks, positions 128..511 (115,200 positions), bits per word vs the interpolated trigram on the same positions; paired HARM minus RAND interval (blocks of 384).
 - This is a trained recurrent neural model (the "something extra"); the question is how far it goes past the fixed-feature readouts (best mixture 7.5205 on HWORD's queries) and whether the harmonic start helps.
 - **Predictions:** HARM below the trigram on its own (80%); HARM below RAND with the interval below zero (55%); HARM below 7.0 bits (45%).
+
+### CM8 results -- FAIL (2026-11-09; sieve_cm8auc_beta.json, mtest/cm8_gen.json, sieve_cm8_pair_scores.json; 240 prompts DEC_POFF 59, agreement 0.867 / 0.875)
+- Kernel primasieve-kv4 (1,000 positions): P 0.7941; D8192 AUC 0.8057, with P 0.8422. Inside MEAN (236 content true words, T 1): weight 0 / 0.5 / 1 / 2 / 4: 0.8096 / 0.8364 / 0.8427 / 0.8460 / 0.8391; weight 2.
+- CM8 vs CM4: coherence -0.05 [-0.175, 0.0709] (CM8 preferred 0.408, CM4 0.458); fluency -0.025 [-0.1417, 0.0917].
+- Predictions: coherence point above 0 failed; pass failed.
+- Reading: beyond 4,096 dims the ranking still rises a little (0.8415 -> 0.8460 inside MEAN) but raters see no difference; CM4 stays the decoder.

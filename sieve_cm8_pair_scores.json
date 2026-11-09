@@ -1,0 +1,24 @@
+{
+ "coherence": {
+  "n": 240,
+  "cm8_wins": 0.408,
+  "cm4_wins": 0.458,
+  "mean": -0.05,
+  "interval": [
+   -0.175,
+   0.0709
+  ],
+  "agreement": 0.867
+ },
+ "fluency": {
+  "n": 240,
+  "cm8_wins": 0.425,
+  "cm4_wins": 0.45,
+  "mean": -0.025,
+  "interval": [
+   -0.1417,
+   0.0917
+  ],
+  "agreement": 0.875
+ }
+}
