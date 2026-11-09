@@ -274,7 +274,7 @@ def text_crit(ids):
         else: cur.append(x)
     if cur: sents.append(cur)
     return float(np.mean([crit_score(s_, k == 0 or k == len(sents) - 1) for k, s_ in enumerate(sents)])) if sents else 0.0
-MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]; TRACE = int(os.environ.get("G1_TRACE", 0)); TRL = []; TR_ADD = None; HTRACE = bool(os.environ.get("G1_HTRACE")); HTRACE_STEPS = {0, 1, 2, 10, 25}; HTL = []
+MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]; DRIFT = [0, 0]; TRACE = int(os.environ.get("G1_TRACE", 0)); TRL = []; TR_ADD = None; HTRACE = bool(os.environ.get("G1_HTRACE")); HTRACE_STEPS = {0, 1, 2, 10, 25}; HTL = []
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
     x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
@@ -483,10 +483,12 @@ def plan_verb(grp, recent, rng):
     top = np.argsort(-sc_)[:20]; pr = np.exp(sc_[top] - sc_[top].max()); return int(cand[top][rng.choice(len(top), p=pr / pr.sum())])
 class Disc:
     """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
-    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1; s.pref = set(); s.pw = 1.0
-    def read(s, ids):
+    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1; s.pref = set(); s.pw = 1.0; s.R = []; s.VS = []; s.cbw = -1
+    def read(s, ids, period=False):
         ws = [vw[i] if i < len(vw) and vw[i] is not None else "<unk>" for i in ids]
-        if not ws: return
+        if not ws:
+            if period: s.R.append(0); s.VS.append(-1)
+            return
         tg, _ = SYMP_["tag"](ws); _, hd = SYMP_["parse"](tg); TAGS_ = SYMP_["TAGS"]
         for r in s.sal: s.sal[r] *= 0.5
         s.k += 1
@@ -498,6 +500,14 @@ class Disc:
             h = hd[j]; role = (3.0 if j + 1 < h else 2.0) if h > 0 and TAGS_[tg[h - 1]] in ("VERB", "AUX") else 1.0
             s.sal[r] = s.sal.get(r, 0.0) + role; s.last[r] = s.k
             if role == 3.0 and ws[h - 1] in _wid: s.ev.setdefault(r, []).append(_wid[ws[h - 1]])
+        for j, (w, t) in enumerate(zip(ws, tg)):                                                                  # COMB: per-token roles from the parse (1 SUBJ, 2 OBJ, 3 VERB + its subject's atom)
+            T_ = TAGS_[t]; h = hd[j]; rc = 0; vs = -1
+            if (T_ in ("NOUN", "PROPN", "PRON")) and h > 0 and TAGS_[tg[h - 1]] in ("VERB", "AUX"): rc = 1 if j + 1 < h else 2
+            elif T_ == "VERB":
+                rc = 3; sj = [k for k in range(j) if hd[k] == j + 1 and TAGS_[tg[k]] in ("NOUN", "PROPN", "PRON")]
+                if sj and ws[sj[-1]] in _wid and FHC is not None: vs = int(FH_ATOM[_wid[ws[sj[-1]]]])
+            s.R.append(rc); s.VS.append(vs)
+        if period: s.R.append(0); s.VS.append(-1)
     useverb = False
     def plan(s, rng=None, ptr=None):
         """Centering: CONTINUE (most salient referent), SHIFT (another referent, by salience) or NEW (no plan), sampled with ptr; default always CONTINUE"""
@@ -514,6 +524,7 @@ class Disc:
                 if not oth: return []
                 wv = np.array([key_(r) for r in oth]); cb = oth[int(rng.choice(len(oth), p=wv / wv.sum()))]
         s.vplan = plan_verb(cb, s.ev.get(cb, []), rng) if (EVC is not None and s.useverb and cb in SUBJ and rng is not None) else -1
+        s.cbw = _wid.get(SUBJ[cb], -1) if cb in SUBJ else _wid.get(cb, -1)
         if cb in SUBJ: return [_wid.get(SUBJ[cb], -1)]
         return [_wid.get("the", -1), _wid.get(cb, -1)]
     def ref_ids(s):
@@ -529,7 +540,7 @@ def generate(cfg, pids):
         if cfg.get("sym"):                                                                                   # read the prompt sentence by sentence
             DS = Disc(); DS.useverb = "v" in cfg["sym"]; cur = []
             for x_ in text:
-                if x_ == 0: DS.read(cur); cur = []
+                if x_ == 0: DS.read(cur, period=True); cur = []
                 else: cur.append(x_)
             if cur: DS.read(cur)
             DS.pref = set(DS.sal); DS.pw = float(cfg.get("pw", 1.0))
@@ -571,8 +582,14 @@ def generate(cfg, pids):
                 hm = HM.setdefault(json.dumps(cfg, sort_keys=True), Harm(cfg)); hw = text[::-1][:hm.WIN]; Qh = torch.tensor([hw + [-1] * (hm.WIN - len(hw))], device=dev)
                 tier = ok[0] & (m4[0] >= m4[0][ok[0]].max() - 1); sel = torch.nonzero(tier)[:, 0][:int(cfg.get("htop", 1024))]       # only candidates that can still win
                 if cfg.get("fhrr"):                                                                                    # FHRR: compare bound who-did-what states instead of bags of words
-                    tr_, tv_ = fh_roles(text); Wn = min(hm.WIN, len(text)); qa = torch.tensor([text[::-1][:Wn]], device=dev); qr = torch.tensor([tr_[::-1][:Wn].copy()], device=dev); qv = torch.tensor([tv_[::-1][:Wn].copy()], device=dev)
-                    eq_ = fh_enc(qa, qr, qv, cfg); sim = []
+                    tr_, tv_ = fh_roles(text)
+                    if "d" in str(cfg["fhrr"]) and cfg.get("sym") and len(DS.R) <= len(text):                          # COMB derived: roles of finished sentences from SYM's parse
+                        tr_ = np.r_[np.array(DS.R, np.int8), tr_[len(DS.R):]]; tv_ = np.r_[np.array(DS.VS, np.int32), tv_[len(DS.VS):]]
+                    Wn = min(hm.WIN, len(text)); qa = torch.tensor([text[::-1][:Wn]], device=dev); qr = torch.tensor([tr_[::-1][:Wn].copy()], device=dev); qv = torch.tensor([tv_[::-1][:Wn].copy()], device=dev)
+                    eq_ = fh_enc(qa, qr, qv, cfg)
+                    if "p" in str(cfg["fhrr"]) and cfg.get("sym") and DS.cbw >= 0:                                  # COMB plan-guided search: prefer passages whose recent subject is the planned protagonist
+                        eq_ = eq_ + 0.5 * fh_enc(torch.tensor([[DS.cbw]], device=dev), torch.tensor([[1]], device=dev), torch.tensor([[-1]], device=dev), cfg)
+                    sim = []
                     for b0 in range(0, len(sel), 2048):
                         pp = (c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(Wn, device=dev)).clamp(min=0)
                         sim.append((fh_enc(St[pp].long(), FHC["role"][pp], FHC["vsub"][pp], cfg) * eq_).sum(1))
@@ -639,6 +656,18 @@ def generate(cfg, pids):
                 wp = np.bincount(inv, weights=WPV) ** cfg["pow"]; pb = wp[0] / wp.sum(); ww = ww / ww.sum(); rest = ww[1:].sum()
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
+            if cfg.get("fhrr") and cfg.get("sym") and PLAN and len(text) - 1 - (len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else -10**9) == 1:   # COMB drift: phasor protagonist vs SYM's, at the planned sentence start
+                tr2, tv2 = fh_roles(text[:-1])
+                if "d" in str(cfg["fhrr"]) and len(DS.R) <= len(text) - 1: tr2 = np.r_[np.array(DS.R, np.int8), tr2[len(DS.R):]]; tv2 = np.r_[np.array(DS.VS, np.int32), tv2[len(DS.VS):]]
+                ids2 = torch.tensor(text[:-1][::-1][:hm.WIN], device=dev); r2 = torch.tensor(tr2[::-1][:hm.WIN].copy(), device=dev); v2 = torch.tensor(tv2[::-1][:hm.WIN].copy(), device=dev)
+                j2 = torch.arange(len(ids2), dtype=torch.float32, device=dev); ph2 = FHC["rid"][FHC["atom"][ids2]] + FHC["rph2"][r2.long()] + torch.where((v2 >= 0)[:, None], FHC["rid"][v2.clamp(min=0).long()], torch.zeros(1, device=dev))
+                zst = (((1 - 1 / 128) ** j2) * (r2 > 0).float())[:, None].mul(torch.exp(1j * ph2)).sum(0)
+                u2 = zst * torch.exp(-1j * FHC["rph2"][1]) + 0.67 * zst * torch.exp(-1j * FHC["rph2"][2])
+                refs2 = [r_ for r_ in DS.sal if r_ != "IT"]; atoms2 = [int(FH_ATOM[_wid[SUBJ[r_]]]) if r_ in SUBJ and SUBJ[r_] in _wid else (int(FH_ATOM[_wid[r_]]) if r_ in _wid else -1) for r_ in refs2]
+                okr = [(r_, a_) for r_, a_ in zip(refs2, atoms2) if a_ >= 0]
+                if okr and DS.cbw >= 0:
+                    scs = [float(torch.real((u2 * torch.exp(-1j * FHC["rid"][a_])).sum())) for _, a_ in okr]; ph_top = okr[int(np.argmax(scs))][1]
+                    DRIFT[0] += 1; DRIFT[1] += int(ph_top == int(FH_ATOM[DS.cbw]))
             if TRACE and cfg.get("sym") and pid < TRACE:                                                           # step-by-step trace
                 m4n = m4[0].cpu().numpy(); okn = ok[0].cpu().numpy(); o_ = np.argsort(-ww)[:6]; pw_ = ww / ww.sum()
                 def _w(i): return "." if i == 0 else (vw[i] if i < len(vw) and vw[i] is not None else "<unk>")
@@ -649,7 +678,7 @@ def generate(cfg, pids):
                 vetoed = [ _w(x_) for x_ in pv if (nx == x_).any() and bad[nx == x_].all()]; absent = [_w(x_) for x_ in pv if not (nx[okn] == x_).any()]
                 TRL.append(f"[{nm_}|p{pid}|k{kpos}] plan={pl} vplan={_w(DS.vplan) if DS.vplan >= 0 else '-'} planned-vetoed={vetoed} planned-absent={absent} -> {_w(text[-1])} | top: {' '.join(row)}")
             if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
-                lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; DS.read(text[lb2 + 1:-1]); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
+                lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; del DS.R[lb2 + 1:]; del DS.VS[lb2 + 1:]; DS.read(text[lb2 + 1:-1], period=True); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
                 if TRACE and pid < TRACE: TRL.append(f"   [state] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
                 SYMST[1] += 1
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
@@ -664,13 +693,14 @@ if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
     if JX: JSTAT[0] = JSTAT[1] = JSTAT[2] = 0
-    MWSTAT[0] = MWSTAT[1] = 0; GSTAT.clear(); EDITS.clear()
+    MWSTAT[0] = MWSTAT[1] = 0; GSTAT.clear(); EDITS.clear(); DRIFT[0] = DRIFT[1] = 0
     nm_ = nm; gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     if JX:                                                                                                    # share of completed sentences without a verb-like word
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
     cr = float(np.mean([text_crit(ids) for ids in gg.values()])) if CRITM is not None else None
     g5 = float(np.mean([np.mean(ng5_terms(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64).tolist() + ids, range(LP, LP + len(ids)))) for p, ids in gg.items()])) if NG5 is not None else None
-    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(edits=[dict(e, before=words(e["before"]), after=words(e["after"])) for e in EDITS], ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(drift_agree=[DRIFT[1], DRIFT[0]], edits=[dict(e, before=words(e["before"]), after=words(e["after"])) for e in EDITS], ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    if DRIFT[0]: log(f"COMB {nm}: phasor protagonist = SYM protagonist at {DRIFT[1]} of {DRIFT[0]} planned sentence starts")
     log(f"NG5 {nm}: 5-gram log p per generated word {g5}; critic log-odds per sentence {cr}"); GO[nm]["critic"] = cr
     log(f"PLAG {nm}: 5-gram share {GO[nm]['plag_share5']:.4f} (8-gram {GO[nm]['plag_share8']:.4f}), longest {GO[nm]['plag_longest']}; MW steps with a surviving word {GO[nm]['mw_ok']:.3f}; Gibbs changed {GO[nm]['gibbs_changed']}")
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
