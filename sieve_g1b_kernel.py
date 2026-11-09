@@ -274,7 +274,7 @@ def text_crit(ids):
         else: cur.append(x)
     if cur: sents.append(cur)
     return float(np.mean([crit_score(s_, k == 0 or k == len(sents) - 1) for k, s_ in enumerate(sents)])) if sents else 0.0
-MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]; TRACE = int(os.environ.get("G1_TRACE", 0)); TRL = []; TR_ADD = None
+MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]; TRACE = int(os.environ.get("G1_TRACE", 0)); TRL = []; TR_ADD = None; HTRACE = bool(os.environ.get("G1_HTRACE")); HTRACE_STEPS = {0, 1, 2, 10, 25}; HTL = []
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
     x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
@@ -543,6 +543,25 @@ def generate(cfg, pids):
                 eq_ = hm.enc(Qh); sim = torch.cat([(hm.enc(St[(c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long()) * eq_).sum(1) for b0 in range(0, len(sel), 2048)])
                 z = torch.zeros_like(sc[0]); z[sel] = (sim - sim.mean()) / sim.std().clamp(min=1e-6) if len(sel) > 1 else 0.0
                 sc = sc + cfg["beta"] * z[None]
+                if HTRACE and pid == 0 and len(text) - LP in HTRACE_STEPS:                                         # harmonic trace: per-band similarity of each top-tier candidate's history to the text's
+                    def _w(i): return "." if i == 0 else (vw[i] if i < len(vw) and vw[i] is not None else "<unk>")
+                    eC = torch.cat([hm.enc(St[(c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long()) for b0 in range(0, len(sel), 2048)])
+                    nb = len(hm.bands); pb = (eC.reshape(len(sel), nb, -1) * eq_.reshape(1, nb, -1)).sum(2) * eC.reshape(len(sel), nb, -1).shape[2]
+                    nxs = St[c[0, sel]].long().cpu().numpy(); m4s = m4[0, sel].cpu().numpy(); zs = z[sel].cpu().numpy()
+                    HTL.append(f"=== step {len(text) - LP}: text so far ends: ...{' '.join(_w(x_) for x_ in text[-12:])}")
+                    HTL.append(f"    {int(len(sel))} candidate positions in the top two match tiers (of {int(ok[0].sum())}); best tier m={int(m4s.max())}")
+                    words_ = {}
+                    for j_ in range(len(sel)):
+                        wd_ = _w(int(nxs[j_])); words_.setdefault(wd_, []).append(j_)
+                    rows_ = []
+                    for wd_, js in words_.items():
+                        js = np.array(js); top_ = js[np.argmax(zs[js])]
+                        w0 = np.exp(LAM0 * (m4s[js] - m4s.max())).sum(); w1 = np.exp(LAM0 * (m4s[js] - m4s.max()) + zs[js]).sum()
+                        rows_.append((wd_, len(js), int(m4s[js].max()), float(zs[js].mean()), w0, w1, pb[top_].cpu().numpy()))
+                    t0 = sum(r_[4] for r_ in rows_) ; t1 = sum(r_[5] for r_ in rows_)
+                    p0 = np.array([r_[4] for r_ in rows_]) ** cfg["pow"]; p1 = np.array([r_[5] for r_ in rows_]) ** cfg["pow"]; p0 /= p0.sum(); p1 /= p1.sum()
+                    for k_ in np.argsort(-p1)[:8]:
+                        r_ = rows_[k_]; HTL.append(f"    {r_[0]:>14s}: {r_[1]:4d} positions, tier m{r_[2]}, mean z {r_[3]:+.2f} | P without harmonics {p0[k_]:.3f} -> with {p1[k_]:.3f} | per-band cos of best position (tau 2..128): {' '.join(f'{x_:+.2f}' for x_ in r_[6])}")
             if cfg.get("lamc"):
                 qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
             if cfg.get("linw"):                                                                                   # next-word readout bonus (log p, nats)
@@ -621,4 +640,5 @@ log(f"CRIT truth: critic log-odds per sentence {np.mean([text_crit(S[PROMPTS[p] 
 _tp = [plag(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]; log(f"PLAG truth: 5-gram share {np.mean([a for a, _, _ in _tp]):.4f}, longest {[b for _, b, _ in _tp]}")
 GO["truth"] = dict(plag_share5=float(np.mean([a for a, _, _ in _tp])), plag_longest=[b for _, b, _ in _tp], gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 if TRL: open(os.path.join(OUTD, "trace.txt"), "w", encoding="utf-8").write(chr(10).join(TRL))
+if HTL: open(os.path.join(OUTD, "htrace.txt"), "w", encoding="utf-8").write(chr(10).join(HTL))
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
