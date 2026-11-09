@@ -31,6 +31,9 @@ def p_tri(a, b, y):
 ev = S[ntr:]; NE = 40 if SMOKE else 300; es = np.linspace(0, len(ev) - T - 1, NE).astype(int); EV = np.stack([ev[s:s + T + 1] for s in es])          # (NE, T+1)
 pos_a, pos_b, pos_y = EV[:, WARM - 2:T - 2].ravel(), EV[:, WARM - 1:T - 1].ravel(), EV[:, WARM:T].ravel()   # predict EV[:, t] for t in WARM..T-1 from <t
 ptri = p_tri(pos_a, pos_b, pos_y); R = dict(trigram_bits=float(-np.log2(ptri).mean()), eval_positions=int(len(ptri))); log(f"HSSM trigram bits/word {R['trigram_bits']:.4f} on {len(ptri):,} positions")
+if os.environ.get("HM_BIG"):                                                                                      # training text = MT 27M + the four PG-19 half-shards (vocabulary and trigram stay MT's)
+    _parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
+    Str = np.concatenate([Str] + [np.load(p)["S"].astype(np.int64) for p in _parts]); log(f"HSSM training stream {len(Str):,} words")
 class SSM(nn.Module):
     def __init__(s, init):
         super().__init__(); g = torch.Generator().manual_seed(11 if init == "harm" else 12)
@@ -57,7 +60,9 @@ class LM(nn.Module):
         return s.head(s.lnf(x))
 VIDt = torch.tensor(vid, device=dev); POOv = torch.tensor(np.log(p_in_oov), dtype=torch.float32, device=dev)
 def train_eval(init, minutes):
-    torch.manual_seed(0); m = LM(init).to(dev); opt = torch.optim.AdamW(m.parameters(), lr=1e-3, weight_decay=0.01); g = np.random.default_rng(1); step = 0; t0 = time.time(); BS = 4 if SMOKE else int(os.environ.get("HM_BS", 24))
+    torch.manual_seed(0); m = LM(init).to(dev)
+    if os.environ.get("HM_FROM"): _fp = glob.glob(f"/kaggle/input/**/{os.environ['HM_FROM']}", recursive=True) or [os.environ["HM_FROM"]]; m.load_state_dict(torch.load(_fp[0], map_location=dev)); log(f"HSSM continued from {_fp[0]}")
+    opt = torch.optim.AdamW(m.parameters(), lr=1e-3, weight_decay=0.01); g = np.random.default_rng(1); step = 0; t0 = time.time(); BS = 4 if SMOKE else int(os.environ.get("HM_BS", 24))
     sched = lambda st: min(1.0, st / 300)
     while time.time() - t0 < minutes * 60:
         st = g.integers(0, len(Str) - T - 1, BS); X = torch.tensor(np.stack([Str[a:a + T + 1] for a in st]), device=dev)

@@ -16,3 +16,6 @@ Protocol for small steps: 20 fresh prompts per step, one blind pairwise rater pe
 11. (05:00) SSMR (20 prompts): S1 (ssm 1/6) leads JX3S1 (fluency 0.60, coherence 0.65), S2 0.45/0.60, S4 0.45/0.50; grammar 0.586/0.598/0.580 vs 0.621. HSSML pushed (running). SRM milestone (S1 vs JX3S1, 80 prompts, offset 119) preregistered; push queued for a GPU slot.
 12. (06:55) HSSML: 6.8698 bits per word (HSSM 7.0379), best mixture 6.7853. SRM milestone still waiting for / running on a GPU slot.
 13. (07:05) Scorer reads its size from the weights; SRL (S1 with the HSSML scorer, SRM's 80 prompts) preregistered; push queued.
+
+## After the 8-hour loop (owner-directed)
+14. (09:40) Owner: "worth trying all of this. prereg it. The gibbs sounds good." REV preregistered: MW (HSSML writes, counts veto), GIBBS (2 revision sweeps using left and right context), PLAG (5-gram copy share + longest chain), HSSMB (HSSML continued on 191M). Smoke passed. The weekly Kaggle GPU quota is exhausted: REV, SRM and SRL pushed as CPU kernels; HSSMB packaged, waits for the quota reset.

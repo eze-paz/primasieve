@@ -57,7 +57,7 @@ if JX:                                                                          
     VSET = np.zeros(BC, bool); VSET[VCL] = True; log(f"verb-like classes {VCL.tolist()} (share after pronouns {cf[VCL].round(3).tolist()})")
     del CLS_
     WT = {}
-    for n in sorted({int(c["wn"]) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values() if c.get("wn")}):     # word n-gram tables (sorted hashes) over the first NJ tokens
+    for n in sorted({int(c["wn"]) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values() if c.get("wn")} | ({3, 5} if any(c.get("gibbs") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values())  else set()) | {5} | ({3} if any(c.get("gen") == "ssm" for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()) else set())):     # word n-gram tables (sorted hashes) over the first NJ tokens
         h = np.zeros(NJ - n + 1, np.uint64)
         with np.errstate(over="ignore"):
             for i in range(n): h = h * M64 + S[i:NJ - n + 1 + i].astype(np.uint64) + np.uint64(1)
@@ -100,7 +100,7 @@ if any(c.get("linw") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values
     LW = dict(W=_r["W"].to(dev).float(), b=_r["b"].to(dev).float(), vid=_vid, NV=int(_r["NV"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]), loov=_lin_oov)
     log("next-word readout loaded")
 SSMM = None
-if any(c.get("ssm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                             # trained harmonic-start state-space LM (HSSM) as a candidate scorer
+if any(c.get("ssm") or c.get("gen") == "ssm" for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                             # trained harmonic-start state-space LM (HSSM) as a candidate scorer
     import torch.nn as nn
     def _load_hssm():
         VVh = int(max(S[:ntr0].max(), S[ntr:].max())) + 1; NVh = 8192; cw = np.bincount(S[:ntr0].astype(np.int64), minlength=VVh); topw = np.argsort(-cw)[:NVh - 1]
@@ -126,7 +126,7 @@ if any(c.get("ssm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
                 for l in s.layers: x = l(x)
                 return s.head(s.lnf(x))
         m = LM().to(dev); m.load_state_dict(sd); m.eval(); log(f"HSSM scorer {mp[0]}: width {DM}, {NLy} layers")
-        return dict(m=m, VV=VVh, NV=NVh, vid=torch.tensor(np.r_[vid, np.full(max(0, (1 << 16) - VVh), NVh - 1)][:1 << 16], device=dev), poo=torch.tensor(np.r_[poo, np.zeros(max(0, (1 << 16) - VVh))][:1 << 16], dtype=torch.float32, device=dev))
+        return dict(m=m, VV=VVh, NV=NVh, topw=np.r_[topw, UNK].astype(np.int64), vid=torch.tensor(np.r_[vid, np.full(max(0, (1 << 16) - VVh), NVh - 1)][:1 << 16], device=dev), poo=torch.tensor(np.r_[poo, np.zeros(max(0, (1 << 16) - VVh))][:1 << 16], dtype=torch.float32, device=dev))
     SSMM = _load_hssm(); log(f"HSSM scorer loaded (vocabulary {SSMM['VV']:,})")
 def ssm_logprob(text, nx):
     """log p(next word) for candidate words nx under the trained HSSM, given the text so far (last 512 words)"""
@@ -188,11 +188,67 @@ class Harm:                                                                     
         if s.cfg.get("svd"): TH_ = SVDTH[(s.cfg.get("svdsrc", "mt"), int(s.cfg.get("D", 64)))]; zz = torch.stack([((torch.exp(1j * TH_[t][sym]) * s.rot[None] * (w >= 0)[:, :, None]) * s.W[b].to(torch.complex64)[None, :, None]).sum(1) for b, t in enumerate(s.bands)], 1)
         else: u = torch.exp(1j * s.theta[sym]) * s.rot[None] * (w >= 0)[:, :, None]; zz = torch.einsum("njd,bj->nbd", u, s.W.to(u.dtype))
         v = torch.cat([zz.real, zz.imag], 2); v = v / v.norm(dim=2, keepdim=True).clamp(min=1e-9); return v.reshape(len(w), -1) / math.sqrt(v.shape[1])
+def inT(n, rows):
+    """which rows (word n-grams) occur in the training stream"""
+    Wt = WT[n]; hv = hn(rows); return Wt[np.minimum(np.searchsorted(Wt, hv), len(Wt) - 1)] == hv
+def inH8(rows):
+    hv = hn(rows); return H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
+def class_ok(ctx4, nx, eps):
+    uf, nf, uc, nc = TB[4]; c4 = 0
+    for x_ in ctx4: c4 = (c4 << 6) | int(BCL[x_])
+    k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
+    jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0; return n5 >= eps * max(n4, 1)
+MWSTAT = [0, 0]; GSTAT = []
+def mw_step(text, rng, cfg):
+    """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
+    x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
+    with torch.no_grad(): pr = torch.softmax(SSMM["m"](x)[0, -1].float() / cfg.get("temp", 0.8), 0).cpu().numpy().astype(np.float64)
+    pr[SSMM["NV"] - 1] = 0; o = np.argsort(-pr); cs = np.cumsum(pr[o]) / pr.sum(); keep = o[:int(np.searchsorted(cs, cfg.get("topp", 0.9))) + 1]
+    nx = SSMM["topw"][keep]; q = pr[keep]; ok_ = nx != UNK
+    ok_ &= class_ok(text[-4:], nx, cfg.get("eps", 0.03)); ok_ &= inT(3, np.c_[np.repeat(np.array([text[-2:]]), len(nx), 0), nx])
+    ok_ &= ~inH8(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}
+    ok_ &= np.array([(text[-2], text[-1], int(x_)) not in seen for x_ in nx])
+    MWSTAT[0] += 1; MWSTAT[1] += float(ok_.any())
+    if ok_.any(): q = q * ok_
+    return int(nx[rng.choice(len(nx), p=q / q.sum())])
+def gibbs(text, rng, cfg):
+    """revision sweeps over the generated words: re-choose each word given 4 words left (collage candidates) and up to 2 words right (training n-grams)"""
+    G = [0, 0]
+    for sw in range(int(cfg["gibbs"])):
+        for i in range(LP, len(text)):
+            h = text[:i][::-1][:8]; c, ok = cands(np.array([h[:4]]), np.array([h[4:8]])); c = c[0][ok[0]]
+            if len(c) == 0: continue
+            m4 = (St[(c[:, None] - 1 - torch.arange(4, device=dev)).clamp(min=0)].long() == torch.tensor([h[:4]], device=dev)).float().sum(1).cpu().numpy(); nx = St[c].long().cpu().numpy()
+            nx = np.r_[nx, text[i]].astype(np.int64); m4 = np.r_[m4, 4.0]; R = text[i + 1:i + 3]; L2 = text[i - 2:i]; n_ = len(nx)
+            sc = 8.0 * m4
+            if len(R) == 2:
+                sc += 8.0 * inT(3, np.c_[nx, np.repeat(np.array([R]), n_, 0)]) + 8.0 * inT(5, np.c_[np.repeat(np.array([L2]), n_, 0), nx, np.repeat(np.array([R]), n_, 0)])
+            if len(R) >= 1:
+                sc += 8.0 * inT(3, np.c_[np.repeat(np.array([L2[-1:]]), n_, 0), nx, np.repeat(np.array([R[:1]]), n_, 0)])
+            bad = nx == UNK
+            for a in range(max(0, i - 7), min(i, len(text) - 8) + 1):                                         # copy cap on every 8-word window containing position i
+                win = np.repeat(np.array([text[a:a + 8]]), n_, 0); win[:, i - a] = nx; bad |= inH8(win)
+            st_ = {tuple(text[j:j + 3]) for j in range(len(text) - 2) if not (i - 2 <= j <= i)}
+            for d in range(3):
+                if i - d >= 0 and i - d + 3 <= len(text):
+                    t3 = np.repeat(np.array([text[i - d:i - d + 3]]), n_, 0); t3[:, d] = nx; bad |= np.array([tuple(r) in st_ for r in t3.tolist()])
+            w = np.exp(sc - sc.max()) * ~bad
+            if w.sum() <= 0: continue
+            uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg.get("pow", 6.0); new = int(uw[rng.choice(len(uw), p=ww / ww.sum())])
+            G[0] += 1; G[1] += new != text[i]; text[i] = new
+    GSTAT.append(G[1] / max(G[0], 1)); return text
+def plag(ids):
+    """share of the 8-grams of the generated words found in training, and the longest chain of consecutive found 8-grams (as a span length)"""
+    if len(ids) < 8: return 0.0, 0, 0.0
+    f = inT(5, np.array([ids[i:i + 5] for i in range(len(ids) - 4)])); best = run = 0
+    for x_ in f: run = run + 1 if x_ else 0; best = max(best, run)
+    return float(f.mean()), (4 + best) if best else 0, float(inH8(np.array([ids[i:i + 8] for i in range(len(ids) - 7)])).mean())
 def generate(cfg, pids):
     out = {}; LSTAT.clear()
     for pid in pids:
         t = PROMPTS[pid]; text = S[t:t + LP].astype(np.int64).tolist(); rng = np.random.default_rng(1000 * pid + 7)
         while len(text) - LP < LG:
+            if cfg.get("gen") == "ssm": text.append(mw_step(text, rng, cfg)); continue
             h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
             if cfg.get("hr"):                                                                                    # harmonic retrieval: widen the pool with a sample of all positions sharing the last hr words
                 q4 = int(pack(np.array([h[:4]]))[0]); sh_ = 16 * (4 - int(cfg["hr"])); lo_k = (q4 >> sh_) << sh_; hi_k = lo_k + (1 << sh_)
@@ -241,6 +297,7 @@ def generate(cfg, pids):
                 wp = np.bincount(inv, weights=WPV) ** cfg["pow"]; pb = wp[0] / wp.sum(); ww = ww / ww.sum(); rest = ww[1:].sum()
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
+        if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
         out[pid] = text[LP:]
     return out
 def words(ids): return " ".join("." if i == 0 else "<unk>" if i == UNK or vw[i] is None else vw[i] for i in ids).replace(" .", ".")
@@ -250,10 +307,13 @@ if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
     if JX: JSTAT[0] = JSTAT[1] = JSTAT[2] = 0
+    MWSTAT[0] = MWSTAT[1] = 0; GSTAT.clear()
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     if JX:                                                                                                    # share of completed sentences without a verb-like word
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
-    GO[nm] = dict(verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    log(f"PLAG {nm}: 5-gram share {GO[nm]['plag_share5']:.4f} (8-gram {GO[nm]['plag_share8']:.4f}), longest {GO[nm]['plag_longest']}; MW steps with a surviving word {GO[nm]['mw_ok']:.3f}; Gibbs changed {GO[nm]['gibbs_changed']}")
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
-GO["truth"] = dict(gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
+_tp = [plag(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]; log(f"PLAG truth: 5-gram share {np.mean([a for a, _, _ in _tp]):.4f}, longest {[b for _, b, _ in _tp]}")
+GO["truth"] = dict(plag_share5=float(np.mean([a for a, _, _ in _tp])), plag_longest=[b for _, b, _ in _tp], gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
