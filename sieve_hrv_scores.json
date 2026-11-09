@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "HALL over JX3S1": {
+   "share": 0.0,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.0
+   ]
+  },
+  "HFLAG over JX3S1": {
+   "share": 0.0,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.0
+   ]
+  },
+  "HBOTH over JX3S1": {
+   "share": 0.5,
+   "pairs": 10,
+   "interval": [
+    0.2,
+    0.8
+   ]
+  }
+ },
+ "coherence": {
+  "HALL over JX3S1": {
+   "share": 0.0,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.0
+   ]
+  },
+  "HFLAG over JX3S1": {
+   "share": 0.0,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.0
+   ]
+  },
+  "HBOTH over JX3S1": {
+   "share": 0.6,
+   "pairs": 10,
+   "interval": [
+    0.3,
+    0.9
+   ]
+  }
+ }
+}
