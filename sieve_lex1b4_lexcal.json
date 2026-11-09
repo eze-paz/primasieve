@@ -1,0 +1,16 @@
+{
+ "cfg": {
+  "T": 1.0,
+  "nounk": 1,
+  "norep": 1,
+  "gender": 3,
+  "ms": 2,
+  "msubj": 1,
+  "cm": 2.0,
+  "cmnorm": 1,
+  "lexb": 4.0
+ },
+ "n": 2000,
+ "score": 0.7538,
+ "present": 0.8265
+}

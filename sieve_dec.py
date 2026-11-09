@@ -29,9 +29,24 @@ def pack4(Q):
 class Dec:
     def __init__(s):
         z = np.load(MT.fp(C, "data")); s.S = S = z["S"].astype(np.int64); s.ntr = ntr = int(z["ntr"]); s.vw = z["vw"]; s.V = len(s.vw) - 1
-        PA = np.arange(9, ntr); K1 = pack4(np.stack([S[PA - 1 - i] for i in range(4)], 1)); K2 = pack4(np.stack([S[PA - 5 - i] for i in range(4)], 1)); o = np.lexsort((K2, K1))   # MIX: 8-word reversed prefix
+        PA = np.arange(9, ntr)
+        if os.environ.get("DEC_LEX"):                                                                                                    # LEX1: lexicon sentences appended after the stream (positions >= lex0)
+            LS = np.load(os.path.join(os.environ["DEC_LEX"], "lex_tokens.npy")).astype(np.int64); s.lex0 = lex0 = len(S); S = s.S = np.r_[S, LS]; s.lsid = np.cumsum(LS == 0)
+            lp = np.arange(lex0 + 9, len(S)); s.lexmerge = bool(os.environ.get("DEC_LEXMERGE"))
+            if s.lexmerge: PA = np.r_[PA, lp]                                                                                      # LEXA: same index, equal footing
+            else:
+                L1 = pack4(np.stack([S[lp - 1 - i] for i in range(4)], 1)); L2 = pack4(np.stack([S[lp - 5 - i] for i in range(4)], 1)); o = np.lexsort((L2, L1)); s.LKA, s.LKB, s.LOA = L1[o], L2[o], lp[o]
+            s._lexcopy = lp                                                                                                     # copy cap extended to lexicon 8-grams (built after H8 loads)
+        K1 = pack4(np.stack([S[PA - 1 - i] for i in range(4)], 1)); K2 = pack4(np.stack([S[PA - 5 - i] for i in range(4)], 1)); o = np.lexsort((K2, K1))   # MIX: 8-word reversed prefix
         s.KA = K1[o]; s.KB = K2[o]; s.OA = PA[o]; del K1, K2, o
-        s.H8 = np.load(MT.fp(C, "sw_index"))["H8"]; g = np.load(MT.fp(C, "ngram")); n1 = g["n1"].astype(float); s.pU = (n1 + 0.5) / (n1.sum() + 0.5 * len(n1))
+        s.H8 = np.load(MT.fp(C, "sw_index"))["H8"]
+        if getattr(s, "_lexcopy", None) is not None:
+            i = s._lexcopy; a = np.zeros(len(i), np.uint64); b = np.zeros(len(i), np.uint64)
+            for j in range(4): a = (a << np.uint64(16)) | S[i - 7 + j].astype(np.uint64)
+            for j in range(3): b = (b << np.uint64(16)) | S[i - 3 + j].astype(np.uint64)
+            with np.errstate(over="ignore"): hl = (a * M64) ^ ((b << np.uint64(16)) | S[i].astype(np.uint64))
+            s.H8 = np.sort(np.r_[s.H8, hl]); del a, b, hl
+        g = np.load(MT.fp(C, "ngram")); n1 = g["n1"].astype(float); s.pU = (n1 + 0.5) / (n1.sum() + 0.5 * len(n1))
         t = np.load(MT.fp(C, "trig")); s.tu, s.tn = t["u"], t["n"]; s.rc = np.bincount(s.tu // MT.VV, weights=s.tn, minlength=MT.VV)
         if os.environ.get("DEC_H6"):                                                                                                     # COH: 6-word copy cap
             St = S[:ntr].astype(np.uint64); n6 = len(St) - 5; a6 = np.zeros(n6, np.uint64); b6 = np.zeros(n6, np.uint64)
@@ -59,10 +74,13 @@ class Dec:
             s._hgc = []; s._hgs = []
         if os.environ.get("DEC_KC"):                                                                                                     # KCG: count-built corpus matrix (sieve_kc_rank_part.py)
             kc_ = os.environ["DEC_KC"]; kz = {k: np.load(os.path.join(kc_, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(kc_, "R.npy")) else ())} if os.path.isdir(kc_) else np.load(kc_); s.kcE = kz["E"]; s.kcML = np.asarray(kz["ML"], np.float32); s.kcidf = np.asarray(kz["idf"]); s.kcHL = kz["HL"] if not isinstance(kz, dict) and "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s.kcR = kz["R"] if "R" in (kz.keys() if isinstance(kz, dict) else kz.files) else None; s._cmcal = []
+        if os.environ.get("DEC_LEX") and os.environ.get("DEC_KC"):                                                                       # LEXB: content word -> lexicon sentences
+            LS = S[s.lex0:]; cm_ = (LS > 100) & (LS <= s.V) & (s.kcidf[np.minimum(LS, len(s.kcidf) - 1)] >= 2); k_ = np.unique(LS[cm_] * 10_000_000 + s.lsid[cm_])
+            s.lxw, s.lxs = k_ // 10_000_000, k_ % 10_000_000; s.lxst = np.searchsorted(s.lxw, np.arange(MT.VV + 1))
         if os.environ.get("DEC_KC2"):                                                                                                    # KCG5: second (all-word) matrix in the same process
             k2 = os.environ["DEC_KC2"]; kz = {k: np.load(os.path.join(k2, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(k2, "R.npy")) else ())}
             s.kc2 = (kz["E"], np.asarray(kz["ML"], np.float32), np.asarray(kz["idf"]), np.array([2.0, 8.0, 30.0]), kz.get("R"))
-        st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
+        n0 = getattr(s, "lex0", len(S)); st = np.nonzero((S[ntr + 1:n0 - 100] != 0) & (S[ntr:n0 - 101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
         for i in range(4): a = (a << np.uint64(16)) | np.uint64(w7[i])
@@ -77,6 +95,15 @@ class Dec:
             for j in range(cfg["depth"]): ok &= S[pos - 1 - j] == text[-1 - j]; dep += ok
             sc = dep
         else: sc = m4
+        if cfg.get("lexb") is not None and getattr(s, "LKA", None) is not None:                                                    # LEXB: gated lexicon lookup, weight x e^lexb
+            ctx = np.unique([w for w in text[-30:] if 100 < w <= s.V and s.kcidf[w] >= 2])
+            if len(ctx):
+                el_ = np.unique(np.concatenate([s.lxs[s.lxst[w]:s.lxst[w + 1]] for w in ctx]))
+                lo = int(np.searchsorted(s.LKA, q1, "left")); hi = int(np.searchsorted(s.LKA, q1, "right")); j0 = lo + int(np.searchsorted(s.LKB[lo:hi], q2)) if hi > lo else lo
+                lp = s.LOA[max(j0 - HC, 0):min(j0 + HC, len(s.LOA))]; lm = sum((S[lp - 1 - j] == text[-1 - j]).astype(float) for j in range(4))
+                keep = (lm >= 1) & np.isin(s.lsid[lp - 1 - s.lex0], el_)                                                       # sentence of the matched context word
+                lp, lm = lp[keep], lm[keep]
+                if len(lp): pos = np.r_[pos, lp]; m4 = np.r_[m4, lm]; sc = np.r_[sc, lm + cfg["lexb"] / 4]
         if cfg.get("doc"):
             top = s.topchunks(text, cfg.get("ndoc", 100)); sc = sc + cfg["doc"] / 4 * np.isin(pos // s.CH, top)              # DOC: bonus for candidates inside the most similar passages
         if cfg.get("nextsent") and text[-1] == 0:                                                                                  # NSENT: start the next sentence the way similar sentences were followed
@@ -326,6 +353,21 @@ def cmcal():
     out = {str(b): float(np.mean(v)) for b, v in LPs.items()}; out["n"] = len(LPs[0.0]); out["beta"] = max(B, key=lambda b: np.mean(LPs[b]))
     if AUC: out["auc"] = {str(b): round(float(np.mean(v)), 4) for b, v in AUC.items()}; out["n_auc"] = len(AUC[0.0])
     json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ.get('DEC_CMTAG', 'kcg')}_beta.json"), "w"), indent=1); log(json.dumps(out))
+def lexcal():
+    """LEX1 gate: mean ranking AUC of the true next word among the candidates (0 when absent), T 1, all positions of the
+    calibration continuations; DEC_LEXCFG = base cfg (json), DEC_LEXB = lexb value or empty; writes sieve_<DEC_LEXTAG>_lexcal.json"""
+    d = Dec(); cfg = dict(json.loads(os.environ["DEC_LEXCFG"]), T=1.0)
+    if os.environ.get("DEC_LEXB"): cfg["lexb"] = float(os.environ["DEC_LEXB"])
+    A = []; pres = []
+    for pid, t in enumerate(d.prompts):
+        pr = d.S[t:t + LP + LG].tolist()
+        for j in range(LP, LP + LG):
+            uw, p = d.dist(pr[:j], cfg); y = pr[j]
+            if y in uw: yi = int(np.searchsorted(uw, y)); o = np.delete(p, yi); A.append(float((o < p[yi]).mean() + 0.5 * (o == p[yi]).mean()) if len(o) else 1.0); pres.append(1)
+            else: A.append(0.0); pres.append(0)
+        if pid % 10 == 0: log(f"lexcal prompt {pid}: {np.mean(A):.4f}")
+    out = dict(cfg=cfg, n=len(A), score=round(float(np.mean(A)), 4), present=round(float(np.mean(pres)), 4)); json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ['DEC_LEXTAG']}_lexcal.json"), "w"), indent=1); log(json.dumps(out))
+if __name__ == "__main__" and sys.argv[1] == "lexcal": lexcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "cmcal": cmcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()
 if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else None)
