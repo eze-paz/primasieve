@@ -3058,3 +3058,10 @@ Motivation: decoding is one word at a time with no revision, so an early bad jun
 - LEXB (CM4 + gated lexicon lookup, weight 2) vs CM4: coherence 0.1187 [0.0042, 0.2375] (LEXB preferred 0.487, CM4 0.371); fluency 0.1167 [0.0, 0.2292] (0.492 / 0.375). 20 of 240 pairs identical (the lookup never fired).
 - Predictions: rater pass (20%) held; fluency moving more than coherence (60%) failed (both about the same).
 - Replication preregistered now, before generation: same arms, 240 fresh prompts DEC_POFF 79, two raters per half; replicated = coherence point above 0 and the pooled 480 coherence interval excludes 0.
+
+### REV results (2026-11-09; Kaggle CPU primasieve-rev; sieve_REV_scores.json, sieve_gramREV_scores.json; 20 prompts offset 125, one rater)
+- Over JX3S1: **MW fluency 0.80 [0.60, 0.95], coherence 0.80 [0.60, 0.95]**; JX3S1G 0.20 / 0.25; MWG 0.15 / 0.45.
+- Grammatical share: JX3S1 0.656 (96 sentences); MW 0.630 (81; paired [-0.187, 0.137]); JX3S1G 0.468 (paired [-0.285, -0.090]); MWG 0.490 (paired [-0.293, -0.032]); truth 0.961.
+- PLAG (5-gram share in the 191M training stream; longest chain of found 5-grams, median over 20 texts): JX3S1 0.8533, median 23; JX3S1G 0.7728, 18; MW 0.5370, 12.5; MWG 0.7489, 18; truth (held-out human text) 0.2620, 8. 8-gram share 0.0000 in every arm (copy cap holds). MW steps with a surviving word 0.994; Gibbs changed 22.9% of JX3S1's words, 41.3% of MW's.
+- Predictions: JX3S1G grammar above JX3S1 failed (0.468); JX3S1G coherence above 0.5 failed (0.25); MW grammar above 0.412 held (0.630); MW grammar above JX3S1 failed (0.630 vs 0.656, n.s.); MWG best on grammar failed; MW and MWG 5-gram share below JX3S1 held (0.5370, 0.7489 vs 0.8533); JX3S1 longest chain at least 8 in most texts held (20 of 20).
+- Reading: the model writing with the counts as a veto is the first arm to beat JX3S1 clearly on both fluency and coherence at 20 prompts, while copying much less. Gibbs revision as built (count-driven, left 4 / right 2) makes text worse: it pulls words toward frequent n-grams that fit locally but break the sentence. JX3S1 stitches 5-gram chains up to 48 words long despite the 8-word copy cap.

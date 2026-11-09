@@ -19,3 +19,4 @@ Protocol for small steps: 20 fresh prompts per step, one blind pairwise rater pe
 
 ## After the 8-hour loop (owner-directed)
 14. (09:40) Owner: "worth trying all of this. prereg it. The gibbs sounds good." REV preregistered: MW (HSSML writes, counts veto), GIBBS (2 revision sweeps using left and right context), PLAG (5-gram copy share + longest chain), HSSMB (HSSML continued on 191M). Smoke passed. The weekly Kaggle GPU quota is exhausted: REV, SRM and SRL pushed as CPU kernels; HSSMB packaged, waits for the quota reset.
+15. (10:45) REV (20 prompts): MW beats JX3S1 (fluency 0.80, coherence 0.80; grammar 0.630 vs 0.656) and copies less (5-gram share 0.5370 vs 0.8533; truth 0.2620). Gibbs as built hurts (JX3S1G 0.20/0.25, grammar 0.468; MWG 0.15/0.45). New best candidate: MW. Next: local bench, iterate MW.

@@ -14,6 +14,7 @@ def find(pat, env): return glob.glob(f"/kaggle/input/**/{pat}", recursive=True) 
 z = np.load([x for x in find("books_data.npz", "G1_DATA")][0]); S0 = z["S"]; ntr0 = int(z["ntr"]); vw = [str(w) for w in z["vw"]]; del z
 if SMOKE: S0 = np.r_[S0[:2_000_000], S0[ntr0:ntr0 + 300_000]]; ntr0 = 2_000_000
 if SMOKE: parts = []
+elif os.environ.get("G1_LOCAL"): parts = []                                                                      # local bench: MT 27M only
 elif MODE in ("sanity", "sa", "jx"): parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
 else:
     parts = [glob.glob(f"/kaggle/input/**/tok1b_{k}.npz", recursive=True)[0] for k in range(12)]
