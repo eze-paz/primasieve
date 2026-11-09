@@ -173,7 +173,10 @@ class Dec:
             if el.sum() >= 2:
                 z_ = s.cmz(text, uw[el])
                 if cfg.get("cmcal"): s._cmel, s._cmzv = el, z_
-                if cfg.get("cm"): p[el] *= np.exp(cfg["cm"] * z_)
+                if cfg.get("cm"):
+                    w_ = np.exp(cfg["cm"] * z_)
+                    if cfg.get("cmnorm"): w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300)                                      # KCG3: keep the content words' total mass
+                    p[el] *= w_
             elif cfg.get("cmcal"): s._cmel = None
         if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
             j = len(text) - 2
@@ -295,8 +298,12 @@ def cmcal():
         for j in range(LP, LP + LG):
             uw, p = d.dist(pr[:j], cfg); y = pr[j]
             if y not in uw or d._cmel is None: continue
+            if os.environ.get("DEC_CMCONTENT") and not d._cmel[int(np.searchsorted(uw, y))]: continue
             zf = np.zeros(len(uw)); zf[d._cmel] = d._cmzv; yi = int(np.searchsorted(uw, y))
-            for b in B: q = p * np.exp(b * zf / cfg["T"]); LPs[b].append(float(np.log(q[yi] / q.sum() + 1e-300)))
+            for b in B:
+                w = np.exp(b * zf)
+                if os.environ.get("DEC_CMNORM"): pp = p ** cfg["T"]; w[d._cmel] *= pp[d._cmel].sum() / max((pp[d._cmel] * w[d._cmel]).sum(), 1e-300)
+                q = p * w ** (1.0 / cfg["T"]); LPs[b].append(float(np.log(q[yi] / q.sum() + 1e-300)))
         if pid % 10 == 0: log(f"cal prompt {pid}: " + ", ".join(f"{b}: {np.mean(v):.4f}" for b, v in LPs.items()))
     out = {str(b): float(np.mean(v)) for b, v in LPs.items()}; out["n"] = len(LPs[0.0]); out["beta"] = max(B, key=lambda b: np.mean(LPs[b]))
     json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ.get('DEC_CMTAG', 'kcg')}_beta.json"), "w"), indent=1); log(json.dumps(out))

@@ -2892,3 +2892,9 @@ Scores: sieve_lt_scores.json.
 ## KV3 — further dimension (autonomous; preregistered 2026-11-09, before the run)
 - KV2's protocol (same 4,000 positions). Arms: D2048 (repeat), D4096, D8192 (decays 2/8/30 over 30 words; keys 12,288 / 24,576), D4096L (long + local key, 24,576). Also reported: AUC of Sieve B's own probability on the same candidates (P), and AUC of log P + 0.5 z / 0.35 (the reweighted distribution's ranking) per arm. Ridge solved in fp32 above key 12,288 (GPU memory).
 - **Predictions:** D4096 above D2048 (65%); D8192 above D4096 (50%); a matrix arm's AUC alone above P's (45%); auc_with_P above P for every arm (80%).
+
+### KCG2 results -- FAIL, closest yet (2026-11-09; sieve_kcg2_beta.json, mtest/kcg2_gen.json, sieve_kcg2_pair_scores.json; two raters, agreement coherence 0.900 / fluency 0.925)
+- Calibration (40 prompts, DEC_POFF 39, 1,650 true words): beta 0 / 0.25 / 0.5 / 1 / 2: -26.4658 / -26.4545 / -26.5001 / -26.8421 / -28.8610; beta 0.25. 0 of 120 CM2 texts identical to MEAN.
+- CM2 vs MEAN: coherence 0.15 [-0.0167, 0.3083] (CM2 preferred 0.525, MEAN 0.375); fluency 0.125 [-0.0417, 0.2917] (0.525 / 0.400).
+- Predictions: beta above 0 held; coherence point above MEAN held; coherence pass failed.
+- Diagnostic (after the run): on content-word true positions only (236 of 1,650) the same calibration gives -22.1714 / -21.7829 / -21.5461 / -21.5990 / -23.5811 (best beta 0.5). Method fault: e^(beta z) has mean above 1, so the reweight also shifts mass from function words to content words, which costs every other position; a pre-temperature mass-preserving version barely helps (-26.4608 at 0.25) because the temperature step changes the content mass again.
