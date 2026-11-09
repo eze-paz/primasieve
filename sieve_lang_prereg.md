@@ -2878,3 +2878,13 @@ Scores: sieve_lt_scores.json.
 - Decision: the arm with the highest held-out log probability goes to a rater round inside MEAN (KCG's protocol, fresh prompts), with beta recalibrated on MEAN.
 - **Predictions:** D512s0 AUC within 0.02 of D512's 0.7086 (70%); D1024 above D512s0 (70%); D2048 above D1024 (55%); D2048L above D2048 (50%); best AUC at least 0.75 (35%).
 **LINM results (loop 2 milestone, 2026-11-09; 80 fresh prompts; sieve_linm_*.json, sieve_gramlinm_*.json).** LIN3 vs JX3S1: fluency 0.550 [0.450, 0.662], coherence 0.550 [0.450, 0.650]; grammatical share JX3S1 0.661 (363 sentences), LIN3 0.680 (366; paired [-0.039, 0.078]), truth 0.902. Predictions: fluency interval above 0.5 — failed; point above 0.5 — held (0.550); grammar above JX3S1 — held (0.680 vs 0.661, n.s.). The class readout's small-step lead shrank at 80 prompts; not adopted.
+
+### KV2 results (2026-11-09; kernel primasieve-kv2, 294 s on a T4; sieve_kv2.json). Same 4,000 positions; beta 0 log p -23.3893
+- D512s0 AUC 0.6939, log p -22.9453; D1024 0.7442, -22.7697; D2048 0.7711, -22.6984 [gain 0.5338, 0.8478]; D2048L 0.8000, -22.6925 [0.5984, 0.7899].
+- Predictions: D512s0 within 0.02 of 0.7086 held (0.6939); D1024 above D512s0 held; D2048 above D1024 held; D2048L above D2048 held; best AUC at least 0.75 held.
+- Reading: no-training count matrices keep improving with dimension (AUC 0.6939 / 0.7442 / 0.7711 at 512 / 1,024 / 2,048). Higher dimension = less random-basis crosstalk in the PPMI vectors; the limit is the full PPMI row (60,002 dims).
+- Amendment (before the rater round): the rater arm uses D2048, not D2048L. D2048L's matrices were not saved, and its key needs 120 words of context while generation has 30 to 79; its log probability is within 0.0059 of D2048's.
+
+## KCG2 — the 2,048-dim count matrix inside Sieve (autonomous; KCG's protocol; preregistered 2026-11-09, before calibration)
+- Arm CM2 = MEAN x e^(beta z), z from D2048 (kv2_D2048.npz). beta from {0, 0.25, 0.5, 1, 2} on 40 calibration prompts (DEC_POFF 39); 120 fresh prompts DEC_POFF 43; side by side MEAN:CM2, two blind raters. Pass = coherence interval excludes 0 in CM2's favour, then replication.
+- **Predictions:** beta above 0 (85%); CM2 coherence point above MEAN (45%); coherence pass (20%).

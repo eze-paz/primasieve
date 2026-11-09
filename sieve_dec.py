@@ -58,7 +58,7 @@ class Dec:
             HK.PROJ = torch.from_numpy(pz["proj"]); s.hb = HK.OLM("HBlearn"); s.hb.load_state_dict(torch.load(os.environ["DEC_HB"], map_location="cpu")); s.hb.eval(); torch.set_num_threads(4)
             s._hgc = []; s._hgs = []
         if os.environ.get("DEC_KC"):                                                                                                     # KCG: count-built corpus matrix (sieve_kc_rank_part.py)
-            kz = np.load(os.environ["DEC_KC"]); s.kcE = kz["E"].astype(np.float32); s.kcML = kz["ML"]; s.kcidf = kz["idf"]; s.kcHL = kz["HL"]; s._cmcal = []
+            kz = np.load(os.environ["DEC_KC"]); s.kcE = kz["E"]; s.kcML = kz["ML"].astype(np.float32); s.kcidf = kz["idf"]; s.kcHL = kz["HL"] if "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s._cmcal = []
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -200,8 +200,8 @@ class Dec:
         """standardised cosine of each candidate's count vector with ML x (idf-weighted context state at three decays, last 30 words)"""
         win = np.array(text[-30:]); L = len(win); idf = s.kcidf[np.minimum(win, len(s.kcidf) - 1)]; ks = []
         for h in s.kcHL:
-            k = (idf * 2.0 ** (-(L - 1 - np.arange(L)) / h)).astype(np.float32) @ s.kcE[win]; ks.append(k / max(np.linalg.norm(k), 1e-9))
-        r = s.kcML @ np.concatenate(ks); A = s.kcE[cw]; sc = (A @ r) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(r), 1e-9))
+            k = (idf * 2.0 ** (-(L - 1 - np.arange(L)) / h)).astype(np.float32) @ s.kcE[win].astype(np.float32); ks.append(k / max(np.linalg.norm(k), 1e-9))
+        r = s.kcML @ np.concatenate(ks); A = s.kcE[cw].astype(np.float32); sc = (A @ r) / (np.maximum(np.linalg.norm(A, axis=1), 1e-9) * max(np.linalg.norm(r), 1e-9))
         return (sc - sc.mean()) / max(sc.std(), 1e-9)
     def tstate(s, text):
         if getattr(s, "_tsk", None) == tuple(text): return s._tsv
