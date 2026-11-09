@@ -2879,6 +2879,10 @@ Scores: sieve_lt_scores.json.
 - **Predictions:** D512s0 AUC within 0.02 of D512's 0.7086 (70%); D1024 above D512s0 (70%); D2048 above D1024 (55%); D2048L above D2048 (50%); best AUC at least 0.75 (35%).
 **LINM results (loop 2 milestone, 2026-11-09; 80 fresh prompts; sieve_linm_*.json, sieve_gramlinm_*.json).** LIN3 vs JX3S1: fluency 0.550 [0.450, 0.662], coherence 0.550 [0.450, 0.650]; grammatical share JX3S1 0.661 (363 sentences), LIN3 0.680 (366; paired [-0.039, 0.078]), truth 0.902. Predictions: fluency interval above 0.5 — failed; point above 0.5 — held (0.550); grammar above JX3S1 — held (0.680 vs 0.661, n.s.). The class readout's small-step lead shrank at 80 prompts; not adopted.
 
+## LW — next-word readout re-ranker (loop 2 small step; preregistered 2026-11-09, before the run)
+- Base JX3S1. Arms add gamma x log p_readout(candidate word) (HWORD2's saved readout, its own phases; nats) to each candidate's score: LW1 gamma 1/6, LW2 2/6, LW3 3/6. 20 fresh prompts (offset 107); one pairwise rater, one grammar rater.
+- **Predictions:** some LW arm fluency point above 0.5 (65%); its grammar share above JX3S1's (55%).
+
 ### KV2 results (2026-11-09; kernel primasieve-kv2, 294 s on a T4; sieve_kv2.json). Same 4,000 positions; beta 0 log p -23.3893
 - D512s0 AUC 0.6939, log p -22.9453; D1024 0.7442, -22.7697; D2048 0.7711, -22.6984 [gain 0.5338, 0.8478]; D2048L 0.8000, -22.6925 [0.5984, 0.7899].
 - Predictions: D512s0 within 0.02 of 0.7086 held (0.6939); D1024 above D512s0 held; D2048 above D1024 held; D2048L above D2048 held; best AUC at least 0.75 held.
@@ -2898,3 +2902,5 @@ Scores: sieve_lt_scores.json.
 - CM2 vs MEAN: coherence 0.15 [-0.0167, 0.3083] (CM2 preferred 0.525, MEAN 0.375); fluency 0.125 [-0.0417, 0.2917] (0.525 / 0.400).
 - Predictions: beta above 0 held; coherence point above MEAN held; coherence pass failed.
 - Diagnostic (after the run): on content-word true positions only (236 of 1,650) the same calibration gives -22.1714 / -21.7829 / -21.5461 / -21.5990 / -23.5811 (best beta 0.5). Method fault: e^(beta z) has mean above 1, so the reweight also shifts mass from function words to content words, which costs every other position; a pre-temperature mass-preserving version barely helps (-26.4608 at 0.25) because the temperature step changes the content mass again.
+**HWORD2 results (2026-11-09; Kaggle GPU primasieve-hword2; sieve_hword2.json).** 18 epochs; validation loss stopped improving at step 2,350 (5.0005). Bits per word (even): readout alone 8.1105, **mixture (alpha 0.4) 7.5594**, trigram 7.8928 (paired interval [-0.3514, -0.3151]). Predictions: readout alone below 8.0 — failed; mixture below 7.5 — failed (7.5594). The linear readout has converged: training longer barely helps.
+- LW first run failed on a device bug in the generator (readout vocabulary map on GPU); fixed, re-run unchanged.

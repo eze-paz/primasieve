@@ -95,7 +95,7 @@ if any(c.get("lin") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
 LW = None
 if any(c.get("linw") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                            # next-word log-bilinear readout (HWORD2)
     _lp = glob.glob("/kaggle/input/**/hword_readout.pt", recursive=True) or [os.environ.get("G1_LW", "hword_readout.pt")]
-    _r = torch.load(_lp[0], map_location=dev); _vid = _r["vid"].to(dev); _cw = np.bincount(S[:ntr0], minlength=VV).astype(np.float64); _oov = (_r["vid"].numpy()[:VV] == _r["NV"] - 1)
+    _r = torch.load(_lp[0], map_location=dev); _vid = _r["vid"].to(dev); _cw = np.bincount(S[:ntr0], minlength=VV).astype(np.float64); _oov = (_r["vid"].cpu().numpy()[:VV] == _r["NV"] - 1)
     _lin_oov = torch.tensor(np.log(np.maximum(_cw, 1) / max(_cw[_oov].sum(), 1)), dtype=torch.float32, device=dev)
     LW = dict(W=_r["W"].to(dev).float(), b=_r["b"].to(dev).float(), vid=_vid, NV=int(_r["NV"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]), loov=_lin_oov)
     log("next-word readout loaded")
