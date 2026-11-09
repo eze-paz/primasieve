@@ -46,7 +46,12 @@ for a, b in zip(cuts[:-1], cuts[1:]):
 assert off == NP_; del w1; log(f"key index: {NP_:,} positions in {len(cuts) - 1} ranges")
 if JX:                                                                                                         # Brown-objective classes (exchange, on the MT 27M text) and class 5-gram table over the training stream
     if "brown" not in globals(): import sys as _s; _s.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from sieve_brown import brown
-    BC = 64; BCL = brown(S[:ntr0], VV, C=BC, iters=3 if SMOKE else 15, log=log); BCLu = BCL.astype(np.uint32); NJ = min(ntr, int(os.environ.get("G1_JXN", ntr))); CLS_ = BCLu[S[:NJ]]               # class tables over the first NJ training tokens
+    BC = 64; _bc = os.environ.get("G1_BCACHE")
+    if _bc and os.path.exists(_bc): BCL = np.load(_bc)["BCL"]; log(f"Brown classes from cache {_bc}")
+    else:
+        BCL = brown(S[:ntr0], VV, C=BC, iters=3 if SMOKE else 15, log=log)
+        if _bc: np.savez(_bc, BCL=BCL)
+    BCLu = BCL.astype(np.uint32); NJ = min(ntr, int(os.environ.get("G1_JXN", ntr))); CLS_ = BCLu[S[:NJ]]               # class tables over the first NJ training tokens
     TB = {}
     for J in sorted({int(c.get("jn", 4)) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()} | {4}):            # class (J+1)-gram and J-gram counts over the training stream
         kf = np.zeros(NJ - J, np.uint64)
@@ -199,7 +204,35 @@ def class_ok(ctx4, nx, eps):
     for x_ in ctx4: c4 = (c4 << 6) | int(BCL[x_])
     k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
     jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0; return n5 >= eps * max(n4, 1)
-MWSTAT = [0, 0]; GSTAT = []
+NG5 = None
+if any(c.get("accept") or c.get("flag") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
+    NG5 = {"c1": np.bincount(S[:ntr].astype(np.int64), minlength=VV).astype(np.float64)}; NG5["N"] = NG5["c1"].sum()
+    with np.errstate(over="ignore"):
+        hc = S[:ntr].astype(np.uint64) + np.uint64(1)                                                          # hash of the 1-word context at each position
+        for n in range(2, 6):
+            L_ = ntr - n + 1; hcn = hc[:L_]; hf = hcn * M64 + S[n - 1:ntr].astype(np.uint64) + np.uint64(1)
+            uf, idx, nf = np.unique(hf, return_index=True, return_counts=True); uc, t = np.unique(hcn[idx], return_counts=True)
+            NG5[n] = (uf, nf.astype(np.float64)); NG5[f"t{n}"] = (uc, t.astype(np.float64)); hc = hf[:ntr - n]; log(f"5-gram scorer: order {n}, {len(uf):,} n-grams")
+    del hc, hf
+def _look(tab, x):
+    k, v = tab; i = np.minimum(np.searchsorted(k, x), len(k) - 1); return np.where(k[i] == x, v[i], 0.0)
+def ng5_logp(ctx, w):
+    """log p(w | last 4 words of ctx) under the interpolated absolute-discount 5-gram model; ctx (m, 4) int, w (m,) int"""
+    D = 0.75; p = (NG5["c1"][w] + 0.5) / (NG5["N"] + 0.5 * VV)
+    with np.errstate(over="ignore"):
+        for n in range(2, 6):                                                                                  # context = the last n-1 words, hashed oldest first
+            hh = np.zeros(len(w), np.uint64)
+            for j in range(5 - n, 4): hh = hh * M64 + ctx[:, j].astype(np.uint64) + np.uint64(1)
+            ch = NG5["c1"][ctx[:, 3]] if n == 2 else _look(NG5[n - 1], hh)
+            cw = _look(NG5[n], hh * M64 + w.astype(np.uint64) + np.uint64(1)); t = _look(NG5[f"t{n}"], hh)
+            p = np.where(ch > 0, np.maximum(cw - D, 0) / np.maximum(ch, 1) + D * t / np.maximum(ch, 1) * p, p)
+    return np.log(np.maximum(p, 1e-300))
+def ng5_terms(text, js):
+    """log p(text[j] | text[j-4:j]) for each j in js"""
+    js = np.array([j for j in js if 4 <= j < len(text)]);
+    if len(js) == 0: return 0.0
+    ctx = np.array([text[j - 4:j] for j in js]); return ng5_logp(ctx, np.array([text[j] for j in js]))
+MWSTAT = [0, 0]; GSTAT = []; G5STAT = []
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
     x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
@@ -216,7 +249,10 @@ def gibbs(text, rng, cfg):
     """revision sweeps over the generated words: re-choose each word given 4 words left (collage candidates) and up to 2 words right (training n-grams)"""
     G = [0, 0]
     for sw in range(int(cfg["gibbs"])):
-        for i in range(LP, len(text)):
+        pos = range(LP, len(text))
+        if cfg.get("flag"):                                                                                    # only the weakest generated words (lowest 5-gram contribution of the terms they touch)
+            con = np.array([float(np.sum(ng5_terms(text, range(i, i + 5)))) for i in pos]); pos = sorted(np.array(list(pos))[np.argsort(con)[:max(1, int(round(cfg["flag"] * len(con))))]].tolist())
+        for i in pos:
             h = text[:i][::-1][:8]; c, ok = cands(np.array([h[:4]]), np.array([h[4:8]])); c = c[0][ok[0]]
             if len(c) == 0: continue
             m4 = (St[(c[:, None] - 1 - torch.arange(4, device=dev)).clamp(min=0)].long() == torch.tensor([h[:4]], device=dev)).float().sum(1).cpu().numpy(); nx = St[c].long().cpu().numpy()
@@ -236,6 +272,9 @@ def gibbs(text, rng, cfg):
             w = np.exp(sc - sc.max()) * ~bad
             if w.sum() <= 0: continue
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg.get("pow", 6.0); new = int(uw[rng.choice(len(uw), p=ww / ww.sum())])
+            if cfg.get("accept") and new != text[i]:                                                              # keep only if the whole-text 5-gram log probability rises (terms i..i+4)
+                old = text[i]; before = float(np.sum(ng5_terms(text, range(i, i + 5)))); text[i] = new; after = float(np.sum(ng5_terms(text, range(i, i + 5)))); text[i] = old
+                if after <= before: new = old
             G[0] += 1; G[1] += new != text[i]; text[i] = new
     GSTAT.append(G[1] / max(G[0], 1)); return text
 def plag(ids):
@@ -312,7 +351,9 @@ for nm, cfg in GENS.items():
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     if JX:                                                                                                    # share of completed sentences without a verb-like word
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
-    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    g5 = float(np.mean([np.mean(ng5_terms(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64).tolist() + ids, range(LP, LP + len(ids)))) for p, ids in gg.items()])) if NG5 is not None else None
+    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    log(f"NG5 {nm}: 5-gram log p per generated word {g5}")
     log(f"PLAG {nm}: 5-gram share {GO[nm]['plag_share5']:.4f} (8-gram {GO[nm]['plag_share8']:.4f}), longest {GO[nm]['plag_longest']}; MW steps with a surviving word {GO[nm]['mw_ok']:.3f}; Gibbs changed {GO[nm]['gibbs_changed']}")
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
 _tp = [plag(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]; log(f"PLAG truth: 5-gram share {np.mean([a for a, _, _ in _tp]):.4f}, longest {[b for _, b, _ in _tp]}")
