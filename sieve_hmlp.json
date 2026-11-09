@@ -1,0 +1,11 @@
+{
+ "trigram_bits_even": 7.892818662504827,
+ "readout_bits_even": 8.014555248332869,
+ "mix_alpha": 0.4,
+ "mix_bits_even": 7.520525923801419,
+ "mix_minus_trigram_interval": [
+  -0.3909646030027514,
+  -0.3536012717976041
+ ],
+ "val_nll": 4.934816360473633
+}
