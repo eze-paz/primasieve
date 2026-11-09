@@ -2944,3 +2944,7 @@ Scores: sieve_lt_scores.json.
 - Predictions: replication pass held; coherence point above MEAN held.
 - KCG3 + KCG3R pooled (480 prompts, sieve_kcg3_all480_scores.json): see that file.
 - Reading: CM4 (MEAN + a no-training 4,096-dim count matrix reordering content words) is the new best Sieve decoder; it is the first change over MEAN to pass and replicate on coherence.
+
+## GAP2 — CM4 against the transformer (autonomous; preregistered 2026-11-09, before generation)
+- CEIL's 120 prompts (DEC_POFF 0) and seeds. Generate MEAN and CM4 with today's decoder; NET = CEIL's transformer texts (mtest/ceil_gen.json). Side by side NET:MEAN and NET:CM4 (120 pairs each, two blind raters each). Reported: preference shares and intervals; the question is whether CM4 narrows the gap (CM4's share against NET above MEAN's).
+- **Predictions:** NET preferred over CM4 on coherence with interval excluding 0 (85%); CM4's coherence share against NET above MEAN's (60%).
