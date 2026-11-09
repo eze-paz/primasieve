@@ -2917,3 +2917,8 @@ Scores: sieve_lt_scores.json.
 - Arm CM4 = MEAN with eligible content candidates multiplied by e^(2 z) and rescaled to keep their total probability (before temperature), z from D4096 (kv2_D4096.npz). Weight 2 = the best ranking weight above (chosen on calibration prompts DEC_POFF 39, before generation).
 - Run: 240 fresh prompts (DEC_POFF 47), arms MEAN and CM4, same seeds. Side by side MEAN:CM4, two blind raters per half (120 items each). Pass = coherence interval excludes 0 in CM4's favour.
 - **Predictions:** CM4 coherence point above MEAN (60%); coherence pass (35%); fluency point above MEAN (50%).
+**LW results (loop 2, 2026-11-09; 20 prompts; sieve_lw_*.json, sieve_gramlw_*.json).** Pairwise vs JX3S1, fluency / coherence: LW1 0.400 / 0.500, LW2 0.450 / 0.500, LW3 0.550 / 0.550. Grammatical share: JX3S1 0.706 (85 sentences), LW1 0.663, LW2 0.624, LW3 0.624, truth 0.878. Predictions: some LW fluency point above 0.5 — held only for LW3 (0.550, n.s.); its grammar above JX3S1 — failed. The next-word readout as a re-ranker does not help.
+
+## PW — let the readout matter: less consensus sharpening + readout (loop 2 small step; preregistered 2026-11-09, before the run)
+- Reasoning: at power 6 the consensus of copies decides almost every step, so a re-ranker's preferences are overruled. Arms (base JX3S1, power 6): P3 (power 3, no readout: the sharpening control), P3LW (power 3 + next-word readout gamma 1/2), P3L (power 3 + class readout gamma 1/2). 20 fresh prompts (offset 113).
+- **Predictions:** P3 below JX3S1 on fluency (70%, as in earlier sharpening rounds); P3LW above P3 on fluency (55%); P3LW at least JX3S1 on fluency (30%).
