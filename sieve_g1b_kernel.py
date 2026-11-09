@@ -274,7 +274,7 @@ def text_crit(ids):
         else: cur.append(x)
     if cur: sents.append(cur)
     return float(np.mean([crit_score(s_, k == 0 or k == len(sents) - 1) for k, s_ in enumerate(sents)])) if sents else 0.0
-MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []
+MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
     x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
@@ -400,10 +400,57 @@ def plag(ids):
     f = inT(5, np.array([ids[i:i + 5] for i in range(len(ids) - 4)])); best = run = 0
     for x_ in f: run = run + 1 if x_ else 0; best = max(best, run)
     return float(f.mean()), (4 + best) if best else 0, float(inH8(np.array([ids[i:i + 8] for i in range(len(ids) - 7)])).mean())
+SYMP_ = None
+if any(c.get("sym") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                                                  # SYM: NN-free reader (PARSE's tagger + parser), discourse state, planner, realiser constraints
+    _ud = os.environ.get("G1_UD", "mtest/ud"); _src = open(os.environ.get("G1_PARSEPY", "sieve_parse.py"), encoding="utf-8").read().split("# ---- sanity")[0].replace('"mtest/ud/', '_UD + "/')
+    SYMP_ = {"_UD": _ud, "__name__": "symparse"}; exec(_src, SYMP_); log("SYM reader (tagger + parser) loaded")
+    PRONG = {w: g for g, ws in dict(HE="he him his himself", SHE="she her hers herself", THEY="they them their theirs themselves", IT="it its itself", I="i me my mine myself", YOU="you your yours yourself", WE="we us our ours ourselves").items() for w in ws.split()}
+    SUBJ = dict(HE="he", SHE="she", THEY="they", IT="it", I="i", YOU="you", WE="we")
+    _wid = {w: i for i, w in enumerate(vw) if w is not None}
+    _ptag = SYMP_["ti"]["PROPN"]; _cw = SYMP_["cw"]
+    ISPROPN = np.zeros(VV, bool)
+    for w, i in _wid.items():
+        if w in _cw and max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w][k]) == _ptag: ISPROPN[i] = True
+    log(f"SYM: {int(ISPROPN.sum()):,} vocabulary words mostly tagged PROPN in EWT")
+class Disc:
+    """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
+    def __init__(s): s.sal = {}; s.last = {}; s.k = 0
+    def read(s, ids):
+        ws = [vw[i] if i < len(vw) and vw[i] is not None else "<unk>" for i in ids]
+        if not ws: return
+        tg, _ = SYMP_["tag"](ws); _, hd = SYMP_["parse"](tg); TAGS_ = SYMP_["TAGS"]
+        for r in s.sal: s.sal[r] *= 0.5
+        s.k += 1
+        for j, (w, t) in enumerate(zip(ws, tg)):
+            T_ = TAGS_[t]
+            if T_ in ("NOUN", "PROPN"): r = w
+            elif w in PRONG: r = PRONG[w]
+            else: continue
+            h = hd[j]; role = (3.0 if j + 1 < h else 2.0) if h > 0 and TAGS_[tg[h - 1]] in ("VERB", "AUX") else 1.0
+            s.sal[r] = s.sal.get(r, 0.0) + role; s.last[r] = s.k
+    def plan(s):
+        """Centering CONTINUE: the next subject is the most salient referent; pronoun for pronoun groups, else 'the' + noun"""
+        if not s.sal: return []
+        cb = max(s.sal, key=lambda r: s.sal[r])
+        if cb in SUBJ: return [_wid.get(SUBJ[cb], -1)]
+        return [_wid.get("the", -1), _wid.get(cb, -1)]
+    def ref_ids(s):
+        out = set()
+        for r in s.sal:
+            if r in SUBJ: out |= {_wid[w] for w, g in PRONG.items() if g == r and w in _wid}
+            elif r in _wid: out.add(_wid[r])
+        return out
 def generate(cfg, pids):
     out = {}; LSTAT.clear()
     for pid in pids:
         t = PROMPTS[pid]; text = S[t:t + LP].astype(np.int64).tolist(); rng = np.random.default_rng(1000 * pid + 7)
+        if cfg.get("sym"):                                                                                   # read the prompt sentence by sentence
+            DS = Disc(); cur = []
+            for x_ in text:
+                if x_ == 0: DS.read(cur); cur = []
+                else: cur.append(x_)
+            if cur: DS.read(cur)
+            PLAN = DS.plan() if text[-1] == 0 else []; REFS = DS.ref_ids(); SYMST[0] += 1
         while len(text) - LP < LG:
             if cfg.get("gen") == "ssm": text.append(mw_step(text, rng, cfg)); continue
             h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
@@ -432,6 +479,12 @@ def generate(cfg, pids):
                 sc = sc + cfg["ssm"] * ssm_logprob(text, St[c[0]].long())[None]
             if cfg.get("lin"):                                                                                    # readout bonus for each candidate's next-word class (beyond the local state)
                 sc = sc + cfg["lin"] * lin_logits(text)[FINE[St[c[0]].long()]][None]
+            if cfg.get("sym"):                                                                                    # realiser constraints
+                nxc = St[c[0]].long().cpu().numpy(); lb = len(text) - 1 - text[::-1].index(0) if 0 in text[LP:] or text[-1] == 0 else None
+                kpos = len(text) - 1 - lb if lb is not None else 99; add = np.zeros(len(nxc))
+                if "p" in cfg["sym"] and kpos < len(PLAN): add += 8.0 * (nxc == PLAN[kpos])
+                if "e" in cfg["sym"]: add += 2.0 * np.isin(nxc, list(REFS)) - 8.0 * (ISPROPN[np.minimum(nxc, VV - 1)] & ~np.isin(nxc, list(REFS)))
+                sc = sc + torch.tensor(add, dtype=sc.dtype, device=sc.device)[None]
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
             w = torch.exp(sc - sc.max()).cpu().numpy(); nx = St[c[0]].long().cpu().numpy()
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
@@ -454,6 +507,9 @@ def generate(cfg, pids):
                 wp = np.bincount(inv, weights=WPV) ** cfg["pow"]; pb = wp[0] / wp.sum(); ww = ww / ww.sum(); rest = ww[1:].sum()
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
+            if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
+                lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; DS.read(text[lb2 + 1:-1]); PLAN = DS.plan(); REFS = DS.ref_ids()
+                SYMST[1] += 1
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
         if cfg.get("cdiff"): text = count_diffuse(text, np.random.default_rng(1000 * pid + 17), cfg)
         if cfg.get("block"): text = gibbs_block(text, np.random.default_rng(1000 * pid + 13), cfg)
