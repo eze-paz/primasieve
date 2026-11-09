@@ -2922,3 +2922,13 @@ Scores: sieve_lt_scores.json.
 ## PW — let the readout matter: less consensus sharpening + readout (loop 2 small step; preregistered 2026-11-09, before the run)
 - Reasoning: at power 6 the consensus of copies decides almost every step, so a re-ranker's preferences are overruled. Arms (base JX3S1, power 6): P3 (power 3, no readout: the sharpening control), P3LW (power 3 + next-word readout gamma 1/2), P3L (power 3 + class readout gamma 1/2). 20 fresh prompts (offset 113).
 - **Predictions:** P3 below JX3S1 on fluency (70%, as in earlier sharpening rounds); P3LW above P3 on fluency (55%); P3LW at least JX3S1 on fluency (30%).
+
+### KCG3 results -- PASS (2026-11-09; mtest/kcg3_gen.json, sieve_kcg3_pair_scores.json; 240 prompts DEC_POFF 47, two raters per half, agreement 0.883 / 0.883)
+- 0 of 240 CM4 texts identical to MEAN.
+- CM4 vs MEAN over 240: coherence 0.1917 [0.075, 0.3042] (CM4 preferred 0.537, MEAN 0.346); fluency 0.0083 [-0.1167, 0.125] (0.446 / 0.438). Halves: coherence 0.2667 [0.1, 0.4167] and 0.1167 [-0.0583, 0.2833].
+- Predictions: coherence point above MEAN held; coherence pass held; fluency point above MEAN held (0.0083).
+- Reading: the first licence over MEAN that raters prefer on coherence, and it uses no training: PPMI random-indexing vectors in 4,096 dims, a ridge corpus matrix (one closed-form solve), and a mass-preserving reorder of content candidates. Replication (KCG3R) before it counts, per the KCG line's rule.
+
+## KCG3R — replication (preregistered 2026-11-09, before generation)
+- Identical arms and settings; 240 fresh prompts DEC_POFF 53; same rater brief, two raters per half. Pass = coherence interval over the 240 excludes 0 in CM4's favour.
+- **Predictions:** replication pass (55%); coherence point above MEAN (80%).

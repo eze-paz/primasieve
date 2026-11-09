@@ -1,0 +1,24 @@
+{
+ "raters": [
+  "kcg3b_pair_ratings.json",
+  "kcg3b_pair_ratings_r2.json"
+ ],
+ "CM4 vs MEAN coherence": {
+  "b_wins": 0.5166666666666667,
+  "a_wins": 0.4,
+  "mean": 0.1167,
+  "interval": [
+   -0.0583,
+   0.2833
+  ]
+ },
+ "CM4 vs MEAN fluency": {
+  "b_wins": 0.425,
+  "a_wins": 0.48333333333333334,
+  "mean": -0.0583,
+  "interval": [
+   -0.2333,
+   0.1083
+  ]
+ }
+}
