@@ -2980,3 +2980,14 @@ Scores: sieve_lt_scores.json.
 ## HSSMGEN — does the trained state-space LM write better text than JX3S1? (loop 2; preregistered 2026-11-09, before the run)
 - Sample from HSSM (harm) on the 20 PW prompts (offset 113, same 30-word prompts as JX3S1 in sieve_pw_gen.json, prompts checked equal): HSSM08 (temperature 0.8, top-p 0.9), HSSM10 (temperature 1.0, top-p 0.9); 50 words; rare-word bucket sampled by unigram; no `<unk>`. sieve_armjudge.py tag HG, base JX3S1, one blind rater per pair batch + grammar batches.
 - **Predictions:** HSSM08 grammar share below JX3S1's (70%: a 7-bit model is far from fluent, while JX3S1 copies real word sequences); HSSM08 coherence share against JX3S1 above 0.5 (40%).
+
+### HSSMGEN results (2026-11-09; sieve_HG_scores.json, sieve_gramHG_scores.json; 20 prompts, one rater)
+- Pairwise over JX3S1: HSSM08 fluency 0.0, coherence 0.30 [0.10, 0.50]; HSSM10 fluency 0.05, coherence 0.35 [0.15, 0.55].
+- Grammatical share: JX3S1 0.688 [0.61, 0.76]; HSSM08 0.412 [0.301, 0.512] (paired vs JX3S1 [-0.406, -0.139]); HSSM10 0.348; truth 0.933.
+- Predictions: HSSM08 grammar below JX3S1 held; HSSM08 coherence share above 0.5 failed (0.30).
+- Reading: a 7.04-bit model on its own writes much worse text than the collage; its value, if any, is as a scorer over the collage's real-text candidates.
+
+## SSMR — the trained HSSM as a scorer over JX3S1's candidates (loop 2; preregistered 2026-11-09, before the run)
+- sieve_g1b_kernel.py option ssm: candidate score += ssm x log p_HSSM(candidate word | last 512 words of text), before the word aggregation and power 6 (so ssm 1/6 = multiply by p_HSSM once). JX3S1 settings otherwise. Arms on the 20 PW prompts (offset 113): JX3S1 (must reproduce sieve_pw_gen.json's JX3S1 texts), S1 (ssm 1/6), S2 (2/6), S4 (4/6). Judged with sieve_armjudge.py (tag SR, base JX3S1).
+- Unlike the earlier readouts (best alone 8.01 bits), this scorer is 7.04 bits alone, so it can tell candidates apart.
+- **Predictions:** at least one arm's coherence share above 0.6 (40%); best arm's grammar share above JX3S1's (45%); S4 grammar below JX3S1 (55%: too much weight lets the 7-bit model pick odd splices).

@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "HSSM08 over JX3S1": {
+   "share": 0.0,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.0
+   ]
+  },
+  "HSSM10 over JX3S1": {
+   "share": 0.05,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.15
+   ]
+  }
+ },
+ "coherence": {
+  "HSSM08 over JX3S1": {
+   "share": 0.3,
+   "pairs": 20,
+   "interval": [
+    0.1,
+    0.5
+   ]
+  },
+  "HSSM10 over JX3S1": {
+   "share": 0.35,
+   "pairs": 20,
+   "interval": [
+    0.15,
+    0.55
+   ]
+  }
+ }
+}

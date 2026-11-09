@@ -99,6 +99,39 @@ if any(c.get("linw") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values
     _lin_oov = torch.tensor(np.log(np.maximum(_cw, 1) / max(_cw[_oov].sum(), 1)), dtype=torch.float32, device=dev)
     LW = dict(W=_r["W"].to(dev).float(), b=_r["b"].to(dev).float(), vid=_vid, NV=int(_r["NV"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]), loov=_lin_oov)
     log("next-word readout loaded")
+SSMM = None
+if any(c.get("ssm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                             # trained harmonic-start state-space LM (HSSM) as a candidate scorer
+    import torch.nn as nn
+    def _load_hssm():
+        VVh = int(max(S[:ntr0].max(), S[ntr:].max())) + 1; NVh = 8192; cw = np.bincount(S[:ntr0].astype(np.int64), minlength=VVh); topw = np.argsort(-cw)[:NVh - 1]
+        vid = np.full(VVh, NVh - 1, np.int64); vid[topw] = np.arange(NVh - 1); oov = cw[vid == NVh - 1].sum(); poo = np.log(np.maximum(cw, 1) / max(oov, 1))
+        TA = (2, 4, 8, 16, 32, 64, 128); DB = 64; NN = DB * len(TA); DM = 256
+        class SSM(nn.Module):
+            def __init__(s):
+                super().__init__(); s.nu = nn.Parameter(torch.zeros(NN)); s.th = nn.Parameter(torch.zeros(NN)); s.B = nn.Parameter(torch.zeros(NN, DM, 2)); s.C = nn.Parameter(torch.zeros(DM, NN, 2)); s.Dd = nn.Parameter(torch.ones(DM))
+                s.ln = nn.LayerNorm(DM); s.ff = nn.Sequential(nn.Linear(DM, 4 * DM), nn.GELU(), nn.Linear(4 * DM, DM)); s.ln2 = nn.LayerNorm(DM)
+            def forward(s, x):
+                u = s.ln(x); Bc = torch.complex(s.B[..., 0], s.B[..., 1]); Bu = torch.einsum("btd,nd->btn", u.to(torch.complex64), Bc)
+                lam = torch.exp(-torch.exp(s.nu) + 1j * s.th); Tn = x.shape[1]; j = torch.arange(Tn, device=x.device, dtype=torch.float32)
+                k = torch.exp(j[:, None] * torch.log(lam)[None, :]); n_ = 2 * Tn
+                h = torch.fft.ifft(torch.fft.fft(Bu, n=n_, dim=1) * torch.fft.fft(k, n=n_, dim=0)[None], dim=1)[:, :Tn]
+                Cc = torch.complex(s.C[..., 0], s.C[..., 1]); y = torch.einsum("btn,dn->btd", h, Cc).real + s.Dd * u
+                x = x + y; return x + s.ff(s.ln2(x))
+        class LM(nn.Module):
+            def __init__(s):
+                super().__init__(); s.emb = nn.Embedding(VVh, DM); s.layers = nn.ModuleList([SSM(), SSM()]); s.lnf = nn.LayerNorm(DM); s.head = nn.Linear(DM, NVh)
+            def forward(s, w):
+                x = s.emb(w)
+                for l in s.layers: x = l(x)
+                return s.head(s.lnf(x))
+        m = LM().to(dev); mp = glob.glob("/kaggle/input/**/hssm_harm.pt", recursive=True) or [os.environ.get("G1_SSM", "hssm_harm.pt")]; m.load_state_dict(torch.load(mp[0], map_location=dev)); m.eval()
+        return dict(m=m, VV=VVh, NV=NVh, vid=torch.tensor(np.r_[vid, np.full(max(0, (1 << 16) - VVh), NVh - 1)][:1 << 16], device=dev), poo=torch.tensor(np.r_[poo, np.zeros(max(0, (1 << 16) - VVh))][:1 << 16], dtype=torch.float32, device=dev))
+    SSMM = _load_hssm(); log(f"HSSM scorer loaded (vocabulary {SSMM['VV']:,})")
+def ssm_logprob(text, nx):
+    """log p(next word) for candidate words nx under the trained HSSM, given the text so far (last 512 words)"""
+    x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
+    with torch.no_grad(): lp = torch.log_softmax(SSMM["m"](x)[0, -1].float(), 0)
+    v_ = SSMM["vid"][nx]; return lp[v_] + torch.where(v_ == SSMM["NV"] - 1, SSMM["poo"][nx], torch.zeros_like(SSMM["poo"][nx]))
 def linw_logprob(text, nx):
     """log p(next word) for candidate words nx under the HWORD readout (state of words 3+ back + fitted codes of the last two words)"""
     w = torch.tensor(text[::-1][2:], device=dev); vs = []
@@ -181,6 +214,8 @@ def generate(cfg, pids):
                 qc = FINE[torch.tensor([(text[::-1] + [0] * 8)[:8]], device=dev)]; mc = (FINE[St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long()] == qc[:, None, :]).float().sum(2); sc = sc + cfg["lamc"] * mc
             if cfg.get("linw"):                                                                                   # next-word readout bonus (log p, nats)
                 sc = sc + cfg["linw"] * linw_logprob(text, St[c[0]].long())[None]
+            if cfg.get("ssm"):                                                                                    # trained HSSM bonus (log p, nats)
+                sc = sc + cfg["ssm"] * ssm_logprob(text, St[c[0]].long())[None]
             if cfg.get("lin"):                                                                                    # readout bonus for each candidate's next-word class (beyond the local state)
                 sc = sc + cfg["lin"] * lin_logits(text)[FINE[St[c[0]].long()]][None]
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
