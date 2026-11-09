@@ -3374,3 +3374,15 @@ Theory: a damped-oscillator bank is a multi-timescale transform of the history (
 - As preregistered (LSA atoms, D 64, tau 32, unbind SUBJ): next-subject accuracy **0.1916**; most recent subject 0.1933; symbolic salience 0.3247. Predictions: above the recent baseline failed; equal to salience failed.
 - Diagnostic (post hoc; mtest/fhrr_diag.py, fhrr_diag2.py): the same queries computed exactly (no phasors): SUBJ tau 32 0.2586, SUBJ+0.67 OBJ tau 128 0.3213 (= symbolic salience). Phasor versions with LSA atoms: 0.1916 / 0.2294. With random atoms (subj+obj, tau 128): D 64 0.2766, D 256 0.3153, **D 1024 0.3265**. Reading: the phasor state can hold the scene as well as the symbolic state; it failed because (1) the query asked only for subjects (salience counts objects too) and (2) LSA atoms are deliberately similar (same-topic characters interfere), while FHRR unbinding needs near-orthogonal atoms; crosstalk falls with dimension as theory says (about 1/sqrt(D)).
 - **Amendment to the generation encoder (before any generation with it):** bands tau 16, 32, 64 keep LSA atoms + roles (fuzzy meaning match between passages); band tau 128 uses random identity atoms, D 256, + roles (clean who-did-what). Same width as the old harmonic state (448 numbers per token).
+
+## COMB — how should the symbolic and the phasor state be combined? (owner, 2026-11-09: "test and find out whats the best way to combine them"; preregistered before implementation)
+Theory: complementary learning systems (McClelland, McNaughton & O'Reilly 1995) and Smolensky's symbolic/vector integration: an exact symbolic state should decide, a distributed state should search memory by similarity; two independently built states describing the same scene can diverge and pull different decisions apart.
+- **Drift diagnostic (trace):** at each planned sentence start, SYM's protagonist (its planned subject) vs the phasor state's (identity band tau 128, unbind SUBJ + 0.67 OBJ, clean-up over SYM's referents); agreement rate.
+- **Arms** (local bench MT 27M, the same 20 prompts as Test B, G1_POFF 191; all SYM3C settings):
+  - SYM3C (old harmonic tie-breaker; base);
+  - SYM3F (FHRR, independent: text roles from the cheap rule, as Test B);
+  - SYM3FD (FHRR, derived: text roles and verb-subject bindings taken from SYM's parse for every finished sentence; the cheap rule only for the unfinished current sentence; the book side keeps the cheap rule);
+  - SYM3FP (derived + plan-guided search: the phasor query adds 0.5 x the encoding of the planned subject in role SUBJ at age 0, so passages whose recent subject matches the plan are preferred);
+  - SYM3N (no harmonic term at all).
+- One blind rater pair (two raters) per comparison vs SYM3C (tag CB); grammar; PLAG; agreement rates.
+- **Predictions:** agreement of the independent state with SYM below 0.7 (60%); the derived state's agreement above the independent's (75%); SYM3FP coherence share over SYM3C above 0.5 (45%), the best of the four (35%); SYM3N coherence share over SYM3C at least 0.45 (60%: the harmonic term adds little once the plan supplies coherence).
