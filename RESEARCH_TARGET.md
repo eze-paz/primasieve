@@ -22,6 +22,8 @@
 
 ## Caveats (honest status)
 
+- **Milestone failed (2026-11-09, SYM2M80):** SYM2H vs JX3S1 on 80 fresh prompts with two blind raters: coherence pooled 0.4562 [0.35, 0.5563], fluency 0.475, grammar 0.656 vs 0.644. The 20-prompt wins below were within noise. The current SYM plans only which referent opens the next sentence; that is too thin. The target designation stands by the owner's decision; the evidence for it is now the theory and the failure of the alternatives, not a measured gain. Next: plan more of each sentence (events).
+
 - The SYM result is 20 prompts with one rater: intervals [0.50, 0.90] touch 0.5. A milestone on more prompts with two raters is required before adoption as the default decoder.
 - Always-CONTINUE planning (SYMP) did not replicate on fresh prompts (coherence 0.70 in round SY, 0.4737 in round SY2; pooled 23 of 39 = 0.59). The current best variant is SYM2H (human-frequency transitions: coherence 0.7368, interval [0.526, 0.895]); its milestone is the next step.
 - Its components are crude: tag-only parser (attachment accuracy 0.6152), coreference by pronoun groups, no gender for nouns.
