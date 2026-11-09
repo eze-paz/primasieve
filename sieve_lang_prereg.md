@@ -2841,6 +2841,9 @@ Scores: sieve_lt_scores.json.
 - **Predictions:** readout alone below the trigram in bits (40%); mixture below the trigram with the interval below zero (85%).
 **LIN rater step (loop 2, 2026-11-09; 20 prompts, one pairwise rater per arm, one grammar rater; sieve_lin_*.json, sieve_gramlin_*.json).** Pairwise vs JX3S1: LIN1 fluency 0.368 [0.158, 0.579] (19), coherence 0.579; **LIN2 fluency 0.700 [0.500, 0.900] (20), coherence 0.600 [0.400, 0.800]**. Grammatical share: JX3S1 0.604 (96 sentences), LIN1 0.483 (89; paired [-0.218, -0.038]), **LIN2 0.685 (92; paired [-0.037, 0.187])**, truth 0.797 (64). Small sample; LIN2 is a lead, LIN1 a negative.
 
+## LINS — readout weight sweep (loop 2 small step; preregistered 2026-11-09, before the run)
+- 20 fresh prompts (offset 97), base JX3S1; arms LIN2 (gamma 2/6, replication), LIN3 (3/6), LIN5 (5/6). Same rater protocol. Prediction: LIN2 fluency point above 0.5 again (60%); some gamma above 2/6 at least as good as LIN2 on grammar share (45%).
+
 ## KV — count-matrix variants, fast proxy (autonomous run; preregistered 2026-11-09, before the run)
 - Question: which no-training change to CMRL makes Sieve's next-word choice better? Each variant = PPMI random-indexing vectors + a ridge corpus matrix from 1,000,000 training positions (closed form); no gradient descent.
 - Variants: CMRL (replicate: d 256, window 5 vectors, decays 2/8/30 over 30 words); LONG (decays 2/8/30/120 over 120 words); D512 (512-dim vectors); W2 (vectors from window 2: more syntactic); LOCAL (CMRL key + the random vectors of the last two words); RF4096 (higher dimension without training: 4,096 random ReLU features of the CMRL key, ridge in 4,096 dims).
@@ -2854,3 +2857,9 @@ Scores: sieve_lt_scores.json.
 - CM vs MEAN: coherence -0.1167 [-0.2833, 0.0583] (CM preferred 0.392, MEAN 0.508); fluency -0.0667 [-0.2333, 0.1000] (0.383 / 0.450).
 - Predictions: beta above 0 held; CM coherence point above MEAN failed; coherence pass failed; fluency interval excluding 0 failed.
 - Reading: the count matrix ranks the true word better (KC AUC 0.6433) but at the strength the data supports (beta 0.25) it barely moves Sieve's likelihood (-26.3158 vs -26.3400), and raters lean to MEAN, as with HG (-0.075), HH and JT (-0.1417). Licences layered on MEAN have not yet helped coherence.
+- Amendment (HWORD): first run ran out of GPU memory building features (trigram baseline already logged: 7.8928 bits/word on even queries); features now filled in place in half precision. Method unchanged.
+**LINS results (loop 2, 2026-11-09; 20 prompts; sieve_lins_*.json, sieve_gramlins_*.json).** Pairwise vs JX3S1, fluency / coherence: LIN2 0.500 / 0.550; **LIN3 0.650 [0.450, 0.850] / 0.700 [0.500, 0.900]**; LIN5 0.550 / 0.650. Grammatical share: JX3S1 0.756 (90 sentences), LIN2 0.806 (93), LIN3 0.794 (97), LIN5 0.648 (88; paired [-0.198, -0.012]), truth 0.859 (78). Predictions: LIN2 fluency point above 0.5 — failed (0.500); a larger gamma at least as good as LIN2 on grammar — failed (LIN3 0.794 vs 0.806, close). Across the two small steps LIN2 fluency is 24 of 40. The useful range is gamma 2/6-3/6; 5/6 hurts grammar. LIN3 goes to an 80-prompt milestone.
+
+## LINM — milestone: readout re-ranker gamma 3/6 vs JX3S1 on 80 fresh prompts (preregistered 2026-11-09, before the run)
+- 80 fresh prompts (offset 101); arms JX3S1, LIN3; one pairwise rater (80 pairs) and three grammar raters (prompt thirds), as in the earlier full rounds.
+- **Predictions:** LIN3 fluency share above 0.5 with interval above 0.5 (35%); point above 0.5 (65%); grammar share above JX3S1's (60%).

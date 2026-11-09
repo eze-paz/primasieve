@@ -78,11 +78,14 @@ ptq = p_tri(S[q - 2], S[q - 1], S[q]); R = dict(trigram_bits_even=float(-np.log2
 gt = torch.Generator().manual_seed(1); _thC = torch.rand(K, D, generator=gt); omega = torch.cat([torch.zeros(D // 2), torch.rand(D // 2, generator=gt) * 2 * np.pi]).to(dev)
 THt = {t: torch.tensor(TH[t], dtype=torch.float32, device=dev) for t in TAUS}
 def feats(idx):
-    Z = torch.cat([phasor_states(S, THt[t], omega, t, idx) for t in TAUS], 1)                                     # words 3 back and older
-    w1 = torch.tensor(S[idx - 1], device=dev); w2 = torch.tensor(S[idx - 2], device=dev); e = []
-    for t in (2, 4):
-        for w_ in (w1, w2): e += [torch.cos(THt[t][w_]), torch.sin(THt[t][w_])]
-    return torch.cat([Z.float(), torch.cat(e, 1) / 8.0], 1).half()
+    F = torch.empty(len(idx), 2 * D * len(TAUS) + 8 * D, dtype=torch.float16, device=dev); o_ = 0
+    for t in TAUS: F[:, o_:o_ + 2 * D] = phasor_states(S, THt[t], omega, t, idx); o_ += 2 * D                      # filled in place: no float copy
+    for a0 in range(0, len(idx), 262144):
+        ii = idx[a0:a0 + 262144]; w1 = torch.tensor(S[ii - 1], device=dev); w2 = torch.tensor(S[ii - 2], device=dev); e = []
+        for t in (2, 4):
+            for w_ in (w1, w2): e += [torch.cos(THt[t][w_]), torch.sin(THt[t][w_])]
+        F[a0:a0 + len(ii), o_:] = (torch.cat(e, 1) / 8.0).half()
+    return F
 Ftr = feats(trs); Fq = feats(q); ytr = torch.tensor(vid[S[trs]], device=dev); log(f"HWORD features {tuple(Ftr.shape)}")
 nv = len(trs) // 20; perm = torch.randperm(len(trs), generator=torch.Generator().manual_seed(3)).to(dev); va, tr_ = perm[:nv], perm[nv:]
 W = torch.zeros(Ftr.shape[1], NV, device=dev, requires_grad=True); b = torch.zeros(NV, device=dev, requires_grad=True)

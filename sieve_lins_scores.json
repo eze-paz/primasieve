@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "LIN2 over JX3S1": {
+   "share": 0.5,
+   "pairs": 20,
+   "interval": [
+    0.3,
+    0.7
+   ]
+  },
+  "LIN3 over JX3S1": {
+   "share": 0.65,
+   "pairs": 20,
+   "interval": [
+    0.45,
+    0.85
+   ]
+  },
+  "LIN5 over JX3S1": {
+   "share": 0.55,
+   "pairs": 20,
+   "interval": [
+    0.35,
+    0.75
+   ]
+  }
+ },
+ "coherence": {
+  "LIN2 over JX3S1": {
+   "share": 0.55,
+   "pairs": 20,
+   "interval": [
+    0.35,
+    0.75
+   ]
+  },
+  "LIN3 over JX3S1": {
+   "share": 0.7,
+   "pairs": 20,
+   "interval": [
+    0.5,
+    0.9
+   ]
+  },
+  "LIN5 over JX3S1": {
+   "share": 0.65,
+   "pairs": 20,
+   "interval": [
+    0.45,
+    0.85
+   ]
+  }
+ }
+}
