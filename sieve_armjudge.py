@@ -7,6 +7,8 @@ import os, sys, json, subprocess, numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 def D(tag): return os.path.join(HERE, "mtest", f"kaggle_{tag}j")
 def build(tag, gen, base, arms):
+    for f in (os.path.join(HERE, f"sieve_{tag}_key.json"), os.path.join(HERE, f"sieve_gram{tag}_key.json"), D(tag)):     # file names are case-insensitive on Windows: never build over an existing tag
+        if os.path.exists(f): sys.exit(f"tag {tag} already used ({f}); pick another tag")
     g = json.load(open(gen, encoding="utf-8")); arms = arms.split(","); G = {k: g[k] for k in [base] + arms + ["truth"]}; NP = len(G[base]["gens"])
     for B in G: assert [x["pid"] for x in G[B]["gens"]] == list(range(NP)), B
     json.dump(dict(G, _meta=dict(base=base, arms=arms)), open(os.path.join(HERE, f"sieve_{tag}_gen.json"), "w", encoding="utf-8"), indent=0); rng = np.random.default_rng(sum(map(ord, tag))); key = {}
