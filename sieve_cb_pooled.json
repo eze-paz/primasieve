@@ -1,0 +1,82 @@
+{
+ "SYM3F_coherence": {
+  "r1": 0.45,
+  "r2": 0.55,
+  "pooled": 0.5,
+  "interval": [
+   0.3,
+   0.7
+  ],
+  "agree": 0.9
+ },
+ "SYM3F_fluency": {
+  "r1": 0.5,
+  "r2": 0.55,
+  "pooled": 0.525,
+  "interval": [
+   0.3,
+   0.725
+  ],
+  "agree": 0.95
+ },
+ "SYM3FD_coherence": {
+  "r1": 0.45,
+  "r2": 0.45,
+  "pooled": 0.45,
+  "interval": [
+   0.25,
+   0.65
+  ],
+  "agree": 0.8
+ },
+ "SYM3FD_fluency": {
+  "r1": 0.45,
+  "r2": 0.5,
+  "pooled": 0.475,
+  "interval": [
+   0.25,
+   0.676
+  ],
+  "agree": 0.95
+ },
+ "SYM3FP_coherence": {
+  "r1": 0.5,
+  "r2": 0.45,
+  "pooled": 0.475,
+  "interval": [
+   0.275,
+   0.675
+  ],
+  "agree": 0.85
+ },
+ "SYM3FP_fluency": {
+  "r1": 0.55,
+  "r2": 0.5,
+  "pooled": 0.525,
+  "interval": [
+   0.3,
+   0.75
+  ],
+  "agree": 0.95
+ },
+ "SYM3N_coherence": {
+  "r1": 0.65,
+  "r2": 0.85,
+  "pooled": 0.75,
+  "interval": [
+   0.575,
+   0.9
+  ],
+  "agree": 0.8
+ },
+ "SYM3N_fluency": {
+  "r1": 0.6,
+  "r2": 0.6,
+  "pooled": 0.6,
+  "interval": [
+   0.4,
+   0.8
+  ],
+  "agree": 0.9
+ }
+}
