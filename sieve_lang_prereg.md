@@ -3026,3 +3026,13 @@ Scores: sieve_lt_scores.json.
 ## SRL — the larger scorer: S1L (HSSML, ssm 1/6) on SRM's 80 prompts (loop 2; preregistered 2026-11-09, before the run)
 - sieve_g1b_kernel.py now reads the scorer's width and depth from its weights (G1_SSMF). One arm S1L = JX3S1 + ssm 1/6 with hssmL_harm.pt, G1_POFF 119, 80 prompts; judged against SRM's JX3S1 texts (same prompts; tag SRL, base JX3S1, arms S1 and S1L, so S1 vs S1L is also visible through the common base).
 - **Predictions:** S1L coherence share over JX3S1 above S1's (55%); S1L coherence interval above 0.5 (25%).
+
+## LEX1 — rich lexicon as a decode-time source (user idea; preregistered 2026-11-09, before any entry is written)
+- Idea (user): learning as writing, not gradients: each word gets a long entry (definition, sensory attributes, common frames, 10-20 usage sentences from simple to complex); sentences are stored once and indexed under every word they contain (a sentence using moon and stars sits under both, not duplicated).
+- Lexicon: the 1,000 most frequent words with id > 100 in the training stream (mtest/lex1_words.json; the 1,000th occurs 2,130 times), chosen by frequency only, never from evaluation prompts. Entries written by Claude subagents (distilled neural knowledge: no training cost, but not pure counts), corpus style: lowercase, words and periods only. Sentences with any out-of-vocabulary word are dropped. Stored as a token stream with sentence boundaries plus an inverted index word -> sentences.
+- Arms (both on top of CM4, same cfg):
+  - LEXA (counts): lexicon positions retrieved with the same 8-word reversed-prefix match as the corpus and added to the candidate set at equal footing (no bonus).
+  - LEXB (lookup): only lexicon sentences that share at least one content word (id > 100, idf >= 2) with the last 30 words are eligible; their matching positions are added with a bonus delta on the match score.
+- Gate (calibration prompts DEC_POFF 39, 40 prompts, T 1, all positions): (1) score of the true next word = mean over positions of its ranking AUC among candidates, 0 when it is not a candidate; the arm must exceed CM4's at its best bonus (LEXB grid 0.5/1/2/4); (2) loop check on 40 generated texts per arm: distinct words and sentence-end rate each no more than 5% below CM4's on the same prompts.
+- Then the gate-passing arm with the higher gate score vs CM4 on 240 fresh prompts (DEC_POFF 73), two raters per half; pass = coherence or fluency interval excludes 0 in the arm's favour.
+- **Predictions:** LEXA gate passes (30%); LEXB gate passes (50%); rater pass (20%); if it passes, fluency moves more than coherence (60%).
