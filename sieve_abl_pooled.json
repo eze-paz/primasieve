@@ -1,0 +1,46 @@
+{
+ "SYM3NNV_coherence": {
+  "r1": 0.2,
+  "r2": 0.2,
+  "pooled": 0.2,
+  "interval": [
+   0.05,
+   0.375
+  ],
+  "agree": 0.9,
+  "pairs": 20
+ },
+ "SYM3NNV_fluency": {
+  "r1": 0.2,
+  "r2": 0.2,
+  "pooled": 0.2,
+  "interval": [
+   0.05,
+   0.4
+  ],
+  "agree": 1.0,
+  "pairs": 20
+ },
+ "SYM3NP3_coherence": {
+  "r1": 0.35,
+  "r2": 0.35,
+  "pooled": 0.35,
+  "interval": [
+   0.175,
+   0.55
+  ],
+  "agree": 0.8,
+  "pairs": 20
+ },
+ "SYM3NP3_fluency": {
+  "r1": 0.45,
+  "r2": 0.45,
+  "pooled": 0.45,
+  "interval": [
+   0.25,
+   0.65
+  ],
+  "agree": 0.8,
+  "pairs": 20
+ }
+}

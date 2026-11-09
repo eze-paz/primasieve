@@ -3404,3 +3404,10 @@ Theory: complementary learning systems (McClelland, McNaughton & O'Reilly 1995) 
 - **NOH80 milestone:** SYM3N (SYM3C without the harmonic term) vs SYM3C, 80 fresh prompts (G1_POFF 197), two blind raters + grammar (tag NOH). Decision rule as before: SYM3N becomes the default if the pooled coherence share's interval is above 0.5 and the grammar paired lower bound is above -0.05. If the coherence point is at least 0.45 and grammar is not worse, the harmonic term is removed anyway for speed and simplicity (Occam), recorded as such.
 - **ABL (20 prompts, G1_POFF 203, two raters, base SYM3N, tag ABL):** SYM3N-NV (junction veto off: no eps) and SYM3N-P3 (power 3 instead of 6). A component is dropped if removing it is not worse (coherence and fluency points at least 0.45, grammar not lower by more than 0.03).
 - **Predictions:** NOH80 coherence pooled above 0.5 (60%), interval above 0.5 (30%); SYM3N-NV grammar lower than SYM3N by more than 0.03 (55%); SYM3N-P3 fluency below 0.45 (50%).
+
+### ABL results (2026-11-10; local bench MT 27M, 20 prompts offset 203, two raters + grammar, base SYM3N; sieve_abl_pooled.json, sieve_abl_scores.json, sieve_gramabl_scores.json)
+- Generation speed without harmonics: 47-50 s per arm for 20 prompts (with harmonics about 6 min).
+- SYM3N-NV (junction veto off) over SYM3N: coherence 0.20 [0.05, 0.375], fluency 0.20 [0.05, 0.40] (agreement 0.90 / 1.0); grammar 0.584 vs 0.670. 5-gram copy share 0.6696 vs 0.6489.
+- SYM3N-P3 (power 3) over SYM3N: coherence 0.35, fluency 0.45; grammar 0.516 vs 0.670 (paired [-0.285, -0.016]). Copy share 0.6141.
+- Predictions: NV grammar lower by more than 0.03 held (0.584 vs 0.670); P3 fluency below 0.45 failed narrowly (0.45).
+- Decision (preregistered rule): both components stay: the junction veto clearly helps (removing it is rejected 0.20 / 0.20), and power 6 beats power 3 (coherence 0.35, grammar -0.154).
