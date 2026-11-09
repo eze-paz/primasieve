@@ -80,6 +80,7 @@ class Dec:
             s.lxw, s.lxs = k_ // 10_000_000, k_ % 10_000_000; s.lxst = np.searchsorted(s.lxw, np.arange(MT.VV + 1))
         if os.environ.get("DEC_NEC"):                                                                                                    # NEC: narrative event chains (sieve_nec_build.py)
             nz_ = np.load(os.environ["DEC_NEC"]); s.necV = nz_["verbs"]; s.necC = nz_["codes"]; s.necP = nz_["pmi"]; s.necPR = set(int(x) for x in nz_["PR"]); s.necN = int(nz_["N"])
+            s.necS = nz_["subj"] if "subj" in nz_.files else np.isin(np.arange(s.necN), nz_["PR"]); s.necStop = nz_["stop"] if "stop" in nz_.files else (np.arange(s.necN) == 0)   # NEC2: names as subjects
         if os.environ.get("DEC_KC2"):                                                                                                    # KCG5: second (all-word) matrix in the same process
             k2 = os.environ["DEC_KC2"]; kz = {k: np.load(os.path.join(k2, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(k2, "R.npy")) else ())}
             s.kc2 = (kz["E"], np.asarray(kz["ML"], np.float32), np.asarray(kz["idf"]), np.array([2.0, 8.0, 30.0]), kz.get("R"))
@@ -216,7 +217,7 @@ class Dec:
             el = (uw > 0) & (uw <= s.V)
             if el.sum() >= 2: w_ = np.exp(cfg["cma"] * s.cmz(text, uw[el], s.kc2)); w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300); p = p.copy(); p[el] *= w_
         if cfg.get("nec") and getattr(s, "necV", None) is not None:                                                         # NEC: chain state reorders verb candidates, same mass
-            r_ = s.nez(text, uw)
+            r_ = s.nez(text, uw, cfg.get("necany"))
             if r_ is not None: el, z_ = r_; w_ = np.exp(cfg["nec"] * z_); w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300); p = p.copy(); p[el] *= w_
         if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
             j = len(text) - 2
@@ -241,20 +242,24 @@ class Dec:
         if cfg.get("cmpost") and getattr(s, "_cmpost", None) is not None:                                                    # KCG3: reorder content words, same total mass
             el, z_ = s._cmpost; s._cmpost = None; q_ = p[el]; w_ = np.exp(cfg["cmpost"] * z_); p = p.copy(); p[el] = q_ * w_ * q_.sum() / max((q_ * w_).sum(), 1e-300)
         return uw, p / p.sum()
-    def nez(s, text, uw):
+    def nez(s, text, uw, any_=False):
         """NEC: in a verb slot (pronoun, or pronoun + function word), z of each verb candidate = standardised sum of chain PMI
         with the same pronoun's last 3 events in the last 200 words; None outside slots or with an empty state"""
-        if text[-1] in s.necPR: p_, k0 = text[-1], len(text) - 1
-        elif len(text) > 1 and text[-2] in s.necPR and 0 < text[-1] <= 100: p_, k0 = text[-2], len(text) - 2
+        sb = lambda w: 0 < w < len(s.necS) and bool(s.necS[w]); st_ = lambda w: w == 0 or (w < len(s.necStop) and bool(s.necStop[w]))
+        if sb(text[-1]): p_, k0 = text[-1], len(text) - 1
+        elif len(text) > 1 and sb(text[-2]) and 0 < text[-1] <= 100 and not st_(text[-1]): p_, k0 = text[-2], len(text) - 2
         else: return None
-        lo = max(0, len(text) - 200); evs = []
+        lo = max(0, len(text) - 200); evs = []; alle = []
         for i in range(lo, k0):
-            if text[i] != p_: continue
+            if not sb(text[i]): continue
             for k in (1, 2, 3):
-                if i + k >= k0 or text[i + k] == 0: break
+                if i + k >= k0 or st_(text[i + k]): break
                 w = text[i + k]
-                if 0 < w < len(s.necV) and s.necV[w]: evs.append(w); break
-        evs = evs[-3:]
+                if 0 < w < len(s.necV) and s.necV[w]:
+                    alle.append(w)
+                    if text[i] == p_: evs.append(w)
+                    break
+        evs = evs[-3:] if evs else (alle[-3:] if any_ else [])
         if not evs: return None
         el = s.necV[np.minimum(uw, len(s.necV) - 1)] & (uw > 0)
         if el.sum() < 2: return None
@@ -429,10 +434,11 @@ def neccal():
     """NEC gate: 1,500 random held-out verb slots with a nonempty chain state; CM4 cfg at T 1; ranking AUC of the true word
     among all candidates (0 if absent) with the chain reweight applied to the final distribution for each beta"""
     d = Dec(); cfg = dict(json.loads(os.environ["DEC_LEXCFG"]), T=1.0); B = [0.0, 0.5, 1.0, 2.0, 4.0]; S = d.S; n0 = getattr(d, "lex0", len(S))
-    t_ = np.arange(d.ntr + 200, n0); PRa = np.array(sorted(d.necPR)); sl = np.isin(S[t_ - 1], PRa) | (np.isin(S[t_ - 2], PRa) & (S[t_ - 1] > 0) & (S[t_ - 1] <= 100))
+    t_ = np.arange(d.ntr + 200, n0 - 1); sm = d.necS[np.minimum(S, len(d.necS) - 1)]; stp = d.necStop[np.minimum(S, len(d.necStop) - 1)]
+    sl = sm[t_ - 1] | (sm[t_ - 2] & (S[t_ - 1] > 0) & (S[t_ - 1] <= 100) & ~stp[t_ - 1])
     order = np.random.default_rng(0).permutation(t_[sl]); A = {b: [] for b in B}; NV = int(os.environ.get("DEC_NECN", 1500)); vy = []
     for t in order:
-        text = S[t - 200:t].tolist(); uw, p = d.dist(text, cfg); r_ = d.nez(text, uw)
+        text = S[t - 200:t].tolist(); uw, p = d.dist(text, cfg); r_ = d.nez(text, uw, cfg.get("necany"))
         if r_ is None: continue
         el, z_ = r_; y = int(S[t]); vy.append(bool(d.necV[min(y, len(d.necV) - 1)]))
         for b in B:

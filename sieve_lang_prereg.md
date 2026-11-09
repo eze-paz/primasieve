@@ -3200,3 +3200,9 @@ Theory: masked discrete diffusion (D3PM, Austin et al. 2021; MDLM, Sahoo et al. 
 - Gate: (1) ranking AUC on 1,500 random books2 held-out slots with a nonempty state, beta grid 0 / 0.5 / 1 / 2 / 4, best above 0; (2) loop check on 40 texts (distinct words and sentence ends no more than 5% below MEAN's); (3) firing: at least 1/3 of the 40 texts differ from MEAN's. All three needed before raters.
 - Then NEC2 vs MEAN (books2) on 240 fresh books2 prompts (DEC_POFF 89), shown in books2's native format (both arms share it), two raters per half; pass = coherence interval excludes 0 in NEC2's favour.
 - **Predictions:** gate passes (40%); rater coherence pass (20%).
+
+### NEC2 results -- gate FAIL (2026-11-09; sieve_nec2_neccal.json, mtest/nec/loop_mean2.log)
+- Counts (books2): 17,366 subjects, 1,452 verbs, 879,925 events (248,718 with a name as subject), 1,179,772 pairs, 32,601 kept (after opened: closed, opened, gasped, pressed, handed, shut).
+- 1,500 held-out slots (true word a chain verb 0.2553), MEAN on books2 at T 1: ranking AUC beta 0 / 0.5 / 1 / 2 / 4: 0.7116 / 0.7102 / 0.699 / 0.6714 / 0.6506; true word a verb: 0.6701 / 0.6608 / 0.6097 / 0.4892 / 0.404. Every weight lowers the true word's rank: gate fails, no loop, firing or rater stage.
+- Prediction gate passes (40%) failed.
+- Reading: with names, punctuation-aware events and discounted scores, the counted chain state ranks the next verb worse than the decoder's own local consensus, most of all where the true word is a verb. The local context already carries what the chain knows, and the chain's extra guesses are mostly wrong. Together with NEC (no effect in text), state tracking by counted event chains is closed.
