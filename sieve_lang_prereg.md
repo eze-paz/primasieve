@@ -3053,3 +3053,8 @@ Motivation: decoding is one word at a time with no revision, so an early bad jun
 - Ranking score (2,000 positions, T 1; true word present / score): CM4 0.825 / 0.7524; LEXA 0.8235 / 0.7513 (FAIL); LEXB 0.5 / 1 / 2 / 4: 0.7536 / 0.7537 / 0.7538 / 0.7538, present 0.8265 (pass; weight 2).
 - Loop check (40 texts): CM4 distinct 600, sentence ends 0.0695; LEXB 2 distinct 580, sentence ends 0.0725 (pass); share of the written words' weight coming from lexicon sentences 0.1062.
 - Predictions: LEXA gate fail (held 70%); LEXB gate pass (held 50%). LEXB (weight 2) vs CM4 on 240 fresh prompts DEC_POFF 73 follows.
+
+### LEX1 results -- PASS, narrow (2026-11-09; mtest/lex1_gen.json, sieve_lex1_pair_scores.json; 240 prompts DEC_POFF 73, agreement 0.938 / 0.95)
+- LEXB (CM4 + gated lexicon lookup, weight 2) vs CM4: coherence 0.1187 [0.0042, 0.2375] (LEXB preferred 0.487, CM4 0.371); fluency 0.1167 [0.0, 0.2292] (0.492 / 0.375). 20 of 240 pairs identical (the lookup never fired).
+- Predictions: rater pass (20%) held; fluency moving more than coherence (60%) failed (both about the same).
+- Replication preregistered now, before generation: same arms, 240 fresh prompts DEC_POFF 79, two raters per half; replicated = coherence point above 0 and the pooled 480 coherence interval excludes 0.

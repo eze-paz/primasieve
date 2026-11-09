@@ -1,0 +1,24 @@
+{
+ "coherence": {
+  "n": 240,
+  "lexb_wins": 0.487,
+  "cm4_wins": 0.371,
+  "mean": 0.1187,
+  "interval": [
+   0.0042,
+   0.2375
+  ],
+  "agreement": 0.938
+ },
+ "fluency": {
+  "n": 240,
+  "lexb_wins": 0.492,
+  "cm4_wins": 0.375,
+  "mean": 0.1167,
+  "interval": [
+   0.0,
+   0.2292
+  ],
+  "agreement": 0.95
+ }
+}
