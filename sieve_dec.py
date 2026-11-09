@@ -77,6 +77,8 @@ class Dec:
         if os.environ.get("DEC_LEX") and os.environ.get("DEC_KC"):                                                                       # LEXB: content word -> lexicon sentences
             LS = S[s.lex0:]; cm_ = (LS > 100) & (LS <= s.V) & (s.kcidf[np.minimum(LS, len(s.kcidf) - 1)] >= 2); k_ = np.unique(LS[cm_] * 10_000_000 + s.lsid[cm_])
             s.lxw, s.lxs = k_ // 10_000_000, k_ % 10_000_000; s.lxst = np.searchsorted(s.lxw, np.arange(MT.VV + 1))
+        if os.environ.get("DEC_NEC"):                                                                                                    # NEC: narrative event chains (sieve_nec_build.py)
+            nz_ = np.load(os.environ["DEC_NEC"]); s.necV = nz_["verbs"]; s.necC = nz_["codes"]; s.necP = nz_["pmi"]; s.necPR = set(int(x) for x in nz_["PR"]); s.necN = int(nz_["N"])
         if os.environ.get("DEC_KC2"):                                                                                                    # KCG5: second (all-word) matrix in the same process
             k2 = os.environ["DEC_KC2"]; kz = {k: np.load(os.path.join(k2, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf") + (("R",) if os.path.exists(os.path.join(k2, "R.npy")) else ())}
             s.kc2 = (kz["E"], np.asarray(kz["ML"], np.float32), np.asarray(kz["idf"]), np.array([2.0, 8.0, 30.0]), kz.get("R"))
@@ -212,6 +214,9 @@ class Dec:
         if cfg.get("cma") and getattr(s, "kc2", None) is not None:                                                            # KCG5: all-word matrix reorders every word, same total mass
             el = (uw > 0) & (uw <= s.V)
             if el.sum() >= 2: w_ = np.exp(cfg["cma"] * s.cmz(text, uw[el], s.kc2)); w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300); p = p.copy(); p[el] *= w_
+        if cfg.get("nec") and getattr(s, "necV", None) is not None:                                                         # NEC: chain state reorders verb candidates, same mass
+            r_ = s.nez(text, uw)
+            if r_ is not None: el, z_ = r_; w_ = np.exp(cfg["nec"] * z_); w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300); p = p.copy(); p[el] *= w_
         if cfg.get("msubj") and text[-1] == 0:                                                                                      # MEAN: keep the subject of the last sentence
             j = len(text) - 2
             while j >= 0 and text[j] != 0: j -= 1
@@ -235,6 +240,28 @@ class Dec:
         if cfg.get("cmpost") and getattr(s, "_cmpost", None) is not None:                                                    # KCG3: reorder content words, same total mass
             el, z_ = s._cmpost; s._cmpost = None; q_ = p[el]; w_ = np.exp(cfg["cmpost"] * z_); p = p.copy(); p[el] = q_ * w_ * q_.sum() / max((q_ * w_).sum(), 1e-300)
         return uw, p / p.sum()
+    def nez(s, text, uw):
+        """NEC: in a verb slot (pronoun, or pronoun + function word), z of each verb candidate = standardised sum of chain PMI
+        with the same pronoun's last 3 events in the last 200 words; None outside slots or with an empty state"""
+        if text[-1] in s.necPR: p_, k0 = text[-1], len(text) - 1
+        elif len(text) > 1 and text[-2] in s.necPR and 0 < text[-1] <= 100: p_, k0 = text[-2], len(text) - 2
+        else: return None
+        lo = max(0, len(text) - 200); evs = []
+        for i in range(lo, k0):
+            if text[i] != p_: continue
+            for k in (1, 2, 3):
+                if i + k >= k0 or text[i + k] == 0: break
+                w = text[i + k]
+                if 0 < w < len(s.necV) and s.necV[w]: evs.append(w); break
+        evs = evs[-3:]
+        if not evs: return None
+        el = s.necV[np.minimum(uw, len(s.necV) - 1)] & (uw > 0)
+        if el.sum() < 2: return None
+        cw = uw[el]; sc = np.zeros(len(cw))
+        for e in evs:
+            q = e * s.necN + cw; i = np.minimum(np.searchsorted(s.necC, q), len(s.necC) - 1); sc += np.where(s.necC[i] == q, s.necP[i], 0.0)
+        if sc.std() < 1e-9: return None
+        return el, (sc - sc.mean()) / sc.std()
     def cmz(s, text, cw, m=None):
         """standardised cosine of each candidate's count vector with ML x (idf-weighted context state at three decays, last 30 words)"""
         kE, kML, kidf, kHL, kR = m if m is not None else (s.kcE, s.kcML, s.kcidf, s.kcHL, getattr(s, "kcR", None))
@@ -367,6 +394,26 @@ def lexcal():
             else: A.append(0.0); pres.append(0)
         if pid % 10 == 0: log(f"lexcal prompt {pid}: {np.mean(A):.4f}")
     out = dict(cfg=cfg, n=len(A), score=round(float(np.mean(A)), 4), present=round(float(np.mean(pres)), 4)); json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ['DEC_LEXTAG']}_lexcal.json"), "w"), indent=1); log(json.dumps(out))
+def neccal():
+    """NEC gate: 1,500 random held-out verb slots with a nonempty chain state; CM4 cfg at T 1; ranking AUC of the true word
+    among all candidates (0 if absent) with the chain reweight applied to the final distribution for each beta"""
+    d = Dec(); cfg = dict(json.loads(os.environ["DEC_LEXCFG"]), T=1.0); B = [0.0, 0.5, 1.0, 2.0, 4.0]; S = d.S; n0 = getattr(d, "lex0", len(S))
+    t_ = np.arange(d.ntr + 200, n0); PRa = np.array(sorted(d.necPR)); sl = np.isin(S[t_ - 1], PRa) | (np.isin(S[t_ - 2], PRa) & (S[t_ - 1] > 0) & (S[t_ - 1] <= 100))
+    order = np.random.default_rng(0).permutation(t_[sl]); A = {b: [] for b in B}; NV = int(os.environ.get("DEC_NECN", 1500)); vy = []
+    for t in order:
+        text = S[t - 200:t].tolist(); uw, p = d.dist(text, cfg); r_ = d.nez(text, uw)
+        if r_ is None: continue
+        el, z_ = r_; y = int(S[t]); vy.append(bool(d.necV[min(y, len(d.necV) - 1)]))
+        for b in B:
+            q = p.copy(); w_ = np.exp(b * z_); q[el] *= w_ * p[el].sum() / max((p[el] * w_).sum(), 1e-300)
+            if y in uw: yi = int(np.searchsorted(uw, y)); o = np.delete(q, yi); A[b].append(float((o < q[yi]).mean() + 0.5 * (o == q[yi]).mean()) if len(o) else 1.0)
+            else: A[b].append(0.0)
+        if len(vy) % 250 == 0: log(f"neccal {len(vy)}: " + ", ".join(f"{b}: {np.mean(A[b]):.4f}" for b in B))
+        if len(vy) >= NV: break
+    vm = np.array(vy); out = dict(n=len(vy), true_is_verb=round(float(vm.mean()), 4), auc={str(b): round(float(np.mean(A[b])), 4) for b in B},
+                                  auc_true_verb={str(b): round(float(np.mean(np.array(A[b])[vm])), 4) for b in B})
+    json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ.get('DEC_NECTAG', 'nec')}_neccal.json"), "w"), indent=1); log(json.dumps(out))
+if __name__ == "__main__" and sys.argv[1] == "neccal": neccal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "lexcal": lexcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "cmcal": cmcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()

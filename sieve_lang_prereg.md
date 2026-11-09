@@ -3132,3 +3132,9 @@ Gibbs/MH revision samples from whatever its scorer prefers, so revision can only
 - Reference: GPROXY (Pythia-410m, neural) G AUC all 0.8171.
 - Predictions: RES G AUC above NG5 held (0.8608 vs 0.8410); RES+NG5 G AUC at least 0.80 held; RES H AUC at least 0.80 held (0.8980); some critic passes the decision rule failed (arm ordering 34-37 of 50, below 38).
 - Reading: sentence length alone gives 0.8352 on generated sentences (short fragments are usually grammatical), so on grammaticality the critics add only 0.006-0.028 AUC beyond length. On telling human from generated sentences the reservoir is strong (0.8980; with NG5 0.9252, length alone 0.5800): the untrained harmonic reservoir separates human sentences from ours better than the neural Pythia proxy did on grammar. But no critic orders the systems the way the raters do (arm-level r 0.14-0.20), so none is ready to steer revision by grammar; a human-vs-generated critic (H) is the stronger signal and the natural objective for revision.
+
+### NEC gate -- PASS, narrow (2026-11-09; sieve_nec_neccal.json, mtest/nec/loop_nec05.log)
+- Counts (sieve_nec_build.py): 1,023 verbs, 616,866 events, 1,107,348 pairs, 47,923 kept (e.g. after opened: closed, shut, rushed).
+- 1,500 held-out verb slots with a nonempty state (true word a chain verb 0.3573): ranking AUC beta 0 / 0.5 / 1 / 2 / 4: 0.7738 / 0.7747 / 0.7715 / 0.7499 / 0.6953; true word a verb: 0.7369 / 0.7373 / 0.723 / 0.653 / 0.4916. Beta 0.5.
+- Loop check (40 texts): distinct 593, sentence ends 0.0715 (CM4 600 / 0.0695): pass. Prediction gate passes (55%) held, by a margin as small as LEX1's.
+- NEC (beta 0.5) vs CM4 on 240 fresh prompts DEC_POFF 83 follows.
