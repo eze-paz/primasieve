@@ -15,3 +15,4 @@ Protocol for small steps: 20 fresh prompts per step, one blind pairwise rater pe
 10. (04:35) HSSML preregistered (width 512, 4 layers, harmonic start, 150 min); push retries until a GPU slot frees (2-session limit).
 11. (05:00) SSMR (20 prompts): S1 (ssm 1/6) leads JX3S1 (fluency 0.60, coherence 0.65), S2 0.45/0.60, S4 0.45/0.50; grammar 0.586/0.598/0.580 vs 0.621. HSSML pushed (running). SRM milestone (S1 vs JX3S1, 80 prompts, offset 119) preregistered; push queued for a GPU slot.
 12. (06:55) HSSML: 6.8698 bits per word (HSSM 7.0379), best mixture 6.7853. SRM milestone still waiting for / running on a GPU slot.
+13. (07:05) Scorer reads its size from the weights; SRL (S1 with the HSSML scorer, SRM's 80 prompts) preregistered; push queued.

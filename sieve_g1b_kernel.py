@@ -105,7 +105,8 @@ if any(c.get("ssm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
     def _load_hssm():
         VVh = int(max(S[:ntr0].max(), S[ntr:].max())) + 1; NVh = 8192; cw = np.bincount(S[:ntr0].astype(np.int64), minlength=VVh); topw = np.argsort(-cw)[:NVh - 1]
         vid = np.full(VVh, NVh - 1, np.int64); vid[topw] = np.arange(NVh - 1); oov = cw[vid == NVh - 1].sum(); poo = np.log(np.maximum(cw, 1) / max(oov, 1))
-        TA = (2, 4, 8, 16, 32, 64, 128); DB = 64; NN = DB * len(TA); DM = 256
+        TA = (2, 4, 8, 16, 32, 64, 128); DB = 64; NN = DB * len(TA); fn = os.environ.get("G1_SSMF", "hssm_harm.pt")
+        mp = glob.glob(f"/kaggle/input/**/{fn}", recursive=True) or [os.environ.get("G1_SSM", fn)]; sd = torch.load(mp[0], map_location=dev); DM = int(sd["emb.weight"].shape[1]); NLy = len({k.split(".")[1] for k in sd if k.startswith("layers.")})
         class SSM(nn.Module):
             def __init__(s):
                 super().__init__(); s.nu = nn.Parameter(torch.zeros(NN)); s.th = nn.Parameter(torch.zeros(NN)); s.B = nn.Parameter(torch.zeros(NN, DM, 2)); s.C = nn.Parameter(torch.zeros(DM, NN, 2)); s.Dd = nn.Parameter(torch.ones(DM))
@@ -119,12 +120,12 @@ if any(c.get("ssm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
                 x = x + y; return x + s.ff(s.ln2(x))
         class LM(nn.Module):
             def __init__(s):
-                super().__init__(); s.emb = nn.Embedding(VVh, DM); s.layers = nn.ModuleList([SSM(), SSM()]); s.lnf = nn.LayerNorm(DM); s.head = nn.Linear(DM, NVh)
+                super().__init__(); s.emb = nn.Embedding(VVh, DM); s.layers = nn.ModuleList([SSM() for _ in range(NLy)]); s.lnf = nn.LayerNorm(DM); s.head = nn.Linear(DM, NVh)
             def forward(s, w):
                 x = s.emb(w)
                 for l in s.layers: x = l(x)
                 return s.head(s.lnf(x))
-        m = LM().to(dev); mp = glob.glob("/kaggle/input/**/hssm_harm.pt", recursive=True) or [os.environ.get("G1_SSM", "hssm_harm.pt")]; m.load_state_dict(torch.load(mp[0], map_location=dev)); m.eval()
+        m = LM().to(dev); m.load_state_dict(sd); m.eval(); log(f"HSSM scorer {mp[0]}: width {DM}, {NLy} layers")
         return dict(m=m, VV=VVh, NV=NVh, vid=torch.tensor(np.r_[vid, np.full(max(0, (1 << 16) - VVh), NVh - 1)][:1 << 16], device=dev), poo=torch.tensor(np.r_[poo, np.zeros(max(0, (1 << 16) - VVh))][:1 << 16], dtype=torch.float32, device=dev))
     SSMM = _load_hssm(); log(f"HSSM scorer loaded (vocabulary {SSMM['VV']:,})")
 def ssm_logprob(text, nx):

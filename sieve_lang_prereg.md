@@ -3022,3 +3022,7 @@ Scores: sieve_lt_scores.json.
 - Width 512, 4 layers, harmonic start, 150 min (18,096 steps): **6.8698 bits per word** (HSSM 7.0379; trigram 7.8812); best trigram mixture (alpha 0.8) 6.7853.
 - Predictions: below 7.0379 held; below 6.7 failed; mixture below 6.6 failed.
 - Reading: four times the width x depth for under four times the time gives 6.8698; the model is compute-bound on a T4 (18,096 steps of 24 x 512 words = 0.22B words seen, about 8 passes over MT 27M).
+
+## SRL — the larger scorer: S1L (HSSML, ssm 1/6) on SRM's 80 prompts (loop 2; preregistered 2026-11-09, before the run)
+- sieve_g1b_kernel.py now reads the scorer's width and depth from its weights (G1_SSMF). One arm S1L = JX3S1 + ssm 1/6 with hssmL_harm.pt, G1_POFF 119, 80 prompts; judged against SRM's JX3S1 texts (same prompts; tag SRL, base JX3S1, arms S1 and S1L, so S1 vs S1L is also visible through the common base).
+- **Predictions:** S1L coherence share over JX3S1 above S1's (55%); S1L coherence interval above 0.5 (25%).
