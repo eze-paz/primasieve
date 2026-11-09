@@ -3342,3 +3342,8 @@ Theory: scripts (Schank & Abelson 1977) and their count-based form, narrative ev
 - Grammatical share: JX3S1 0.692; SYMPH 0.618 ([-0.190, 0.032]); SYM3C 0.674 ([-0.131, 0.081]); SYM3 0.670; truth 0.914.
 - Predictions: SYMPH coherence above 0.5 held (0.65); SYM3 coherence above SYMPH failed (0.55 vs 0.65); SYM3 grammar within 0.05 held (0.670 vs 0.692); SYM3C coherence above 0.5 held (0.75).
 - Reading: after trace debugging, subject + event planning that always continues the protagonist (SYM3C) is preferred on coherence by both raters independently on 15 of 20 prompts, with grammar unchanged and less copying. Human transition rates (SYM3) dilute the plan and lose most of the gain. Still 20 prompts: the 80-prompt two-rater milestone decides (the previous SYM milestone failed after a 20-prompt win).
+
+## SY3M80 — milestone: SYM3C vs JX3S1 on 80 fresh prompts, two blind raters (owner, 2026-11-09: "go ahead with the milestone"; preregistered before the run)
+- Local bench (MT 27M), G1_POFF 185, 80 prompts; arms JX3S1 and SYM3C (hard subject + verb plan, always CONTINUE, prompt referents weighted 3, no expletive it, verbs from direct pronoun-verb events). Tag SY3M: 80 pairs judged independently by two blind raters (pair_ratings.json, pair_ratings_r2.json), grammar in 3 batches (one rater); 3 prompts traced.
+- **Decision rule (as SYM2M80):** SYM3C becomes the default decoder if the pooled coherence share has its interval above 0.5 and the grammar paired interval's lower bound is above -0.05.
+- **Predictions:** pooled coherence above 0.5 (70%); its interval above 0.5 (45%); pooled fluency above 0.5 (50%); grammar lower bound above -0.05 (45%); decision rule passes (35%).
