@@ -3111,3 +3111,24 @@ REV's Gibbs re-chose every word from a local count score (left 4, right 2) and m
 - Gate (no raters): 1,500 random held-out slot positions with a nonempty state (seed 0), CM4 at T 1, ranking AUC of the true word among all candidates (0 if absent), reweight applied to the final distribution; grid beta 0 / 0.5 / 1 / 2 / 4; pass = best beta above beta 0. Loop check as in LEX1 (40 texts; distinct words and sentence ends no more than 5% below CM4's).
 - Then NEC (best beta) vs CM4 on 240 fresh prompts (DEC_POFF 83), two raters per half; pass = coherence interval excludes 0 in NEC's favour; replication on fresh prompts before any claim.
 - **Predictions:** gate passes (55%); rater coherence pass (25%).
+
+## CRIT — can an NN-free critic recognise good sentences? (owner, 2026-11-09: a state/reservoir system that reads a completed sentence and decides to rewrite it; "Test these"; preregistered before any run)
+Gibbs/MH revision samples from whatever its scorer prefers, so revision can only help if the scorer ranks good sentences above bad ones. CRIT measures candidate critics on the 20,363 rater-labelled sentences (gramlab.json, 14 rounds, label grammatical 0/1; 4,209 of them human text). No neural network.
+- **NG5 critic:** features from the MT 27M interpolated 5-gram model: sentence log p, mean log p per word, min term, SLOR (log p minus unigram log p, per word), length, first/last flag.
+- **RES critic (harmonic reservoir):** the count-fitted phases of HLIN2 (7 bands tau 2..128 x 64 oscillators) run over the sentence forwards (state after the last word) and backwards (state before the first word), each band normalised: 2 x 7 x 128 = 1,792 features, + length and edge flag. Nothing in the reservoir is trained.
+- **RES+NG5:** both feature sets.
+- Readout: logistic regression on standardised features, 5-fold CV grouped by text item (as GPROXY). Targets: (G) grammatical label, on all sentences and on generated sentences only; (H) human vs generated sentence. Also, per round, whether the critic orders the arms as the raters do (arm-level Pearson r and pair-ordering agreement, as GPROXY).
+- Reference: GPROXY (Pythia-410m features, neural) CV AUC 0.8171 on G.
+- **Decision rule:** a critic is worth using for revision if its G AUC (generated only) is at least 0.80 and it orders arms as the raters in at least 75% of pairs.
+- **Predictions:** RES G AUC above NG5's (50%); RES+NG5 G AUC at least 0.80 (35%); RES H AUC at least 0.80 (50%); some critic passes the decision rule (25%).
+
+### CRIT results (2026-11-09; local CPU; sieve_crit.json, mtest/crit.log)
+| critic | G AUC all | G AUC generated only | H AUC (human vs generated) | arm pairs ordered as raters | arm-level r |
+|---|---|---|---|---|---|
+| length + edge flag only (baseline, computed after the run) | 0.7865 | 0.8352 | 0.5800 | — | — |
+| NG5 | 0.8030 | 0.8410 | 0.8584 | 37 of 50 | 0.199 |
+| RES (harmonic reservoir) | 0.8358 | 0.8608 | 0.8980 | 34 of 50 | 0.188 |
+| RES+NG5 | 0.8401 | 0.8627 | 0.9252 | 36 of 50 | 0.138 |
+- Reference: GPROXY (Pythia-410m, neural) G AUC all 0.8171.
+- Predictions: RES G AUC above NG5 held (0.8608 vs 0.8410); RES+NG5 G AUC at least 0.80 held; RES H AUC at least 0.80 held (0.8980); some critic passes the decision rule failed (arm ordering 34-37 of 50, below 38).
+- Reading: sentence length alone gives 0.8352 on generated sentences (short fragments are usually grammatical), so on grammaticality the critics add only 0.006-0.028 AUC beyond length. On telling human from generated sentences the reservoir is strong (0.8980; with NG5 0.9252, length alone 0.5800): the untrained harmonic reservoir separates human sentences from ours better than the neural Pythia proxy did on grammar. But no critic orders the systems the way the raters do (arm-level r 0.14-0.20), so none is ready to steer revision by grammar; a human-vs-generated critic (H) is the stronger signal and the natural objective for revision.
