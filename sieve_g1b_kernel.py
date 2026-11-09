@@ -274,7 +274,7 @@ def text_crit(ids):
         else: cur.append(x)
     if cur: sents.append(cur)
     return float(np.mean([crit_score(s_, k == 0 or k == len(sents) - 1) for k, s_ in enumerate(sents)])) if sents else 0.0
-MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]
+MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []; SYMST = [0, 0]; TRACE = int(os.environ.get("G1_TRACE", 0)); TRL = []; TR_ADD = None
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
     x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
@@ -465,6 +465,7 @@ def generate(cfg, pids):
                 else: cur.append(x_)
             if cur: DS.read(cur)
             PLAN = DS.plan(rng, cfg.get("ptr")) if text[-1] == 0 else []; REFS = DS.ref_ids(); SYMST[0] += 1
+            if TRACE and pid < TRACE: TRL.append(f"   [prompt state p{pid}] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
         while len(text) - LP < LG:
             if cfg.get("gen") == "ssm": text.append(mw_step(text, rng, cfg)); continue
             h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
@@ -503,9 +504,9 @@ def generate(cfg, pids):
             if cfg.get("sym"):                                                                                    # realiser constraints
                 nxc = St[c[0]].long().cpu().numpy(); lb = len(text) - 1 - text[::-1].index(0) if 0 in text[LP:] or text[-1] == 0 else None
                 kpos = len(text) - 1 - lb if lb is not None else 99; add = np.zeros(len(nxc))
-                if "p" in cfg["sym"] and kpos < len(PLAN): add += 8.0 * (nxc == PLAN[kpos])
+                if "p" in cfg["sym"] and kpos < len(PLAN): add += (1000.0 if "h" in cfg["sym"] else 8.0) * (nxc == PLAN[kpos])      # "h": the plan is a hard constraint
                 if "e" in cfg["sym"]: add += 2.0 * np.isin(nxc, list(REFS)) - 8.0 * (ISPROPN[np.minimum(nxc, VV - 1)] & ~np.isin(nxc, list(REFS)))
-                sc = sc + torch.tensor(add, dtype=sc.dtype, device=sc.device)[None]
+                sc = sc + torch.tensor(add, dtype=sc.dtype, device=sc.device)[None]; TR_ADD = add
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
             w = torch.exp(sc - sc.max()).cpu().numpy(); nx = St[c[0]].long().cpu().numpy()
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
@@ -522,14 +523,25 @@ def generate(cfg, pids):
             if cfg.get("verbend"):                                                                               # hold the sentence open until it has a verb-like word
                 lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; cur = text[lb + 1:]
                 if not any(VSET[BCL[x_]] for x_ in cur) and len(cur) > 0: bad = bad | (nx == 0)
+            if cfg.get("sym") and "h" in cfg["sym"] and kpos < len(PLAN) and (nx == PLAN[kpos]).any(): bad = bad & (nx != PLAN[kpos])   # the planned word is exempt from the vetoes
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
             if cfg.get("keepb") and uw[0] == 0:                                                                  # keep the sentence-end probability at its pre-veto value
                 wp = np.bincount(inv, weights=WPV) ** cfg["pow"]; pb = wp[0] / wp.sum(); ww = ww / ww.sum(); rest = ww[1:].sum()
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
+            if TRACE and cfg.get("sym") and pid < TRACE:                                                           # step-by-step trace
+                m4n = m4[0].cpu().numpy(); okn = ok[0].cpu().numpy(); o_ = np.argsort(-ww)[:6]; pw_ = ww / ww.sum()
+                def _w(i): return "." if i == 0 else (vw[i] if i < len(vw) and vw[i] is not None else "<unk>")
+                row = []
+                for j in o_:
+                    msk = (nx == uw[j]) & okn; row.append(f"{_w(uw[j])}:{pw_[j]:.2f}(m{int(m4n[msk].max()) if msk.any() else -1},+{TR_ADD[msk].max() if msk.any() else 0:.0f})")
+                pl = " ".join(_w(i) for i in PLAN) if PLAN else "-"; pv = [int(x_) for x_ in PLAN]
+                vetoed = [ _w(x_) for x_ in pv if (nx == x_).any() and bad[nx == x_].all()]; absent = [_w(x_) for x_ in pv if not (nx[okn] == x_).any()]
+                TRL.append(f"[{nm_}|p{pid}|k{kpos}] plan={pl} planned-vetoed={vetoed} planned-absent={absent} -> {_w(text[-1])} | top: {' '.join(row)}")
             if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
                 lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; DS.read(text[lb2 + 1:-1]); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
+                if TRACE and pid < TRACE: TRL.append(f"   [state] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
                 SYMST[1] += 1
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
         if cfg.get("cdiff"): text = count_diffuse(text, np.random.default_rng(1000 * pid + 17), cfg)
@@ -544,7 +556,7 @@ GO = {}
 for nm, cfg in GENS.items():
     if JX: JSTAT[0] = JSTAT[1] = JSTAT[2] = 0
     MWSTAT[0] = MWSTAT[1] = 0; GSTAT.clear(); EDITS.clear()
-    gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
+    nm_ = nm; gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     if JX:                                                                                                    # share of completed sentences without a verb-like word
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
     cr = float(np.mean([text_crit(ids) for ids in gg.values()])) if CRITM is not None else None
@@ -556,4 +568,5 @@ for nm, cfg in GENS.items():
 log(f"CRIT truth: critic log-odds per sentence {np.mean([text_crit(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]) if CRITM is not None else None}")
 _tp = [plag(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]; log(f"PLAG truth: 5-gram share {np.mean([a for a, _, _ in _tp]):.4f}, longest {[b for _, b, _ in _tp]}")
 GO["truth"] = dict(plag_share5=float(np.mean([a for a, _, _ in _tp])), plag_longest=[b for _, b, _ in _tp], gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
+if TRL: open(os.path.join(OUTD, "trace.txt"), "w", encoding="utf-8").write(chr(10).join(TRL))
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
