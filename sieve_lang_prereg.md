@@ -2863,3 +2863,12 @@ Scores: sieve_lt_scores.json.
 ## LINM — milestone: readout re-ranker gamma 3/6 vs JX3S1 on 80 fresh prompts (preregistered 2026-11-09, before the run)
 - 80 fresh prompts (offset 101); arms JX3S1, LIN3; one pairwise rater (80 pairs) and three grammar raters (prompt thirds), as in the earlier full rounds.
 - **Predictions:** LIN3 fluency share above 0.5 with interval above 0.5 (35%); point above 0.5 (65%); grammar share above JX3S1's (60%).
+### KV results (2026-11-09; kernel primasieve-kv, 1,693 s CPU; sieve_kv.json). 4,000 held-out positions; log probability on the second 2,000 (beta 0: -23.3893)
+- CMRL AUC 0.6398, beta 0.5, log p -23.1149 [gain interval 0.2129, 0.3397]; LONG 0.6522, -23.0535; D512 0.7086, -22.8604 [0.4627, 0.5903]; W2 0.6194, -23.2102; LOCAL 0.6597, -23.0930; RF4096 0.6447, -23.1039.
+- Predictions: CMRL gain excludes 0 held; LONG above CMRL held; RF4096 above CMRL held (-23.1039 vs -23.1149); LOCAL above CMRL held; W2 below CMRL held; D512 above CMRL held.
+- Reading: vector dimension is the strongest lever (256 -> 512: AUC 0.6398 -> 0.7086). Decision rule names D512 for raters, but the dimension trend is the bigger question, so KV2 first measures 1,024 and 2,048 (D512 used random seed 1; KV2 adds a seed-0 control).
+
+## KV2 — dimension sweep (autonomous run; preregistered 2026-11-09, before the run)
+- Same construction and metric as KV (same 4,000-position protocol, Sieve B, beta chosen on the first half). Arms: D512s0 (seed-0 control for KV's D512), D1024, D2048 (decays 2/8/30 over 30 words), D2048L (2,048 dims with LONG decays 2/8/30/120 over 120 words + random vectors of the last two words: key 12,288). Linear algebra on a Kaggle GPU (torch); no gradient descent.
+- Decision: the arm with the highest held-out log probability goes to a rater round inside MEAN (KCG's protocol, fresh prompts), with beta recalibrated on MEAN.
+- **Predictions:** D512s0 AUC within 0.02 of D512's 0.7086 (70%); D1024 above D512s0 (70%); D2048 above D1024 (55%); D2048L above D2048 (50%); best AUC at least 0.75 (35%).

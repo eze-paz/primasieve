@@ -1,0 +1,63 @@
+{
+ "n": 4000,
+ "CMRL": {
+  "auc": 0.6398,
+  "beta": 0.5,
+  "logp_beta0": -23.3893,
+  "logp_best": -23.1149,
+  "gain_interval": [
+   0.2129,
+   0.3397
+  ]
+ },
+ "LONG": {
+  "auc": 0.6522,
+  "beta": 0.5,
+  "logp_beta0": -23.3893,
+  "logp_best": -23.0535,
+  "gain_interval": [
+   0.2748,
+   0.4007
+  ]
+ },
+ "D512": {
+  "auc": 0.7086,
+  "beta": 0.5,
+  "logp_beta0": -23.3893,
+  "logp_best": -22.8604,
+  "gain_interval": [
+   0.4627,
+   0.5903
+  ]
+ },
+ "W2": {
+  "auc": 0.6194,
+  "beta": 0.5,
+  "logp_beta0": -23.3893,
+  "logp_best": -23.2102,
+  "gain_interval": [
+   0.1164,
+   0.2446
+  ]
+ },
+ "LOCAL": {
+  "auc": 0.6597,
+  "beta": 0.5,
+  "logp_beta0": -23.3893,
+  "logp_best": -23.093,
+  "gain_interval": [
+   0.2313,
+   0.3658
+  ]
+ },
+ "RF4096": {
+  "auc": 0.6447,
+  "beta": 0.5,
+  "logp_beta0": -23.3893,
+  "logp_best": -23.1039,
+  "gain_interval": [
+   0.2233,
+   0.3532
+  ]
+ }
+}
