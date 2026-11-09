@@ -205,7 +205,7 @@ def class_ok(ctx4, nx, eps):
     k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
     jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0; return n5 >= eps * max(n4, 1)
 NG5 = None
-if any(c.get("accept") or c.get("flag") or c.get("crit") or c.get("block") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
+if any(c.get("accept") or c.get("flag") or c.get("crit") or c.get("block") or c.get("cdiff") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
     NG5 = {"c1": np.bincount(S[:ntr].astype(np.int64), minlength=VV).astype(np.float64)}; NG5["N"] = NG5["c1"].sum()
     with np.errstate(over="ignore"):
         hc = S[:ntr].astype(np.uint64) + np.uint64(1)                                                          # hash of the 1-word context at each position
@@ -287,6 +287,40 @@ def mw_step(text, rng, cfg):
     MWSTAT[0] += 1; MWSTAT[1] += float(ok_.any())
     if ok_.any(): q = q * ok_
     return int(nx[rng.choice(len(nx), p=q / q.sum())])
+def cd_fill(text, i, masked, rng, cfg):
+    """two-sided count denoiser: candidates matching the left 4 words, scored by left match + right match (masked words are wildcards)"""
+    h = text[:i][::-1][:8]; c, ok = cands(np.array([h[:4]]), np.array([h[4:8]])); c = c[0][ok[0]]
+    if len(c) == 0: return None, -1.0
+    m4 = (St[(c[:, None] - 1 - torch.arange(4, device=dev)).clamp(min=0)].long() == torch.tensor([h[:4]], device=dev)).float().sum(1).cpu().numpy(); nx = St[c].long().cpu().numpy().astype(np.int64)
+    r = np.zeros(len(c)); alive = np.ones(len(c), bool); cc = c.cpu().numpy() if hasattr(c, "cpu") else c
+    for d in (1, 2):
+        if i + d >= len(text) or (i + d) in masked: break
+        nxt = St[torch.as_tensor(np.minimum(cc + d, len(St) - 1), device=dev)].long().cpu().numpy(); alive &= nxt == text[i + d]; r += alive
+    t = text[:i]; bad = (nx == UNK) | inH8(np.c_[np.repeat(np.array([t[-7:]]), len(nx), 0), nx]); seen = {tuple(text[j:j + 3]) for j in range(len(text) - 2) if not (i - 2 <= j <= i)}
+    for d in range(3):
+        if i - d >= 0 and i - d + 3 <= len(text):
+            t3 = np.repeat(np.array([text[i - d:i - d + 3]]), len(nx), 0); t3[:, d] = nx; bad |= np.array([tuple(x_) in seen for x_ in t3.tolist()])
+    for a in range(max(0, i - 7), min(i, len(text) - 8) + 1):
+        win = np.repeat(np.array([text[a:a + 8]]), len(nx), 0); win[:, i - a] = nx; bad |= inH8(win)
+    sc = 8.0 * m4 + 8.0 * r; w = np.exp(sc - sc.max()) * ~bad
+    if w.sum() <= 0: return None, -1.0
+    uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg.get("pow", 6.0)
+    return int(uw[rng.choice(len(uw), p=ww / ww.sum())]), float((sc * ~bad).max())
+def count_diffuse(text, rng, cfg):
+    """CDIFF: mask the weakest share of generated words (schedule), refill in order of confidence with the two-sided count denoiser"""
+    draft = list(text)
+    for frac in cfg["cdiff"]:
+        pos = list(range(LP, len(text))); con = np.array([float(np.sum(ng5_terms(text, range(i, i + 5)))) for i in pos])
+        masked = set(np.array(pos)[np.argsort(con)[:max(1, int(round(frac * len(pos))))]].tolist())
+        conf = {i: cd_fill(text, i, masked, np.random.default_rng(0), cfg)[1] for i in masked}                # fill order: most confident first
+        for i in sorted(masked, key=lambda k: -conf[k]):
+            masked.discard(i); new, _ = cd_fill(text, i, masked, rng, cfg)
+            if new is None or new == text[i]: continue
+            if cfg.get("cacc"):
+                js = range(i, min(i + 5, len(text))); before = float(np.sum(ng5_terms(text, js))); old = text[i]; text[i] = new
+                if float(np.sum(ng5_terms(text, js))) < before: text[i] = old
+            else: text[i] = new
+    GSTAT.append(sum(a != b for a, b in zip(text[LP:], draft[LP:])) / max(len(text) - LP, 1)); return text
 def span_propose(text, i, sl, rng, cfg):
     """regenerate text[i:i+sl] left to right with the collage's candidate step (left context only); guards as in decoding"""
     t = text[:i]; new = []
@@ -419,6 +453,7 @@ def generate(cfg, pids):
                 if rest > 0 and pb < 1: ww[1:] *= (1 - pb) / rest; ww[0] = pb
             text.append(int(uw[rng.choice(len(uw), p=ww / ww.sum())]))
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
+        if cfg.get("cdiff"): text = count_diffuse(text, np.random.default_rng(1000 * pid + 17), cfg)
         if cfg.get("block"): text = gibbs_block(text, np.random.default_rng(1000 * pid + 13), cfg)
         out[pid] = text[LP:]
     return out
