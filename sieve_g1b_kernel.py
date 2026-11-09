@@ -412,6 +412,36 @@ if any(c.get("sym") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values(
     for w, i in _wid.items():
         if w in _cw and max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w][k]) == _ptag: ISPROPN[i] = True
     log(f"SYM: {int(ISPROPN.sum()):,} vocabulary words mostly tagged PROPN in EWT")
+FHC = None
+if any(c.get("fhrr") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                                                 # FHRR: harmonic state as phasor-bound roles (who did what), sieve_lang_prereg.md FHRR
+    _tw = np.full(VV, SYMP_["ti"]["NOUN"])
+    for w__, i__ in _wid.items():
+        if w__ in _cw: _tw[i__] = max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w__][k])
+    FH_NOM = np.isin(_tw, [SYMP_["ti"][t_] for t_ in ("NOUN", "PROPN", "PRON")]); FH_VRB = _tw == SYMP_["ti"]["VERB"]
+    FH_ATOM = np.arange(VV)
+    for w__, g__ in {w: g for g, ws in dict(he="he him his himself", she="she her hers herself", they="they them their theirs themselves", it="it its itself", i="i me my mine myself", you="you your yours yourself", we="we us our ours ourselves").items() for w in ws.split()}.items():
+        if w__ in _wid and g__ in _wid: FH_ATOM[_wid[w__]] = _wid[g__]
+    def fh_roles(ids):
+        """vectorised role rule: 1 SUBJ (nominal before the sentence's first verb), 2 OBJ (after), 3 VERB; vsub = atom of the verb's subject (-1)"""
+        ids = np.asarray(ids, np.int64); n = len(ids); idx = np.arange(n); sid = np.cumsum(ids == 0)
+        starts = np.r_[0, np.nonzero(np.diff(sid))[0] + 1]; isv = FH_VRB[ids] & (ids != 0)
+        fv = np.minimum.reduceat(np.where(isv, idx, n), starts)[sid - sid[0]]
+        nom = FH_NOM[ids] & (ids != 0); role = np.where(nom & (idx < fv), 1, np.where(nom & (idx > fv), 2, np.where(isv, 3, 0))).astype(np.int8)
+        last = np.maximum.accumulate(np.where(role == 1, idx, -1)); okk = (last >= 0) & (sid[np.maximum(last, 0)] == sid)
+        return role, np.where((role == 3) & okk, FH_ATOM[ids[np.maximum(last, 0)]], -1).astype(np.int32)
+    _r, _v = fh_roles(S[:ntr]); FHC = dict(role=torch.tensor(_r, device=dev), vsub=torch.tensor(_v, device=dev), atom=torch.tensor(FH_ATOM, device=dev))
+    _rg = np.random.default_rng(3); FHC["rph"] = torch.tensor(np.stack([np.zeros(64)] + [_rg.random(64) * 2 * np.pi for _ in range(3)]), dtype=torch.float32, device=dev)   # role phases (none, SUBJ, OBJ, VERB)
+    _rg = np.random.default_rng(5); FHC["rid"] = torch.tensor(_rg.random((VV, 256)) * 2 * np.pi, dtype=torch.float32, device=dev)            # identity band: random near-orthogonal atoms (Test A diagnostic)
+    FHC["rph2"] = torch.tensor(np.stack([np.zeros(256)] + [_rg.random(256) * 2 * np.pi for _ in range(3)]), dtype=torch.float32, device=dev)
+    log(f"FHRR: corpus roles: SUBJ {(_r == 1).mean():.3f}, OBJ {(_r == 2).mean():.3f}, VERB {(_r == 3).mean():.3f}; verbs with a bound subject {(_v >= 0).sum() / max((_r == 3).sum(), 1):.3f}"); del _r, _v
+def fh_enc(A, R, Vs, cfg):
+    """FHRR state per band (tau 16..128): sum_j lam^j [R>0] exp(i (TH_tau[atom] + role phase + TH_tau[verb's subject])), normalised per band; A, R, Vs (n, WIN), newest first"""
+    TH_ = SVDTH[(cfg.get("svdsrc", "mt"), int(cfg.get("D", 64)))]; WIN = A.shape[1]; j = torch.arange(WIN, dtype=torch.float32, device=dev); out = []
+    for t in (16, 32, 64, 128):
+        if t == 128: ph = FHC["rid"][FHC["atom"][A]] + FHC["rph2"][R.long()] + torch.where((Vs >= 0)[..., None], FHC["rid"][Vs.clamp(min=0).long()], torch.zeros(1, device=dev))   # identity band
+        else: ph = TH_[t][FHC["atom"][A]] + FHC["rph"][R.long()] + torch.where((Vs >= 0)[..., None], TH_[t][Vs.clamp(min=0).long()], torch.zeros(1, device=dev))
+        wgt = ((1 - 1 / t) ** j)[None, :] * (R > 0).float(); zz = (wgt[..., None] * torch.exp(1j * ph)).sum(1); v = torch.cat([zz.real, zz.imag], 1); out.append(v / v.norm(dim=1, keepdim=True).clamp(min=1e-9))
+    return torch.cat(out, 1) / 2.0
 _PP = {}
 def plan_positions(prev, w):
     """training positions p (p >= 200) with S[p] == w and S[p-1] == prev (cached)"""
@@ -540,10 +570,18 @@ def generate(cfg, pids):
             if cfg.get("beta"):                                                                                  # harmonic similarity of each candidate's history to the text's (z-scored across candidates)
                 hm = HM.setdefault(json.dumps(cfg, sort_keys=True), Harm(cfg)); hw = text[::-1][:hm.WIN]; Qh = torch.tensor([hw + [-1] * (hm.WIN - len(hw))], device=dev)
                 tier = ok[0] & (m4[0] >= m4[0][ok[0]].max() - 1); sel = torch.nonzero(tier)[:, 0][:int(cfg.get("htop", 1024))]       # only candidates that can still win
-                eq_ = hm.enc(Qh); sim = torch.cat([(hm.enc(St[(c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long()) * eq_).sum(1) for b0 in range(0, len(sel), 2048)])
+                if cfg.get("fhrr"):                                                                                    # FHRR: compare bound who-did-what states instead of bags of words
+                    tr_, tv_ = fh_roles(text); Wn = min(hm.WIN, len(text)); qa = torch.tensor([text[::-1][:Wn]], device=dev); qr = torch.tensor([tr_[::-1][:Wn].copy()], device=dev); qv = torch.tensor([tv_[::-1][:Wn].copy()], device=dev)
+                    eq_ = fh_enc(qa, qr, qv, cfg); sim = []
+                    for b0 in range(0, len(sel), 2048):
+                        pp = (c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(Wn, device=dev)).clamp(min=0)
+                        sim.append((fh_enc(St[pp].long(), FHC["role"][pp], FHC["vsub"][pp], cfg) * eq_).sum(1))
+                    sim = torch.cat(sim)
+                else:
+                    eq_ = hm.enc(Qh); sim = torch.cat([(hm.enc(St[(c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long()) * eq_).sum(1) for b0 in range(0, len(sel), 2048)])
                 z = torch.zeros_like(sc[0]); z[sel] = (sim - sim.mean()) / sim.std().clamp(min=1e-6) if len(sel) > 1 else 0.0
                 sc = sc + cfg["beta"] * z[None]
-                if HTRACE and pid == 0 and len(text) - LP in HTRACE_STEPS:                                         # harmonic trace: per-band similarity of each top-tier candidate's history to the text's
+                if HTRACE and not cfg.get("fhrr") and pid == 0 and len(text) - LP in HTRACE_STEPS:                                         # harmonic trace: per-band similarity of each top-tier candidate's history to the text's
                     def _w(i): return "." if i == 0 else (vw[i] if i < len(vw) and vw[i] is not None else "<unk>")
                     eC = torch.cat([hm.enc(St[(c[0, sel[b0:b0 + 2048]][:, None] - 1 - torch.arange(hm.WIN, device=dev)).clamp(min=0)].long()) for b0 in range(0, len(sel), 2048)])
                     nb = len(hm.bands); pb = (eC.reshape(len(sel), nb, -1) * eq_.reshape(1, nb, -1)).sum(2) * eC.reshape(len(sel), nb, -1).shape[2]
