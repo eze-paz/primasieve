@@ -419,9 +419,41 @@ def plan_positions(prev, w):
     if k not in _PP:
         P_ = np.nonzero(S[200:ntr] == w)[0] + 200; _PP[k] = P_[S[P_ - 1] == prev]
     return _PP[k]
+EVC = None
+if any("v" in str(c.get("sym", "")) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                                  # SYM3: narrative event chains (Chambers & Jurafsky 2008) from the training text
+    GRPS = list(SUBJ); SUBJID = {_wid[SUBJ[g]]: k for k, g in enumerate(GRPS) if SUBJ[g] in _wid}
+    AUXW = np.array([_wid[w] for w in "was were is are am be been had has have would could should will shall might may must did do does not then also never only".split() if w in _wid])
+    _Str = S[:ntr].astype(np.int64); _pos = np.nonzero(np.isin(_Str[:-3], list(SUBJID)))[0]
+    _vt = SYMP_["ti"]["VERB"]; ISVERB = np.zeros(VV, bool)                                                  # verbs = words whose most frequent EWT tag is VERB (Brown verb-like classes also admit prepositions)
+    for w__, i__ in _wid.items():
+        if w__ in _cw and max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w__][k]) == _vt: ISVERB[i__] = True
+    def _vl(w): return ISVERB[np.minimum(w, VV - 1)] & ~np.isin(w, AUXW) & (w != 0)
+    w1, w2, w3 = _Str[_pos + 1], _Str[_pos + 2], _Str[_pos + 3]; a1, a2 = np.isin(w1, AUXW), np.isin(w2, AUXW)
+    _verb = np.where(_vl(w1), w1, np.where(a1 & _vl(w2), w2, np.where(a1 & a2 & _vl(w3), w3, -1))); _k = _verb >= 0
+    EP, EV, EG = _pos[_k], _verb[_k], np.array([SUBJID[int(x_)] for x_ in _Str[_pos[_k]]])
+    PVG = np.zeros((len(GRPS), VV)); np.add.at(PVG, (EG, EV), 1.0)
+    keys = []
+    for g_ in range(len(GRPS)):
+        m_ = EG == g_; p_, v_ = EP[m_], EV[m_]
+        for d in range(1, 5):
+            if len(p_) <= d: break
+            near = (p_[d:] - p_[:-d]) <= 60; keys.append(v_[:-d][near] * VV + v_[d:][near])
+    kk = np.concatenate(keys) if keys else np.zeros(0, np.int64); uk, ck = np.unique(kk, return_counts=True); keep = ck >= 3
+    uk, ck = uk[keep], ck[keep]; c1v = np.bincount(uk // VV, weights=ck, minlength=VV); c2v = np.bincount(uk % VV, weights=ck, minlength=VV); NPv = ck.sum()
+    EVC = dict(PVG=PVG, uk=uk, pmi=np.log(ck * NPv / np.maximum(c1v[uk // VV] * c2v[uk % VV], 1)))
+    log(f"SYM3 events: {len(EP):,} (pronoun subject, verb) events; {len(uk):,} verb pairs with PMI")
+def ev_pmi(v1, v2s):
+    k_ = v1 * VV + np.asarray(v2s); i_ = np.minimum(np.searchsorted(EVC["uk"], k_), len(EVC["uk"]) - 1); return np.where(EVC["uk"][i_] == k_, EVC["pmi"][i_], 0.0)
+def plan_verb(grp, recent, rng):
+    """the planned verb for a pronoun-group subject: log P(verb | group) + mean chain PMI with the subject's recent verbs; sample among the top 20"""
+    g_ = GRPS.index(grp); pv = EVC["PVG"][g_]; cand = np.argsort(-pv)[:300]; cand = cand[(pv[cand] > 0) & ~np.isin(cand, recent[-3:])]   # no repeat of the subject's last 3 verbs
+    if len(cand) == 0: return -1
+    sc_ = np.log(pv[cand] / pv.sum())
+    if recent: sc_ = sc_ + np.mean([ev_pmi(int(r_), cand) for r_ in recent[-3:]], axis=0)
+    top = np.argsort(-sc_)[:20]; pr = np.exp(sc_[top] - sc_[top].max()); return int(cand[top][rng.choice(len(top), p=pr / pr.sum())])
 class Disc:
     """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
-    def __init__(s): s.sal = {}; s.last = {}; s.k = 0
+    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1
     def read(s, ids):
         ws = [vw[i] if i < len(vw) and vw[i] is not None else "<unk>" for i in ids]
         if not ws: return
@@ -435,6 +467,8 @@ class Disc:
             else: continue
             h = hd[j]; role = (3.0 if j + 1 < h else 2.0) if h > 0 and TAGS_[tg[h - 1]] in ("VERB", "AUX") else 1.0
             s.sal[r] = s.sal.get(r, 0.0) + role; s.last[r] = s.k
+            if role == 3.0 and ws[h - 1] in _wid: s.ev.setdefault(r, []).append(_wid[ws[h - 1]])
+    useverb = False
     def plan(s, rng=None, ptr=None):
         """Centering: CONTINUE (most salient referent), SHIFT (another referent, by salience) or NEW (no plan), sampled with ptr; default always CONTINUE"""
         if not s.sal: return []
@@ -446,6 +480,7 @@ class Disc:
                 oth = [r for r in s.sal if r != cb]
                 if not oth: return []
                 wv = np.array([s.sal[r] for r in oth]); cb = oth[int(rng.choice(len(oth), p=wv / wv.sum()))]
+        s.vplan = plan_verb(cb, s.ev.get(cb, []), rng) if (EVC is not None and s.useverb and cb in SUBJ and rng is not None) else -1
         if cb in SUBJ: return [_wid.get(SUBJ[cb], -1)]
         return [_wid.get("the", -1), _wid.get(cb, -1)]
     def ref_ids(s):
@@ -459,7 +494,7 @@ def generate(cfg, pids):
     for pid in pids:
         t = PROMPTS[pid]; text = S[t:t + LP].astype(np.int64).tolist(); rng = np.random.default_rng(1000 * pid + 7)
         if cfg.get("sym"):                                                                                   # read the prompt sentence by sentence
-            DS = Disc(); cur = []
+            DS = Disc(); DS.useverb = "v" in cfg["sym"]; cur = []
             for x_ in text:
                 if x_ == 0: DS.read(cur); cur = []
                 else: cur.append(x_)
@@ -482,6 +517,17 @@ def generate(cfg, pids):
                     if len(ex):
                         HG.manual_seed(len(text) * 7919 + PLAN[kq]); ex = ex[torch.randperm(len(ex), generator=HG)[:256].numpy()]
                         c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool); SYMST[1] += 1
+            VP_ = -1
+            if cfg.get("sym") and "v" in cfg["sym"] and DS.vplan >= 0 and PLAN and DS.vplan not in text[-2:]:      # SYM3: realise the planned verb at word 2, or word 3 after an auxiliary
+                lbv = len(text) - 1 - text[::-1].index(0) if 0 in text else None; kv = len(text) - 1 - lbv if lbv is not None else 99
+                if kv == 1 or (kv == 2 and text[-1] in set(AUXW.tolist())):
+                    VP_ = DS.vplan
+                    if not bool((St[c[0]][ok[0]] == VP_).any()):
+                        ex = plan_positions(text[-1], VP_)
+                        if len(ex):
+                            HG.manual_seed(len(text) * 7919 + VP_); ex = ex[torch.randperm(len(ex), generator=HG)[:256].numpy()]
+                            c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool)
+                        else: VP_ = -1
             if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
                 eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
             else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
@@ -505,6 +551,7 @@ def generate(cfg, pids):
                 nxc = St[c[0]].long().cpu().numpy(); lb = len(text) - 1 - text[::-1].index(0) if 0 in text[LP:] or text[-1] == 0 else None
                 kpos = len(text) - 1 - lb if lb is not None else 99; add = np.zeros(len(nxc))
                 if "p" in cfg["sym"] and kpos < len(PLAN): add += (1000.0 if "h" in cfg["sym"] else 8.0) * (nxc == PLAN[kpos])      # "h": the plan is a hard constraint
+                if VP_ >= 0: add += 1000.0 * (nxc == VP_)
                 if "e" in cfg["sym"]: add += 2.0 * np.isin(nxc, list(REFS)) - 8.0 * (ISPROPN[np.minimum(nxc, VV - 1)] & ~np.isin(nxc, list(REFS)))
                 sc = sc + torch.tensor(add, dtype=sc.dtype, device=sc.device)[None]; TR_ADD = add
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
@@ -524,6 +571,7 @@ def generate(cfg, pids):
                 lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; cur = text[lb + 1:]
                 if not any(VSET[BCL[x_]] for x_ in cur) and len(cur) > 0: bad = bad | (nx == 0)
             if cfg.get("sym") and "h" in cfg["sym"] and kpos < len(PLAN) and (nx == PLAN[kpos]).any(): bad = bad & (nx != PLAN[kpos])   # the planned word is exempt from the vetoes
+            if cfg.get("sym") and VP_ >= 0 and (nx == VP_).any(): bad = bad & (nx != VP_)
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
             if cfg.get("keepb") and uw[0] == 0:                                                                  # keep the sentence-end probability at its pre-veto value
@@ -538,7 +586,7 @@ def generate(cfg, pids):
                     msk = (nx == uw[j]) & okn; row.append(f"{_w(uw[j])}:{pw_[j]:.2f}(m{int(m4n[msk].max()) if msk.any() else -1},+{TR_ADD[msk].max() if msk.any() else 0:.0f})")
                 pl = " ".join(_w(i) for i in PLAN) if PLAN else "-"; pv = [int(x_) for x_ in PLAN]
                 vetoed = [ _w(x_) for x_ in pv if (nx == x_).any() and bad[nx == x_].all()]; absent = [_w(x_) for x_ in pv if not (nx[okn] == x_).any()]
-                TRL.append(f"[{nm_}|p{pid}|k{kpos}] plan={pl} planned-vetoed={vetoed} planned-absent={absent} -> {_w(text[-1])} | top: {' '.join(row)}")
+                TRL.append(f"[{nm_}|p{pid}|k{kpos}] plan={pl} vplan={_w(DS.vplan) if DS.vplan >= 0 else '-'} planned-vetoed={vetoed} planned-absent={absent} -> {_w(text[-1])} | top: {' '.join(row)}")
             if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
                 lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; DS.read(text[lb2 + 1:-1]); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
                 if TRACE and pid < TRACE: TRL.append(f"   [state] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
