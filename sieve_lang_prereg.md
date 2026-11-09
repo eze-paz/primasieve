@@ -2888,3 +2888,7 @@ Scores: sieve_lt_scores.json.
 ## KCG2 — the 2,048-dim count matrix inside Sieve (autonomous; KCG's protocol; preregistered 2026-11-09, before calibration)
 - Arm CM2 = MEAN x e^(beta z), z from D2048 (kv2_D2048.npz). beta from {0, 0.25, 0.5, 1, 2} on 40 calibration prompts (DEC_POFF 39); 120 fresh prompts DEC_POFF 43; side by side MEAN:CM2, two blind raters. Pass = coherence interval excludes 0 in CM2's favour, then replication.
 - **Predictions:** beta above 0 (85%); CM2 coherence point above MEAN (45%); coherence pass (20%).
+
+## KV3 — further dimension (autonomous; preregistered 2026-11-09, before the run)
+- KV2's protocol (same 4,000 positions). Arms: D2048 (repeat), D4096, D8192 (decays 2/8/30 over 30 words; keys 12,288 / 24,576), D4096L (long + local key, 24,576). Also reported: AUC of Sieve B's own probability on the same candidates (P), and AUC of log P + 0.5 z / 0.35 (the reweighted distribution's ranking) per arm. Ridge solved in fp32 above key 12,288 (GPU memory).
+- **Predictions:** D4096 above D2048 (65%); D8192 above D4096 (50%); a matrix arm's AUC alone above P's (45%); auc_with_P above P for every arm (80%).

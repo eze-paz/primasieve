@@ -299,7 +299,7 @@ def cmcal():
             for b in B: q = p * np.exp(b * zf / cfg["T"]); LPs[b].append(float(np.log(q[yi] / q.sum() + 1e-300)))
         if pid % 10 == 0: log(f"cal prompt {pid}: " + ", ".join(f"{b}: {np.mean(v):.4f}" for b, v in LPs.items()))
     out = {str(b): float(np.mean(v)) for b, v in LPs.items()}; out["n"] = len(LPs[0.0]); out["beta"] = max(B, key=lambda b: np.mean(LPs[b]))
-    json.dump(out, open(os.path.join(HERE, "sieve_kcg_beta.json"), "w"), indent=1); log(json.dumps(out))
+    json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ.get('DEC_CMTAG', 'kcg')}_beta.json"), "w"), indent=1); log(json.dumps(out))
 if __name__ == "__main__" and sys.argv[1] == "cmcal": cmcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()
 if __name__ == "__main__": run(sys.argv[1], json.loads(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else None)

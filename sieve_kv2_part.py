@@ -25,6 +25,8 @@ def dstate(win, E, hls):
         w = IDF[win] * (2.0 ** (-(L - 1 - torch.arange(L, device=gpu, dtype=torch.float32)) / h))[None]; k = torch.einsum("bl,bld->bd", w, ev); out.append(k / k.norm(dim=1, keepdim=True).clamp(min=1e-9))
     return torch.cat(out, 1)
 ARMS = {"D512s0": (512, 0, "short"), "D1024": (1024, 0, "short"), "D2048": (2048, 0, "short"), "D2048L": (2048, 0, "long")}
+if os.environ.get("KV_ARMS"): ARMS = {k: tuple(v) for k, v in json.loads(os.environ["KV_ARMS"]).items()}   # KV3
+SAVE = set(os.environ.get("KV_SAVE", "D2048").split(","))
 def keyf(win, E, R, kind):
     if kind == "short": return dstate(win[:, -30:], E, (2.0, 8.0, 30.0))
     return torch.cat([dstate(win, E, (2.0, 8.0, 30.0, 120.0)), R[win[:, -1]], R[win[:, -2]]], 1)                   # LONG + LOCAL
@@ -38,22 +40,31 @@ for t in order:                                                                 
     if el.sum() < 2: continue
     EX.append((win, uw, p, el, yi))
     if len(EX) >= NEX: break
-log(f"{len(EX)} evaluation positions"); out = {"n": len(EX)}; h = len(EX) // 2; St_ = torch.as_tensor(Str).to(gpu); Sg = torch.as_tensor(S).to(gpu)
+log(f"{len(EX)} evaluation positions"); out = {"n": len(EX)}
+PA = []
+for win, uw, p, el, yi in EX:
+    sc = p[el]; yy = int(np.searchsorted(uw[el], uw[yi])); o = np.delete(sc, yy); PA.append(float((o < sc[yy]).mean() + 0.5 * (o == sc[yy]).mean()))
+out["P_auc"] = round(float(np.mean(PA)), 4); h = len(EX) // 2; St_ = torch.as_tensor(Str).to(gpu); Sg = torch.as_tensor(S).to(gpu)
 for arm, (dim, seed, kind) in ARMS.items():
     E, R = vectors(dim, seed); CV = CK = None
-    for i in range(0, len(pos), 1000):
-        p_ = torch.as_tensor(pos[i:i + 1000]).to(gpu); win = St_[p_[:, None] - LW + torch.arange(LW, device=gpu)[None]]; K = keyf(win, E, R, kind); Vv = E[St_[p_]]
+    bs = max(100, 1000 * 1024 // dim)
+    for i in range(0, len(pos), bs):
+        p_ = torch.as_tensor(pos[i:i + bs]).to(gpu); win = St_[p_[:, None] - LW + torch.arange(LW, device=gpu)[None]]; K = keyf(win, E, R, kind); Vv = E[St_[p_]]
         CV = Vv.T @ K if CV is None else CV + Vv.T @ K; CK = K.T @ K if CK is None else CK + K.T @ K
-    CK = CK.double(); M = torch.linalg.solve((CK + 1e-3 * torch.trace(CK) / len(CK) * torch.eye(len(CK), device=gpu, dtype=torch.float64)).T, CV.double().T).T.float(); del CV, CK
-    log(f"{arm}: ridge solved (key {M.shape[1]})"); REC, AU = [], []
+    lam = 1e-3 * torch.trace(CK) / len(CK)
+    if len(CK) <= 12288: CK = CK.double(); CK.diagonal().add_(lam); M = torch.linalg.solve(CK.T, CV.double().T).T.float()
+    else: CK.diagonal().add_(lam); M = torch.linalg.solve(CK.T, CV.T).T                                                 # KV3: fp32 solve above 12,288 (GPU memory)
+    del CV, CK
+    log(f"{arm}: ridge solved (key {M.shape[1]})"); REC, AU, CB = [], [], []
     for win, uw, p, el, yi in EX:
         wg = torch.as_tensor(win).to(gpu)[None]; r = M @ keyf(wg, E, R, kind)[0]; cw = torch.as_tensor(uw[el]).to(gpu); A = E[cw]
         sc = ((A @ r) / (A.norm(dim=1).clamp(min=1e-9) * r.norm().clamp(min=1e-9))).cpu().numpy(); z = (sc - sc.mean()) / max(sc.std(), 1e-9)
         zf = np.zeros(len(uw)); zf[el] = z; REC.append([float(np.log((p[yi] * np.exp(b * zf[yi] / 0.35)) / (p * np.exp(b * zf / 0.35)).sum() + 1e-300)) for b in BETAS])
         yy = int(np.searchsorted(uw[el], uw[yi])); o = np.delete(sc, yy); AU.append(float((o < sc[yy]).mean() + 0.5 * (o == sc[yy]).mean()))
+        cb = np.log(p[el] + 1e-300) + z / 0.35 * 0.5; o = np.delete(cb, yy); CB.append(float((o < cb[yy]).mean() + 0.5 * (o == cb[yy]).mean()))
     a = np.array(REC); bi = int(np.argmax(a[:h].mean(0))); dd = a[h:, bi] - a[h:, 0]; gg = np.random.default_rng(0); s = [dd[gg.integers(0, len(dd), len(dd))].mean() for _ in range(2000)]
-    out[arm] = dict(auc=round(float(np.mean(AU)), 4), beta=BETAS[bi], logp_beta0=round(float(a[h:, 0].mean()), 4), logp_best=round(float(a[h:, bi].mean()), 4), gain_interval=[round(float(np.percentile(s, 2.5)), 4), round(float(np.percentile(s, 97.5)), 4)])
+    out[arm] = dict(auc=round(float(np.mean(AU)), 4), auc_with_P=round(float(np.mean(CB)), 4), beta=BETAS[bi], logp_beta0=round(float(a[h:, 0].mean()), 4), logp_best=round(float(a[h:, bi].mean()), 4), gain_interval=[round(float(np.percentile(s, 2.5)), 4), round(float(np.percentile(s, 97.5)), 4)])
     log(f"{arm}: {json.dumps(out[arm])}"); json.dump(out, open(os.path.join(OUTD, "kv2.json"), "w"), indent=1)
-    if arm == "D2048": np.savez(os.path.join(OUTD, "kv2_D2048.npz"), E=E.cpu().numpy().astype(np.float16), ML=M.cpu().numpy(), idf=idf)
+    if arm in SAVE: np.savez(os.path.join(OUTD, f"kv2_{arm}.npz"), E=E.cpu().numpy().astype(np.float16), ML=M.cpu().numpy(), idf=idf)
     del E, R, M; torch.cuda.empty_cache()
 log("kv2 done")
