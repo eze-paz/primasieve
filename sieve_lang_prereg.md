@@ -2923,6 +2923,11 @@ Scores: sieve_lt_scores.json.
 - Reasoning: at power 6 the consensus of copies decides almost every step, so a re-ranker's preferences are overruled. Arms (base JX3S1, power 6): P3 (power 3, no readout: the sharpening control), P3LW (power 3 + next-word readout gamma 1/2), P3L (power 3 + class readout gamma 1/2). 20 fresh prompts (offset 113).
 - **Predictions:** P3 below JX3S1 on fluency (70%, as in earlier sharpening rounds); P3LW above P3 on fluency (55%); P3LW at least JX3S1 on fluency (30%).
 
+## HMLP — one-hidden-layer readout on the same features (loop 2; preregistered 2026-11-09, before the run)
+- HWORD with the linear map replaced by ReLU(x W1 + b1) W + b, 2,048 hidden units; same data, optimiser, validation, 12 epochs. This is a small neural readout on fixed count-fitted harmonic features (no recurrence trained).
+- **Decision:** if the readout alone beats the trigram (7.8928) and the mixture drops below 7.3, capacity is the binding limit and a small learned readout is the path; otherwise the features are.
+- **Predictions:** readout alone below 7.8928 (55%); mixture below 7.3 (35%).
+
 ### KCG3 results -- PASS (2026-11-09; mtest/kcg3_gen.json, sieve_kcg3_pair_scores.json; 240 prompts DEC_POFF 47, two raters per half, agreement 0.883 / 0.883)
 - 0 of 240 CM4 texts identical to MEAN.
 - CM4 vs MEAN over 240: coherence 0.1917 [0.075, 0.3042] (CM4 preferred 0.537, MEAN 0.346); fluency 0.0083 [-0.1167, 0.125] (0.446 / 0.438). Halves: coherence 0.2667 [0.1, 0.4167] and 0.1167 [-0.0583, 0.2833].
@@ -2932,3 +2937,4 @@ Scores: sieve_lt_scores.json.
 ## KCG3R — replication (preregistered 2026-11-09, before generation)
 - Identical arms and settings; 240 fresh prompts DEC_POFF 53; same rater brief, two raters per half. Pass = coherence interval over the 240 excludes 0 in CM4's favour.
 - **Predictions:** replication pass (55%); coherence point above MEAN (80%).
+**PW results (loop 2, 2026-11-09; 20 prompts; sieve_pw_*.json, sieve_grampw_*.json).** Pairwise vs JX3S1, fluency / coherence: P3 0.450 / 0.400; P3LW 0.550 / 0.550; P3L 0.650 [0.450, 0.850] / 0.600. Grammatical share: JX3S1 0.602 (93), P3 0.578 (83), P3LW 0.619 (97), P3L 0.553 (85), truth 0.933 (75). Predictions: P3 below JX3S1 on fluency — held (0.450); P3LW above P3 — held (0.550 vs 0.450); P3LW at least JX3S1 — held weakly (0.550). All within the noise of 20 prompts; no arm stands out across fluency and grammar together.

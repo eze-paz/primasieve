@@ -7,3 +7,4 @@ Protocol for small steps: 20 fresh prompts per step, one blind pairwise rater pe
 2. (01:30) LINS sweep (20 prompts): gamma 3/6 best (fluency 0.650, coherence 0.700, grammar 0.794 vs 0.756); 5/6 hurts. Milestone LINM (80 prompts) launched for gamma 3/6.
 3. (02:10) LINM milestone (80 prompts): class readout gamma 3/6 vs JX3S1 fluency 0.550, coherence 0.550, grammar 0.680 vs 0.661 — n.s.; the 20-prompt lead was mostly noise. Next: next-word readout (HWORD2, longer training) as re-ranker.
 4. (02:55) HWORD2 converged (mixture 7.5594 bits vs trigram 7.8928). LW (next-word readout re-ranker, gamma 1/6-3/6, 20 prompts): no help (fluency 0.400 / 0.450 / 0.550; grammar 0.663 / 0.624 / 0.624 vs 0.706). Next: lower sharpening so the readout can matter (PW).
+5. (03:25) PW (power 3 + readouts, 20 prompts): all within noise (P3L fluency 0.650 but grammar 0.553; P3LW 0.550 / 0.619). Readout re-rankers have not produced a consistent gain in four small steps and one milestone.

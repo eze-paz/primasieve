@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "P3 over JX3S1": {
+   "share": 0.45,
+   "pairs": 20,
+   "interval": [
+    0.25,
+    0.65
+   ]
+  },
+  "P3LW over JX3S1": {
+   "share": 0.55,
+   "pairs": 20,
+   "interval": [
+    0.35,
+    0.75
+   ]
+  },
+  "P3L over JX3S1": {
+   "share": 0.65,
+   "pairs": 20,
+   "interval": [
+    0.45,
+    0.85
+   ]
+  }
+ },
+ "coherence": {
+  "P3 over JX3S1": {
+   "share": 0.4,
+   "pairs": 20,
+   "interval": [
+    0.2,
+    0.6
+   ]
+  },
+  "P3LW over JX3S1": {
+   "share": 0.55,
+   "pairs": 20,
+   "interval": [
+    0.35,
+    0.75
+   ]
+  },
+  "P3L over JX3S1": {
+   "share": 0.6,
+   "pairs": 20,
+   "interval": [
+    0.4,
+    0.8
+   ]
+  }
+ }
+}
