@@ -1,0 +1,79 @@
+{
+ "JX3S1": {
+  "share": 0.68,
+  "sentences": 97,
+  "interval": [
+   0.589,
+   0.765
+  ],
+  "batch": [
+   0.722,
+   0.613,
+   0.7
+  ]
+ },
+ "GALL": {
+  "share": 0.693,
+  "sentences": 101,
+  "interval": [
+   0.593,
+   0.781
+  ],
+  "batch": [
+   0.718,
+   0.735,
+   0.607
+  ],
+  "paired_vs_base": [
+   -0.1,
+   0.109
+  ]
+ },
+ "GALLA": {
+  "share": 0.704,
+  "sentences": 98,
+  "interval": [
+   0.612,
+   0.788
+  ],
+  "batch": [
+   0.722,
+   0.688,
+   0.7
+  ],
+  "paired_vs_base": [
+   0.0,
+   0.061
+  ]
+ },
+ "GFLAGA": {
+  "share": 0.701,
+  "sentences": 97,
+  "interval": [
+   0.61,
+   0.785
+  ],
+  "batch": [
+   0.722,
+   0.677,
+   0.7
+  ],
+  "paired_vs_base": [
+   0.0,
+   0.053
+  ]
+ },
+ "truth": {
+  "share": 0.912,
+  "sentences": 80,
+  "interval": [
+   0.849,
+   0.969
+  ],
+  "batch": [
+   0.917,
+   0.923,
+   0.9
+  ]
+ }
+}
