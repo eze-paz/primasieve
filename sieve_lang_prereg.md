@@ -3268,3 +3268,12 @@ NN-free hybrid in the Reiter & Dale pipeline shape, with DRT-lite referents and 
 - **Arms** (local bench, MT 27M, 20 fresh prompts, G1_POFF 161): JX3S1; SYM (all three); SYMP (plan only: constraint 1); SYME (entities only: constraints 2 + 3).
 - **Measured:** entity continuity (share of generated sentences mentioning a prompt referent; share of sentence starts whose subject is the plan's referent), PLAG; one blind rater pairwise vs JX3S1 + grammar (tag SY).
 - **Predictions:** SYM entity continuity above JX3S1's (90%); SYM coherence share over JX3S1 above 0.5 (50%), above 0.6 (25%); SYM grammar within 0.05 of JX3S1 (60%); SYMP coherence above SYME's (45%).
+
+### EGRID results (2026-11-09; local CPU; sieve_egrid.json nouns only, sieve_egrid_pron.json with pronoun entities; 5,738 rater coherence pairs with differing texts, 45 rounds; majority answer 0.5136)
+| grid | shuffle sanity | zero-shot on rater pairs | supervised (CV by round) | + length baseline |
+|---|---|---|---|---|
+| nouns only (preregistered) | 0.4843 | 0.5383 | 0.5613 | 0.5687 |
+| + pronoun entities (amended) | 0.6170 | 0.4899 | 0.5679 | 0.5767 |
+| length baseline | — | — | 0.5218 | — |
+- Predictions: shuffle sanity at least 0.75 failed (0.6170 best); zero-shot at least 0.58 failed; supervised at least 0.60 failed (0.5679); 0.05 above baseline failed (+0.046 with pronouns, +0.040 nouns only). Decision rule failed narrowly.
+- Reading: entity continuity carries a real but small part of what raters call coherence: about 4-5 points of pair accuracy beyond length, from count-based roles alone. Pronouns are what carries entities in these book passages (sanity 0.4843 -> 0.6170). The zero-shot transfer from shuffled human text to rater pairs fails: what separates our generators' texts is not sentence order but topic drift within a continuation. Consistent with the theory note: coherence needs a plan of who and what, which a judge over form cannot supply; supports building SYM (a generator that keeps entities) rather than more judges.
