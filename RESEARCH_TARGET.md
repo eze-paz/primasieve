@@ -23,5 +23,6 @@
 ## Caveats (honest status)
 
 - The SYM result is 20 prompts with one rater: intervals [0.50, 0.90] touch 0.5. A milestone on more prompts with two raters is required before adoption as the default decoder.
+- Always-CONTINUE planning (SYMP) did not replicate on fresh prompts (coherence 0.70 in round SY, 0.4737 in round SY2; pooled 23 of 39 = 0.59). The current best variant is SYM2H (human-frequency transitions: coherence 0.7368, interval [0.526, 0.895]); its milestone is the next step.
 - Its components are crude: tag-only parser (attachment accuracy 0.6152), coreference by pronoun groups, no gender for nouns.
 - The neural MW (HSSM writes, counts veto) also beat JX3S1 (0.80 / 0.80), but it is an NN. SYM is the leading **NN-free** direction and the primary target by the owner's decision of 2026-11-09.
