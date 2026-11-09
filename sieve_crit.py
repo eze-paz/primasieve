@@ -64,7 +64,7 @@ def cv(X, target, mask):
     for tr, te in GroupKFold(5).split(Xs, ym, gm): pr[te] = LogisticRegression(max_iter=3000, C=0.1).fit(Xs[tr], ym[tr]).predict_proba(Xs[te])[:, 1]
     return float(roc_auc_score(ym, pr)), pr
 R = {}; ALL = np.ones(len(rows), bool); GEN = ~hum
-for nm, X in (("NG5", FN), ("RES", np.c_[FR, FN[:, 4:]]), ("RES+NG5", np.c_[FR, FN])):
+for nm, X in (() if __import__("os").environ.get("CRIT_FIT_ONLY") else (("NG5", FN), ("RES", np.c_[FR, FN[:, 4:]]), ("RES+NG5", np.c_[FR, FN]))):
     aG, prG = cv(X, y, ALL); aGg, _ = cv(X, y, GEN); aH, _ = cv(X, hum.astype(int), ALL)
     by = defaultdict(lambda: [0.0, 0.0, 0])
     for r, p in zip(rows, prG): k = (r["tag"], r["arm"]); by[k][0] += r["label"]; by[k][1] += p; by[k][2] += 1
@@ -76,4 +76,6 @@ for nm, X in (("NG5", FN), ("RES", np.c_[FR, FN[:, 4:]]), ("RES+NG5", np.c_[FR, 
         xs += [rs[a] for a in arms]; ys += [ps[a] for a in arms]
     R[nm] = dict(auc_G_all=aG, auc_G_generated=aGg, auc_H=aH, arm_pearson=float(np.corrcoef(xs, ys)[0, 1]), arm_order=[int(agree), int(tot)])
     log(f"CRIT {nm}: G AUC all {aG:.4f}, generated only {aGg:.4f}; H AUC {aH:.4f}; arm r {R[nm]['arm_pearson']:.3f}, arm pairs ordered as raters {agree} of {tot}")
-json.dump(R, open("sieve_crit.json", "w"), indent=1); log("saved")
+if R: json.dump(R, open("sieve_crit.json", "w"), indent=1); log("saved")
+X = np.c_[FR, FN]; mu, sd = X.mean(0), X.std(0) + 1e-9; m = LogisticRegression(max_iter=3000, C=0.1).fit((X - mu) / sd, hum.astype(int))   # HREV: frozen H critic on all sentences
+np.savez("sieve_crit.npz", mu=mu, sd=sd, coef=m.coef_[0], b=m.intercept_[0]); log("critic saved")

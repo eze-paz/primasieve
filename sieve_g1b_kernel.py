@@ -205,7 +205,7 @@ def class_ok(ctx4, nx, eps):
     k5c = (np.uint64(c4) << np.uint64(6)) | BCLu[nx].astype(np.uint64); j = np.minimum(np.searchsorted(uf, k5c), len(uf) - 1); n5 = np.where(uf[j] == k5c, nf[j], 0)
     jc = min(int(np.searchsorted(uc, np.uint64(c4))), len(uc) - 1); n4 = int(nc[jc]) if uc[jc] == np.uint64(c4) else 0; return n5 >= eps * max(n4, 1)
 NG5 = None
-if any(c.get("accept") or c.get("flag") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
+if any(c.get("accept") or c.get("flag") or c.get("crit") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                     # interpolated absolute-discount 5-gram model over the training text (whole-text scorer)
     NG5 = {"c1": np.bincount(S[:ntr].astype(np.int64), minlength=VV).astype(np.float64)}; NG5["N"] = NG5["c1"].sum()
     with np.errstate(over="ignore"):
         hc = S[:ntr].astype(np.uint64) + np.uint64(1)                                                          # hash of the 1-word context at each position
@@ -232,6 +232,48 @@ def ng5_terms(text, js):
     js = np.array([j for j in js if 4 <= j < len(text)]);
     if len(js) == 0: return 0.0
     ctx = np.array([text[j - 4:j] for j in js]); return ng5_logp(ctx, np.array([text[j] for j in js]))
+CRITM = None
+if any(c.get("crit") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                                                 # HREV: frozen human-likeness critic (CRIT's RES+NG5 readout)
+    _c = np.load(os.environ.get("G1_CRIT", "sieve_crit.npz")); _d = torch.load(os.environ.get("G1_CRITPH", "hlin_readout.pt"), map_location="cpu")
+    CRITM = dict(mu=_c["mu"], sd=_c["sd"], w=_c["coef"], b=float(_c["b"]), om=_d["omega"].numpy().astype(np.float64), TAUS=[int(t) for t in _d["TAUS"]], TH={int(t): v.numpy().astype(np.float64) for t, v in _d["TH"].items()},
+                 lu=np.log((NG5["c1"] + 0.5) / (NG5["N"] + 0.5 * VV))); log("human-likeness critic loaded")
+def crit_score(w, edge):
+    """critic log-odds that sentence w (word ids) is human-written; features exactly as sieve_crit.py"""
+    w = np.asarray(w, np.int64)
+    if len(w) == 0: return 0.0
+    D = 0.75; tm = np.zeros(len(w)); c1_, N_ = NG5["c1"], NG5["N"]
+    with np.errstate(over="ignore"):
+        for j in range(len(w)):
+            p = (c1_[w[j]] + 0.5) / (N_ + 0.5 * VV)
+            for n in range(2, min(5, j + 1) + 1):
+                hh = np.uint64(0)
+                for x in w[j - n + 1:j]: hh = hh * M64 + np.uint64(x) + np.uint64(1)
+                ch = c1_[w[j - 1]] if n == 2 else _look(NG5[n - 1], np.array([hh]))[0]
+                cw = _look(NG5[n], np.array([hh * M64 + np.uint64(w[j]) + np.uint64(1)]))[0]; t = _look(NG5[f"t{n}"], np.array([hh]))[0]
+                if ch > 0: p = max(cw - D, 0) / ch + D * t / ch * p
+            tm[j] = np.log(p)
+    fn = [tm.sum(), tm.mean(), tm.min(), (tm.sum() - CRITM["lu"][w].sum()) / len(w), len(w), float(edge), np.log1p(len(w))]; v = []
+    for seq in (w[::-1], w):
+        j = np.arange(len(seq))[:, None]
+        for t in CRITM["TAUS"]:
+            zz = (((1 - 1 / t) ** j) * np.exp(1j * (CRITM["TH"][t][np.minimum(seq, len(CRITM["TH"][t]) - 1)] + j * CRITM["om"][None]))).sum(0); vv = np.r_[zz.real, zz.imag]; v.append(vv / max(np.linalg.norm(vv), 1e-9))
+    x = (np.r_[np.concatenate(v), fn] - CRITM["mu"]) / CRITM["sd"]; return float(x @ CRITM["w"] + CRITM["b"])
+def sent_span(text, i):
+    a = i
+    while a > LP and text[a - 1] != 0: a -= 1
+    b = i
+    while b < len(text) and text[b] != 0: b += 1
+    return a, b, (a == LP) or (b == len(text))
+def text_crit(ids):
+    """mean critic log-odds over the sentences of a generated passage (split at sentence ends, as the raters see them)"""
+    sents, cur = [], []
+    for x in ids:
+        if x == 0:
+            if cur: sents.append(cur)
+            cur = []
+        else: cur.append(x)
+    if cur: sents.append(cur)
+    return float(np.mean([crit_score(s_, k == 0 or k == len(sents) - 1) for k, s_ in enumerate(sents)])) if sents else 0.0
 MWSTAT = [0, 0]; GSTAT = []; G5STAT = []
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
@@ -271,7 +313,15 @@ def gibbs(text, rng, cfg):
                     t3 = np.repeat(np.array([text[i - d:i - d + 3]]), n_, 0); t3[:, d] = nx; bad |= np.array([tuple(r) in st_ for r in t3.tolist()])
             w = np.exp(sc - sc.max()) * ~bad
             if w.sum() <= 0: continue
-            uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg.get("pow", 6.0); new = int(uw[rng.choice(len(uw), p=ww / ww.sum())])
+            uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg.get("ppow", cfg.get("pow", 6.0))
+            if cfg.get("ppow") is not None and text[i] in uw: ww[np.searchsorted(uw, text[i])] = 0                      # HREV: propose a different word (the critic decides)
+            if ww.sum() <= 0: continue
+            new = int(uw[rng.choice(len(uw), p=ww / ww.sum())])
+            if cfg.get("crit") and new != text[i]:                                                                # HREV: keep only if the critic finds the sentence more human-like; sentence ends fixed
+                if new == 0 or text[i] == 0: new = text[i]
+                else:
+                    a_, b_, e_ = sent_span(text, i); old = text[i]; before = crit_score(text[a_:b_], e_); text[i] = new; after = crit_score(text[a_:b_], e_); text[i] = old
+                    if after <= before: new = old
             if cfg.get("accept") and new != text[i]:                                                              # keep only if the whole-text 5-gram log probability rises (terms i..i+4)
                 old = text[i]; before = float(np.sum(ng5_terms(text, range(i, i + 5)))); text[i] = new; after = float(np.sum(ng5_terms(text, range(i, i + 5)))); text[i] = old
                 if after <= before: new = old
@@ -351,11 +401,13 @@ for nm, cfg in GENS.items():
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     if JX:                                                                                                    # share of completed sentences without a verb-like word
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
+    cr = float(np.mean([text_crit(ids) for ids in gg.values()])) if CRITM is not None else None
     g5 = float(np.mean([np.mean(ng5_terms(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64).tolist() + ids, range(LP, LP + len(ids)))) for p, ids in gg.items()])) if NG5 is not None else None
     pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
-    log(f"NG5 {nm}: 5-gram log p per generated word {g5}")
+    log(f"NG5 {nm}: 5-gram log p per generated word {g5}; critic log-odds per sentence {cr}"); GO[nm]["critic"] = cr
     log(f"PLAG {nm}: 5-gram share {GO[nm]['plag_share5']:.4f} (8-gram {GO[nm]['plag_share8']:.4f}), longest {GO[nm]['plag_longest']}; MW steps with a surviving word {GO[nm]['mw_ok']:.3f}; Gibbs changed {GO[nm]['gibbs_changed']}")
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
+log(f"CRIT truth: critic log-odds per sentence {np.mean([text_crit(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]) if CRITM is not None else None}")
 _tp = [plag(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]; log(f"PLAG truth: 5-gram share {np.mean([a for a, _, _ in _tp]):.4f}, longest {[b for _, b, _ in _tp]}")
 GO["truth"] = dict(plag_share5=float(np.mean([a for a, _, _ in _tp])), plag_longest=[b for _, b, _ in _tp], gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64)), ids=S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(int).tolist()) for p in range(NG)])
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
