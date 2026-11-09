@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "S1 over JX3S1": {
+   "share": 0.6,
+   "pairs": 20,
+   "interval": [
+    0.4,
+    0.8
+   ]
+  },
+  "S2 over JX3S1": {
+   "share": 0.45,
+   "pairs": 20,
+   "interval": [
+    0.25,
+    0.65
+   ]
+  },
+  "S4 over JX3S1": {
+   "share": 0.45,
+   "pairs": 20,
+   "interval": [
+    0.25,
+    0.7
+   ]
+  }
+ },
+ "coherence": {
+  "S1 over JX3S1": {
+   "share": 0.65,
+   "pairs": 20,
+   "interval": [
+    0.45,
+    0.85
+   ]
+  },
+  "S2 over JX3S1": {
+   "share": 0.6,
+   "pairs": 20,
+   "interval": [
+    0.4,
+    0.8
+   ]
+  },
+  "S4 over JX3S1": {
+   "share": 0.5,
+   "pairs": 20,
+   "interval": [
+    0.3,
+    0.7
+   ]
+  }
+ }
+}

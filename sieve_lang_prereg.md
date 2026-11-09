@@ -2995,3 +2995,14 @@ Scores: sieve_lt_scores.json.
 ## HSSML — a larger HSSM (loop 2; preregistered 2026-11-09, before the run)
 - Same kernel, HM_DM 512, HM_L 4 layers, harmonic start only, 150 minutes on a T4, same data, evaluation and trigram as HSSM (115,200 held-out positions). Purpose: a stronger scorer for SSMR-style hybrids; the bits are compared with HSSM's 7.0379.
 - **Predictions:** HSSML below 7.0379 (85%); below 6.7 (40%); best trigram mixture below 6.6 (35%).
+
+### SSMR results (2026-11-09; sieve_SR_scores.json, sieve_gramSR_scores.json; 20 prompts offset 113, one rater)
+- JX3S1 in this run reproduced 6 of 20 texts of sieve_pw_gen.json (GPU nondeterminism in the candidate scores); comparisons use this run's JX3S1.
+- Over JX3S1: S1 (ssm 1/6) fluency 0.60 [0.40, 0.80], coherence 0.65 [0.45, 0.85]; S2 0.45 / 0.60; S4 0.45 / 0.50.
+- Grammatical share: JX3S1 0.621 (87 sentences); S1 0.586 (paired [-0.131, 0.051]); S2 0.598; S4 0.580; truth 0.947.
+- Predictions: an arm's coherence above 0.6 held (S1 0.65); best arm's grammar above JX3S1 failed; S4 grammar below JX3S1 held (0.580 vs 0.621, n.s.).
+- Reading: weak lead for the lightest weight; to the milestone.
+
+## SRM — milestone: S1 (HSSM scorer, ssm 1/6) vs JX3S1 on 80 fresh prompts (offset 119; preregistered 2026-11-09, before the run)
+- Same kernel and settings as SSMR; arms JX3S1, S1; G1_POFF 119, 80 prompts; sieve_armjudge.py tag SRM (one pairwise batch of 80, three grammar batches).
+- **Predictions:** S1 coherence share above 0.5 (60%); interval above 0.5 (20%); S1 grammar at or above JX3S1 (45%).
