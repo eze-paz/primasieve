@@ -274,7 +274,7 @@ def text_crit(ids):
         else: cur.append(x)
     if cur: sents.append(cur)
     return float(np.mean([crit_score(s_, k == 0 or k == len(sents) - 1) for k, s_ in enumerate(sents)])) if sents else 0.0
-MWSTAT = [0, 0]; GSTAT = []; G5STAT = []
+MWSTAT = [0, 0]; GSTAT = []; G5STAT = []; EDITS = []
 def mw_step(text, rng, cfg):
     """MW: the HSSM model proposes (temperature, top-p over the frequent words), the count tables veto"""
     x = torch.tensor([text[-512:]], device=dev).clamp(max=SSMM["VV"] - 1)
@@ -349,7 +349,9 @@ def gibbs_block(text, rng, cfg):
             if new is None or new == text[i:i + sl]: continue
             js = range(i, min(i + sl + 4, len(text))); before = float(np.sum(ng5_terms(text, js))); old = text[i:i + sl]; text[i:i + sl] = new; after = float(np.sum(ng5_terms(text, js)))
             d = after - before
-            if d > 0 or (T > 0 and rng.random() < np.exp(d / T)): G[1] += sum(a != b for a, b in zip(new, old))
+            if d > 0 or (T > 0 and rng.random() < np.exp(d / T)):
+                G[1] += sum(a != b for a, b in zip(new, old)); w0, w1 = max(LP, i - 10), min(len(text), i + sl + 10)
+                EDITS.append(dict(d=float(d), T=float(T), sweep=sw, before=list(text[w0:i]) + old + list(text[i + sl:w1]), after=list(text[w0:w1])))
             else: text[i:i + sl] = old
     GSTAT.append(sum(a != b for a, b in zip(text[LP:], draft[LP:])) / max(len(text) - LP, 1)); return text
 def gibbs(text, rng, cfg):
@@ -464,13 +466,13 @@ if SMOKE and not SA and not JX: GENS = dict(GENS, CLS4=dict(pow=6.0, lamc=4.0))
 GO = {}
 for nm, cfg in GENS.items():
     if JX: JSTAT[0] = JSTAT[1] = JSTAT[2] = 0
-    MWSTAT[0] = MWSTAT[1] = 0; GSTAT.clear()
+    MWSTAT[0] = MWSTAT[1] = 0; GSTAT.clear(); EDITS.clear()
     gg = generate(cfg, range(NG)); ext = [i for ids in gg.values() for i in ids if i > UNK]; nw = sum(1 for ids in gg.values() for i in ids if i != 0)
     if JX:                                                                                                    # share of completed sentences without a verb-like word
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
     cr = float(np.mean([text_crit(ids) for ids in gg.values()])) if CRITM is not None else None
     g5 = float(np.mean([np.mean(ng5_terms(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64).tolist() + ids, range(LP, LP + len(ids)))) for p, ids in gg.items()])) if NG5 is not None else None
-    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(edits=[dict(e, before=words(e["before"]), after=words(e["after"])) for e in EDITS], ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), ids=[int(i) for i in ids]) for p, ids in gg.items()])
     log(f"NG5 {nm}: 5-gram log p per generated word {g5}; critic log-odds per sentence {cr}"); GO[nm]["critic"] = cr
     log(f"PLAG {nm}: 5-gram share {GO[nm]['plag_share5']:.4f} (8-gram {GO[nm]['plag_share8']:.4f}), longest {GO[nm]['plag_longest']}; MW steps with a surviving word {GO[nm]['mw_ok']:.3f}; Gibbs changed {GO[nm]['gibbs_changed']}")
     log(f"G1B {MODE} {nm}: vetoed candidate mass {GO[nm]['veto_mass']}, longest history among candidates {GO[nm]['mean_best_history']:.3f}, extended-vocabulary share {GO[nm]['ext_share']:.4f} | {GO[nm]['gens'][0]['text'][:100]}")
