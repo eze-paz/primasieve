@@ -2904,3 +2904,16 @@ Scores: sieve_lt_scores.json.
 - Diagnostic (after the run): on content-word true positions only (236 of 1,650) the same calibration gives -22.1714 / -21.7829 / -21.5461 / -21.5990 / -23.5811 (best beta 0.5). Method fault: e^(beta z) has mean above 1, so the reweight also shifts mass from function words to content words, which costs every other position; a pre-temperature mass-preserving version barely helps (-26.4608 at 0.25) because the temperature step changes the content mass again.
 **HWORD2 results (2026-11-09; Kaggle GPU primasieve-hword2; sieve_hword2.json).** 18 epochs; validation loss stopped improving at step 2,350 (5.0005). Bits per word (even): readout alone 8.1105, **mixture (alpha 0.4) 7.5594**, trigram 7.8928 (paired interval [-0.3514, -0.3151]). Predictions: readout alone below 8.0 — failed; mixture below 7.5 — failed (7.5594). The linear readout has converged: training longer barely helps.
 - LW first run failed on a device bug in the generator (readout vocabulary map on GPU); fixed, re-run unchanged.
+
+### KV3 results (2026-11-09; kernel primasieve-kv3, 1,649 s on a T4; sieve_kv3.json). Same 4,000 positions; Sieve B's own AUC (P) 0.7952
+- AUC alone / AUC of log P + 0.5 z / 0.35: D2048 0.7712 / 0.8366; D4096 0.7927 / 0.8391; D8192 0.8038 / 0.8419; D4096L 0.8144 / 0.8416. Log p (beta 0: -23.3893): -22.6983 / -22.6556 / -22.6242 / -22.6925.
+- Predictions: D4096 above D2048 held; D8192 above D4096 held; a matrix arm alone above P held (D8192 0.8038, D4096L 0.8144); auc_with_P above P for every arm held.
+
+### KCG diagnostics (2026-11-09, after KCG2; 40 calibration prompts DEC_POFF 39, sieve_kcg3*_beta.json)
+- Log probability of the true word is a poor calibration target: it is dominated by positions where MEAN's masks (no repeated trigram, licence) leave the true word near zero, and at T 0.35 by the far tail. At T 1: all 1,650 positions -22.2757 at beta 0 vs -22.2748 at 0.25; content positions (236) -13.2833 vs -12.9099 at 1, of which a mass-preserving reorder keeps only -13.2114 (beta 0.5).
+- Ranking inside MEAN (T 1, 236 content true words; AUC of log p + b z over eligible content candidates): MEAN alone 0.8096; D2048 at b 0.25 / 0.5 / 1 / 2 / 4: 0.8249 / 0.8276 / 0.8302 / 0.8264 / 0.8106; D4096: 0.8289 / 0.8334 / 0.8396 / 0.8415 / 0.8329. The count matrix adds ranking information on top of MEAN, more at higher dimension.
+
+## KCG3 — mass-preserving reorder by the 4,096-dim count matrix, 240 prompts (autonomous; preregistered 2026-11-09, before generation)
+- Arm CM4 = MEAN with eligible content candidates multiplied by e^(2 z) and rescaled to keep their total probability (before temperature), z from D4096 (kv2_D4096.npz). Weight 2 = the best ranking weight above (chosen on calibration prompts DEC_POFF 39, before generation).
+- Run: 240 fresh prompts (DEC_POFF 47), arms MEAN and CM4, same seeds. Side by side MEAN:CM4, two blind raters per half (120 items each). Pass = coherence interval excludes 0 in CM4's favour.
+- **Predictions:** CM4 coherence point above MEAN (60%); coherence pass (35%); fluency point above MEAN (50%).

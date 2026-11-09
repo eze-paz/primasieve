@@ -58,7 +58,7 @@ class Dec:
             HK.PROJ = torch.from_numpy(pz["proj"]); s.hb = HK.OLM("HBlearn"); s.hb.load_state_dict(torch.load(os.environ["DEC_HB"], map_location="cpu")); s.hb.eval(); torch.set_num_threads(4)
             s._hgc = []; s._hgs = []
         if os.environ.get("DEC_KC"):                                                                                                     # KCG: count-built corpus matrix (sieve_kc_rank_part.py)
-            kz = np.load(os.environ["DEC_KC"]); s.kcE = kz["E"]; s.kcML = kz["ML"].astype(np.float32); s.kcidf = kz["idf"]; s.kcHL = kz["HL"] if "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s._cmcal = []
+            kc_ = os.environ["DEC_KC"]; kz = {k: np.load(os.path.join(kc_, k + ".npy"), mmap_mode="r") for k in ("E", "ML", "idf")} if os.path.isdir(kc_) else np.load(kc_); s.kcE = kz["E"]; s.kcML = np.asarray(kz["ML"], np.float32); s.kcidf = np.asarray(kz["idf"]); s.kcHL = kz["HL"] if not isinstance(kz, dict) and "HL" in kz.files else np.array([2.0, 8.0, 30.0]); s._cmcal = []
         st = np.nonzero((S[ntr + 1:-100] != 0) & (S[ntr:-101] == 0))[0] + ntr + 1; s.prompts = st[np.minimum(np.linspace(0, len(st) - 1, NP).astype(int) + int(os.environ.get("DEC_POFF", 0)), len(st) - 1)]; log("decoder ready")
     def h8v(s, w7, nx):
         a = np.uint64(0); b = np.uint64(0)
@@ -173,7 +173,8 @@ class Dec:
             if el.sum() >= 2:
                 z_ = s.cmz(text, uw[el])
                 if cfg.get("cmcal"): s._cmel, s._cmzv = el, z_
-                if cfg.get("cm"):
+                if cfg.get("cmpost"): s._cmpost = (el, z_)                                                                      # KCG3: applied after the temperature
+                elif cfg.get("cm"):
                     w_ = np.exp(cfg["cm"] * z_)
                     if cfg.get("cmnorm"): w_ *= p[el].sum() / max((p[el] * w_).sum(), 1e-300)                                      # KCG3: keep the content words' total mass
                     p[el] *= w_
@@ -198,6 +199,8 @@ class Dec:
             seen = {tuple(text[i:i + 3]) for i in range(len(text) - 2)}; rep = np.array([(text[-2], text[-1], int(w)) in seen for w in uw])
             if (~rep).any() and (p * ~rep).sum() > 0: p = p * ~rep
         p = p ** (1.0 / cfg.get("T", 1.0)) if cfg.get("T", 1.0) != 1.0 else p
+        if cfg.get("cmpost") and getattr(s, "_cmpost", None) is not None:                                                    # KCG3: reorder content words, same total mass
+            el, z_ = s._cmpost; s._cmpost = None; q_ = p[el]; w_ = np.exp(cfg["cmpost"] * z_); p = p.copy(); p[el] = q_ * w_ * q_.sum() / max((q_ * w_).sum(), 1e-300)
         return uw, p / p.sum()
     def cmz(s, text, cw):
         """standardised cosine of each candidate's count vector with ML x (idf-weighted context state at three decays, last 30 words)"""
@@ -292,7 +295,7 @@ def hgcal():
     json.dump(out, open(os.path.join(HERE, "sieve_jt_tau.json" if os.environ.get("DEC_HGW") else "sieve_hgh_tau.json"), "w"), indent=1); log(json.dumps(out))
 def cmcal():
     """KCG: choose beta on calibration prompts: mean log probability of the true next word under MEAN x e^(beta z) (z only on eligible content words)"""
-    d = Dec(); cfg = {"T": 0.35, "nounk": 1, "norep": 1, "gender": 3, "ms": 2, "msubj": 1, "cmcal": 1}; B = [0.0, 0.25, 0.5, 1.0, 2.0]; LPs = {b: [] for b in B}
+    d = Dec(); cfg = {"T": float(os.environ.get("DEC_CMT", 0.35)), "nounk": 1, "norep": 1, "gender": 3, "ms": 2, "msubj": 1, "cmcal": 1}; AUC = {}; B = [float(x) for x in os.environ.get("DEC_CMB", "0,0.25,0.5,1,2").split(",")]; LPs = {b: [] for b in B}
     for pid, t in enumerate(d.prompts):
         pr = d.S[t:t + LP + LG].tolist()
         for j in range(LP, LP + LG):
@@ -300,12 +303,20 @@ def cmcal():
             if y not in uw or d._cmel is None: continue
             if os.environ.get("DEC_CMCONTENT") and not d._cmel[int(np.searchsorted(uw, y))]: continue
             zf = np.zeros(len(uw)); zf[d._cmel] = d._cmzv; yi = int(np.searchsorted(uw, y))
+            if os.environ.get("DEC_CMAUC") and d._cmel[yi]:                                                                  # KCG3: ranking-pure check inside MEAN
+                ce = np.nonzero(d._cmel)[0]; yy = int(np.searchsorted(ce, yi)); lp = np.log(p[ce] + 1e-300)
+                for b in B:
+                    sc = lp + b * d._cmzv; o = np.delete(sc, yy); AUC.setdefault(b, []).append(float((o < sc[yy]).mean() + 0.5 * (o == sc[yy]).mean()))
             for b in B:
                 w = np.exp(b * zf)
-                if os.environ.get("DEC_CMNORM"): pp = p ** cfg["T"]; w[d._cmel] *= pp[d._cmel].sum() / max((pp[d._cmel] * w[d._cmel]).sum(), 1e-300)
-                q = p * w ** (1.0 / cfg["T"]); LPs[b].append(float(np.log(q[yi] / q.sum() + 1e-300)))
+                if os.environ.get("DEC_CMPOST"): w[d._cmel] *= p[d._cmel].sum() / max((p[d._cmel] * w[d._cmel]).sum(), 1e-300); q = p * w
+                else:
+                    if os.environ.get("DEC_CMNORM"): pp = p ** cfg["T"]; w[d._cmel] *= pp[d._cmel].sum() / max((pp[d._cmel] * w[d._cmel]).sum(), 1e-300)
+                    q = p * w ** (1.0 / cfg["T"])
+                LPs[b].append(float(np.log(q[yi] / q.sum() + 1e-300)))
         if pid % 10 == 0: log(f"cal prompt {pid}: " + ", ".join(f"{b}: {np.mean(v):.4f}" for b, v in LPs.items()))
     out = {str(b): float(np.mean(v)) for b, v in LPs.items()}; out["n"] = len(LPs[0.0]); out["beta"] = max(B, key=lambda b: np.mean(LPs[b]))
+    if AUC: out["auc"] = {str(b): round(float(np.mean(v)), 4) for b, v in AUC.items()}; out["n_auc"] = len(AUC[0.0])
     json.dump(out, open(os.path.join(HERE, f"sieve_{os.environ.get('DEC_CMTAG', 'kcg')}_beta.json"), "w"), indent=1); log(json.dumps(out))
 if __name__ == "__main__" and sys.argv[1] == "cmcal": cmcal(); sys.exit()
 if __name__ == "__main__" and sys.argv[1] == "hgcal": hgcal(); sys.exit()
