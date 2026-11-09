@@ -3017,3 +3017,8 @@ Scores: sieve_lt_scores.json.
 - Predictions: KCG5 coherence pass over CM4 failed (the gate prediction held but did not carry over).
 - Diagnosis: the all-word matrix loops on topic words through function words ("the sky the blue sky", "the shadow of the shadow"): distinct words over all 240 texts 816 vs CM4 1,697; sentence ends 0.0395 vs 0.0784 per word. The gain in single-step ranking (AUC 0.9188 vs 0.914 at T 1) hides a self-reinforcing loop in generation: the matrix's key is built from the text it is reordering, so each topical pick raises the next one; the 3-gram norep mask cannot see through interleaved "the"/"and".
 - Lesson: a single-step ranking gate is not enough for reweights that touch function words; the next gate must include a generation-side check (distinct words and sentence-end rate vs CM4 on the calibration prompts) before raters.
+
+### HSSML results (2026-11-09; Kaggle GPU primasieve-hssml; mtest/kaggle_hssml/k/out/hssmL.json)
+- Width 512, 4 layers, harmonic start, 150 min (18,096 steps): **6.8698 bits per word** (HSSM 7.0379; trigram 7.8812); best trigram mixture (alpha 0.8) 6.7853.
+- Predictions: below 7.0379 held; below 6.7 failed; mixture below 6.6 failed.
+- Reading: four times the width x depth for under four times the time gives 6.8698; the model is compute-bound on a T4 (18,096 steps of 24 x 512 words = 0.22B words seen, about 8 passes over MT 27M).
