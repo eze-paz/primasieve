@@ -2971,3 +2971,12 @@ Scores: sieve_lt_scores.json.
 - CM8 vs CM4: coherence -0.05 [-0.175, 0.0709] (CM8 preferred 0.408, CM4 0.458); fluency -0.025 [-0.1417, 0.0917].
 - Predictions: coherence point above 0 failed; pass failed.
 - Reading: beyond 4,096 dims the ranking still rises a little (0.8415 -> 0.8460 inside MEAN) but raters see no difference; CM4 stays the decoder.
+
+### HSSM results (2026-11-09; Kaggle GPU primasieve-hssm; mtest/kaggle_hssm/k/out/hssm.json)
+- Bits per word on 115,200 held-out positions: trigram 7.8812; **HARM 7.0379** (16,498 steps); RAND 7.0537 (16,484 steps); HARM minus RAND interval [-0.0239, -0.0085]. Best mixture with the trigram (alpha 0.8): HARM 6.9436, RAND 6.9610.
+- Predictions: HARM below the trigram held; HARM below RAND with interval below zero held; HARM below 7.0 failed (7.0379).
+- Reading: learning the features takes the state from 7.5205 (best fixed-feature mixture, HWORD queries) to 7.0379 alone. The harmonic start is a small but real help over a random start at equal training time.
+
+## HSSMGEN — does the trained state-space LM write better text than JX3S1? (loop 2; preregistered 2026-11-09, before the run)
+- Sample from HSSM (harm) on the 20 PW prompts (offset 113, same 30-word prompts as JX3S1 in sieve_pw_gen.json, prompts checked equal): HSSM08 (temperature 0.8, top-p 0.9), HSSM10 (temperature 1.0, top-p 0.9); 50 words; rare-word bucket sampled by unigram; no `<unk>`. sieve_armjudge.py tag HG, base JX3S1, one blind rater per pair batch + grammar batches.
+- **Predictions:** HSSM08 grammar share below JX3S1's (70%: a 7-bit model is far from fluent, while JX3S1 copies real word sequences); HSSM08 coherence share against JX3S1 above 0.5 (40%).
