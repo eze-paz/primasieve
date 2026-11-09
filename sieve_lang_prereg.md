@@ -3011,3 +3011,9 @@ Scores: sieve_lt_scores.json.
 - Kernel primasieve-kv5 (all-word targets, 1,000 positions): P 0.7941; A4096L AUC 0.7222, with P 0.8172.
 - Inside MEAN, every candidate, all positions (1,506 true words in the candidate set, T 1): weight 0 / 0.5 / 1 / 2 / 4: 0.914 / 0.9188 / 0.9185 / 0.9168 / 0.9126; weight 0.5. Gate passes (prediction 60%: held).
 - Amendment before generation: the decoder holds both matrices in one process (DEC_KC = D4096 content matrix, DEC_KC2 = A4096L all-word matrix; cfg "cma" = weight, mass-preserving over all words, before the temperature). Arms CM4 and CM4A (CM4 + cma 0.5), 240 fresh prompts DEC_POFF 67, two raters per half; pass = coherence interval excludes 0 in CM4A's favour.
+
+### KCG5 results -- FAIL (2026-11-09; mtest/kcg5_gen.json, sieve_kcg5_pair_scores.json; 240 prompts DEC_POFF 67, agreement 0.946 / 0.971)
+- CM4A (CM4 + all-word matrix, weight 0.5) vs CM4: coherence -0.7625 [-0.8375, -0.6792] (CM4A preferred 0.092, CM4 0.854); fluency -0.8792 [-0.9333, -0.8125] (0.046 / 0.925).
+- Predictions: KCG5 coherence pass over CM4 failed (the gate prediction held but did not carry over).
+- Diagnosis: the all-word matrix loops on topic words through function words ("the sky the blue sky", "the shadow of the shadow"): distinct words over all 240 texts 816 vs CM4 1,697; sentence ends 0.0395 vs 0.0784 per word. The gain in single-step ranking (AUC 0.9188 vs 0.914 at T 1) hides a self-reinforcing loop in generation: the matrix's key is built from the text it is reordering, so each topical pick raises the next one; the 3-gram norep mask cannot see through interleaved "the"/"and".
+- Lesson: a single-step ranking gate is not enough for reweights that touch function words; the next gate must include a generation-side check (distinct words and sentence-end rate vs CM4 on the calibration prompts) before raters.
