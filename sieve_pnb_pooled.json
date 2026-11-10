@@ -1,0 +1,24 @@
+{
+ "BOOKS2_coherence": {
+  "r1": 0.2,
+  "r2": 0.15,
+  "pooled": 0.175,
+  "interval": [
+   0.025,
+   0.35
+  ],
+  "agree": 0.95,
+  "pairs": 20
+ },
+ "BOOKS2_fluency": {
+  "r1": 0.15,
+  "r2": 0.1,
+  "pooled": 0.125,
+  "interval": [
+   0.0,
+   0.275
+  ],
+  "agree": 0.95,
+  "pairs": 20
+ }
+}

@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "SYM3NNV over SYM3N": {
+   "share": 0.2105,
+   "pairs": 19,
+   "interval": [
+    0.053,
+    0.421
+   ]
+  },
+  "SYM3NP3 over SYM3N": {
+   "share": 0.45,
+   "pairs": 20,
+   "interval": [
+    0.25,
+    0.65
+   ]
+  }
+ },
+ "coherence": {
+  "SYM3NNV over SYM3N": {
+   "share": 0.2105,
+   "pairs": 19,
+   "interval": [
+    0.053,
+    0.421
+   ]
+  },
+  "SYM3NP3 over SYM3N": {
+   "share": 0.35,
+   "pairs": 20,
+   "interval": [
+    0.15,
+    0.55
+   ]
+  }
+ }
+}

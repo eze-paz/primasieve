@@ -1,0 +1,70 @@
+{
+ "fluency": {
+  "SYMP over JX3S1": {
+   "share": 0.5263,
+   "pairs": 19,
+   "interval": [
+    0.316,
+    0.737
+   ]
+  },
+  "SYMPF over JX3S1": {
+   "share": 0.5263,
+   "pairs": 19,
+   "interval": [
+    0.316,
+    0.737
+   ]
+  },
+  "SYM2H over JX3S1": {
+   "share": 0.6842,
+   "pairs": 19,
+   "interval": [
+    0.474,
+    0.895
+   ]
+  },
+  "SYM2M over JX3S1": {
+   "share": 0.5789,
+   "pairs": 19,
+   "interval": [
+    0.368,
+    0.789
+   ]
+  }
+ },
+ "coherence": {
+  "SYMP over JX3S1": {
+   "share": 0.4737,
+   "pairs": 19,
+   "interval": [
+    0.263,
+    0.684
+   ]
+  },
+  "SYMPF over JX3S1": {
+   "share": 0.4737,
+   "pairs": 19,
+   "interval": [
+    0.263,
+    0.684
+   ]
+  },
+  "SYM2H over JX3S1": {
+   "share": 0.7368,
+   "pairs": 19,
+   "interval": [
+    0.526,
+    0.895
+   ]
+  },
+  "SYM2M over JX3S1": {
+   "share": 0.6316,
+   "pairs": 19,
+   "interval": [
+    0.421,
+    0.842
+   ]
+  }
+ }
+}

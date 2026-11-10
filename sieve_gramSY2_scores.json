@@ -1,0 +1,96 @@
+{
+ "JX3S1": {
+  "share": 0.674,
+  "sentences": 95,
+  "interval": [
+   0.576,
+   0.76
+  ],
+  "batch": [
+   0.581,
+   0.806,
+   0.607
+  ]
+ },
+ "SYMP": {
+  "share": 0.583,
+  "sentences": 84,
+  "interval": [
+   0.493,
+   0.663
+  ],
+  "batch": [
+   0.571,
+   0.679,
+   0.5
+  ],
+  "paired_vs_base": [
+   -0.192,
+   0.003
+  ]
+ },
+ "SYMPF": {
+  "share": 0.583,
+  "sentences": 84,
+  "interval": [
+   0.493,
+   0.663
+  ],
+  "batch": [
+   0.571,
+   0.679,
+   0.5
+  ],
+  "paired_vs_base": [
+   -0.192,
+   0.003
+  ]
+ },
+ "SYM2H": {
+  "share": 0.653,
+  "sentences": 98,
+  "interval": [
+   0.568,
+   0.736
+  ],
+  "batch": [
+   0.6,
+   0.735,
+   0.618
+  ],
+  "paired_vs_base": [
+   -0.114,
+   0.065
+  ]
+ },
+ "SYM2M": {
+  "share": 0.616,
+  "sentences": 86,
+  "interval": [
+   0.506,
+   0.714
+  ],
+  "batch": [
+   0.462,
+   0.75,
+   0.607
+  ],
+  "paired_vs_base": [
+   -0.154,
+   0.038
+  ]
+ },
+ "truth": {
+  "share": 0.909,
+  "sentences": 66,
+  "interval": [
+   0.845,
+   0.968
+  ],
+  "batch": [
+   0.913,
+   0.826,
+   1.0
+  ]
+ }
+}

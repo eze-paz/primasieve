@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "SYM3NL over SYM3N": {
+   "share": 0.35,
+   "pairs": 20,
+   "interval": [
+    0.15,
+    0.551
+   ]
+  },
+  "SYM3NO over SYM3N": {
+   "share": 0.2,
+   "pairs": 15,
+   "interval": [
+    0.0,
+    0.4
+   ]
+  },
+  "SYM3NLO over SYM3N": {
+   "share": 0.35,
+   "pairs": 20,
+   "interval": [
+    0.15,
+    0.55
+   ]
+  }
+ },
+ "coherence": {
+  "SYM3NL over SYM3N": {
+   "share": 0.45,
+   "pairs": 20,
+   "interval": [
+    0.25,
+    0.65
+   ]
+  },
+  "SYM3NO over SYM3N": {
+   "share": 0.2667,
+   "pairs": 15,
+   "interval": [
+    0.067,
+    0.533
+   ]
+  },
+  "SYM3NLO over SYM3N": {
+   "share": 0.35,
+   "pairs": 20,
+   "interval": [
+    0.15,
+    0.55
+   ]
+  }
+ }
+}

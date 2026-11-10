@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "CD over JX3S1": {
+   "share": 0.05,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.15
+   ]
+  },
+  "CDA over JX3S1": {
+   "share": 0.3846,
+   "pairs": 13,
+   "interval": [
+    0.154,
+    0.692
+   ]
+  }
+ },
+ "coherence": {
+  "CD over JX3S1": {
+   "share": 0.15,
+   "pairs": 20,
+   "interval": [
+    0.0,
+    0.301
+   ]
+  },
+  "CDA over JX3S1": {
+   "share": 0.4615,
+   "pairs": 13,
+   "interval": [
+    0.231,
+    0.692
+   ]
+  }
+ }
+}

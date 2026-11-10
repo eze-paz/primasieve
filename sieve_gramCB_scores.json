@@ -1,0 +1,96 @@
+{
+ "SYM3C": {
+  "share": 0.771,
+  "sentences": 105,
+  "interval": [
+   0.676,
+   0.85
+  ],
+  "batch": [
+   0.714,
+   0.771,
+   0.829
+  ]
+ },
+ "SYM3F": {
+  "share": 0.742,
+  "sentences": 93,
+  "interval": [
+   0.67,
+   0.8
+  ],
+  "batch": [
+   0.767,
+   0.737,
+   0.72
+  ],
+  "paired_vs_base": [
+   -0.133,
+   0.076
+  ]
+ },
+ "SYM3FD": {
+  "share": 0.8,
+  "sentences": 105,
+  "interval": [
+   0.725,
+   0.866
+  ],
+  "batch": [
+   0.811,
+   0.805,
+   0.778
+  ],
+  "paired_vs_base": [
+   -0.06,
+   0.12
+  ]
+ },
+ "SYM3FP": {
+  "share": 0.742,
+  "sentences": 97,
+  "interval": [
+   0.659,
+   0.812
+  ],
+  "batch": [
+   0.647,
+   0.794,
+   0.793
+  ],
+  "paired_vs_base": [
+   -0.112,
+   0.051
+  ]
+ },
+ "SYM3N": {
+  "share": 0.814,
+  "sentences": 97,
+  "interval": [
+   0.739,
+   0.876
+  ],
+  "batch": [
+   0.818,
+   0.788,
+   0.839
+  ],
+  "paired_vs_base": [
+   -0.043,
+   0.142
+  ]
+ },
+ "truth": {
+  "share": 0.884,
+  "sentences": 69,
+  "interval": [
+   0.795,
+   0.969
+  ],
+  "batch": [
+   0.741,
+   0.96,
+   1.0
+  ]
+ }
+}

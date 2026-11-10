@@ -1,0 +1,54 @@
+{
+ "fluency": {
+  "GFLAGA over JX3S1": {
+   "share": 0.5833,
+   "pairs": 12,
+   "interval": [
+    0.25,
+    0.833
+   ]
+  },
+  "BLK over JX3S1": {
+   "share": 0.2667,
+   "pairs": 15,
+   "interval": [
+    0.067,
+    0.533
+   ]
+  },
+  "BLKA over JX3S1": {
+   "share": 0.375,
+   "pairs": 16,
+   "interval": [
+    0.125,
+    0.625
+   ]
+  }
+ },
+ "coherence": {
+  "GFLAGA over JX3S1": {
+   "share": 0.5833,
+   "pairs": 12,
+   "interval": [
+    0.333,
+    0.833
+   ]
+  },
+  "BLK over JX3S1": {
+   "share": 0.3333,
+   "pairs": 15,
+   "interval": [
+    0.133,
+    0.6
+   ]
+  },
+  "BLKA over JX3S1": {
+   "share": 0.5625,
+   "pairs": 16,
+   "interval": [
+    0.312,
+    0.812
+   ]
+  }
+ }
+}

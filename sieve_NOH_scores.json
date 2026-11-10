@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "SYM3N over SYM3C": {
+   "share": 0.525,
+   "pairs": 80,
+   "interval": [
+    0.412,
+    0.637
+   ]
+  }
+ },
+ "coherence": {
+  "SYM3N over SYM3C": {
+   "share": 0.525,
+   "pairs": 80,
+   "interval": [
+    0.412,
+    0.637
+   ]
+  }
+ }
+}

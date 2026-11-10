@@ -1,0 +1,45 @@
+{
+ "BOOKS": {
+  "share": 0.743,
+  "sentences": 101,
+  "interval": [
+   0.667,
+   0.812
+  ],
+  "batch": [
+   0.771,
+   0.75,
+   0.7
+  ]
+ },
+ "BOOKS2": {
+  "share": 0.508,
+  "sentences": 59,
+  "interval": [
+   0.377,
+   0.621
+  ],
+  "batch": [
+   0.545,
+   0.571,
+   0.375
+  ],
+  "paired_vs_base": [
+   -0.364,
+   -0.104
+  ]
+ },
+ "truth": {
+  "share": 1.0,
+  "sentences": 61,
+  "interval": [
+   1.0,
+   1.0
+  ],
+  "batch": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ }
+}

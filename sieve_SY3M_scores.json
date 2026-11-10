@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "SYM3C over JX3S1": {
+   "share": 0.5875,
+   "pairs": 80,
+   "interval": [
+    0.487,
+    0.688
+   ]
+  }
+ },
+ "coherence": {
+  "SYM3C over JX3S1": {
+   "share": 0.75,
+   "pairs": 80,
+   "interval": [
+    0.65,
+    0.838
+   ]
+  }
+ }
+}
