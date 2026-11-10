@@ -1,0 +1,22 @@
+{
+ "fluency": {
+  "P2 over BOOKS": {
+   "share": 0.2,
+   "pairs": 20,
+   "interval": [
+    0.05,
+    0.4
+   ]
+  }
+ },
+ "coherence": {
+  "P2 over BOOKS": {
+   "share": 0.35,
+   "pairs": 20,
+   "interval": [
+    0.15,
+    0.55
+   ]
+  }
+ }
+}
