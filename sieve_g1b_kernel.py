@@ -27,7 +27,17 @@ S[ntr:] = S0[ntr0:]; del S0; fine = np.load([x for x in find("books_cls.npz", "G
 St = torch.empty(N, dtype=torch.int32, device=dev)
 for a in range(0, N, CHUNK): St[a:a + CHUNK] = torch.from_numpy(S[a:a + CHUNK].astype(np.int32)).to(dev)
 # 4-word key index: KEYS sorted (host uint64), ORD = positions (GPU int32), positions P = 200..ntr-1, key = (S[P-1], S[P-2], S[P-3], S[P-4]) packed high to low
-w1 = S[199:ntr - 1]; cnt = np.bincount(w1, minlength=1 << 16); NP_ = len(w1); KEYS = np.empty(NP_, np.uint64); KEYS2 = np.empty(NP_ if SA else 0, np.uint64); ORD = torch.empty(NP_, dtype=torch.int32, device=dev)
+WORDKEY = bool(os.environ.get("G1_WORDKEY"))
+if WORDKEY:                                                                                                   # PUNC2: keys skip punctuation tokens
+    _pun = np.zeros(1 << 16, bool)
+    for _i, _w in enumerate(vw[:1 << 16]):
+        if _w in set(',;:!?"()') | {"--", "'"}: _pun[_i] = True
+    WPOS = np.nonzero(~_pun[S[:ntr]])[0].astype(np.int64); log(f"PUNC2: {len(WPOS):,} word positions of {ntr:,} tokens")
+    def prevw(Pa, i): j = np.searchsorted(WPOS, Pa) - 1 - i; return S[WPOS[np.maximum(j, 0)]] * (j >= 0)
+    w1 = np.empty(ntr - 200, np.uint16)
+    for _a in range(0, ntr - 200, 20_000_000): _b = min(_a + 20_000_000, ntr - 200); w1[_a:_b] = prevw(np.arange(200 + _a, 200 + _b), 0)
+else: w1 = S[199:ntr - 1]
+cnt = np.bincount(w1, minlength=1 << 16); NP_ = len(w1); KEYS = np.empty(NP_, np.uint64); KEYS2 = np.empty(NP_ if SA else 0, np.uint64); ORD = torch.empty(NP_, dtype=torch.int32, device=dev)
 cum = np.cumsum(cnt); cuts = [0]
 while cuts[-1] < (1 << 16):
     b = int(np.searchsorted(cum, (cum[cuts[-1] - 1] if cuts[-1] else 0) + CHUNK, side="right")); cuts.append(min(max(b, cuts[-1] + 1), 1 << 16))
@@ -36,7 +46,7 @@ for a, b in zip(cuts[:-1], cuts[1:]):
     P = np.nonzero((w1 >= a) & (w1 < b))[0] + 200
     if not len(P): continue
     kk = np.zeros(len(P), np.uint64)
-    for i in range(4): kk = (kk << np.uint64(16)) | S[P - 1 - i].astype(np.uint64)
+    for i in range(4): kk = (kk << np.uint64(16)) | (prevw(P, i) if WORDKEY else S[P - 1 - i]).astype(np.uint64)
     if SA:                                                                                                   # ties on the 4-word key ordered by words 5-8 back (longest shared history adjacent)
         k2 = np.zeros(len(P), np.uint64)
         for i in range(4): k2 = (k2 << np.uint64(16)) | S[P - 5 - i].astype(np.uint64)
@@ -94,6 +104,19 @@ def cands(Qrev, Q2=None):
     i0 = torch.tensor(i0, device=dev); r = torch.arange(K // 2, device=dev)
     idx = torch.cat([i0[:, None] - 1 - r, i0[:, None] + r], 1); ok = (idx >= 0) & (idx < NP_); return ORD[idx.clamp(0, NP_ - 1)].long(), ok
 LSTAT = []; HM = {}; SVDTH = None; HG = torch.Generator(); LIN = None
+WPOS_T = torch.tensor(WPOS, device=dev) if WORDKEY else None
+def prev_tok(c, n):
+    """previous n tokens (or words, with G1_WORDKEY) of candidate positions c (tensor, any shape) -> c.shape + (n,), newest first"""
+    if not WORDKEY: return St[(c[..., None] - 1 - torch.arange(n, device=dev)).clamp(min=0)].long()
+    j = torch.searchsorted(WPOS_T, c.reshape(-1)).reshape(c.shape)[..., None] - 1 - torch.arange(n, device=dev)
+    return St[WPOS_T[j.clamp(min=0)]].long() * (j >= 0)
+def text_hist(text, n):
+    """the text's last n tokens (or words), newest first"""
+    if not WORDKEY: return text[::-1][:n]
+    return [x_ for x_ in text[::-1] if not (x_ < len(PUNID0) and PUNID0[x_])][:n]
+PUNID0 = np.zeros(VV + 2, bool)
+for _i, _w in enumerate(vw):
+    if _w in set(',;:!?"()') | {"--", "'"}: PUNID0[_i] = True
 if any(c.get("lin") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                             # trained linear readout on the fitted harmonic state (HLIN2), next fine class
     _lp = glob.glob("/kaggle/input/**/hlin_readout.pt", recursive=True) or [os.environ.get("G1_LIN", "hlin_readout.pt")]
     _r = torch.load(_lp[0], map_location=dev); LIN = dict(W=_r["W"].to(dev).float(), sc=float(_r["cfg"]["sc"]), om=_r["omega"].to(dev), TH={int(t): v.to(dev) for t, v in _r["TH"].items()}, TAUS=tuple(int(t) for t in _r["TAUS"]))
@@ -487,6 +510,13 @@ def plan_verb(grp, recent, rng):
     if recent: sc_ = sc_ + np.mean([ev_pmi(int(r_), cand) for r_ in recent[-3:]], axis=0)
     top = np.argsort(-sc_)[:20]; pr = np.exp(sc_[top] - sc_[top].max()); return int(cand[top][rng.choice(len(top), p=pr / pr.sum())])
 SLEN = None; VOB = None
+CLOSE_P2 = None
+if any(c.get("p2") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                # PUNC2: words that can close a sentence (EWT tags, lower-case lookup)
+    _tw4 = np.full(VV, -1)
+    for w__, i__ in _wid.items():
+        if w__.lower() in _cw: _tw4[i__] = max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w__.lower()][k])
+    CLOSE_P2 = np.isin(_tw4, [SYMP_["ti"][t_] for t_ in ("NOUN", "PROPN", "PRON", "ADJ", "ADV", "VERB", "NUM")])
+    CLOSE_P2[[_wid[w_] for w_ in "the a an his her their my your our its of to in on at by for with from and or but that which who was were is are be been had has have would could should will shall not".split() if w_ in _wid]] = False
 if any("l" in str(c.get("sym", "")) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                                  # SENT length plan: human sentence lengths in the training text
     _z0 = np.nonzero(S[:ntr] == 0)[0]; SLEN = np.clip(np.diff(_z0) - 1, 4, 30); SLEN = SLEN[np.diff(_z0) > 1]; log(f"SENT: {len(SLEN):,} sentence lengths, mean {SLEN.mean():.1f}")
     _tw3 = np.full(VV, -1)
@@ -529,7 +559,7 @@ UNITS = bool(os.environ.get("G1_UNITS"))
 def nunits(seq): return sum(1 for x_ in seq if not (x_ < len(PUNID) and PUNID[x_])) if UNITS else len(seq)
 EXTP_ = None
 if os.environ.get("G1_PROMPTS"):                                                                               # PUNC: external shared prompts (mtest/books2_prompts.json; key = corpus)
-    _pp = json.load(open(os.environ["G1_PROMPTS"], encoding="utf-8")); _pk = os.environ.get("G1_PKEY", CORPUS)
+    _pp = json.load(open(os.environ["G1_PROMPTS"], encoding="utf-8"))[int(os.environ.get("G1_PSTART", 0)):]; _pk = os.environ.get("G1_PKEY", CORPUS)
     EXTP_ = [x[_pk]["prompt"] for x in _pp]; EXTT_ = [x[_pk]["truth"] for x in _pp]
 class Disc:
     """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
@@ -587,6 +617,15 @@ class Disc:
             if r in SUBJ: out |= {_wid[w] for w, g in PRONG.items() if g == r and w in _wid}
             elif r in _wid: out.add(_wid[r])
         return out
+COMMA_ = _wid.get(",", -1) if "_wid" in globals() else -1
+CONJ_ = {_wid[w_] for w_ in ("and", "but", "then", "so") if "_wid" in globals() and w_ in _wid}; SEMI_ = _wid.get(";", -1) if "_wid" in globals() else -1
+def seg_start(text, cfg):
+    """index of the token that opened the current segment: the last sentence end, or (PUNC2) the last clause opener (";" or a conjunction after ",")"""
+    lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1
+    if cfg.get("p2"):
+        for i in range(len(text) - 1, lb, -1):
+            if text[i] == SEMI_ or (text[i] in CONJ_ and i > 0 and text[i - 1] == COMMA_): return i
+    return lb
 def generate(cfg, pids):
     global LP
     out = {}; LSTAT.clear()
@@ -606,7 +645,7 @@ def generate(cfg, pids):
             if TRACE and pid < TRACE: TRL.append(f"   [prompt state p{pid}] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
         while nunits(text[LP:]) < LG:
             if cfg.get("gen") == "ssm": text.append(mw_step(text, rng, cfg)); continue
-            h = text[::-1][:8]; Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
+            h = text_hist(text, 8); h = h + [0] * (8 - len(h)); Qw = torch.tensor([h], device=dev); c, ok = cands(np.array([h[:4]]), np.array([h[4:8]]))
             if cfg.get("hr"):                                                                                    # harmonic retrieval: widen the pool with a sample of all positions sharing the last hr words
                 q4 = int(pack(np.array([h[:4]]))[0]); sh_ = 16 * (4 - int(cfg["hr"])); lo_k = (q4 >> sh_) << sh_; hi_k = lo_k + (1 << sh_)
                 lo = int(np.searchsorted(KEYS, np.uint64(lo_k))); hi = int(np.searchsorted(KEYS, np.uint64(hi_k - 1), side="right"))
@@ -614,7 +653,9 @@ def generate(cfg, pids):
                     HG.manual_seed(len(text) * 7919 + int(q4 % 1000003)); extra = torch.randint(lo, hi, (min(int(cfg.get("hrn", 16384)), hi - lo),), generator=HG, device="cpu").to(dev)
                     pos = torch.unique(torch.cat([c[0][ok[0]], ORD[extra].long()])); c = pos[None]; ok = torch.ones_like(c, dtype=torch.bool)
             if cfg.get("sym") and "f" in cfg["sym"] and PLAN:                                                       # SYM2 fix 2: if no candidate carries the planned word, add book positions that start a sentence with it
-                lbq = len(text) - 1 - text[::-1].index(0) if 0 in text else None; kq = len(text) - 1 - lbq if lbq is not None else 99
+                lbq = len(text) - 1 - text[::-1].index(0) if 0 in text else None
+                if cfg.get("p2"): lbq = seg_start(text, cfg)
+                kq = len(text) - 1 - lbq if lbq is not None else 99
                 if kq < len(PLAN) and PLAN[kq] >= 0 and not bool((St[c[0]][ok[0]] == PLAN[kq]).any()):
                     prev = 0 if kq == 0 else PLAN[kq - 1]; ex = plan_positions(prev, PLAN[kq])
                     if len(ex):
@@ -622,7 +663,9 @@ def generate(cfg, pids):
                         c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool); SYMST[1] += 1
             VP_ = -1
             if cfg.get("sym") and "v" in cfg["sym"] and DS.vplan >= 0 and PLAN and DS.vplan not in text[-2:]:      # SYM3: realise the planned verb at word 2, or word 3 after an auxiliary
-                lbv = len(text) - 1 - text[::-1].index(0) if 0 in text else None; kv = len(text) - 1 - lbv if lbv is not None else 99
+                lbv = len(text) - 1 - text[::-1].index(0) if 0 in text else None
+                if cfg.get("p2"): lbv = seg_start(text, cfg)
+                kv = len(text) - 1 - lbv if lbv is not None else 99
                 if kv == 1 or (kv == 2 and text[-1] in set(AUXW.tolist())):
                     VP_ = DS.vplan
                     if not bool((St[c[0]][ok[0]] == VP_).any()):
@@ -645,7 +688,7 @@ def generate(cfg, pids):
                             c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool)
             if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
                 eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
-            else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
+            else: m4 = (prev_tok(c, MW) == Qw[:, None, :MW]).float().sum(2)
             eqL = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); LSTAT.append(float(torch.cumprod(eqL, 2).sum(2).max()))
             sc = LAM0 * m4
             if cfg.get("beta"):                                                                                  # harmonic similarity of each candidate's history to the text's (z-scored across candidates)
@@ -697,6 +740,7 @@ def generate(cfg, pids):
                 sc = sc + cfg["lin"] * lin_logits(text)[FINE[St[c[0]].long()]][None]
             if cfg.get("sym"):                                                                                    # realiser constraints
                 nxc = St[c[0]].long().cpu().numpy(); lb = len(text) - 1 - text[::-1].index(0) if 0 in text[LP:] or text[-1] == 0 else None
+                if cfg.get("p2"): _ss = seg_start(text, cfg); lb = _ss if (lb is not None or _ss >= LP) else lb
                 kpos = len(text) - 1 - lb if lb is not None else 99; add = np.zeros(len(nxc))
                 if "p" in cfg["sym"] and kpos < len(PLAN): add += (1000.0 if "h" in cfg["sym"] else 8.0) * (nxc == PLAN[kpos])      # "h": the plan is a hard constraint
                 if VP_ >= 0: add += 1000.0 * (nxc == VP_)
@@ -723,6 +767,12 @@ def generate(cfg, pids):
             if cfg.get("sym") and "h" in cfg["sym"] and kpos < len(PLAN) and (nx == PLAN[kpos]).any(): bad = bad & (nx != PLAN[kpos])   # the planned word is exempt from the vetoes
             if cfg.get("sym") and VP_ >= 0 and (nx == VP_).any(): bad = bad & (nx != VP_)
             if cfg.get("sym") and LEND_ and (nx == 0).any(): bad = bad & (nx != 0)
+            if cfg.get("p2") and PUNID0[text[-1]] and vw[text[-1]] != '"':                                       # PUNC2 trace fix: no mark right after a mark (a quote may follow)
+                bad = bad | (PUNID0[np.minimum(nx, len(PUNID0) - 1)] & (nx != _wid.get('"', -1)))
+            if cfg.get("p2"):                                                                                    # PUNC2 run-on control
+                lb0 = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; cur_ = text[lb0 + 1:]
+                if sum(x_ == COMMA_ for x_ in cur_) >= 3: bad = bad | (nx == COMMA_)
+                if sum(1 for x_ in cur_ if not PUNID0[x_]) >= 35 and CLOSE_P2[min(text[-1], VV - 1)] and (nx == 0).any(): bad = bad | (nx != 0)
             if cfg.get("sym") and OP_ >= 0 and (nx == OP_).any(): bad = bad & (nx != OP_)
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
@@ -754,6 +804,8 @@ def generate(cfg, pids):
             if cfg.get("sym") and "o" in cfg["sym"] and VOB is not None:
                 if DS.oplan >= 0: DS.oage += 1; DS.odone = DS.odone or text[-1] == DS.oplan
                 elif not DS.odone and DS.vplan >= 0 and text[-1] == DS.vplan: DS.oplan = plan_object(DS.vplan, DS, rng); DS.oage = 0
+            if cfg.get("sym") and cfg.get("p2") and (text[-1] == SEMI_ or (text[-1] in CONJ_ and len(text) > 1 and text[-2] == COMMA_)):   # PUNC2: a clause opens: plan its subject + verb
+                PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids(); DS.oplan = -1; DS.odone = False
             if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
                 lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; del DS.R[lb2 + 1:]; del DS.VS[lb2 + 1:]; DS.read(text[lb2 + 1:-1], period=True); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
                 if SLEN is not None and "l" in cfg["sym"]: DS.tlen = int(SLEN[rng.integers(len(SLEN))])
@@ -765,13 +817,18 @@ def generate(cfg, pids):
         if cfg.get("block"): text = gibbs_block(text, np.random.default_rng(1000 * pid + 13), cfg)
         out[pid] = text[LP:]
     return out
-def words(ids):
+def words(ids, cap0=True):
     out = []
     for i in ids:
         if i == 0:
             if out and out[-1] in ("?", "!"): continue
             out.append(".")
         else: out.append("<unk>" if i == UNK or i >= len(vw) or vw[i] is None else vw[i])
+    if os.environ.get("G1_CAPS"):                                                                              # PUNC2: capitalise the first word of each sentence
+        cap = cap0
+        for k_, w_ in enumerate(out):
+            if w_ in (".", "?", "!"): cap = True
+            elif cap and w_[:1].isalpha(): out[k_] = w_[:1].upper() + w_[1:]; cap = False
     t = " ".join(out)
     for p_ in (".", ",", ";", ":", "?", "!", ")"): t = t.replace(" " + p_, p_)
     return t.replace("( ", "(")
@@ -788,7 +845,7 @@ for nm, cfg in GENS.items():
         sents = [seg for ids in gg.values() for seg in " ".join(map(str, ids)).split(" 0 ")[1:-1]]; nv = [not any(VSET[BCL[int(x_)]] for x_ in seg.split() if x_ != "0") for seg in sents]; VLS = float(np.mean(nv)) if nv else None
     cr = float(np.mean([text_crit(ids) for ids in gg.values()])) if CRITM is not None else None
     g5 = float(np.mean([np.mean(ng5_terms(S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64).tolist() + ids, range(LP, LP + len(ids)))) for p, ids in gg.items()])) if NG5 is not None else None
-    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(drift_agree=[DRIFT[1], DRIFT[0]], edits=[dict(e, before=words(e["before"]), after=words(e["after"])) for e in EDITS], ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids), text_plain=words_plain(ids), prompt_plain=words_plain(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), ids=[int(i) for i in ids]) for p, ids in gg.items()])
+    pl = [plag(ids) for ids in gg.values()]; GO[nm] = dict(drift_agree=[DRIFT[1], DRIFT[0]], edits=[dict(e, before=words(e["before"]), after=words(e["after"])) for e in EDITS], ng5_logp_per_word=g5, plag_share5=float(np.mean([a for a, _, _ in pl])), plag_longest=[b for _, b, _ in pl], plag_share8=float(np.mean([c_ for _, _, c_ in pl])), mw_ok=MWSTAT[1] / max(MWSTAT[0], 1), gibbs_changed=float(np.mean(GSTAT)) if GSTAT else None, verbless=VLS if JX else None, veto_mass=(JSTAT[0] / max(JSTAT[1], 1)) if JX else None, word_veto_mass=(JSTAT[2] / max(JSTAT[1], 1)) if JX else None, ext_share=len(ext) / max(nw, 1), mean_best_history=float(np.mean(LSTAT)), gens=[dict(pid=int(p), prompt=words(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(ids, cap0=(EXTP_[p][-1] == 0) if EXTP_ is not None else bool(S[PROMPTS[p] + LP - 1] == 0)), text_plain=words_plain(ids), prompt_plain=words_plain(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), ids=[int(i) for i in ids]) for p, ids in gg.items()])
     if DRIFT[0]: log(f"COMB {nm}: phasor protagonist = SYM protagonist at {DRIFT[1]} of {DRIFT[0]} planned sentence starts")
     log(f"NG5 {nm}: 5-gram log p per generated word {g5}; critic log-odds per sentence {cr}"); GO[nm]["critic"] = cr
     log(f"PLAG {nm}: 5-gram share {GO[nm]['plag_share5']:.4f} (8-gram {GO[nm]['plag_share8']:.4f}), longest {GO[nm]['plag_longest']}; MW steps with a surviving word {GO[nm]['mw_ok']:.3f}; Gibbs changed {GO[nm]['gibbs_changed']}")
@@ -796,7 +853,7 @@ for nm, cfg in GENS.items():
 log(f"CRIT truth: critic log-odds per sentence {np.mean([text_crit(S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist()) for p in range(NG)]) if CRITM is not None else None}")
 _TRU = [list(EXTT_[p]) for p in range(NG)] if EXTP_ is not None else [S[PROMPTS[p] + LP:PROMPTS[p] + LP + LG].astype(np.int64).tolist() for p in range(NG)]
 _tp = [plag(x_) for x_ in _TRU]; log(f"PLAG truth: 5-gram share {np.mean([a for a, _, _ in _tp]):.4f}, longest {[b for _, b, _ in _tp]}")
-GO["truth"] = dict(plag_share5=float(np.mean([a for a, _, _ in _tp])), plag_longest=[b for _, b, _ in _tp], gens=[dict(pid=int(p), prompt=words(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(_TRU[p][:LG + 30] if EXTP_ is not None else _TRU[p]), text_plain=words_plain(_TRU[p][:LG + 30] if EXTP_ is not None else _TRU[p]), prompt_plain=words_plain(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), ids=[int(x_) for x_ in _TRU[p]]) for p in range(NG)])
+GO["truth"] = dict(plag_share5=float(np.mean([a for a, _, _ in _tp])), plag_longest=[b for _, b, _ in _tp], gens=[dict(pid=int(p), prompt=words(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), text=words(_TRU[p][:LG + 30] if EXTP_ is not None else _TRU[p], cap0=(EXTP_[p][-1] == 0) if EXTP_ is not None else bool(S[PROMPTS[p] + LP - 1] == 0)), text_plain=words_plain(_TRU[p][:LG + 30] if EXTP_ is not None else _TRU[p]), prompt_plain=words_plain(EXTP_[p] if EXTP_ is not None else S[PROMPTS[p]:PROMPTS[p] + LP].astype(np.int64)), ids=[int(x_) for x_ in _TRU[p]]) for p in range(NG)])
 if TRL: open(os.path.join(OUTD, "trace.txt"), "w", encoding="utf-8").write(chr(10).join(TRL))
 if HTL: open(os.path.join(OUTD, "htrace.txt"), "w", encoding="utf-8").write(chr(10).join(HTL))
 json.dump(GO, open(os.path.join(OUTD, f"g1b_{MODE}_gen.json"), "w"), indent=0); log("saved")
