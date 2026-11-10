@@ -9,7 +9,7 @@ out, poff, ng, arms = sys.argv[1], sys.argv[2], sys.argv[3], json.loads(sys.argv
 out = os.path.abspath(out); os.makedirs(out, exist_ok=True); T0 = time.time()
 src = open(os.path.join(HERE, "sieve_brown.py"), encoding="utf-8").read().split("\n")[:35]
 open(os.path.join(out, "g.py"), "w", encoding="utf-8").write("\n".join(src) + "\n" + open(os.path.join(HERE, "sieve_g1b_kernel.py"), encoding="utf-8").read())
-ENV = dict(os.environ, G1_LOCAL="1", G1_JX="1", G1_MODE="jx", G1_DATA=M, G1_CLS=os.path.join(M, "kaggle_ms", "data"), G1_BCACHE=os.path.join(M, "bench", "brown_mt27.npz"),
+ENV = dict(os.environ, G1_LOCAL="1", G1_JX="1", G1_MODE="jx", G1_DATA=M, G1_CLS=os.path.join(M, "kaggle_ms", "data"), G1_BCACHE=os.path.join(M, "bench", "brown_mt27.npz" if os.environ.get("G1_CORPUS", "books") == "books" else f"brown_{os.environ['G1_CORPUS']}.npz"),
            G1_UD=os.path.join(M, "ud"), G1_PARSEPY=os.path.join(HERE, "sieve_parse.py"), G1_SVDCACHE=os.path.join(M, "bench", "svdcache"), G1_POFF=poff, G1_NG=ng, G1_TRACE=trace)
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
 need_svd = [k for k, c in arms.items() if c.get("svd")]
