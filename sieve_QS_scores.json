@@ -1,0 +1,38 @@
+{
+ "fluency": {
+  "P2 over P2Q": {
+   "share": 0.55,
+   "pairs": 20,
+   "interval": [
+    0.3,
+    0.75
+   ]
+  },
+  "BOOKS over P2Q": {
+   "share": 0.7,
+   "pairs": 20,
+   "interval": [
+    0.5,
+    0.9
+   ]
+  }
+ },
+ "coherence": {
+  "P2 over P2Q": {
+   "share": 0.5,
+   "pairs": 20,
+   "interval": [
+    0.3,
+    0.7
+   ]
+  },
+  "BOOKS over P2Q": {
+   "share": 0.55,
+   "pairs": 20,
+   "interval": [
+    0.35,
+    0.75
+   ]
+  }
+ }
+}
