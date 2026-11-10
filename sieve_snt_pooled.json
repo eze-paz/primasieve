@@ -1,0 +1,68 @@
+{
+ "SYM3NL_coherence": {
+  "r1": 0.45,
+  "r2": 0.5,
+  "pooled": 0.475,
+  "interval": [
+   0.275,
+   0.675
+  ],
+  "agree": 0.85,
+  "pairs": 20
+ },
+ "SYM3NL_fluency": {
+  "r1": 0.35,
+  "r2": 0.3,
+  "pooled": 0.325,
+  "interval": [
+   0.15,
+   0.525
+  ],
+  "agree": 0.85,
+  "pairs": 20
+ },
+ "SYM3NLO_coherence": {
+  "r1": 0.35,
+  "r2": 0.45,
+  "pooled": 0.4,
+  "interval": [
+   0.2,
+   0.6
+  ],
+  "agree": 0.9,
+  "pairs": 20
+ },
+ "SYM3NLO_fluency": {
+  "r1": 0.35,
+  "r2": 0.25,
+  "pooled": 0.3,
+  "interval": [
+   0.125,
+   0.5
+  ],
+  "agree": 0.9,
+  "pairs": 20
+ },
+ "SYM3NO_coherence": {
+  "r1": 0.4,
+  "r2": 0.4,
+  "pooled": 0.4,
+  "interval": [
+   0.2,
+   0.65
+  ],
+  "agree": 1.0,
+  "pairs": 20
+ },
+ "SYM3NO_fluency": {
+  "r1": 0.35,
+  "r2": 0.4,
+  "pooled": 0.375,
+  "interval": [
+   0.175,
+   0.6
+  ],
+  "agree": 0.95,
+  "pairs": 20
+ }
+}
