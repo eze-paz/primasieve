@@ -619,6 +619,13 @@ class Disc:
         return out
 COMMA_ = _wid.get(",", -1) if "_wid" in globals() else -1
 CONJ_ = {_wid[w_] for w_ in ("and", "but", "then", "so") if "_wid" in globals() and w_ in _wid}; SEMI_ = _wid.get(";", -1) if "_wid" in globals() else -1
+COMMA_PREV_OK = None
+if any(c.get("cm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                # COMMA: comma placement from counts
+    assert CLOSE_P2 is not None, "cm requires p2"
+    _cp = np.nonzero(S[:ntr] == COMMA_)[0]
+    COMMA_PREV_OK = np.zeros(VV, bool); COMMA_PREV_OK[S[:ntr][np.maximum(_cp - 1, 0)]] = True
+    log(f"COMMA: {int(_cp.size):,} commas; {int(COMMA_PREV_OK.sum()):,} distinct prev words allowed")
+
 def seg_start(text, cfg):
     """index of the token that opened the current segment: the last sentence end, or (PUNC2) the last clause opener (";" or a conjunction after ",")"""
     lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1
@@ -796,6 +803,16 @@ def generate(cfg, pids):
                 lb0 = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; cur_ = text[lb0 + 1:]
                 if sum(x_ == COMMA_ for x_ in cur_) >= 3: bad = bad | (nx == COMMA_)
                 if sum(1 for x_ in cur_ if not PUNID0[x_]) >= 35 and CLOSE_P2[min(text[-1], VV - 1)] and (nx == 0).any(): bad = bad | (nx != 0)
+            if cfg.get("cm") and COMMA_PREV_OK is not None:                                                      # COMMA: placement from counts
+                cm_ = nx == COMMA_
+                if cm_.any():
+                    _pv = min(text[-1], VV - 1)
+                    _cbad = cm_ & (~CLOSE_P2[_pv] | ~COMMA_PREV_OK[_pv])
+                    _cc = cm_ & np.isin(nx, list(CONJ_))
+                    if _cc.any():
+                        _lb0 = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; _cur = text[_lb0 + 1:]
+                        if sum(1 for i_, x_ in enumerate(_cur) if x_ == COMMA_ and i_ + 1 < len(_cur) and _cur[i_ + 1] in CONJ_) >= 1: _cbad = _cbad | _cc
+                    bad = bad | _cbad
             if cfg.get("sym") and OP_ >= 0 and (nx == OP_).any(): bad = bad & (nx != OP_)
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
