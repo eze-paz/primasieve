@@ -11,8 +11,8 @@ V = 60000; UNK = V + 1; LP, LG = 30, 50; M64 = np.uint64(0x9E3779B97F4A7C15); K 
 OUTD = "/kaggle/working" if os.path.isdir("/kaggle/working") else os.environ.get("G1_OUT", ".")
 def log(m): print(f"{m} ({time.time() - T0:.0f} s)", flush=True)
 def find(pat, env): return glob.glob(f"/kaggle/input/**/{pat}", recursive=True) or glob.glob(os.path.join(os.environ.get(env, "."), pat))
-CORPUS = os.environ.get("G1_CORPUS", "books"); z = np.load([x for x in find(f"{CORPUS}_data.npz", "G1_DATA")][0]); S0 = z["S"]; ntr0 = int(z["ntr"]); vw = [str(w) for w in z["vw"]]; del z
-if SMOKE: S0 = np.r_[S0[:2_000_000], S0[ntr0:ntr0 + 300_000]]; ntr0 = 2_000_000
+CORPUS = os.environ.get("G1_CORPUS", "books"); z = np.load([x for x in find(f"{CORPUS}_data.npz", "G1_DATA")][0]); S0 = z["S"]; ntr0 = int(z["ntr"]); vw = [str(w) for w in z["vw"]]; DOC0 = z["D"][:ntr0] if "D" in z.files else None; del z
+if SMOKE: S0 = np.r_[S0[:2_000_000], S0[ntr0:ntr0 + 300_000]]; ntr0 = 2_000_000; DOC0 = DOC0[:2_000_000] if DOC0 is not None else None
 if SMOKE: parts = []
 elif os.environ.get("G1_LOCAL"): parts = []                                                                      # local bench: MT 27M only
 elif MODE in ("sanity", "sa", "jx"): parts = [glob.glob(f"/kaggle/input/**/tok_books_{p}.npz", recursive=True)[0] for p in ("0_0", "0_1", "1_0", "1_1")]
@@ -626,6 +626,13 @@ def seg_start(text, cfg):
         for i in range(len(text) - 1, lb, -1):
             if text[i] == SEMI_ or (text[i] in CONJ_ and i > 0 and text[i - 1] == COMMA_): return i
     return lb
+QIN_T = None; QID = -1
+if any(c.get("q") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                # QSTATE: inside/outside a quotation for every training position (quote parity within its book)
+    QID = vw.index('"') if '"' in vw else -1
+    _Q = (S[:ntr] == QID); _csb = np.cumsum(_Q) - _Q; _dd = DOC0 if DOC0 is not None else np.zeros(ntr, np.int32)
+    _ds = np.maximum.accumulate(np.where(np.r_[True, _dd[1:] != _dd[:-1]], np.arange(ntr), 0)); _qin = ((_csb - _csb[_ds]) % 2) == 1
+    QIN_T = torch.tensor(_qin, device=dev); QOPENPREV = {0} | {_wid[w_] for w_ in (",", ":", "--", ";") if w_ in _wid}
+    log(f"QSTATE: {int(_Q.sum()):,} quote marks; {float(_qin.mean()):.3f} of training positions inside a quotation"); del _Q, _csb, _dd, _ds, _qin
 def generate(cfg, pids):
     global LP
     out = {}; LSTAT.clear()
@@ -686,6 +693,14 @@ def generate(cfg, pids):
                         if len(ex):
                             HG.manual_seed(len(text) * 7919 + wv); ex = ex[torch.randperm(len(ex), generator=HG)[:256].numpy()]
                             c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool)
+            QFORCE_ = False
+            if cfg.get("q") and QID >= 0 and text.count(QID) % 2 == 1:                                         # QSTATE: a long open quote must close at the next phrase end
+                lq = len(text) - 1 - text[::-1].index(QID)
+                if sum(1 for x_ in text[lq + 1:] if not PUNID0[x_]) >= 60 and CLOSE_P2 is not None and CLOSE_P2[min(text[-1], VV - 1)]:
+                    QFORCE_ = True
+                    if not bool((St[c[0]][ok[0]] == QID).any()):
+                        ex = plan_positions(text[-1], QID)
+                        if len(ex): ex = ex[:256]; c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool)
             if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
                 eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
             else: m4 = (prev_tok(c, MW) == Qw[:, None, :MW]).float().sum(2)
@@ -748,6 +763,8 @@ def generate(cfg, pids):
                 if OP_ >= 0: add += 1000.0 * (nxc == OP_)
                 if "e" in cfg["sym"]: add += 2.0 * np.isin(nxc, list(REFS)) - 8.0 * (ISPROPN[np.minimum(nxc, VV - 1)] & ~np.isin(nxc, list(REFS)))
                 sc = sc + torch.tensor(add, dtype=sc.dtype, device=sc.device)[None]; TR_ADD = add
+            if cfg.get("q") and QIN_T is not None:                                                                  # QSTATE: inside a quote, prefer book positions inside quotes (and vice versa)
+                qopen_ = text.count(QID) % 2 == 1; sc = sc + LAM0 * (QIN_T[c.clamp(max=ntr - 1)] == qopen_).float()
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
             w = torch.exp(sc - sc.max()).cpu().numpy(); nx = St[c[0]].long().cpu().numpy()
             hv = hn(np.c_[np.repeat(np.array([text[-7:]]), len(nx), 0), nx]); bad = H8[np.minimum(np.searchsorted(H8, hv), len(H8) - 1)] == hv
@@ -767,6 +784,12 @@ def generate(cfg, pids):
             if cfg.get("sym") and "h" in cfg["sym"] and kpos < len(PLAN) and (nx == PLAN[kpos]).any(): bad = bad & (nx != PLAN[kpos])   # the planned word is exempt from the vetoes
             if cfg.get("sym") and VP_ >= 0 and (nx == VP_).any(): bad = bad & (nx != VP_)
             if cfg.get("sym") and LEND_ and (nx == 0).any(): bad = bad & (nx != 0)
+            if cfg.get("q") and QID >= 0:                                                                         # QSTATE hard rules
+                if text.count(QID) % 2 == 0:
+                    if text[-1] not in QOPENPREV: bad = bad | (nx == QID)                                         # open only after a sentence end or , : -- ;
+                else:
+                    bad = bad | (nx == 0)                                                                       # no sentence end inside an open quote
+                    if QFORCE_ and (nx == QID).any(): bad = bad | (nx != QID)
             if cfg.get("p2") and PUNID0[text[-1]] and vw[text[-1]] != '"':                                       # PUNC2 trace fix: no mark right after a mark (a quote may follow)
                 bad = bad | (PUNID0[np.minimum(nx, len(PUNID0) - 1)] & (nx != _wid.get('"', -1)))
             if cfg.get("p2"):                                                                                    # PUNC2 run-on control
