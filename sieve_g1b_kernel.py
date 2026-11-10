@@ -486,9 +486,44 @@ def plan_verb(grp, recent, rng):
     sc_ = np.log(pv[cand] / pv.sum())
     if recent: sc_ = sc_ + np.mean([ev_pmi(int(r_), cand) for r_ in recent[-3:]], axis=0)
     top = np.argsort(-sc_)[:20]; pr = np.exp(sc_[top] - sc_[top].max()); return int(cand[top][rng.choice(len(top), p=pr / pr.sum())])
+SLEN = None; VOB = None
+if any("l" in str(c.get("sym", "")) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                                  # SENT length plan: human sentence lengths in the training text
+    _z0 = np.nonzero(S[:ntr] == 0)[0]; SLEN = np.clip(np.diff(_z0) - 1, 4, 30); SLEN = SLEN[np.diff(_z0) > 1]; log(f"SENT: {len(SLEN):,} sentence lengths, mean {SLEN.mean():.1f}")
+    _tw3 = np.full(VV, -1)
+    for w__, i__ in _wid.items():
+        if w__ in _cw: _tw3[i__] = max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w__][k])
+    CLOSE = np.isin(_tw3, [SYMP_["ti"][t_] for t_ in ("NOUN", "PROPN", "PRON", "ADJ", "ADV", "VERB", "NUM")])     # trace fix: a sentence may only end after a word that can close it
+    CLOSE[[_wid[w_] for w_ in "the a an his her their my your our its of to in on at by for with from and or but that which who was were is are be been had has have would could should will shall not".split() if w_ in _wid]] = False
+if any("o" in str(c.get("sym", "")) for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()) and EVC is not None:                                # SENT object plan: verb -> object counts (first noun / object pronoun within 3 words, only fillers between)
+    _Str = S[:ntr].astype(np.int64); _tw2 = np.full(VV, -1)
+    for w__, i__ in _wid.items():
+        if w__ in _cw: _tw2[i__] = max(range(len(SYMP_["TAGS"])), key=lambda k: _cw[w__][k])
+    _fill = np.isin(_tw2, [SYMP_["ti"][t_] for t_ in ("DET", "ADJ", "NUM")]); _fill[[_wid[w_] for w_ in "his her their my your our its".split() if w_ in _wid]] = True
+    _objp = np.zeros(VV, bool); _objp[[_wid[w_] for w_ in "him her them it me us you".split() if w_ in _wid]] = True
+    _isobj = (_tw2 == SYMP_["ti"]["NOUN"]) | _objp
+    _vp = np.nonzero(ISVERB[np.minimum(_Str[:-4], VV - 1)])[0]; _got = np.zeros(len(_vp), bool); _keys = []
+    for d in (1, 2, 3):
+        w_ = _Str[_vp + d]; between = np.ones(len(_vp), bool)
+        for e in range(1, d): between &= _fill[np.minimum(_Str[_vp + e], VV - 1)]
+        hit = ~_got & between & _isobj[np.minimum(w_, VV - 1)]; _keys.append(_Str[_vp[hit]] * VV + w_[hit]); _got |= hit
+    VOB = np.unique(np.concatenate(_keys), return_counts=True); log(f"SENT: {len(VOB[0]):,} verb-object pairs from {int(_got.sum()):,} verbs with an object")
+OBJF = dict(HE="him", SHE="her", THEY="them", I="me", WE="us", YOU="you")
+def plan_object(v, DS_, rng):
+    """the planned object of verb v: log P(object | verb) + 1 if it is a discourse referent; never the subject's own pronoun; top 20 softmax"""
+    lo, hi = np.searchsorted(VOB[0], v * VV), np.searchsorted(VOB[0], (v + 1) * VV)
+    if hi <= lo: return -1
+    ob = VOB[0][lo:hi] % VV; cn = VOB[1][lo:hi].astype(float); o_ = np.argsort(-cn)[:300]; ob, cn = ob[o_], cn[o_]
+    refs = set()
+    for r in DS_.sal:
+        if r in OBJF and r != DS_.cbname: refs.add(_wid.get(OBJF[r], -1))
+        elif r in _wid: refs.add(_wid[r])
+    own = _wid.get(OBJF.get(DS_.cbname, ""), -1); keep = ob != own; ob, cn = ob[keep], cn[keep]
+    if len(ob) == 0: return -1
+    sc_ = np.log(cn / cn.sum()) + 1.0 * np.isin(ob, list(refs)); top = np.argsort(-sc_)[:20]; pr = np.exp(sc_[top] - sc_[top].max())
+    return int(ob[top][rng.choice(len(top), p=pr / pr.sum())])
 class Disc:
     """DRT-lite discourse state: referents (nouns by word, pronoun groups) with Centering salience"""
-    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1; s.pref = set(); s.pw = 1.0; s.R = []; s.VS = []; s.cbw = -1
+    def __init__(s): s.sal = {}; s.last = {}; s.k = 0; s.ev = {}; s.vplan = -1; s.pref = set(); s.pw = 1.0; s.R = []; s.VS = []; s.cbw = -1; s.tlen = 0; s.oplan = -1; s.oage = 0; s.odone = False; s.cbname = None
     def read(s, ids, period=False):
         ws = [vw[i] if i < len(vw) and vw[i] is not None else "<unk>" for i in ids]
         if not ws:
@@ -529,7 +564,7 @@ class Disc:
                 if not oth: return []
                 wv = np.array([key_(r) for r in oth]); cb = oth[int(rng.choice(len(oth), p=wv / wv.sum()))]
         s.vplan = plan_verb(cb, s.ev.get(cb, []), rng) if (EVC is not None and s.useverb and cb in SUBJ and rng is not None) else -1
-        s.cbw = _wid.get(SUBJ[cb], -1) if cb in SUBJ else _wid.get(cb, -1)
+        s.cbw = _wid.get(SUBJ[cb], -1) if cb in SUBJ else _wid.get(cb, -1); s.cbname = cb
         if cb in SUBJ: return [_wid.get(SUBJ[cb], -1)]
         return [_wid.get("the", -1), _wid.get(cb, -1)]
     def ref_ids(s):
@@ -550,6 +585,8 @@ def generate(cfg, pids):
             if cur: DS.read(cur)
             DS.pref = set(DS.sal); DS.pw = float(cfg.get("pw", 1.0))
             PLAN = DS.plan(rng, cfg.get("ptr")) if text[-1] == 0 else []; REFS = DS.ref_ids(); SYMST[0] += 1
+            if SLEN is not None and "l" in cfg["sym"]: DS.tlen = int(SLEN[rng.integers(len(SLEN))])
+            DS.oplan = -1; DS.odone = False
             if TRACE and pid < TRACE: TRL.append(f"   [prompt state p{pid}] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
         while len(text) - LP < LG:
             if cfg.get("gen") == "ssm": text.append(mw_step(text, rng, cfg)); continue
@@ -578,6 +615,18 @@ def generate(cfg, pids):
                             HG.manual_seed(len(text) * 7919 + VP_); ex = ex[torch.randperm(len(ex), generator=HG)[:256].numpy()]
                             c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool)
                         else: VP_ = -1
+            LEND_ = False; OP_ = -1
+            if cfg.get("sym") and ("l" in cfg["sym"] or "o" in cfg["sym"]):                                     # SENT: required sentence end at the target length; required object after the verb
+                lbs = len(text) - 1 - text[::-1].index(0) if 0 in text else None; ks = len(text) - 1 - lbs if lbs is not None else len(text)
+                want = []
+                if "l" in cfg["sym"] and DS.tlen > 0 and ks >= DS.tlen and (CLOSE[min(text[-1], VV - 1)] or ks >= DS.tlen + 8): LEND_ = True; want.append(0)
+                elif "o" in cfg["sym"] and DS.oplan >= 0 and not DS.odone and DS.oage <= 4 and (text[-1] == DS.vplan or (DS.oage >= 1 and _fill[min(text[-1], VV - 1)] and all(x_ == DS.vplan or _fill[min(x_, VV - 1)] for x_ in text[-DS.oage - 1:]))): OP_ = DS.oplan; want.append(OP_)   # trace fix: object only right after the verb or after fillers that follow it
+                for wv in want:
+                    if not bool((St[c[0]][ok[0]] == wv).any()):
+                        ex = plan_positions(text[-1], wv)
+                        if len(ex):
+                            HG.manual_seed(len(text) * 7919 + wv); ex = ex[torch.randperm(len(ex), generator=HG)[:256].numpy()]
+                            c = torch.cat([c[0][ok[0]], torch.tensor(ex, device=dev).long()])[None]; ok = torch.ones_like(c, dtype=torch.bool)
             if cfg.get("len"):                                                                               # contiguous matched history, up to 8 words
                 eq = (St[(c[:, :, None] - 1 - torch.arange(8, device=dev)).clamp(min=0)].long() == Qw[:, None, :8]).float(); m4 = torch.cumprod(eq, 2).sum(2)
             else: m4 = (St[(c[:, :, None] - 1 - torch.arange(MW, device=dev)).clamp(min=0)].long() == Qw[:, None, :MW]).float().sum(2)
@@ -635,6 +684,8 @@ def generate(cfg, pids):
                 kpos = len(text) - 1 - lb if lb is not None else 99; add = np.zeros(len(nxc))
                 if "p" in cfg["sym"] and kpos < len(PLAN): add += (1000.0 if "h" in cfg["sym"] else 8.0) * (nxc == PLAN[kpos])      # "h": the plan is a hard constraint
                 if VP_ >= 0: add += 1000.0 * (nxc == VP_)
+                if LEND_: add += 1000.0 * (nxc == 0)
+                if OP_ >= 0: add += 1000.0 * (nxc == OP_)
                 if "e" in cfg["sym"]: add += 2.0 * np.isin(nxc, list(REFS)) - 8.0 * (ISPROPN[np.minimum(nxc, VV - 1)] & ~np.isin(nxc, list(REFS)))
                 sc = sc + torch.tensor(add, dtype=sc.dtype, device=sc.device)[None]; TR_ADD = add
             sc = torch.where(ok, sc, torch.full_like(sc, -1e9))[0]
@@ -655,6 +706,8 @@ def generate(cfg, pids):
                 if not any(VSET[BCL[x_]] for x_ in cur) and len(cur) > 0: bad = bad | (nx == 0)
             if cfg.get("sym") and "h" in cfg["sym"] and kpos < len(PLAN) and (nx == PLAN[kpos]).any(): bad = bad & (nx != PLAN[kpos])   # the planned word is exempt from the vetoes
             if cfg.get("sym") and VP_ >= 0 and (nx == VP_).any(): bad = bad & (nx != VP_)
+            if cfg.get("sym") and LEND_ and (nx == 0).any(): bad = bad & (nx != 0)
+            if cfg.get("sym") and OP_ >= 0 and (nx == OP_).any(): bad = bad & (nx != OP_)
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
             if cfg.get("keepb") and uw[0] == 0:                                                                  # keep the sentence-end probability at its pre-veto value
@@ -681,9 +734,14 @@ def generate(cfg, pids):
                     msk = (nx == uw[j]) & okn; row.append(f"{_w(uw[j])}:{pw_[j]:.2f}(m{int(m4n[msk].max()) if msk.any() else -1},+{TR_ADD[msk].max() if msk.any() else 0:.0f})")
                 pl = " ".join(_w(i) for i in PLAN) if PLAN else "-"; pv = [int(x_) for x_ in PLAN]
                 vetoed = [ _w(x_) for x_ in pv if (nx == x_).any() and bad[nx == x_].all()]; absent = [_w(x_) for x_ in pv if not (nx[okn] == x_).any()]
-                TRL.append(f"[{nm_}|p{pid}|k{kpos}] plan={pl} vplan={_w(DS.vplan) if DS.vplan >= 0 else '-'} planned-vetoed={vetoed} planned-absent={absent} -> {_w(text[-1])} | top: {' '.join(row)}")
+                TRL.append(f"[{nm_}|p{pid}|k{kpos}] plan={pl} vplan={_w(DS.vplan) if DS.vplan >= 0 else '-'} oplan={_w(DS.oplan) if DS.oplan >= 0 else '-'} tlen={DS.tlen} planned-vetoed={vetoed} planned-absent={absent} -> {_w(text[-1])} | top: {' '.join(row)}")
+            if cfg.get("sym") and "o" in cfg["sym"] and VOB is not None:
+                if DS.oplan >= 0: DS.oage += 1; DS.odone = DS.odone or text[-1] == DS.oplan
+                elif not DS.odone and DS.vplan >= 0 and text[-1] == DS.vplan: DS.oplan = plan_object(DS.vplan, DS, rng); DS.oage = 0
             if cfg.get("sym") and text[-1] == 0:                                                                  # update the discourse state with the finished sentence, re-plan
                 lb2 = len(text) - 2 - text[-2::-1].index(0) if 0 in text[:-1] else LP - 1; del DS.R[lb2 + 1:]; del DS.VS[lb2 + 1:]; DS.read(text[lb2 + 1:-1], period=True); PLAN = DS.plan(rng, cfg.get("ptr")); REFS = DS.ref_ids()
+                if SLEN is not None and "l" in cfg["sym"]: DS.tlen = int(SLEN[rng.integers(len(SLEN))])
+                DS.oplan = -1; DS.odone = False
                 if TRACE and pid < TRACE: TRL.append(f"   [state] top referents: {sorted(DS.sal.items(), key=lambda x: -x[1])[:5]}")
                 SYMST[1] += 1
         if cfg.get("gibbs"): text = gibbs(text, np.random.default_rng(1000 * pid + 11), cfg)
