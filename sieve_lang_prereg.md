@@ -3680,3 +3680,28 @@ R11 CANDIDATE-POOL ORACLE (offline only)
 
 AUDIT DECISION
 - These are coverage/feasibility tests, not grammar-improvement measurements. No arm is adopted from this audit. Publish the annotation counts, thresholds, successes/failures, and limitations; preserve honest nulls. Afterward choose between a preregistered bench for a justified lever and a cached-output repair probe for errors that re-ranking provably cannot reach.
+
+### R9 + R11 OFFLINE FEASIBILITY AUDIT — RESULT (2026-11-11 22:40 Europe/Madrid; commit 80294299 protocol)
+No generation benchmark or external grammar judging was run. The punctuated default remains frozen at cm3 + end3 + QBAL; R10 remains skipped.
+
+#### R9 — structural null
+- Five judge-labelled tense excerpts were mapped onto exact engine clause boundaries with the existing EWT-derived verb/tense machinery.
+- Only 1/5 events is structurally addressable by an ordered adjacent-main-verb, within-clause rule (`took` -> `have`). Three events cross the engine's own clause boundary; two involve auxiliaries excluded by the proposed rule (one event falls into both categories).
+- This is below the preregistered structural prerequisite of 3/5 expressible events. The held-out threshold sweep, corpus veto-rate measurement and generation bench were not run. R9 is closed as an offline structural null, not as evidence that tense mistakes are acceptable.
+
+#### R11 — failed oracle premise
+- The frozen P2Q5 arm reproduced all 20 reference generations exactly (20/20 token-id sequences) before any candidate data were accepted. The valid run used the original Python launcher and the complete recovered environment, including `G1_UNITS=1`; all earlier candidate traces from incomplete configurations were discarded.
+- Four clearly annotated, atomic one-token omissions were tested at the exact following-token step. Counts below are surviving training positions that emit the corrective word, not unique vocabulary types:
+
+| Prompt (0-based) | Generated step | Insert / actual token | Corrective token survives? | Surviving positions | Role premise |
+|---|---:|---|---|---:|---|
+| 9 | 19 | `who` / `wouldn't` | no | 0 (31 occurrences were all vetoed) | fail |
+| 11 | 45 | `which` / `is` | yes | 54 | fail |
+| 12 | 44 | `it` / `a` | yes | 162 | fail |
+| 17 | 10 | `was` / `in` | yes | 64 | fail |
+
+- The kernel implements optional FHRR **passage similarity**, not the preregistered role-satisfaction scoring contribution, and the frozen arm has no harmonic/role term active. Per the protocol, no passage-similarity value was relabelled as role satisfaction and no replacement metric was invented. A minimum extra role weight is therefore not applicable for every event.
+- Premise successes: **0/4**, below the required one third (at least 2/4). Only 3/4 corrections are even reachable by re-ranking. R11 does not proceed to a generation bench. This is a feasibility null for the proposed mechanism, not a measurement that all conceivable FHRR scorers are ineffective.
+
+#### Consequence
+Do not spend a punctuation/grammar benchmark on R9 or R11 as proposed. Missing-word work must either implement and independently validate a real role-satisfaction scorer or use an insertion/replacement revision probe with clean-human collateral controls, under a new preregistration. No arm was adopted and no claim about closing the original human-grammar gap is made.
