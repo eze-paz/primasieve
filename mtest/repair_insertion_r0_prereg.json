@@ -1,0 +1,66 @@
+{
+  "round": "REPAIR0",
+  "registered_at": "2026-11-11T22:48:10.302061+00:00",
+  "remote_main_at_registration": "8452edc50ed4ffa24c4b3cfea46d36dc4d9e5e1a",
+  "registration_note": "Formal scorer preregistration written after mechanical trace validation and before any grammar, human-control, n-gram comparator or FHRR score is revealed. Mechanical outcome already observed: 3 complete insertion pairs among 4 oracle-identified omissions. No prior score was invented or accepted from the malformed replacement runs.",
+  "engine_frozen": {
+    "arms": "P2Q5",
+    "native": true,
+    "symbolic": "pfhv",
+    "pw": 3,
+    "pow": 6,
+    "eps": 0.01,
+    "p2": true,
+    "q": true,
+    "cm": true,
+    "cm3": true,
+    "end3": true,
+    "books2": true,
+    "hug": true,
+    "qbal": true,
+    "jx": true,
+    "units": true,
+    "n": 20,
+    "local": true,
+    "r7_r8": "off",
+    "default_change": "none"
+  },
+  "frozen_reference_sha256": "616bf162ea625a0e4d6581febc11861d269036bb069ed30f484f6c1222fff578",
+  "instrumented_kernel_sha256": "963083cb574b19b0653bc55fda8646cb1527d487adb5fda696bae998ddb88b01",
+  "trace_validation": {
+    "original_corrected_pool_availability": 3,
+    "complete_pairs_already_observed": 3,
+    "complete_pair_requires": "forced missing word survives every primitive veto, then the original following word survives against the same veto chain and is retained; no forced next token or bypass",
+    "candidate_position": "c[0,j], a corpus-position pointer",
+    "history": "includes prompt; generated prefix equals the last step tokens, exactly the omitted prompt-prefix convention of the launcher",
+    "required_unforced_exact_prompt_count": 20,
+    "mechanical_gate": "at least 2 complete pairs"
+  },
+  "corpus_grammar_scorer": {
+    "model": "the untouched training-fitted structural scorer used by this arm, including the UD-EWT WordNet order tagger and trained dependency/transition log probabilities",
+    "score": "(transition_score + parse_score) / number_of_words",
+    "threshold": "fifth percentile of restored-minus-deleted structural scores on the calibration split",
+    "accepted_correction": "strictly greater than threshold + 0.05 * abs(threshold); no grammar score means no action",
+    "position": "annotate only four already identified engine omissions (prompts 9, 11, 12, 17); retained oracle position and correct token are controls, never proposed as a deployable general repair"
+  },
+  "human_controls": {
+    "source": "the existing external-blind zero-error human items; no human text is modified on disk",
+    "eligible": "complete 8-30 word sentences outside the two-sentence prompt excerpt; de-duplicate by (prompt, sentence start, end) and use at most two unique units per control",
+    "split": "hash unit identifier with SHA-256; even first byte is calibration, odd is held-out before any grammar score is inspected",
+    "deletions": "omit each eligible in-vocabulary word at its exact frozen human trace step, with its true original availability and up to seven unique alternative surviving tokens",
+    "held_out_collateral_edit": "accept deletion when its restoration structural delta is at most the frozen threshold; report raw count and exact one-sided binomial tail at p=0.05, without claiming significance from zero events",
+    "recovery": "correct restored token top-1 and top-5 among the same candidate pool; n-gram comparator uses the kernel alpha=0.4 interpolated 1-5 gram score; compare without an external judge"
+  },
+  "primary_gate": {
+    "available_complete_pairs": "at least 2",
+    "accepted_correct_events": "at least 2, on distinct prompts",
+    "collateral": "held-out clean-human false-edit rate at most 0.05 and exact binomial p <= 0.05",
+    "interpretation": "small repair-feasibility pilot only; no BOOKS-beaten or gap-closing claim and no generation bench unless separately registered"
+  },
+  "semantics": {
+    "simple_salience": "record difference in the existing discourse-state salience for the inserted word and competing words, diagnostic only",
+    "fhrr": "only use the kernel exposed harmonic/role callback if verified in source; do not relabel scalar salience as FHRR, coherence, role satisfaction or grammar"
+  },
+  "rejections": "R7 and R8 optional/off; R9 and R11 remain closed; R10 remains skipped; no default engine edit is authorized by this pilot",
+  "reporting": "preserve complete raw traces and rejected instrumentation attempts locally; publish concise calibration, held-out, correction and audit summaries, exact hashes and null/adverse outcomes"
+}
