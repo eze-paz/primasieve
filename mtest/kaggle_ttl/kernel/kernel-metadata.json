@@ -1,1 +1,0 @@
-{"id": "ezequieldepaz/primasieve-ttl", "title": "primasieve ttl", "code_file": "ttl.py", "language": "python", "kernel_type": "script", "is_private": true, "enable_gpu": true, "enable_internet": true, "dataset_sources": ["ezequieldepaz/primasieve-mt-pythia"]}
