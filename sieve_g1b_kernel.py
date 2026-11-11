@@ -23,7 +23,10 @@ VV = max(len(vw), V + 2)
 lens = [len(np.load(p)["S"]) for p in parts]; ntr = ntr0 + sum(lens); N = ntr + (len(S0) - ntr0)
 S = np.empty(N, np.uint16); S[:ntr0] = S0[:ntr0]; o_ = ntr0
 for p, l in zip(parts, lens): S[o_:o_ + l] = np.load(p)["S"]; o_ += l
-S[ntr:] = S0[ntr0:]; del S0; fine = np.load([x for x in find("books_cls.npz", "G1_CLS")][0])["fine"]; FINE = torch.tensor(np.r_[fine, np.full(max(0, VV - len(fine)), fine[UNK])].astype(np.int64), device=dev); log(f"stream: {ntr:,} training tokens, {N:,} total, vocabulary {VV:,}")
+S[ntr:] = S0[ntr0:]; del S0; _clsf = find("books_cls.npz", "G1_CLS")
+FINE = None
+if _clsf:
+    fine = np.load(_clsf[0])["fine"]; FINE = torch.tensor(np.r_[fine, np.full(max(0, VV - len(fine)), fine[UNK])].astype(np.int64), device=dev); log(f"stream: {ntr:,} training tokens, {N:,} total, vocabulary {VV:,}")
 St = torch.empty(N, dtype=torch.int32, device=dev)
 for a in range(0, N, CHUNK): St[a:a + CHUNK] = torch.from_numpy(S[a:a + CHUNK].astype(np.int32)).to(dev)
 # 4-word key index: KEYS sorted (host uint64), ORD = positions (GPU int32), positions P = 200..ntr-1, key = (S[P-1], S[P-2], S[P-3], S[P-4]) packed high to low
@@ -646,6 +649,22 @@ if any(c.get("q") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values())
     _ds = np.maximum.accumulate(np.where(np.r_[True, _dd[1:] != _dd[:-1]], np.arange(ntr), 0)); _qin = ((_csb - _csb[_ds]) % 2) == 1
     QIN_T = torch.tensor(_qin, device=dev); QOPENPREV = {0} | {_wid[w_] for w_ in (",", ":", "--", ";") if w_ in _wid}
     log(f"QSTATE: {int(_Q.sum()):,} quote marks; {float(_qin.mean()):.3f} of training positions inside a quotation"); del _Q, _csb, _dd, _ds, _qin
+OQRATE = OQOK = OQCRATE = CQRATE = CQOK = None
+if any(c.get("qa") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                # QA: open-quote gates from counts
+    assert BCL is not None, "qa requires JX (Brown classes)"
+    _qm = (S[:ntr] == QID); _csb2 = np.cumsum(_qm) - _qm; _dd2 = DOC0 if DOC0 is not None else np.zeros(ntr, np.int32)
+    _ds2 = np.maximum.accumulate(np.where(np.r_[True, _dd2[1:] != _dd2[:-1]], np.arange(ntr), 0))
+    _qopen = _qm & (((_csb2 - _csb2[_ds2]) % 2) == 0)
+    _qp = np.nonzero(_qopen)[0]; _Tq = S[:ntr]; _tq = np.bincount(_Tq, minlength=VV + 2)[:VV]
+    _oprev = S[:ntr][np.maximum(_qp - 1, 0)]; _ot = np.bincount(_oprev, minlength=VV + 2)[:VV]
+    OQRATE = _ot / np.maximum(_tq, 1); OQOK = _tq >= 50
+    _oc = np.bincount(BCL[_oprev], minlength=64); _oct = np.bincount(BCL[_Tq], minlength=64)
+    OQCRATE = _oc / np.maximum(_oct, 1)
+    _cid = _wid[","]
+    _cqp = _qp[_qp >= 2][_Tq[np.maximum(_qp[_qp >= 2] - 1, 0)] == _cid]
+    _cqt = np.bincount(S[:ntr][np.maximum(_cqp - 2, 0)], minlength=VV + 2)[:VV]
+    CQRATE = _cqt / np.maximum(_tq, 1); CQOK = _tq >= 50
+    log(f"QA: {int((OQRATE >= 0.01).sum()):,} tokens with open-quote-preceding rate >= 0.01; {int((CQRATE >= 0.01).sum()):,} words with ,\"->open rate >= 0.01")
 def generate(cfg, pids):
     global LP
     out = {}; LSTAT.clear()
@@ -799,7 +818,14 @@ def generate(cfg, pids):
             if cfg.get("sym") and LEND_ and (nx == 0).any(): bad = bad & (nx != 0)
             if cfg.get("q") and QID >= 0:                                                                         # QSTATE hard rules
                 if text.count(QID) % 2 == 0:
-                    if text[-1] not in QOPENPREV: bad = bad | (nx == QID)                                         # open only after a sentence end or , : -- ;
+                    if cfg.get("qa"):
+                        _pv = min(text[-1], VV - 1)
+                        _qok = text[-1] == 0 or ((OQRATE[_pv] >= 0.01) if OQOK[_pv] else (OQCRATE[BCL[_pv]] >= 0.01))
+                        if _qok and text[-1] == _wid.get(",", -1) and len(text) >= 2:
+                            _pp = min(text[-2], VV - 1)
+                            _qok = (CQRATE[_pp] >= 0.01) if CQOK[_pp] else True
+                        if not _qok: bad = bad | (nx == QID)
+                    elif text[-1] not in QOPENPREV: bad = bad | (nx == QID)                                       # open only after a sentence end or , : -- ;
                 else:
                     bad = bad | (nx == 0)                                                                       # no sentence end inside an open quote
                     if QFORCE_ and (nx == QID).any(): bad = bad | (nx != QID)
@@ -875,6 +901,17 @@ def words(ids, cap0=True):
         for k_, w_ in enumerate(out):
             if w_ in (".", "?", "!"): cap = True
             elif cap and w_[:1].isalpha(): out[k_] = w_[:1].upper() + w_[1:]; cap = False
+    if os.environ.get("G1_HUG"):                                                                               # MECH: quotes hug their words (render-only, blind-validated 16/17)
+        _o2 = []; _qo = True; _k = 0
+        while _k < len(out):
+            _w = out[_k]
+            if _w == '"':
+                if _qo: _o2.append('"' + (out[_k + 1] if _k + 1 < len(out) else "")); _qo = False; _k += 2; continue
+                if _o2: _o2[-1] += '"'
+                else: _o2.append('"')
+                _qo = True; _k += 1; continue
+            _o2.append(_w); _k += 1
+        out = _o2
     t = " ".join(out)
     for p_ in (".", ",", ";", ":", "?", "!", ")"): t = t.replace(" " + p_, p_)
     return t.replace("( ", "(")
