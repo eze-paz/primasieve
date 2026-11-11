@@ -644,6 +644,10 @@ if any(c.get("end3") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values
     _ect = np.bincount(BCL[_Te], minlength=64); _ecc = np.bincount(BCL[_eprev], minlength=64)
     ECRATE = _ecc / np.maximum(_ect, 1)
     log(f"END3: {int((ERATE >= 0.01).sum()):,} tokens with END rate >= 0.01 (count >= 50); class back-off for the rest")
+ROLE_OK = ("ISVERB" in globals()) and ("_vl" in globals()) and ("AUXW" in globals())
+if any(c.get("role") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                # ROLE: clause-verb requirement from EWT
+    assert ROLE_OK, "role requires SYM (EWT verb table)"
+    log(f"ROLE: {int(ISVERB.sum()):,} EWT-verb words (aux excluded); clause-level check via seg_start")
 
 def seg_start(text, cfg):
     """index of the token that opened the current segment: the last sentence end, or (PUNC2) the last clause opener (";" or a conjunction after ",")"""
@@ -821,8 +825,11 @@ def generate(cfg, pids):
                 n_ = int(cfg["wn"]); Wt = WT[n_]; hv2 = hn(np.c_[np.repeat(np.array([text[-(n_ - 1):]]), len(nx), 0), nx]); seen_ = Wt[np.minimum(np.searchsorted(Wt, hv2), len(Wt) - 1)] == hv2
                 JSTAT[2] += float((w * ~seen_ * ~bad).sum() / max((w * ~bad).sum(), 1e-30)); bad = bad | ~seen_
             if cfg.get("verbend"):                                                                               # hold the sentence open until it has a verb-like word
-                lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; cur = text[lb + 1:]
-                if not any(VSET[BCL[x_]] for x_ in cur) and len(cur) > 0: bad = bad | (nx == 0)
+                lb = len(text) - 1 - text[::-1].index(0) if 0 in text else -1
+                if cfg.get("role") and cfg.get("p2"): lb = seg_start(text, cfg)                                  # ROLE: the current CLAUSE needs a verb, not just the sentence
+                cur = text[lb + 1:]
+                _vh = (_vl if cfg.get("role") else (lambda x_: bool(VSET[BCL[x_]])))
+                if not any(_vh(x_) for x_ in cur) and len(cur) > 0: bad = bad | (nx == 0)
             if cfg.get("sym") and "h" in cfg["sym"] and kpos < len(PLAN) and (nx == PLAN[kpos]).any(): bad = bad & (nx != PLAN[kpos])   # the planned word is exempt from the vetoes
             if cfg.get("sym") and VP_ >= 0 and (nx == VP_).any(): bad = bad & (nx != VP_)
             if cfg.get("sym") and LEND_ and (nx == 0).any(): bad = bad & (nx != 0)
