@@ -1,0 +1,12 @@
+{
+ "bytes": 1000000,
+ "words": 141111,
+ "distinct": 15588,
+ "skel_bytes": 424300,
+ "xz": {
+  "slice": 290732,
+  "skel": 72920,
+  "words": 226764,
+  "newwords": 56532
+ }
+}
