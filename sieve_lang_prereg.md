@@ -3495,3 +3495,14 @@ Measured on the QS round's generated texts (20 prompts per arm): generated comma
 - Grammar: BOOKS 0.357 (84 sentences), P2QC 0.329 (70; paired [-0.200, 0.140]), P2Q 0.323 (65; paired [-0.218, 0.142]); truth 0.705. Absolute shares are NOT comparable across rounds (stricter rater); only paired intervals are.
 - Predictions: ", and" at most 0.20 failed (0.456); P2QC fluency over P2Q above 0.5 held narrowly (0.512); P2QC coherence over BOOKS above 0.5 held (0.550); grammar within 0.05 of BOOKS held (0.329 vs 0.357).
 - Decision (preregistered rule): fluency and coherence over P2Q both at least 0.5 and grammar not lower by more than 0.03 -- **cm joins the punctuated default (P2QC)**. Caveats: single model rater (two passes, agreement 0.80-1.00), 20 prompts, wide intervals. Confirm at milestone scale (80 prompts, independent raters) before treating the punctuated engine as adopted; the plain engine still leads on fluency (0.55 vs 0.45) and the remaining visible errors are quote-mark placement and clause joins.
+
+### COMMA Round 0 -- error taxonomy from the judged grammar items (2026-11-11, no bench; counts from mtest/kaggle_CMj ratings)
+Method: every sentence rated bad in the 80 grammar items tagged with heuristic classes; examples read by hand to separate real errors from sampling artifacts.
+- ARTIFACT FINDING (changes how to read the grammar metric): BOOKS bad sentences are dominated by its unpunctuated output format -- 54/54 flagged lowercase-start AND no-terminal-punctuation, because the plain arm emits unpunctuated streams so its "sentences" are arbitrary mid-text windows. Truth bad sentences are mostly legitimate mid-sentence excerpts (fragments like "people", "the subject"). So BOOKS 0.357 is understated by format and truth 0.705 is understated by excerpt artifacts; the punctuated-vs-truth grammar gap is partly a FORMAT gap, which is what the punctuated engine exists to close.
+- Punctuated engines' REAL error classes (P2QC / P2Q counts, a sentence can carry several):
+  1. TRUNCATION (bad_ending): 42 / 39 -- sentences ending mid-clause ("He took", "... and"). ~60% of bad punctuated sentences. Biggest lever.
+  2. PUNCTUATION MECHANICS: spacing_punct 10 / 8 (space after comma before quote: `, " `) + quote_unbalanced 9 / 7. Cheap mechanical fixes.
+  3. LOWERCASE STARTS: 15 / 15 -- real, trivially fixable (capitalize sentence starts).
+  4. FRAGMENTS (no verb): 16 / 12 -- harder; candidate for FHRR role/subject checks.
+  5. comma_chain 4 / 6, comma_before_quote 1 / 1 -- small after cm; not a priority.
+- Round plan update: Round 1 = MECH (spacing fix, sentence-start capitalization, quote-pair balance, truncation veto: no sentence-final emission on a function word / require legal terminal bigram) -- all count- or mechanics-derived, no new modeling. Round 2 = FHRR role vetoes for fragments/agreement. Milestone re-bench unchanged.
