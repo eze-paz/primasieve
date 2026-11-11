@@ -634,6 +634,16 @@ if any(c.get("cm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()
     _ct2 = np.bincount(BCL[_T3], minlength=64); _cc2 = np.bincount(BCL[_T3[:-1][_T3[1:] == COMMA_]], minlength=64)
     CRATE = _cc2 / np.maximum(_ct2, 1)
     log(f"CM3: {int(WOK.sum()):,} words with >=50 occurrences (reliable word rates); class back-off for the rest")
+ERATE = EOK = ECRATE = None
+if any(c.get("end3") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()):                                # END3: sentence-end gates from counts
+    assert BCL is not None, "end3 requires JX (Brown classes)"
+    _Te = S[:ntr]; _tw4 = np.bincount(_Te, minlength=VV + 2)[:VV]
+    _ep = np.nonzero(_Te == 0)[0]; _eprev = _Te[np.maximum(_ep - 1, 0)]
+    _et = np.bincount(_eprev, minlength=VV + 2)[:VV]
+    ERATE = _et / np.maximum(_tw4, 1); EOK = _tw4 >= 50
+    _ect = np.bincount(BCL[_Te], minlength=64); _ecc = np.bincount(BCL[_eprev], minlength=64)
+    ECRATE = _ecc / np.maximum(_ect, 1)
+    log(f"END3: {int((ERATE >= 0.01).sum()):,} tokens with END rate >= 0.01 (count >= 50); class back-off for the rest")
 
 def seg_start(text, cfg):
     """index of the token that opened the current segment: the last sentence end, or (PUNC2) the last clause opener (";" or a conjunction after ",")"""
@@ -845,6 +855,9 @@ def generate(cfg, pids):
                         _lb0 = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; _cur = text[_lb0 + 1:]
                         if sum(1 for i_, x_ in enumerate(_cur) if x_ == COMMA_ and i_ + 1 < len(_cur) and _cur[i_ + 1] in CONJ_) >= 1: _cbad = _cbad | _cc
                     bad = bad | _cbad
+            if cfg.get("end3") and ERATE is not None and (nx == 0).any():                                        # END3: end only on words the corpus ends on
+                _pv = min(text[-1], VV - 1)
+                if (ERATE[_pv] < 0.01) if EOK[_pv] else (ECRATE[BCL[_pv]] < 0.01): bad = bad | (nx == 0)
             if cfg.get("sym") and OP_ >= 0 and (nx == OP_).any(): bad = bad & (nx != OP_)
             if (w * ~bad).sum() > 0: w = w * ~bad
             uw, inv = np.unique(nx, return_inverse=True); ww = np.bincount(inv, weights=w) ** cfg["pow"]
@@ -901,6 +914,7 @@ def words(ids, cap0=True):
         for k_, w_ in enumerate(out):
             if w_ in (".", "?", "!"): cap = True
             elif cap and w_[:1].isalpha(): out[k_] = w_[:1].upper() + w_[1:]; cap = False
+    if os.environ.get("G1_QBAL") and out.count('"') % 2 == 1: out.append('"')                                  # QBAL: close an open quote at generation end (training parity is even)
     if os.environ.get("G1_HUG"):                                                                               # MECH: quotes hug their words (render-only, blind-validated 16/17)
         _o2 = []; _qo = True; _k = 0
         while _k < len(out):
