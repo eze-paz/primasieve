@@ -625,6 +625,12 @@ if any(c.get("cm") for c in json.loads(os.environ.get("G1_ARMS", "{}")).values()
     _cp = np.nonzero(S[:ntr] == COMMA_)[0]
     COMMA_PREV_OK = np.zeros(VV, bool); COMMA_PREV_OK[S[:ntr][np.maximum(_cp - 1, 0)]] = True
     log(f"COMMA: {int(_cp.size):,} commas; {int(COMMA_PREV_OK.sum()):,} distinct prev words allowed")
+    assert BCL is not None, "cm3 requires JX (Brown classes)"
+    _T3 = S[:ntr]; _tw3 = np.bincount(_T3, minlength=VV)[:VV]; _cw3 = np.bincount(_T3[:-1][_T3[1:] == COMMA_], minlength=VV + 2)[:VV]
+    WRATE = _cw3 / np.maximum(_tw3, 1); WOK = _tw3 >= 50
+    _ct2 = np.bincount(BCL[_T3], minlength=64); _cc2 = np.bincount(BCL[_T3[:-1][_T3[1:] == COMMA_]], minlength=64)
+    CRATE = _cc2 / np.maximum(_ct2, 1)
+    log(f"CM3: {int(WOK.sum()):,} words with >=50 occurrences (reliable word rates); class back-off for the rest")
 
 def seg_start(text, cfg):
     """index of the token that opened the current segment: the last sentence end, or (PUNC2) the last clause opener (";" or a conjunction after ",")"""
@@ -807,7 +813,7 @@ def generate(cfg, pids):
                 cm_ = nx == COMMA_
                 if cm_.any():
                     _pv = min(text[-1], VV - 1)
-                    _cbad = cm_ & (~CLOSE_P2[_pv] | ~COMMA_PREV_OK[_pv])
+                    _cbad = cm_ & ((WRATE[_pv] < 0.01) if WOK[_pv] else (CRATE[BCL[_pv]] < 0.01)) | ~COMMA_PREV_OK[_pv]
                     _cc = cm_ & np.isin(nx, list(CONJ_))
                     if _cc.any():
                         _lb0 = len(text) - 1 - text[::-1].index(0) if 0 in text else -1; _cur = text[_lb0 + 1:]

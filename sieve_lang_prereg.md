@@ -3548,3 +3548,16 @@ Decision rule (preregistered): cm2 replaces cm in the punctuated default if P2Q2
 - Decision (preregistered rule): fluency and coherence pass, grammar guard FAILS -> **cm2 does NOT replace cm in the punctuated default.** Honest null; cm stays.
 - Predictions: fluency above 0.5 held (0.525); grammar not below FAILED (0.200 vs 0.250); commas band held (3.17).
 - Reading: removing the over-kills helped flow (fluency/coherence up) but the class-rate veto at tau 0.01 also admits commas after high-rate JUNK classes (e.g. class 23, dominant tag unknown, rate 0.246; class 53 INTJ 0.336) -- the Brown classes pool misfit words with content words, so rate alone is not precision enough at the class level. Next lever if pursued: hybrid kill (class-rate OR bigram-absent) with a higher tau, or per-word rates with class back-off for rare words -- preregistered separately. The deeper SELF-DERIVE finding stands: the corpus rates contain the signal (97% word-level separation); the open problem is pooling rare words without admitting junk classes.
+
+### CM3 preregistration (2026-11-11 17:24 Europe/Madrid; written BEFORE the bench runs; follows CM2's null)
+Config id: `cm3` (stacks on `cm`'s bigram + chain vetoes; replaces the CLOSE_P2 class veto). Rule, fully corpus-derived: a comma may only follow word w when (a) if count(w) >= 50 in BOOKS2 training, the word's own comma rate >= 0.01; else (b) the word's Brown class comma rate >= 0.01. Per-word rates fix CM2's junk-class admission (junk members have low word rates even inside high-rate classes); class back-off handles rare words; no hand tags anywhere.
+Arms (local bench, same 20 shared prompts 0-19, books2, same protocol): P2Q3 = P2Q + cm3 vs P2QC = P2Q + cm (reproduced in-round).
+Automatic: commas/50u (predicted 2.6-3.5); kills per 20 generations with corpus comma rate >= 0.05 (precision check; cm killed 3 such legal commas in-round, cm2 killed 0 but admitted junk).
+Predictions: P2Q3 fluency over P2QC above 0.5 (55%); grammar not below P2QC by more than 0.03 (50%); kills of legal-rate commas = 0 (75%).
+Decision rule (preregistered): cm3 replaces cm in the punctuated default if P2Q3's pooled fluency and coherence over P2QC are both at least 0.5 and grammar is not lower by more than 0.03. If cm3 passes, the punctuated default becomes cm3 and the next round targets quote attribution.
+
+### CM3 result (2026-11-11 17:52 Europe/Madrid; judged blind per protocol)
+- Automatic: P2QC reproduced 20/20 byte-identical. Commas/50u: P2Q3 3.09 vs P2QC 2.61 (predicted band 2.6-3.5). Kills of legal-rate (>=0.05) commas: cm 3 (Paris, Laws, Edinburgh), cm3 0 - prediction confirmed.
+- Blind pairs (40 items, 23 decided, 17 ties): P2Q3 12 wins vs P2QC 11 -> pooled fluency/coherence share 0.522 (pass >= 0.5).
+- Grammar (60 items, 30/arm, scrambled): P2Q3 15/30 clean (0.500) vs P2QC 12/30 (0.400); diff +0.100, bootstrap 95% CI [-0.167, +0.333] - guard (not lower by > 0.03) passes.
+- Decision (preregistered rule): fluency/coherence PASS, grammar guard PASS -> **cm3 replaces cm in the punctuated default.** Kernel updated: comma veto = per-word comma rate (count >= 50, rate >= 0.01) with Brown-class back-off for rare words; CLOSE_P2 no longer gates commas (still used for quote/END logic). Next round: quote attribution.
