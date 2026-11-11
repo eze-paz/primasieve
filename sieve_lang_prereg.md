@@ -3506,3 +3506,22 @@ Method: every sentence rated bad in the 80 grammar items tagged with heuristic c
   4. FRAGMENTS (no verb): 16 / 12 -- harder; candidate for FHRR role/subject checks.
   5. comma_chain 4 / 6, comma_before_quote 1 / 1 -- small after cm; not a priority.
 - Round plan update: Round 1 = MECH (spacing fix, sentence-start capitalization, quote-pair balance, truncation veto: no sentence-final emission on a function word / require legal terminal bigram) -- all count- or mechanics-derived, no new modeling. Round 2 = FHRR role vetoes for fragments/agreement. Milestone re-bench unchanged.
+
+### MECH preregistration (2026-11-11 09:59 Europe/Madrid; written BEFORE the bench runs)
+Config id: `me` (stacks on `cm`). Derived from the Round 0 taxonomy (counts above), four mechanical fixes, no new modeling:
+1. TRUNCATION VETO: a candidate that would end the sentence on a function word (determiner/preposition/conjunction/auxiliary set counted from BOOKS2 training) is vetoed; sentence-final bigram (prev-word, END) must exist in training counts.
+2. SPACING: no whitespace before , ; : . " at render time (fixes the `, " ` artifact, 10/8 occurrences).
+3. CAPITALIZATION: sentence-initial token capitalized at render (15/15 occurrences).
+4. QUOTE BALANCE: a candidate is vetoed if it leaves the sentence's quote marks unbalanced at emission (9/7 occurrences).
+Arms: P2QM (`cm`+`me`) vs P2QC on the same 20 shared prompts (60-79), same judging protocol as COMMA (same rater, two passes, blind to arm identity).
+Success rule (preregistered): P2QM grammar paired interval vs P2QC excludes 0 on the positive side, AND P2QM fluency and coherence over P2QC both >= 0.5. If pass, `me` joins the punctuated default. Prediction: truncation-class bad sentences fall by at least half; grammar share rises at least 0.05 absolute.
+
+### MECH prereg AMENDMENT (2026-11-11 10:01 Europe/Madrid; before the bench ran; verified against cm_merged.json)
+Item 3 (capitalization) is DROPPED: all 30 lowercase-start fragments across P2QC+P2Q (15/15) are the FIRST fragment of each generation -- a mid-sentence continuation of the prompt, an excerpting artifact identical to truth's (6). Capitalizing them would be linguistically wrong. Lowercase-start is reclassified as an artifact, not an engine error. MECH = items 1 (truncation veto), 2 (quote spacing at render), 4 (quote-balance veto). No other changes.
+
+### MECH results (2026-11-11 10:39 Europe/Madrid; local bench reproduced P2QC 20/20 byte-identical vs the COMMA round, validating the reconstruction; mtest/kaggle_CMj holds ratings, bench artifacts in the session temp dir)
+- Automatic: quote-unbalanced sentences 14 -> 9; spacing artifacts 9 -> 7; truncation 19 -> 19 (FLAT -- the bad_ending class is dominated by the LG-boundary cut of each generation's last fragment, a sampling artifact the veto cannot touch; Round 0's truncation class was mostly this). Commas/50u 2.61 vs 2.83.
+- Blind pairs (40 items, 2 passes, agreement 1.00; 63/80 ratings ties -- the arms' texts are often identical): P2QM over P2QC fluency 0.662 (14-1, 25 ties), coherence 0.525 (2-0, 38 ties). All 16 decided fluency/coherence calls but one favour P2QM, driven by the quote-hugging render fix.
+- Grammar: P2QC 0.268 (56 sents), P2QM 0.255 (55), truth 0.562; paired P2QM-P2QC [-0.094, 0.052] -- includes 0.
+- Decision (preregistered rule): fluency and coherence pass, grammar paired interval does NOT exclude 0 on the positive side -> **me does NOT join the punctuated default.** Honest null.
+- Reading: the render fix (quote hugging) is a real fluency win and cheap -- it can be adopted as a RENDER-ONLY change later if wanted (it cannot hurt grammar; the pairs show no grammar gain either). The truncation veto is aimed at an artifact-dominated class; the real residual errors are quote-mash dialogue attribution and fragments -- the FHRR role-veto round (Round 2) targets those.
